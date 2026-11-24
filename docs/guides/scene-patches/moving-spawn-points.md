@@ -8,24 +8,24 @@ Move, rotate, disable, or restore a scene spawn point to choose where players st
 
 A scene spawn point is a scene object with a `Character.SpawnPoint` component. The base-game map has 22 scene spawn points under `World/POIs`, with names such as `Alarka` or `Bryson` for their locations. The outliner lists each one once in the **Spawn point** family.
 
-A native spawn is an entry in the `spawns` section of a map's `Map.json`. The native map editor edits native spawns in its **Spawns** category. The patcher does not list or change them. The base map declares no native spawns.
+A native spawn is an entry in the `spawns` section of a map's `Map.json`. Edit native spawns in the native map editor's **Spawns** category. The patcher doesn't list or change them. The base-game map declares no native spawns.
 
 ## What the game uses a spawn point for
 
-The **Use in the game** section of the **Object** tab lists the uses of the inspected spawn point. Use the list below to choose what to check in a test save.
+On the **Object** tab, **Use in the game** lists how the game uses the inspected spawn point. It lists a new game start only if the game is expected to start there. Use the following descriptions to decide what to check in a test save.
 
-- **New game:** when the map declares no native spawns, a new game without a start setup is expected to start at the active spawn point with the highest priority. If several active spawn points share that priority, the game doesn't specify which it chooses, and the tab says so. If the map has native spawns, the new game is expected to use those instead.
+- **New game:** when the map declares no native spawns, a new game without a start setup is expected to start at the active spawn point with the highest priority. The tab shows this use only on that spawn point. If several active spawn points share that priority, the game doesn't specify which it chooses: each of them says that a new game starts at one of them, and none is named as the start. If the priority of another active spawn point can't be read, the tab says that the game might start there instead. If the map has native spawns, the new game is expected to use those instead, and no spawn point shows this use. A disabled spawn point never shows it.
 - **Rescue:** a stuck player is expected to be moved to the closest active spawn point.
-- **Teleport:** the `/tp` console command is expected to offer each active spawn point by its object name and jump to where it stands. Quick search also lists active spawn points, but only in a game version that opens it. Railroader 0.6.3 doesn't open quick search.
-- **Start setup:** when the game applies an active start setup to a company with no cars and no balance yet, the new company game is expected to start at the spawn point that setup names, even if the point is disabled. The tab names each such setup by its identifier, or by its object name if it has no identifier. It hasn't been established whether a start setup or the map's native spawns take precedence when both exist.
+- **Teleport:** the `/tp` console command is expected to offer each active spawn point by its object name and jump to where it stands.
+- **Start setup:** when the game applies an active start setup to a company with no cars and no balance yet, the new company game is expected to start at the spawn point that setup names, even if the point is disabled. The tab names each such setup by its identifier, or by its object name if it has no identifier. It hasn't been established whether a start setup or the map's native spawns take precedence when both exist, so if the map has native spawns, the tab names the setup without saying that the game starts at the spawn point.
 
-The game reads a spawn point's transform each time it uses it. In Railroader 0.6.3, `/tp alarka` took the player to the moved Alarka point. A new East Whittier company game without native spawns used the moved spawn point named by its start setup. Removing the modification returned the new company's start to its authored position.
+The game reads a spawn point's position and rotation each time it uses it. In Railroader 0.6.3, `/tp alarka` took the player to the moved Alarka point. A new East Whittier company game without native spawns used the moved spawn point named by its start setup. Removing the modification returned the new company's start to the position set by the loaded map.
 
-A new game reads its start spawn point while the map loads, before the patcher applies the rest of the scene patch file. The patcher therefore applies spawn point modifications first, just before the game reads those points. A spawn point modification that depends on another modification or uses track-following placement waits for the normal world-load application. In that case, the new game starts at the spawn point's position on the loaded map.
+A new game reads its start spawn point while the map loads. The patcher applies spawn point modifications just before that read, ahead of the rest of the scene patch file. A spawn point modification that depends on another modification or uses track-following placement must wait for normal world-load application. In that case, the new game starts at the spawn point's position on the loaded map.
 
 ## Move a spawn point
 
-1. Open **Scene patches**, click **Refresh** in the command band, open the **Spawn point** family, and select the spawn point's row in the outliner. The **Identity** section of the **Object** tab shows the structure `spawn-point-v1`. If **Supported edits** starts with **Not editable:**, the reason follows.
+1. Open **Scene Patcher**, click **Refresh** in the command band, open the **Spawn point** family, and select the spawn point's row in the outliner. The **Identity** section of the **Object** tab shows the structure `spawn-point-v1`. If **Supported edits** starts with **Not editable:**, the reason follows.
 2. Click **Focus** in the command band. A spawn point has no model, so it shows a [helper marker](select-world-targets.md#helper-markers-for-invisible-objects): a `+` on its pivot.
 3. On the **Placement** tab, enter the position in map coordinates and the rotation in degrees in **Numeric** mode and click **Apply**, or drag the [transform gizmo](using-transform-gizmos.md).
 
@@ -60,7 +60,7 @@ Use the scene name and coordinates from the inspected identity. Add `"active": f
 
 ## What the patcher checks
 
-Before a change, the patcher checks that the spawn point's scene is loaded and its path names exactly one spawn point. After the change, it checks that the spawn point has the mod's placement and activity. If either differs, the modification fails and the patcher restores the spawn point's placement and activity. If it can't verify restoration, it reports incomplete cleanup and refuses further edits to the spawn point until **Recheck** succeeds or the world reloads.
+Before changing a spawn point, the patcher checks that its scene is loaded and its path identifies exactly one spawn point. After the change, it checks the placement and activity against the mod values. If either differs, the modification fails and the patcher restores the previous placement and activity. If it can't verify restoration, it reports incomplete cleanup. Further edits to the spawn point stay blocked until **Recheck** succeeds or the world reloads.
 
 ## Limits
 

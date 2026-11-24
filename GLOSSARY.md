@@ -261,6 +261,12 @@ A retry of an operation whose mutation failed, blocked until the cleanup of the 
 **Capability**:
 An area of patcher behavior whose required game functions and prerequisites are checked per build, so that a demonstrated incompatibility disables only that area.
 
+**Player log**:
+The game's log file, `Player.log`, where the patcher writes its warnings and errors in both modes, and its debug lines while Debug logging is on. A row that the game's **Log** window shows reaches the Player log through the game, and the patcher adds no second line beside it.
+
+**Debug logging**:
+The option, in the **Scene Patcher** section of the **Mods** tab in Preferences, that adds debug lines to the Player log: load steps, the outcome of each scene patch file, edits, saves and diagnostics. It is off by default, takes effect at once, and is stored in the patcher's `settings.json`.
+
 ### Scene object terminology
 
 These are project terms for the scene objects that the patcher lists and edits, not additional Railroader definition types or Unity object types.
@@ -465,7 +471,7 @@ The camera distance beyond which a scene object or a game-defined group shows on
 The scene object that a click or a choice from the choice list proposes, framed in blue, before Confirm makes it the inspected object. A candidate in a game-defined group beyond 125 metres shows its own square marker and object frame. No operation uses a candidate.
 
 **Choice list**:
-The native dropdown beside the pointer that lists the scene objects of one click: those of square markers that overlap at the pointer, with a game-defined group's objects in place of its square marker, or the objects of a game-defined group that the click picks. A choice from it makes the candidate.
+The native dropdown next to the pointer that lists the scene objects of one click: those of square markers that overlap at the pointer, with a game-defined group's objects in place of its square marker, or the objects of a game-defined group that the click picks. A choice from it makes the candidate.
 _Avoid_: Picker, popup
 
 **Game-defined group**:

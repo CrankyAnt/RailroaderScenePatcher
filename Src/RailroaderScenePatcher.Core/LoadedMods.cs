@@ -54,18 +54,48 @@ namespace RailroaderScenePatcher.Core {
                 catch { return null; }
             }
         }
-        // What happened to this scene patch file in one load attempt, as one line for the log: the mod, the map the scene patch file
-        // is for, and the outcome. mapIds is the loaded map followed by its layers. A scene patch file for another map is
-        // skipped; outside the native map editor that skip also gives a native warning.
-        public string LogLine(string patcherVersion, int attempt, IReadOnlyList<string> mapIds) {
+        // Writes what happened to this scene patch file in one load attempt. A file-level failure that gives no Log window row
+        // is one player-mode warning; the outcome of every file is a debug line.
+        public void WriteLog(int attempt, IReadOnlyList<string> mapIds) {
+            var warning = Warning(mapIds);
+            if (warning != null) PatcherLog.Warning(warning);
+            PatcherLog.Debug(() => DebugLine(attempt, mapIds));
+        }
+        bool ForOtherMap(IReadOnlyList<string> maps) {
+            var map = MapId;
+            return map != null && maps.Count != 0 && !maps.Contains(map, StringComparer.Ordinal);
+        }
+        // The player-mode warning of this file, or null. A file that applied, a skip for another map and a failure that the
+        // Log window shows get none: the Log window row is the player's line, written by the game.
+        public string Warning(IReadOnlyList<string> mapIds) {
+            var maps = mapIds ?? Array.Empty<string>();
+            var name = (Mod.Source.Name ?? Mod.Source.Identifier) + " [" + Mod.Source.Identifier + "]";
+            if (Result == null) {
+                if (Mod.Error != null) return name + ": the scene patch file wasn't applied: " + Sentence(Mod.Error);
+                if (!Mod.Applicable) return name + ": the scene patch file wasn't applied because the mod's Info.json doesn't list " + LoadedMod.PatcherId + " under dependencies.required.";
+                return null;
+            }
+            if (Result.Error != null) {
+                if (!Result.MapEditorOnly || Result.NotApplicable != null || ForOtherMap(maps)) return null;
+                return name + ": the scene patch file wasn't applied: " + Sentence(Result.Error);
+            }
+            var unsupported = (Result.Outcomes ?? new Dictionary<string, Outcome>()).Where(o => !o.Value.Applied && o.Value.MapEditorOnly).ToArray();
+            if (unsupported.Length == 0) return null;
+            return name + ": " + (unsupported.Length == 1 ? "modification " + unsupported[0].Key + " wasn't applied" : "modifications " + String.Join(", ", unsupported.Select(o => o.Key)) + " weren't applied") +
+                " because the game can't apply " + (unsupported.Length == 1 ? "it" : "them") + " in play: " + Sentence(String.Join("; ", unsupported.Select(o => o.Key + ": " + (o.Value.Error ?? "").TrimEnd('.'))));
+        }
+        static string Sentence(string text) { text = (text ?? "").Trim(); return text.EndsWith(".", StringComparison.Ordinal) ? text : text + "."; }
+        // What happened to this scene patch file in one load attempt, as one debug line: the load attempt, the mod, the map
+        // the scene patch file is for, and the outcome. mapIds is the loaded map followed by its layers.
+        public string DebugLine(int attempt, IReadOnlyList<string> mapIds) {
             var maps = mapIds ?? Array.Empty<string>();
             var source = Mod.Source;
-            var start = "Scene Patcher " + patcherVersion + ": load attempt " + attempt + ", map " + (maps.Count == 0 ? "unknown" : maps[0]) +
+            var start = "load attempt " + attempt + ", map " + (maps.Count == 0 ? "unknown" : maps[0]) +
                 " (layers " + (maps.Count < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "): " + (source.Name ?? source.Identifier) + " [" + source.Identifier + "] scene patch file";
             var map = MapId;
             var named = start + (map == null ? "" : " for " + map);
-            if (Result == null) return named + " skipped: " + (Skipped ?? "not handed to the patch engine");
-            if (map != null && maps.Count != 0 && !maps.Contains(map, StringComparer.Ordinal)) return named + " skipped: not the loaded map or one of its layers";
+            if (Result == null) return named + " skipped: " + (Skipped ?? "the patcher didn't attempt to apply it");
+            if (ForOtherMap(maps)) return named + " skipped: not the loaded map or one of its layers";
             if (Result.Error != null) return named + " not applied: " + Result.Error;
             var outcomes = Result.Outcomes?.Values.ToArray() ?? Array.Empty<Outcome>();
             int failed = outcomes.Count(o => !o.Applied), unchanged = outcomes.Count(o => o.Applied && o.Unchanged);

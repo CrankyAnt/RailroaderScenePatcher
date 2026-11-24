@@ -81,6 +81,7 @@ static class PartCullingTests {
         EndingThePatcherReturnsTheCullingToTheGame();
         InstallWaitsForTheGamesCuller();
         StaleCallbacksWriteNothing();
+        UpdateFailureIsWrittenOncePerGroupAndFailure();
         UnloadReadsNoCullingManager();
         LeftoverWrapperIsReported();
         InspectorNamesOwnCulling();
@@ -746,6 +747,37 @@ static class PartCullingTests {
         Assert(!g.Post.Active && !g.World.Culling.Waiting, "The next update brings the group to its spheres");
     }
 
+    // The update runs every frame. A failure of one group is written once per group and failure, names the group, and
+    // leaves the other groups updating.
+    static void UpdateFailureIsWrittenOncePerGroupAndFailure() {
+        const string Other = "World/Large Scenery/Whittier/Whittier Saw Mill Culled";
+        var (f, _) = WithFarPost();
+        var second = new FakeGroup();
+        f.World.Objects[Other] = new List<object> { second };
+        f.World.PartsAt[Other + "/Lamp"] = new List<object> { second.Parts[2] };
+        Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost), Mod("far-lamp", Other + "/Lamp", BakedSceneryParts.Structure, new[] { 1160.0, 10, 30 }, null)), "Both groups have a moved part out of their culler's sphere");
+        Assert(Spheres(f).Count == 2, "Each group holds its own sphere");
+        f.World.Culling.GroupName = group => ReferenceEquals(group, f.Group) ? Mill : ReferenceEquals(group, second) ? Other : null;
+        var failure = "game function gone";
+        f.World.Native.FailAlive = target => ReferenceEquals(target, f.Group) || ReferenceEquals(target, second) ? new InvalidOperationException(failure) : null;
+        var log = RecordingLog.Capture(false, () => {
+            for (var frame = 0; frame < 3; frame++) f.World.Culling.Tick();
+            failure = "another failure";
+            f.World.Culling.Tick(); f.World.Culling.Tick();
+        });
+        var warnings = log.At(LogLevel.Warning).ToArray();
+        Assert(warnings.Length == 4, "Each group and failure is written once over five frames: " + String.Join(" | ", warnings));
+        Assert(warnings.Count(w => w.Contains("of " + Mill + " may") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1
+            && warnings.Count(w => w.Contains("of " + Other + " may") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1, "Two groups with the same failure each get one warning that names the group: " + String.Join(" | ", warnings));
+        Assert(warnings.Count(w => w.EndsWith(": another failure", StringComparison.Ordinal)) == 2, "A new failure of the same group is written once more");
+        Assert(warnings[0] == "Moved parts of " + Mill + " may appear or disappear at the wrong distance because the patcher couldn't update when they are shown: game function gone", "The warning says what the player may see: " + warnings[0]);
+        // One failing group leaves the other updating.
+        f.World.Native.FailAlive = target => ReferenceEquals(target, f.Group) ? new InvalidOperationException("only the mill") : null;
+        f.World.Objects.Remove(Other);
+        var quiet = RecordingLog.Capture(false, () => f.World.Culling.Tick());
+        Assert(quiet.At(LogLevel.Warning).Single().Contains("of " + Mill + " may") && f.World.Culling.RegionCount == 1, "The other group still updates and gives back its sphere when it goes, while the failing group keeps its own");
+    }
+
     static void UnloadReadsNoCullingManager() {
         var (f, _) = WithFarPost();
         f.World.Native.Unloading = true;
@@ -768,20 +800,15 @@ static class PartCullingTests {
         Action other = () => { }; own.Handler = other;
         Assert(session.Remove(PartId("Jetty")).Applied, "Removal still applies");
         Assert(own.Handler == other && f.World.Culling.Leftovers.SequenceEqual(new[] { own.Id }), "A wrapper that could not be taken out is named, and the other handler stays");
-        // The report goes to the log at information level, once, and never as a warning.
-        var log = new Log();
-        f.World.Culling.Fault = log.Warning;
-        f.World.Culling.Report(log); f.World.Culling.Report(log);
-        Assert(log.Informations.Count == 1 && log.Warnings.Count == 0, "The wrapper that stays is reported once at information level, not as a warning: " + log.Informations.Count + " / " + log.Warnings.Count);
-        Assert(log.Informations[0] == "Scene inventory: " + BakedSceneryRules.LeftoverWrapper(own.Id) && log.Informations[0].Contains(own.Id), "The line names the culler: " + log.Informations[0]);
-        var quiet = new Log(); new Fixture().World.Culling.Report(quiet);
-        Assert(quiet.Informations.Count == 0 && quiet.Warnings.Count == 0, "Without such a wrapper nothing is reported");
-    }
-
-    sealed class Log : ICullingLog {
-        public readonly List<string> Informations = new List<string>(), Warnings = new List<string>();
-        public void Information(string message) => Informations.Add(message);
-        public void Warning(string message) => Warnings.Add(message);
+        // The report is a debug line, once, and never a warning.
+        var faults = new List<string>();
+        f.World.Culling.Fault = faults.Add;
+        var log = RecordingLog.Capture(true, () => { f.World.Culling.Report(); f.World.Culling.Report(); });
+        Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Debug && faults.Count == 0, "The wrapper that stays is reported once as a debug line, not as a warning: " + log.Lines.Count + " / " + faults.Count);
+        Assert(log.Lines[0].Value == BakedSceneryRules.LeftoverWrapper(own.Id) && log.Lines[0].Value.Contains(own.Id), "The line names the culler: " + log.Lines[0].Value);
+        var playerMode = RecordingLog.Capture(false, () => new Fixture().World.Culling.Report());
+        var quiet = RecordingLog.Capture(true, () => new Fixture().World.Culling.Report());
+        Assert(quiet.Lines.Count == 0 && playerMode.Lines.Count == 0, "Without such a wrapper nothing is reported");
     }
 
     static void InspectorNamesOwnCulling() {

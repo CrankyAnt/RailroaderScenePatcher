@@ -14,7 +14,7 @@ static partial class CoverageTests {
     static bool DetectsBothWays(Fixture f, FakeCrossing crossing, string segment) => new[] { 500.0, 300, 100 }.All(d => f.World.Detects(crossing, segment, d));
     static bool DetectsNowhere(Fixture f, FakeCrossing crossing, string segment) => !new[] { 500.0, 300, 100 }.Any(d => f.World.Detects(crossing, segment, d));
     static int OwnedAnywhere(Fixture f) => f.World.Graph.Values.Count(s => s.Owned);
-    // The fixture crossing evaluates exactly its two native circuits on their native spans.
+    // The fixture crossing evaluates exactly its two native circuits on the map's own detection spans.
     static bool Untouched(Fixture f) => f.Crossing.Circuits.Count == 2 && ReferenceEquals(f.Crossing.Circuits[0], f.Rerouted) && ReferenceEquals(f.Crossing.Circuits[1], f.Retained)
         && f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9" && f.Spans(f.Retained) == "Pdlh,P6id,P1db";
     public static void RunAdditions() {

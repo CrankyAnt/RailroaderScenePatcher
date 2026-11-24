@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher {
                     if (hook.Method == null || hook.Method.ReturnType != typeof(void) || !typeof(Game.GameBehaviour).IsAssignableFrom(hook.Type)) throw new MissingMethodException(hook.TypeName + ".OnEnableWithProperties");
                     harmony.Patch(hook.Method, prefix: new HarmonyMethod(typeof(DeferredRestores), nameof(Before)));
                 }
-            } catch (Exception e) { harmony?.UnpatchAll(Id); harmony = null; Error = "Deferred restore hook unavailable: " + e.GetBaseException().Message; }
+            } catch (Exception e) { harmony?.UnpatchAll(Id); harmony = null; Error = "The patcher couldn't prepare to delay the game's object restoration: " + e.GetBaseException().Message; }
         }
         internal static void Remove() { HandBack(); harmony?.UnpatchAll(Id); harmony = null; }
         static bool InProgress(RestoreNotifier notifier) => notifier != null && notifierState != null && notifierState.GetValue(notifier)?.ToString() == "InProgress";
@@ -112,9 +112,9 @@ namespace RailroaderScenePatcher {
                         if (call.Instance == null || !(call.Instance is Behaviour behaviour) || !behaviour.isActiveAndEnabled) continue;
                         var action = (Action)Delegate.CreateDelegate(typeof(Action), call.Instance, call.Hook.Method);
                         notifier.RegisterForRestore((int)enablePriority.GetValue(call.Instance, null), call.Instance, action);
-                    } catch (Exception e) { Debug.LogWarning("Scene Patcher: a deferred restore of " + call.Instance + " could not be handed back to the game: " + e.GetBaseException().Message); }
+                    } catch (Exception e) { PatcherLog.Warning(call.Instance + " may not match its saved state because the patcher couldn't let the game finish restoring it", e); }
                 }
-            } catch (Exception e) { skipped.Clear(); Debug.LogWarning("Scene Patcher: deferred restores could not be handed back to the game: " + e.GetBaseException().Message); }
+            } catch (Exception e) { skipped.Clear(); PatcherLog.Warning("Some objects may not match their saved state because the patcher couldn't let the game finish restoring them", e); }
         }
     }
     // Hands the skipped callbacks back once, in a frame after the skip and once the restore notifier is complete, so a restore

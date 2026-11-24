@@ -56,7 +56,7 @@ namespace RailroaderScenePatcher.Core {
             }
         }
         public IEnumerable<SceneObservation> Discover() => inspection == null ? Enumerable.Empty<SceneObservation>() : inspection.Discover();
-        // A pad marker id is resolved only by a capability that accepts it, so no other capability matches the path alone.
+        // A pad marker ID is resolved only by a capability that accepts it, so no other capability matches the path alone.
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
             var found = new List<object>();
             foreach (var capability in capabilities) {
@@ -70,7 +70,7 @@ namespace RailroaderScenePatcher.Core {
             if (identity.Structure != null && unavailable.TryGetValue(identity.Structure, out var missing)) found.Add(missing);
             return found;
         }
-        // The structure picks the capability that judges a pad marker id; without one, the first that accepts the identity.
+        // The structure picks the capability that judges a pad marker ID; without one, the first that accepts the identity.
         public string PadMarkerRefusal(TargetIdentity identity) {
             if (identity?.PadMarkerId == null) return null;
             var accepting = capabilities.OfType<IPadMarkerIdentityScene>().ToArray();
@@ -122,6 +122,7 @@ namespace RailroaderScenePatcher.Core {
         // Equipment sources and additions belong to the adapter that resolved the object.
         public IReadOnlyList<SourceCandidate> EquipmentCandidates(object target) => Owner(target) is ICrossingEquipmentScene equipment ? equipment.EquipmentCandidates(target) : throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
         public string EquipmentStatus(object target, string scope, string id) => Owner(target) is ICrossingEquipmentScene equipment ? equipment.EquipmentStatus(target, scope, id) : null;
+        public bool EquipmentLeftover(object target, ObjectState desired) => Owner(target) is ICrossingEquipmentScene equipment && equipment.EquipmentLeftover(target, desired);
         // Only the adapter that resolved the object can confirm it; an object no adapter resolved is not confirmed.
         public bool StillIdentifies(object target, TargetIdentity identity) =>
             target != null && owners.TryGetValue(target, out var owner) && owner.Capability != Capability.Incompatible && owner is ITargetConfirmation confirmation && confirmation.StillIdentifies(target, identity);

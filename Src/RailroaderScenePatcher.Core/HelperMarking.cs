@@ -67,35 +67,35 @@ namespace RailroaderScenePatcher.Core {
             return solid.Count != 0 ? solid : counted;
         }
 
-        // The parts that frame an invisible object, one for each collider of framing (indices from Framing): its world
+        // The boxes that frame an invisible object, one for each collider of framing (indices from Framing): its world
         // bounds from the eight world corners of its own box, which corners reads for the collider at that index. A
         // collider whose corners cannot be read, or that gives no eight corners, is left out alone.
-        public static IReadOnlyList<ObjectMarkingPart> ColliderParts(IReadOnlyList<int> framing, Func<int, IReadOnlyList<WorldPoint>> corners) {
+        public static IReadOnlyList<ObjectMarkingBox> ColliderBoxes(IReadOnlyList<int> framing, Func<int, IReadOnlyList<WorldPoint>> corners) {
             if (corners == null) throw new ArgumentNullException(nameof(corners));
-            var parts = new List<ObjectMarkingPart>();
+            var boxes = new List<ObjectMarkingBox>();
             foreach (var index in framing ?? Array.Empty<int>()) {
                 IReadOnlyList<WorldPoint> box;
                 try { box = corners(index); } catch { continue; }
                 if (box == null || box.Count != 8) continue;
                 double minX = box.Min(c => c.X), maxX = box.Max(c => c.X), minY = box.Min(c => c.Y), maxY = box.Max(c => c.Y), minZ = box.Min(c => c.Z), maxZ = box.Max(c => c.Z);
-                parts.Add(new ObjectMarkingPart("collider #" + index, new WorldPoint((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
+                boxes.Add(new ObjectMarkingBox("collider #" + index, new WorldPoint((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
                     new WorldPoint((maxX - minX) / 2, (maxY - minY) / 2, (maxZ - minZ) / 2), box.ToArray()));
             }
-            return parts;
+            return boxes;
         }
 
         // pivot is the object's transform position and camera the camera's position, both in world coordinates;
-        // colliders holds the bounds of the object's colliders that are switched on, as parts. The projection maps a
+        // colliders holds the bounds of the object's colliders that are switched on, as boxes. The projection maps a
         // world point to clip coordinates. frameDistance is the distance beyond which the object shows only its marker.
         // The colliders are framed as renderers are: the collider at the pivot and the colliders next to it, without one
         // far larger than it or apart from it (ObjectMarkingGeometry.ExtentFactor, ExtentMargin, JoinFraction), as one
         // box in the object's orientation. The frame is never cut off at the ground: it shows the colliders' bounds.
-        public static HelperMarking Mark(WorldPoint pivot, WorldPoint camera, IReadOnlyList<ObjectMarkingPart> colliders, Func<WorldPoint, ClipPoint> project,
+        public static HelperMarking Mark(WorldPoint pivot, WorldPoint camera, IReadOnlyList<ObjectMarkingBox> colliders, Func<WorldPoint, ClipPoint> project,
             ScreenRect view, double frameDistance = ObjectMarkingGeometry.FrameDistance, WorldBasis? orientation = null) {
             if (project == null) throw new ArgumentNullException(nameof(project));
             var marker = OnScreen(project(pivot), view);
-            var bounds = (colliders ?? Array.Empty<ObjectMarkingPart>())
-                .Select(c => new ObjectMarkingPart(c.Name, c.Center, c.Extents, c.Oriented, ObjectMarkingPartKind.Mesh, null)).ToArray();
+            var bounds = (colliders ?? Array.Empty<ObjectMarkingBox>())
+                .Select(c => new ObjectMarkingBox(c.Name, c.Center, c.Extents, c.Oriented, ObjectMarkingBoxKind.Mesh, null)).ToArray();
             double distance = Distance(pivot, camera);
             if (bounds.Length != 0) {
                 var framed = ObjectMarkingGeometry.Frame(pivot, camera, bounds, project, view, null, frameDistance, orientation);

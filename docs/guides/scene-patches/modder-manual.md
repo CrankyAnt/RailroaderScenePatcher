@@ -2,25 +2,27 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Edit scene objects in Railroader
 
-Use this manual to find an existing scene object, make a supported edit, and save it with your mod. Railroader Scene Patcher is under development and has no official release or mod package.
+Find an existing scene object, make a supported edit, and save the change with your mod. Railroader Scene Patcher is under development and has no official release or mod package.
 
 ## Choose where to edit
 
 - Use the native map editor for map data such as track, industry spans, native spawns, and station click spots in Railroader 0.6.3. Change the native data first when it supplies a track or other reference your scene edit needs.
-- Open your mod's map definition in the native map editor and use **Scene patches** for supported Unity scene objects. The patcher writes to the edited mod, even when an object comes from an inherited map layer. Your mod's native changes reach a save on the base-game map through a map-changing script or a map patch.
+- Open your mod's map definition in the native map editor and use **Scene Patcher** for supported Unity scene objects. The patcher writes to the edited mod, even when an object comes from an inherited map layer. Your mod's native changes reach a save on the base-game map through a map-changing script or a map patch.
 - To edit the same scene patch file outside the game, follow [Write a scene patch file](writing-scene-patch-files.md). Use the [v1 reference](scene-patch-file-v1.md) for field definitions and version requirements.
 
-A scene patch file applies to its scene target map and any map that inherits it as a map layer. For a new file, the editor uses the bottom map layer as the scene target map. For an existing file, it keeps the scene target map already set. Tests cover the base-game map (`rr/bushnell-whittier`, terrain `rr/nc-bryson`) and maps that inherit it as a map layer. Maps with a different terrain tile set are untested.
+A scene patch file applies to its scene target map and any map that inherits it as a map layer. The editor uses the bottom map layer as the scene target map for a new file. It keeps the scene target map of an existing file. Tests cover the base-game map (`rr/bushnell-whittier`, terrain `rr/nc-bryson`) and maps that inherit it as a map layer. Maps with a different terrain tile set are untested.
 
 ## Find the object and check what it uses
 
-1. Open **Scene patches** and click **Refresh**. Search the [outliner](inspect-scene-objects.md) by name, path, family, or binding ID, or [select an object in the world](select-world-targets.md). Confirm a world choice before editing it.
+1. Open **Scene Patcher** and click **Refresh**. Search the [outliner](inspect-scene-objects.md) by name, path, family, or binding ID, or [select an object in the world](select-world-targets.md). Confirm a world choice before editing it.
 2. On the **Object** tab, check **Identity**, **Supported edits**, **Detected problems**, and **Dependencies**. Click **Copy ID** for the scene target map and the object's stored identity. A path or display name alone can be ambiguous. Use the copied identifiers when writing JSON.
 3. Check the current placement and observed bindings on **Placement** and **Connections**. An inactive object or a valid connection to the wrong track might need attention even when the **Problems** filter lists nothing. After a native edit, Undo or Redo, click **Refresh** and inspect the object again.
 
 ## Choose an operation
 
-Physical placement controls where an object stands. Use [numeric placement](editing-placement-in-the-map-editor.md#set-a-numeric-placement), the [gizmo](using-transform-gizmos.md), a [one-time snap](snapping-to-track.md), or [track following](following-track.md) where the object supports it. Track following places an object relative to the track and updates its placement if the track moves. A logical binding identifies the track or other resource the game uses. For example, [rebind a crossing pad](rebinding-crossing-pads.md) to regenerate its geometry along the new track, and [repair construction segments](repairing-construction-segments.md) to make bridge visibility follow the replacement segments.
+Physical placement controls where an object stands. Depending on what the object supports, use [numeric placement](editing-placement-in-the-map-editor.md#set-a-numeric-placement), the [gizmo](using-transform-gizmos.md), a [one-time snap](snapping-to-track.md), or [track following](following-track.md). Track following places an object relative to the track and moves it when the track moves.
+
+A logical binding identifies the track or other resource the game uses. For example, [rebinding a crossing pad](rebinding-crossing-pads.md) regenerates its geometry along the new track. [Repairing construction segments](repairing-construction-segments.md) makes bridge visibility follow the replacement segments.
 
 | What you want to change | Where to start |
 | --- | --- |

@@ -51,12 +51,22 @@ static class BellTests {
         EditingOffersBellsAndUndoRedoRemoveThem();
         SaveAndReloadReproduceOneBell();
         AddedBellsSortLikeTheNativeCrossingBell();
+        UnavailableBellRowsUseShortReasons();
         Console.WriteLine("PASS: controller-bound crossing bell eligibility, construction, audio lifetime, refusal, restoration and scene patch editing");
     }
     // Railroader 0.6.3, Track.Crossings.GradeCrossingController.CreateBellPlayer gives its crossing bell player audio
     // priority 9 (0.6.2: 10). An added bell's player uses the same priority, so the game sorts it like the native bell.
     static void AddedBellsSortLikeTheNativeCrossingBell() {
         Assert(EquipmentAddition.BellPriority == 9, "An added bell uses the native crossing bell's audio priority");
+    }
+    static void UnavailableBellRowsUseShortReasons() {
+        foreach (var (problem, expected) in new[] {
+            (EquipmentAddition.BellsUnavailable, "Crossing bells are unavailable in this version of the game."),
+            (EquipmentAddition.BellDefinitionsUnreadable, "The patcher couldn't read the bell definitions from the game's content library, so it can't list bells. Report this to the patcher maintainer and include the Player log.") }) {
+            var row = SourceCandidate.UnavailableBells(problem);
+            Assert(!row.Eligible && RailroaderScenePatcher.CommandBand.Sentence(row.Problem) == expected,
+                "An unavailable bell row gives a short reason: " + row.Problem);
+        }
     }
     static void ABellIsBuiltFromItsDefinitionAndBoundToTheController() {
         var f = new Fixture();
@@ -137,7 +147,7 @@ static class BellTests {
             var result = new PatchEngine(f.Scene).Apply(Doc(Equip("bad", addition)));
             var error = result.Outcomes["bad"].Error ?? "";
             Assert(!result.Outcomes["bad"].Applied && f.World.Mutations == 0 && f.Unchanged, c.Key + " bell source is refused before any change: " + error);
-            if (c.Key == "missing") Assert(error.Contains("not available in the content library") && error.Contains("will not substitute another sound"), "A missing definition substitutes no other sound: " + error);
+            if (c.Key == "missing") Assert(error.Contains("is unavailable in the content library") && error.Contains("will not choose a replacement"), "A missing definition substitutes no other sound: " + error);
             if (c.Key == "ambiguous") Assert(error.Contains("ambiguous"), "An ambiguous definition is named: " + error);
             if (c.Key == "nonconforming") Assert(error.Contains("does not conform to " + EquipmentAddition.BellPattern) && error.Contains("not a bell definition"), "A nonconforming definition gives its reason: " + error);
             if (c.Key == "unavailable audio") Assert(error.Contains("cannot be found in the content library"), "Unavailable audio gives its reason: " + error);
@@ -145,9 +155,9 @@ static class BellTests {
         // A bell whose source names a scene object is no definition: it is invalid, so no scene is resolved or loaded for it.
         var g = new Fixture();
         var scene = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Bell("bell", source: "{\"scene\":\"UnloadedScene\",\"path\":\"World/Bell\"}"))));
-        Assert(!scene.Outcomes["bad"].Applied && scene.Outcomes["bad"].Error.Contains("identifier of a bell definition") && g.World.Mutations == 0 && g.Unchanged, "A bell from a scene path is refused without resolving a scene: " + scene.Outcomes["bad"].Error);
+        Assert(!scene.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment bell needs a bell definition as its source", "scene patch file (Data/scene-patches.json)", "set the source's definition to the bell definition's identifier", "remove any other members from the source" }.All(scene.Outcomes["bad"].Error.Contains) && g.World.Mutations == 0 && g.Unchanged, "A bell from a scene path is refused without resolving a scene: " + scene.Outcomes["bad"].Error);
         var light = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Bell("lamp", pattern: EquipmentAddition.LightGatePattern))));
-        Assert(!light.Outcomes["bad"].Applied && light.Outcomes["bad"].Error.Contains("needs a source with scene and path") && g.Unchanged, "A light or gate from a definition is refused: " + light.Outcomes["bad"].Error);
+        Assert(!light.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment lamp needs a light or gate in the map as its source", "scene patch file (Data/scene-patches.json)", "only a scene and a path" }.All(light.Outcomes["bad"].Error.Contains) && g.Unchanged, "A light or gate from a definition is refused: " + light.Outcomes["bad"].Error);
     }
     static void InvalidBellContentIsRefused() {
         foreach (var invalid in new[] { Bell("bell", source: "{}"), Bell("bell", source: "{\"definition\":\"\"}"), Bell("bell", source: "{\"definition\":5}"),
@@ -237,7 +247,7 @@ static class BellTests {
         var light = session.AddEquipment(Crossing, new EquipmentAddition("lamp", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", SignalPath), new Placement(new double[] { 20, 0, 7 }, new double[] { 0, 0, 0, 1 })));
         Assert(!light.Applied && light.Error.Contains("its audio failed to load"), "An edit that keeps the failed bell is refused: " + light.Error);
         var replaced = session.AddEquipment(Crossing, NewBell(definition: "rr/bell-replacement"));
-        Assert(!replaced.Applied && replaced.Error.Contains("not available in the content library"), "A replacement needs an available definition: " + replaced.Error);
+        Assert(!replaced.Applied && replaced.Error.Contains("is unavailable in the content library"), "A replacement needs an available definition: " + replaced.Error);
         h.World.Bell("rr/bell-replacement");
         replaced = session.AddEquipment(Crossing, NewBell(definition: "rr/bell-replacement"));
         h.World.FinishLoads();
@@ -288,7 +298,7 @@ static class BellTests {
         Assert(session.Remove(Crossing).Applied && f.Bells.Count == 0 && f.World.AudioReferences == 0, "Removing the modification releases the bell");
         mapEditor.Undo(); Assert(f.Bells.Count == 1 && f.Observers == 1, "Undo of the modification's removal restores the bell");
         var refused = session.AddEquipment(Crossing, NewBell(definition: "rr/bell-not-installed", id: "other"));
-        Assert(!refused.Applied && refused.Error.Contains("not available in the content library") && f.Bells.Count == 1, "A missing definition is refused without a change: " + refused.Error);
+        Assert(!refused.Applied && refused.Error.Contains("is unavailable in the content library") && f.Bells.Count == 1, "A missing definition is refused without a change: " + refused.Error);
         Assert(!f.World.Live(f.Other).Any(), "No edit touched the other crossing");
     }
     static void SaveAndReloadReproduceOneBell() {

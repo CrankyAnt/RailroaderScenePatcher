@@ -33,7 +33,7 @@ namespace RailroaderScenePatcher {
                 harmony = patcher;
             } catch (Exception e) {
                 patcher.UnpatchAll(Id);
-                Error = "Map Editor reload unavailable on this build: " + e.GetBaseException().Message;
+                Error = "The patcher couldn't prepare to reload the Map Editor: " + e.GetBaseException().Message;
             }
         }
         internal static void Remove() {
@@ -48,8 +48,8 @@ namespace RailroaderScenePatcher {
             return false;
         }
         internal static void Request(MapEditorAttachment current, string mapIdentifier) {
-            if (Error != null) { current.Fault = Error; return; }
-            if (!returns.CanReload(DateTime.UtcNow, message => current.Fault = message)) return;
+            if (Error != null) { current.Fault.Fail(EditingFailure.HookUnavailable, Error); return; }
+            if (!returns.CanReload(DateTime.UtcNow, message => current.Fault.Fail(EditingFailure.ReloadPending, message))) return;
             if (confirming || relaunching) return;
             try {
                 current.Session.CheckFileVersion();
@@ -70,13 +70,13 @@ namespace RailroaderScenePatcher {
                         finally { allowed = false; }
                     });
                     if (problem != null) {
-                        current.Fault = problem;
+                        current.Fault.Fail(EditingFailure.ReloadStopped, problem);
                         Hooks.PresentMethod().Invoke(null, new object[] { "Reload Cancelled", problem + " The Map Editor remains open. You can try again, discard the remaining unsaved work, or cancel.", new[] { (0, "OK") }, (Action<int>)(_ => { }) });
                     }
                 };
                 confirming = true;
                 PresentChoices(message, choose, canSave, unsaved);
-            } catch (Exception e) { confirming = false; current.Fault = "Reload cancelled: " + e.GetBaseException().Message; }
+            } catch (Exception e) { confirming = false; current.Fault.Fail(EditingFailure.ReloadCancelled, e.GetBaseException().Message); }
         }
         // Without unsaved work the reload discards nothing, so its one action is Reload.
         static void PresentChoices(string message, Action<int> choose, bool canSave, bool unsaved) {
@@ -85,7 +85,7 @@ namespace RailroaderScenePatcher {
                 if (dismissed) return;
                 // Like the native generic factory, a failed callback leaves the prompt open.
                 try { choose(value); }
-                catch (Exception e) { Debug.LogException(e); return; }
+                catch (Exception e) { PatcherLog.Error("The Map Editor couldn't carry out your reload choice. The prompt stays open", e); return; }
                 dismissed = true;
                 dismiss();
             }
@@ -123,8 +123,8 @@ namespace RailroaderScenePatcher {
                 var selector = Native.Read(Native.Type("CameraSelector"), "shared");
                 var point = GroundPoint(selector);
                 var id = returns.Capture(mapIdentifier, ControllerId(), Coordinates(point), DateTime.UtcNow);
-                current.Log("Reload captured working map location " + point + " for " + mapIdentifier + "; return " + id + ".");
-            } catch (Exception e) { returns.Cancel(); current.Log("Working-location capture unavailable; reload will use the native camera location: " + e.GetBaseException().Message); }
+                PatcherLog.Debug("Recorded working location " + point + " on map " + mapIdentifier + " for reload return " + id + ".");
+            } catch (Exception e) { returns.Cancel(); PatcherLog.Debug("Couldn't record the working location for reload. The game will choose the camera location: " + e.GetBaseException().Message); }
         }
         static int ControllerId() {
             var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as UnityEngine.Object;
@@ -140,7 +140,7 @@ namespace RailroaderScenePatcher {
         internal static void Poll(MapEditorAttachment current) {
             var now = DateTime.UtcNow;
             if (!returns.Active(now)) {
-                if (relaunching && current != null) current.Fault = "The return to your working location did not complete within five minutes. Check the game's load diagnostics before trying again.";
+                if (relaunching && current != null) current.Fault.Fail(EditingFailure.ReturnTimedOut);
                 relaunching = false;
                 return;
             }
@@ -166,17 +166,17 @@ namespace RailroaderScenePatcher {
                     var strategy = Enum.Parse(selectorType.GetNestedType("CameraIdentifier", Native.Flags), "Strategy");
                     if (!returns.MarkRequested(pending.RequestId, map, controller, now)) return;
                     Native.Call(selector, "JumpToPoint", point, Quaternion.identity, strategy);
-                    current.Log("Reload requested return " + pending.RequestId + " to working map location " + point + "; arrival is pending.");
+                    PatcherLog.Debug("Reload return " + pending.RequestId + " requested to working location " + point + ". Waiting for arrival.");
                     return;
                 }
                 var measured = GroundPoint(selector);
                 if (returns.Complete(pending.RequestId, map, controller, Coordinates(measured), now)) {
                     relaunching = false;
-                    current.Log("Reload checked return " + pending.RequestId + " at working map location " + measured + ".");
+                    PatcherLog.Debug("Reload return " + pending.RequestId + " completed at working location " + measured + ".");
                 }
             } catch (Exception e) {
                 relaunching = false; returns.Cancel();
-                if (current != null) current.Fault = "The Map Editor reloaded, but your working location could not be restored: " + e.GetBaseException().Message;
+                if (current != null) current.Fault.Fail(EditingFailure.LocationNotRestored, e.GetBaseException().Message);
             }
         }
     }

@@ -42,6 +42,47 @@ namespace RailroaderScenePatcher {
         internal static string Summary(SceneInventory inventory, string search, OutlinerFilter filter, Func<SceneObservation, bool> changed) =>
             Rows(inventory, search, filter, changed).Count + " of " + (inventory?.Entries.Count ?? 0) + " objects";
 
+        const string MarkerIdKey = "ID";
+        internal const string MarkerIdLine = "Marker " + MarkerIdKey + "=";
+
+        // The named values of a binding line of the form "Marker ID=Mlm1; type=Generic": the words before the first key
+        // name the group ("Marker", "Track-relative", "Circuit 0"), and each "key=value" part follows in order. A part
+        // without a key continues the value before it. Null for a line without a key, such as "Graph registration: none".
+        internal static (string Group, IReadOnlyList<KeyValuePair<string, string>> Values)? BindingValues(string line) {
+            var first = line?.IndexOf('=') ?? -1;
+            if (first < 0) return null;
+            var space = line.LastIndexOf(' ', first);
+            var group = space < 0 ? "" : line.Substring(0, space);
+            var values = new List<KeyValuePair<string, string>>();
+            string key = null, value = null;
+            foreach (var part in line.Substring(space + 1).Split(new[] { "; " }, StringSplitOptions.None)) {
+                var equals = part.IndexOf('=');
+                if (equals <= 0) { if (key != null) value += "; " + part; continue; }
+                if (key != null) values.Add(new KeyValuePair<string, string>(key, value));
+                key = part.Substring(0, equals); value = part.Substring(equals + 1);
+            }
+            if (key != null) values.Add(new KeyValuePair<string, string>(key, value));
+            return (group, values);
+        }
+        // The marker ID an entry was observed with: the ID value of its Marker binding line (BindingValues), or null for
+        // an entry without one.
+        internal static string MarkerIdOf(SceneObservation entry) {
+            foreach (var line in entry?.Bindings ?? Enumerable.Empty<string>()) {
+                var values = BindingValues(line);
+                if (values?.Group != "Marker") continue;
+                var id = values.Value.Values.FirstOrDefault(pair => pair.Key == MarkerIdKey).Value?.Trim();
+                if (!String.IsNullOrEmpty(id)) return id;
+            }
+            return null;
+        }
+        // The other entries that hold the marker ID an object had before an edit, its Undo or its Redo, or the one it has
+        // after it: their duplicate marker ID problem and explanation change with the edit, so they are observed again.
+        internal static IReadOnlyList<SceneObservation> OtherMarkerIdHolders(IEnumerable<SceneObservation> entries, SceneObservation before, SceneObservation after) {
+            var ids = new HashSet<string>(new[] { MarkerIdOf(before), MarkerIdOf(after) }.Where(id => id != null), StringComparer.Ordinal);
+            var self = after?.Handle ?? before?.Handle;
+            if (ids.Count == 0) return Array.Empty<SceneObservation>();
+            return (entries ?? Enumerable.Empty<SceneObservation>()).Where(e => e != null && !ReferenceEquals(e.Handle, self) && MarkerIdOf(e) is string id && ids.Contains(id)).ToArray();
+        }
         // Baked scenery parts include their group; other objects use their observed visible name.
         internal static string Name(SceneObservation entry) => entry.GroupPath != null ? BakedSceneryRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
 
@@ -68,15 +109,16 @@ namespace RailroaderScenePatcher {
 
         internal static string EquipmentKind(EquipmentSource source) => source.IsDefinition ? "Bell" : "Light or gate";
 
+        // A source by its visible name, or by the stored-name rule from its recorded source when it has none.
         internal static string EquipmentSourceName(SourceCandidate candidate) {
-            var name = String.IsNullOrWhiteSpace(candidate.Name) ? EquipmentKind(candidate.Source) : candidate.Name;
+            var name = String.IsNullOrWhiteSpace(candidate.Name) ? candidate.Source.StoredName() : candidate.Name;
             return String.IsNullOrEmpty(candidate.Crossing) ? name : name + " at " + candidate.Crossing;
         }
 
         internal static string EquipmentSourceName(EquipmentSource source, IEnumerable<SourceCandidate> candidates) {
             var match = candidates?.FirstOrDefault(candidate => candidate.Source.Scene == source.Scene && candidate.Source.Path == source.Path
                 && candidate.Source.Definition == source.Definition);
-            return match == null ? EquipmentKind(source) : EquipmentSourceName(match);
+            return match == null ? source.StoredName() : EquipmentSourceName(match);
         }
 
         internal static string UnbuiltEquipmentName(EquipmentAddition item, IEnumerable<SourceCandidate> candidates) =>
@@ -92,16 +134,16 @@ namespace RailroaderScenePatcher {
                 .Replace("<", "\\u003c").Replace(">", "\\u003e");
         }
 
-        // The supplying scope and addition ID keep the order independent of the scene and outliner order.
-        internal static string AddedEquipmentName((string Scope, string Id, string CopyName, bool IsBell) equipment,
-            IEnumerable<(string Scope, string Id, string CopyName, bool IsBell)> crossingEquipment) {
-            if (equipment.CopyName == null) return equipment.IsBell ? "Added bell" : "Added light or gate";
-            var matches = crossingEquipment.Where(item => item.IsBell == equipment.IsBell && item.CopyName == equipment.CopyName)
+        // An added light, gate or bell by the source name stored with it, numbered among the additions of its crossing with the
+        // same name and kind. The supplying scope and addition ID keep the order independent of the scene and outliner order.
+        internal static string AddedEquipmentName((string Scope, string Id, string Name, bool IsBell) equipment,
+            IEnumerable<(string Scope, string Id, string Name, bool IsBell)> crossingEquipment) {
+            var matches = crossingEquipment.Where(item => item.IsBell == equipment.IsBell && item.Name == equipment.Name)
                 .OrderBy(item => item.Scope, StringComparer.Ordinal).ThenBy(item => item.Id, StringComparer.Ordinal).ToArray();
             var ordinal = Array.IndexOf(matches, equipment) + 1;
             return matches.Length > 1 && ordinal > 0
-                ? FormattableString.Invariant($"{equipment.CopyName} (added, {ordinal} of {matches.Length})")
-                : equipment.CopyName + " (added)";
+                ? FormattableString.Invariant($"{equipment.Name} (added, {ordinal} of {matches.Length})")
+                : equipment.Name + " (added)";
         }
 
         // The group of the objects that are inspection only: outside the family groups, after them, and absent while
@@ -162,7 +204,7 @@ namespace RailroaderScenePatcher {
         internal static IReadOnlyList<OutlineNode> Categories(IReadOnlyList<SceneObservation> rows, IEnumerable<SceneObservation> inventory, string search) {
             rows = rows ?? Array.Empty<SceneObservation>();
             var all = (inventory ?? rows).Where(entry => entry.GroupPath == null && entry.Family == BakedSceneryRules.Family).ToArray();
-            // The crossbucks of crossings that share one path differ by their crossing's pad marker id.
+            // The crossbucks of crossings that share one path differ by their crossing's pad marker ID.
             string GroupKey(string scene, string path, string padMarkerId = null) => scene + "\n" + path + (padMarkerId == null ? "" : "\n" + padMarkerId);
             var groups = new Dictionary<string, OutlineNode>(StringComparer.Ordinal);
             var order = new List<OutlineNode>();
@@ -261,7 +303,7 @@ namespace RailroaderScenePatcher {
         internal static string Subgroup(SceneObservation entry) {
             if (entry == null || entry.Family != "Track marker") return null;
             foreach (var line in entry.Bindings) {
-                if (!line.StartsWith("Marker id=", StringComparison.Ordinal)) continue;
+                if (!line.StartsWith(MarkerIdLine, StringComparison.Ordinal)) continue;
                 var at = line.IndexOf("; type=", StringComparison.Ordinal);
                 if (at < 0) return null;
                 var type = line.Substring(at + 7); var end = type.IndexOf(';');

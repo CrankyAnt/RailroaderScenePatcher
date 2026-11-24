@@ -167,7 +167,7 @@ namespace RailroaderScenePatcher {
         internal GameObject Construct(GameObject wrapper, GameObject destination, BellSource source, string scope, string id) {
             var facts = Facts(source, destination);
             // The player is named after its source, as a light or gate copy keeps its device's name.
-            var go = new GameObject(String.IsNullOrWhiteSpace(source.Name) ? source.Identifier.Substring(source.Identifier.LastIndexOf('/') + 1) : source.Name) { hideFlags = HideFlags.DontSave };
+            var go = new GameObject(EquipmentSource.ForDefinition(source.Identifier).StoredName(source.Name)) { hideFlags = HideFlags.DontSave };
             go.transform.SetParent(wrapper.transform, false);
             var bell = go.AddComponent<OwnedBell>();
             try {
@@ -227,8 +227,8 @@ namespace RailroaderScenePatcher {
                 + ". Remove or replace the bell, or correct its bell definition.";
             try {
                 if (Warn != null) Warn("bell-audio/" + bell.Scope + "/" + bell.Id + "/" + bell.ControllerPath, message, bell.Scope + ":Data/scene-patches.json");
-                else Debug.LogWarning("Scene Patcher: " + message);
-            } catch (Exception e) { Debug.LogWarning("Scene Patcher: " + message + " (warning delivery failed: " + e.GetBaseException().Message + ")"); }
+                else PatcherLog.Warning(message);
+            } catch (Exception e) { PatcherLog.Warning(message); PatcherLog.Debug(() => "The warning about the bell didn't reach the Log window: " + e); }
         }
         // Configures a controller's own bell player again with the clip the controller loaded, its definition's indexes
         // and volume: what GradeCrossingController.LoadBellAudio does once. A player that was disabled destroyed the

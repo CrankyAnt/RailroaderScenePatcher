@@ -339,11 +339,6 @@ namespace RailroaderScenePatcher.Core {
         public bool Shows { get; }
     }
 
-    // Where own culling reports: information for what needs no action, a warning for a failure.
-    public interface ICullingLog {
-        void Information(string message);
-        void Warning(string message);
-    }
     // The game-facing operations of own culling. Positions are map coordinates.
     public interface ICullingHost {
         // False while the map unloads: nothing registers, moves, releases or reads a sphere then.
@@ -412,14 +407,13 @@ namespace RailroaderScenePatcher.Core {
         // Receives each distinct failure of a callback once.
         public Action<string> Fault;
         // The simple cullers whose handler could not be put back at release, so the hook stays as a pass-through. For
-        // the inventory diagnostics, at information level.
+        // the inventory diagnostics.
         public IReadOnlyList<string> Leftovers => leftovers;
         int reportedLeftovers;
-        // Reports each such handler once, at information level: it only passes the game's events on, so it needs no
-        // action and is no warning.
-        public void Report(ICullingLog log) {
-            if (log == null) throw new ArgumentNullException(nameof(log));
-            for (; reportedLeftovers < leftovers.Count; reportedLeftovers++) log.Information("Scene inventory: " + BakedSceneryRules.LeftoverWrapper(leftovers[reportedLeftovers]));
+        // Reports each such handler once as a debug line: it only passes the game's events on, so it needs no action
+        // and is no warning.
+        public void Report() {
+            for (; reportedLeftovers < leftovers.Count; reportedLeftovers++) { var leftover = leftovers[reportedLeftovers]; PatcherLog.Debug(() => BakedSceneryRules.LeftoverWrapper(leftover)); }
         }
         public int RegionCount => groups.Values.Sum(g => g.Regions.Count);
         // Whether a load-order retry or a failed callback waits for the next Tick.
@@ -440,18 +434,29 @@ namespace RailroaderScenePatcher.Core {
         public void Tick() {
             if (!host.Available || groups.Count == 0) return;
             foreach (var state in groups.Values.ToList()) {
-                if (!host.Alive(state.Group)) {
-                    foreach (var region in state.Regions.Values) { region.Released = true; if (region.Registration != null && host.Live(region.Registration)) host.Release(region.Registration); }
-                    foreach (var hook in state.Hooks.Values) hook.Removed = true;
-                    groups.Remove(state.Group);
-                    continue;
-                }
-                // A waiting group costs a few checks per frame: it is reconciled only once a culler it waits for has
-                // started, or a sphere that found no culling manager can be registered.
-                if (!state.Dirty && !state.Awaiting.Any(culler => !host.Alive(culler) || host.Started(culler)) && !(state.AwaitRegister && Probe(state))) continue;
-                Reconcile(state);
-                if (state.Empty) groups.Remove(state.Group);
+                try {
+                    if (!host.Alive(state.Group)) {
+                        foreach (var region in state.Regions.Values) { region.Released = true; if (region.Registration != null && host.Live(region.Registration)) host.Release(region.Registration); }
+                        foreach (var hook in state.Hooks.Values) hook.Removed = true;
+                        groups.Remove(state.Group);
+                        continue;
+                    }
+                    // A waiting group costs a few checks per frame: it is reconciled only once a culler it waits for has
+                    // started, or a sphere that found no culling manager can be registered.
+                    if (!state.Dirty && !state.Awaiting.Any(culler => !host.Alive(culler) || host.Started(culler)) && !(state.AwaitRegister && Probe(state))) continue;
+                    Reconcile(state);
+                    if (state.Empty) groups.Remove(state.Group);
+                } catch (Exception e) { state.Dirty = true; UpdateFailed(state.Group, e); }
             }
+        }
+        // Names a group in a warning, such as its scene and path; without it a warning names no group.
+        public Func<object, string> GroupName { get; set; }
+        // An update runs every frame: a failure is written once per group and failure, and the other groups still update.
+        readonly LogOnce updateFailures = new LogOnce();
+        void UpdateFailed(object group, Exception error) {
+            string name = null;
+            try { name = GroupName?.Invoke(group); } catch { }
+            updateFailures.Warning((name ?? "") + "\n" + error.GetBaseException().Message, BakedSceneryRules.CullingUpdateFailure(name), error);
         }
         // The patcher's state ends while the scene stays: every group gives back what own culling took over, as if
         // its plan were empty. While the map unloads there is nothing to give back.
@@ -514,7 +519,7 @@ namespace RailroaderScenePatcher.Core {
         }
         void Failed(GroupState state, Exception error) {
             state.Dirty = true;
-            var message = "Own culling callback failed: " + error.GetBaseException().Message;
+            var message = "Moved scenery parts may appear or disappear at the wrong distance because the patcher couldn't respond to a visibility change: " + error.GetBaseException().Message;
             if (faults.Add(message)) Fault?.Invoke(message);
         }
         // A sphere changed. A released registration, a destroyed manager, part or culler writes nothing.

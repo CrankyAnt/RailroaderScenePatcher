@@ -53,11 +53,27 @@ namespace RailroaderScenePatcher.Core {
         public FailureKind Kind { get; }
         public string Reason { get; }
     }
+    internal enum EquipmentCleanupContext { None, EditUndone, Recheck, WorldLoad }
+    internal sealed class EmptyEquipmentObjectException : InvalidOperationException {
+        internal EmptyEquipmentObjectException() : base(EquipmentAddition.EmptyEquipmentObject) { }
+    }
+    internal static class EquipmentCleanupText {
+        internal static string For(EquipmentCleanupContext context) {
+            if (context == EquipmentCleanupContext.WorldLoad)
+                return "The change was undone, but an empty object remains where a light, gate, or bell was added at this crossing. This leftover object won't be saved with the map.";
+            var description = EquipmentAddition.EmptyEquipmentObject + ". It won't be saved with the map.";
+            if (context == EquipmentCleanupContext.Recheck) description += " Your edits are kept.";
+            else description = "The change was undone. " + description;
+            return description + " Click Recheck to try removing it, or reload the native map editor.";
+        }
+    }
     // A failure after a mutation started, with what it left behind.
     internal sealed class AttemptFailure : InvalidOperationException {
-        internal AttemptFailure(FailureKind kind, string message, IReadOnlyList<string> remaining = null, bool wasGuarded = false) : base(message) {
+        internal AttemptFailure(FailureKind kind, string message, IReadOnlyList<string> remaining = null, bool wasGuarded = false, EquipmentCleanupContext equipmentCleanup = EquipmentCleanupContext.None) : base(message) {
             Kind = kind; Remaining = remaining ?? Array.Empty<string>(); WasGuarded = wasGuarded;
+            EquipmentCleanup = equipmentCleanup;
         }
+        internal EquipmentCleanupContext EquipmentCleanup { get; }
         internal bool WasGuarded { get; }
         internal FailureKind Kind { get; }
         internal IReadOnlyList<string> Remaining { get; }
@@ -68,6 +84,10 @@ namespace RailroaderScenePatcher.Core {
         // state could not be read. When every read setting agrees, one line says that the capability's own checks, such as
         // registrations or generated output, did not verify, so that state is uncertain. before may be null when it could not be read.
         public static IReadOnlyList<string> Describe(ObjectState before, Func<ObjectState> readNow, string reason = null) {
+            return Describe(before, readNow, out _, reason);
+        }
+        internal static IReadOnlyList<string> Describe(ObjectState before, Func<ObjectState> readNow, out bool settingsMatch, string reason = null) {
+            settingsMatch = false;
             ObjectState now;
             try { now = readNow(); }
             catch (Exception e) { return new[] { "The object's current state could not be read. Every setting is uncertain. Reason: " + e.Message }; }
@@ -83,7 +103,8 @@ namespace RailroaderScenePatcher.Core {
             if (!CrossingCoverage.Same(before.Coverage, now?.Coverage)) lines.Add("Crossing coverage: does not match its value before the attempt");
             if (before.Segments != null && !ConstructionSegments.Same(before.Segments, now?.Segments)) lines.Add("Construction segments: now " + (now?.Segments?.Display ?? "none") + ", before " + before.Segments.Display);
             if (now?.Coverage?.Residue?.Count > 0) lines.Add("Owned spans still registered: " + String.Join(", ", now.Coverage.Residue));
-            if (lines.Count == 0) lines.Add("The settings match their values before the attempt. The patcher could not verify the related changes" + (String.IsNullOrEmpty(reason) ? "" : ". Reason: " + reason));
+            settingsMatch = lines.Count == 0;
+            if (settingsMatch) lines.Add("The settings match their values before the attempt. The patcher could not verify the related changes" + (String.IsNullOrEmpty(reason) ? "" : ". Reason: " + reason));
             return lines;
         }
         static string Activity(bool? active) => active == null ? "group-driven" : active.Value ? "Yes" : "No";
@@ -92,8 +113,10 @@ namespace RailroaderScenePatcher.Core {
     // The correction guidance for one failed scene patch editing action: what went wrong, what to do, and the guide of the operation.
     public sealed class Recovery {
         readonly bool wasGuarded;
-        internal Recovery(FailureKind kind, string problem, string correction, string guide, string guideTitle, IReadOnlyList<string> remaining, bool wasGuarded) {
+        readonly EquipmentCleanupContext equipmentCleanup;
+        internal Recovery(FailureKind kind, string problem, string correction, string guide, string guideTitle, IReadOnlyList<string> remaining, bool wasGuarded, EquipmentCleanupContext equipmentCleanup) {
             Kind = kind; Problem = problem; Correction = correction; Guide = guide; GuideTitle = guideTitle; Remaining = remaining; this.wasGuarded = wasGuarded;
+            this.equipmentCleanup = equipmentCleanup;
         }
         public FailureKind Kind { get; }
         // The reason the action reported.
@@ -119,6 +142,7 @@ namespace RailroaderScenePatcher.Core {
         // One line for the message area, read as one label followed by plain sentences, as every refusal in the message
         // area reads: the action with its heading, the problem, what remains and the correction.
         public string Line(string action) {
+            if (equipmentCleanup != EquipmentCleanupContext.None) return EquipmentCleanupText.For(equipmentCleanup);
             var detail = Kind == FailureKind.Blocked ? "" : Problem;
             if (Kind == FailureKind.Restored || Kind == FailureKind.AwaitingOutput || Kind == FailureKind.IncompleteCleanup) {
                 const string reason = " Reason: ";
@@ -184,7 +208,7 @@ namespace RailroaderScenePatcher.Core {
             if (outcome == null || outcome.Applied) return null;
             var guide = Guide(place, action, structure);
             var problem = String.IsNullOrWhiteSpace(outcome.Error) ? "no reason was reported for the failure" : outcome.Error;
-            return new Recovery(outcome.Failure == FailureKind.None ? FailureKind.Refused : outcome.Failure, problem, Correction(outcome.Failure, problem), guide.Value, guide.Key, outcome.Remaining, outcome.WasGuarded);
+            return new Recovery(outcome.Failure == FailureKind.None ? FailureKind.Refused : outcome.Failure, problem, Correction(outcome.Failure, problem), guide.Value, guide.Key, outcome.Remaining, outcome.WasGuarded, outcome.EquipmentCleanup);
         }
         static string Correction(FailureKind kind, string problem) {
             switch (kind) {

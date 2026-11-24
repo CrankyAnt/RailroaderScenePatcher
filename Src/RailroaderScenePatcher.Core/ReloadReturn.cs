@@ -47,7 +47,7 @@ namespace RailroaderScenePatcher.Core {
         }
         public bool CanReload(DateTime now, Action<string> feedback) {
             if (!Active(now)) return true;
-            feedback?.Invoke("A working-location return is still pending. Reload is available after it completes or expires.");
+            feedback?.Invoke("The Map Editor is still returning to your working location. Wait for the return to finish or time out before reloading again.");
             return false;
         }
         public bool MarkRequested(string requestId, string mapId, int controller, DateTime now) {

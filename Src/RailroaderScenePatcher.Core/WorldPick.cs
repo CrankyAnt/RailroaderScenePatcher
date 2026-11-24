@@ -101,7 +101,7 @@ namespace RailroaderScenePatcher.Core {
                 objects.All(i => onlyGroup.Objects.Contains(i) && !onlyGroup.Unlisted.Contains(i));
             return new WorldPickResult(objects, picked, hovered, isCrossingSetup);
         }
-        // The rows of the list a click on one spot opens, beside the pointer: to its right and from its height down,
+        // The rows of the list a click on one spot opens, next to the pointer: to its right and from its height down,
         // or to its left without room on the right, moved up when the list would leave the screen at the bottom. The
         // rows are as wide as the widest and stand directly under one another.
         public static IReadOnlyList<ScreenRect> ListBeside(double x, double y, double width, IReadOnlyList<double> heights, ScreenRect screen) {

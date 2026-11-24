@@ -86,6 +86,8 @@ if($Action -eq 'Install') {
     if(!$TestSandbox -and (Test-Path 'D:\SteamLibrary\steamapps\common\Railroader\Mods') -and @(Get-ChildItem 'D:\SteamLibrary\steamapps\common\Railroader\Mods' -Force -ErrorAction Stop).Count){throw 'Install-root Mods is not empty; stop without touching it'}
     $sourceFiles=@{}
     foreach($name in @('Info.json','RailroaderScenePatcher.dll','RailroaderScenePatcher.Core.dll','0Harmony.dll','Icons/SceneWrench.png')) {$sourceFiles['Mods/Issue39ScenePatcher/'+$name]=Join-Path $ProductOutput $name}
+    # The observation reads the patcher's attempt traces, which the patcher writes only with its debug option on.
+    $sourceFiles['Mods/Issue39ScenePatcher/settings.json']=[IO.Path]::GetFullPath("$PSScriptRoot/DebugSettings.json")
     $sourceFiles['Mods/Issue39Observation/NativeObservation.dll']=$ObserverDll
     $sourceFiles['Mods/Issue39Observation/Info.json']=[IO.Path]::GetFullPath("$PSScriptRoot/../NativeObservation/Info.json")
     foreach($name in @('Info.json','Definitions.json','Data/Map.json','Data/scene-patches.json')) {$sourceFiles['ModDev/Issue39FixedPlacement/'+$name]=Join-Path $FixtureSource $name}

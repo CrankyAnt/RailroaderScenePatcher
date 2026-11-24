@@ -101,9 +101,9 @@ static class GameDefinedGroupTests {
             Object("Abutments", "World/Large Scenery/Somewhere", baked: true),             // 3
         };
         Check(Members(GameDefinedGroups.Of(targetsAsRoots)) == "RailBridgeConstruction:0,1,2,3", "a construction whose targets are group roots holds those roots and their parts (got " + Members(GameDefinedGroups.Of(targetsAsRoots)) + ")");
-        // The Almond Bridge as the game holds it in Railroader 0.6.3: the folder carries the controller and the culler and
+        // The Almond Bridge as the game holds it in Railroader 0.6.3: the scene object carries the controller and the culler and
         // is the group root, its abutments and steel are parts, and the controller is no inventory object of its own. The
-        // construction is one baked scenery group with the folder as its root.
+        // construction is one baked scenery group with that scene object as its root.
         var almond = new[] {
             Object("Almond Bridge", "World/Large Scenery", baked: true),                       // 0
             new GroupObject("Steel", Up("World/Large Scenery/Almond Bridge"), bakedPart: true),     // 1
@@ -112,7 +112,7 @@ static class GameDefinedGroupTests {
             Object("Almond Depot", "World/Large Scenery/Almond", baked: true),                  // 4: another town
         };
         var almondGroups = GameDefinedGroups.Of(almond);
-        Check(Members(almondGroups) == "BakedSceneryGroup:0,1,2,3" && almondGroups[0].Root == 0, "the Almond Bridge is one group with the folder as its root and its abutments and steel as parts (got " + Members(almondGroups) + ")");
+        Check(Members(almondGroups) == "BakedSceneryGroup:0,1,2,3" && almondGroups[0].Root == 0, "the Almond Bridge is one group with that scene object as its root and its abutments and steel as parts (got " + Members(almondGroups) + ")");
 
         // An industry storage display holds the storage piles or log pond that one industry's storage fills. An
         // industry building is its own group and no member of a storage display or another group.
@@ -338,8 +338,8 @@ static class GameDefinedGroupTests {
         double depth = p.Z - eye.Z;
         return new ClipPoint((p.X - eye.X) * View.Height / View.Width, p.Y - eye.Y, (Far + Near) / (Far - Near) * depth - 2 * Far * Near / (Far - Near), depth);
     };
-    static ObjectMarkingPart Box(string name, double x, double y, double z, double ex, double ey, double ez) =>
-        new ObjectMarkingPart(name, new WorldPoint(x, y, z), new WorldPoint(ex, ey, ez));
+    static ObjectMarkingBox Box(string name, double x, double y, double z, double ex, double ey, double ez) =>
+        new ObjectMarkingBox(name, new WorldPoint(x, y, z), new WorldPoint(ex, ey, ez));
 
     // Where a world point shows on screen from a camera of Camera(eye).
     static ScreenPoint Screen(WorldPoint p, WorldPoint eye) {

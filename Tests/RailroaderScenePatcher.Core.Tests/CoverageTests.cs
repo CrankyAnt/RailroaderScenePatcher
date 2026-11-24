@@ -226,7 +226,7 @@ static partial class CoverageTests {
         Assert(f.Scene.CoveredSegments(f.Crossing).SequenceEqual(new[] { "Sold", "Smiddle", "Sspur", "Sother" }),
             "Markings include the intermediate segment, and each segment is marked once");
         var result = new PatchEngine(f.Scene).Apply(Doc(Cover("detach", Detached("Pipr"))));
-        Assert(result.Outcomes["detach"].Applied && f.World.IdRegistered("Pcyi"), "The crossing stops evaluating the native span, which stays registered");
+        Assert(result.Outcomes["detach"].Applied && f.World.IdRegistered("Pcyi"), "The crossing stops evaluating the map's detection span, which stays registered");
         Assert(f.Scene.CoveredSegments(f.Crossing).SequenceEqual(new[] { "Sother" }), "Only evaluated spans are marked");
     }
     // A circuit whose detection span no longer resolves to an existing track segment is a problem of its crossing
@@ -240,7 +240,7 @@ static partial class CoverageTests {
         var selectedIsland = f.Rerouted.Spans[1].Id; var added = f.Crossing.Circuits[2];
         Assert(selectedIsland.StartsWith("CrankyAnt.ScenePatcher.", StringComparison.Ordinal) && added.Addition != null, "The fixture holds owned spans: " + selectedIsland);
         Assert(CircuitSpanProblems.CircuitKey("Pipr", null) == "Pipr", "A native circuit is keyed by its island span's ID");
-        Assert(CircuitSpanProblems.CircuitKey(selectedIsland, null) == "Pipr", "A circuit with selected tracks keeps the key of its native island span (got " + CircuitSpanProblems.CircuitKey(selectedIsland, null) + ")");
+        Assert(CircuitSpanProblems.CircuitKey(selectedIsland, null) == "Pipr", "A circuit with selected tracks keeps the ID of the map's own island span as its key (got " + CircuitSpanProblems.CircuitKey(selectedIsland, null) + ")");
         Assert(CircuitSpanProblems.CircuitKey(selectedIsland + ".2", null) == "Pipr", "a numbered owned island span ID gives the same key");
         Assert(CircuitSpanProblems.CircuitKey(added.Spans[1].Id, added.Addition) == added.Addition, "A detection addition is keyed by its addition key");
 
@@ -291,7 +291,7 @@ static partial class CoverageTests {
         Assert(result.Outcomes["reroute"].Applied, "The explicit alternative applies: " + result.Outcomes["reroute"].Error);
         Assert(f.NewRouteDetectsBothWays, "The selected tracks trigger the crossing at both approaches and the island");
         Assert(!f.OldRouteDetects && f.OldRouteStillOccupied, "The obsolete route stops triggering although its spans stay valid and registered");
-        Assert(f.OldSpans.All(s => f.World.Registered(s) && f.World.Covers(s)), "The native spans are not unregistered or changed");
+        Assert(f.OldSpans.All(s => f.World.Registered(s) && f.World.Covers(s)), "The map's own detection spans stay registered and unchanged");
         Assert(f.RetainedDetectsBothWays && f.Spans(f.Retained) == "Pdlh,P6id,P1db", "The untouched circuit keeps its coverage and function");
         Assert(ReferenceEquals(f.Crossing.Circuits[0], f.Rerouted) && f.Crossing.Circuits.Count == 2, "The circuit keeps its identity and order");
         Assert(f.OwnedRegistered == 3 && f.Rerouted.Spans.All(s => s.Owned && s.Id.StartsWith("CrankyAnt.ScenePatcher.Pipr.", StringComparison.Ordinal)), "Three owned spans cover the selected tracks: " + f.Spans(f.Rerouted));
@@ -303,7 +303,7 @@ static partial class CoverageTests {
         var result = new PatchEngine(f.Scene).Apply(Doc(Cover("detach", Detached("Pipr"))));
         Assert(result.Outcomes["detach"].Applied && f.Crossing.Circuits.Count == 1 && ReferenceEquals(f.Crossing.Circuits[0], f.Retained), "A detached circuit leaves the crossing's evaluation: " + result.Outcomes["detach"].Error);
         Assert(!f.OldRouteDetects && f.OldRouteStillOccupied && f.RetainedDetectsBothWays, "The detached route stops triggering; its spans stay registered and the other circuit works");
-        Assert(f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9" && f.OwnedRegistered == 0, "Detach creates nothing and keeps the native span references");
+        Assert(f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9" && f.OwnedRegistered == 0, "Detach creates nothing and keeps the references to the map's own detection spans");
         f = new Fixture();
         var all = new PatchEngine(f.Scene).Apply(Doc(Cover("all", Detached("Pipr") + "," + Detached("P6id"))));
         Assert(!all.Outcomes["all"].Applied && all.Outcomes["all"].Error.Contains("without detection") && f.World.Mutations == 0 && f.Native, "Detaching every circuit is refused before mutation");
@@ -389,7 +389,7 @@ static partial class CoverageTests {
         f = new Fixture();
         f.World.Graph.Remove("Pws9");
         result = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr"))));
-        Assert(!result.Outcomes["reroute"].Applied && f.World.Mutations == 0 && f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9", "A crossing with an unregistered native span is refused");
+        Assert(!result.Outcomes["reroute"].Applied && f.World.Mutations == 0 && f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9", "A crossing with an unregistered detection span from the map is refused");
     }
     static void FailureAfterMutationRestoresCoverage() {
         foreach (var inject in new Action<FakeCrossingWorld>[] { w => w.FailSetCircuits = true, w => w.FailSetSpansOnce = true, w => w.FailCreateAfter = 2, w => w.SkipRegisterOnCreate = true }) {
@@ -446,7 +446,7 @@ static partial class CoverageTests {
         var (f, session, mapEditor, store) = Session();
         var preview = session.PreviewCoverage(Crossing, "Pipr", Selected());
         Assert(preview.Error == null && preview.Lines.Count == 2, "The preview reports every circuit: " + preview.Error);
-        Assert(preview.Lines[0].Contains("Snew end a 308 to 550 m") && preview.Lines[0].Contains("Pcyi, Pipr, Pws9 stay registered and stop triggering"), "The preview shows the selected tracks and the obsolete spans: " + preview.Lines[0]);
+        Assert(preview.Lines[0].Contains("Snew end a 308 to 550 m") && preview.Lines[0].Contains("the map's own detection spans: approach A Pcyi, island Pipr, approach B Pws9") && preview.Lines[0].Contains("The map's own detection spans Pcyi, Pipr, Pws9 stay registered and stop triggering"), "The preview shows the selected tracks and the obsolete spans: " + preview.Lines[0]);
         Assert(preview.Lines[1].StartsWith("Circuit P6id: retained", StringComparison.Ordinal), "The preview shows the retained circuit: " + preview.Lines[1]);
         Assert(f.World.Mutations == 0 && f.Native && session.ScenePatchFileText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A preview changes nothing");
         Assert(session.PreviewCoverage(Crossing, "Pzzz", Selected()).Error.Contains("not a circuit"), "The preview refuses an obsolete circuit");

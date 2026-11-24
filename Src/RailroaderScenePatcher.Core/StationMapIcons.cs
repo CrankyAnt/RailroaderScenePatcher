@@ -8,14 +8,14 @@ namespace RailroaderScenePatcher.Core {
     // Which scene objects are station map icons, and the texts of their family.
     public static class StationMapIconRules {
         public const string Family = "Station map icon", Component = "UI.Map.MapIcon", Structure = "station-map-icon-v1", RequiredVersion = "0.5.0";
-        // The scene folder that holds the station map icons. It is a folder, not a group: each icon in it is an entry of
-        // the family, and the folder itself gets no row.
-        public const string Folder = BakedSceneryRules.WorldRoot + "/" + BakedSceneryRules.MapLabels + "/" + BakedSceneryRules.StationIcons;
-        // Whether a map icon at this scene path is a station map icon: one on a direct child of the Station Icons folder,
-        // as BakedSceneryRules.Classify reads that folder. Map icons deeper in the folder, and elsewhere, such as those
+        // The container object that holds the station map icons. Each icon in it is an entry of
+        // the family, and the container object itself gets no row.
+        public const string IconsPath = BakedSceneryRules.WorldRoot + "/" + BakedSceneryRules.MapLabels + "/" + BakedSceneryRules.StationIcons;
+        // Whether a map icon at this scene path is a station map icon: one on a direct child of the Station Icons container object,
+        // as BakedSceneryRules.Classify reads that container object. Map icons deeper in the container object, and elsewhere, such as those
         // the game creates for cars and players while it runs, are not.
         public static bool Listed(string path) =>
-            path != null && path.Length > Folder.Length + 1 && path.StartsWith(Folder + "/", StringComparison.Ordinal) && path.IndexOf('/', Folder.Length + 1) < 0;
+            path != null && path.Length > IconsPath.Length + 1 && path.StartsWith(IconsPath + "/", StringComparison.Ordinal) && path.IndexOf('/', IconsPath.Length + 1) < 0;
         public const string Operations = "Move, rotate, enable, or disable this station map icon. Edit the station's track span, house, and station agent in the Map Editor.";
         public const string Dependency = "Map window: the map shows the icon at its position. Enabling the icon registers it with the map.";
     }

@@ -16,8 +16,8 @@ static class HelperMarkerTests {
     static ClipPoint Camera(WorldPoint p) =>
         new ClipPoint(p.X * View.Height / View.Width, p.Y, (Far + Near) / (Far - Near) * p.Z - 2 * Far * Near / (Far - Near), p.Z);
     static readonly WorldPoint Eye = new WorldPoint(0, 0, 0);
-    static ObjectMarkingPart Box(string name, double x, double y, double z, double e, ObjectMarkingPartKind kind = ObjectMarkingPartKind.Mesh, Func<double, double, double?> ground = null) =>
-        new ObjectMarkingPart(name, new WorldPoint(x, y, z), new WorldPoint(e, e, e), null, kind, ground);
+    static ObjectMarkingBox Box(string name, double x, double y, double z, double e, ObjectMarkingBoxKind kind = ObjectMarkingBoxKind.Mesh, Func<double, double, double?> ground = null) =>
+        new ObjectMarkingBox(name, new WorldPoint(x, y, z), new WorldPoint(e, e, e), null, kind, ground);
     static bool Near1(double a, double b) => Math.Abs(a - b) < .01;
 
     internal static void Run() {
@@ -38,19 +38,19 @@ static class HelperMarkerTests {
 
     static void ShowsOnlyWithoutAnOutliningRenderer() {
         var anchor = new WorldPoint(0, 0, 50);
-        ObjectMarkingFrame FrameOf(params ObjectMarkingPart[] parts) => ObjectMarkingGeometry.Frame(anchor, Eye, parts, Camera, View, null);
+        ObjectMarkingFrame FrameOf(params ObjectMarkingBox[] boxes) => ObjectMarkingGeometry.Frame(anchor, Eye, boxes, Camera, View, null);
         Check(HelperMarkers.Shows(FrameOf(), false, 0), "an object without renderers shows a helper marker");
-        Check(HelperMarkers.Shows(FrameOf(Box("beam", 0, 0, 50, 2, ObjectMarkingPartKind.Effect)), false, 0), "a light whose only renderer is its beam effect shows a helper marker");
-        Check(HelperMarkers.Shows(FrameOf(Box("shadow", 0, 0, 50, 2, ObjectMarkingPartKind.ShadowsOnly)), false, 0), "an object with only a shadows-only renderer shows a helper marker");
+        Check(HelperMarkers.Shows(FrameOf(Box("beam", 0, 0, 50, 2, ObjectMarkingBoxKind.Effect)), false, 0), "a light whose only renderer is its beam effect shows a helper marker");
+        Check(HelperMarkers.Shows(FrameOf(Box("shadow", 0, 0, 50, 2, ObjectMarkingBoxKind.ShadowsOnly)), false, 0), "an object with only a shadows-only renderer shows a helper marker");
         Check(!HelperMarkers.Shows(FrameOf(Box("mesh", 0, 0, 50, 2)), false, 0), "a visible part shows no helper marker");
-        Check(!HelperMarkers.Shows(FrameOf(Box("mesh", 0, 0, 50, 2), Box("beam", 0, 0, 50, 2, ObjectMarkingPartKind.Effect)), false, 0), "a lamp with a mesh shows its own frame, not a helper marker");
+        Check(!HelperMarkers.Shows(FrameOf(Box("mesh", 0, 0, 50, 2), Box("beam", 0, 0, 50, 2, ObjectMarkingBoxKind.Effect)), false, 0), "a lamp with a mesh shows its own frame, not a helper marker");
     }
 
     // The decision to show a helper marker: only when no renderer would outline the object. A hidden renderer whose box
     // is not known yet, such as a static-batched building part that has not shown since the load, would outline it once
     // seen; an object whose renderer kinds are still being read waits. Both keep the small frame about their marker.
     static void AHiddenRendererWithAnUnknownBoxOrAWaitingObjectShowsNoHelperMarker() {
-        var none = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 50), Eye, Array.Empty<ObjectMarkingPart>(), Camera, View, null);
+        var none = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 50), Eye, Array.Empty<ObjectMarkingBox>(), Camera, View, null);
         Check(HelperMarkers.Shows(none, false, 0), "an object with nothing that would outline it shows a helper marker");
         Check(!HelperMarkers.Shows(none, false, 1), "a static-batched part not seen since the load is no invisible object");
         Check(!HelperMarkers.Shows(none, true, 0), "an object whose renderers are still being read shows no helper marker yet");
@@ -94,7 +94,7 @@ static class HelperMarkerTests {
 
     // A light 2 m right and 1 m up, 50 m ahead: x = 1280 * (1 + 2 * 0.5625 / 50) = 1308.8, y = 720 * (1 - 1 / 50) = 705.6.
     static void ALightOnlyObjectHasItsMarkerAtThePivot() {
-        var mark = HelperMarkers.Mark(new WorldPoint(2, 1, 50), Eye, Array.Empty<ObjectMarkingPart>(), Camera, View);
+        var mark = HelperMarkers.Mark(new WorldPoint(2, 1, 50), Eye, Array.Empty<ObjectMarkingBox>(), Camera, View);
         Check(mark.Marker.HasValue && Near1(mark.Marker.Value.X, 1308.8) && Near1(mark.Marker.Value.Y, 705.6), "the square marker stands on the light's pivot");
         Check(!mark.ColliderFrame && mark.Frame.HasValue && Near1(mark.Frame.Value.Width, 32) && Near1(mark.Frame.Value.Height, 32), "without a collider the frame is the least frame about the marker: 24 px and 4 px on each side");
         Check(Near1(mark.Frame.Value.X + 16, 1308.8) && Near1(mark.Frame.Value.Y + 16, 705.6), "the least frame is centred on the marker");
@@ -125,29 +125,29 @@ static class HelperMarkerTests {
     // its pivot at its bottom face 50 m ahead, a collider that is switched off, and a solid collider whose corners throw.
     static void ACollidersOnlyObjectGetsItsColliderFrame() {
         var pivot = new WorldPoint(0, 0, 50);
-        var renderers = ObjectMarkingGeometry.Frame(pivot, Eye, Array.Empty<ObjectMarkingPart>(), Camera, View, null);
+        var renderers = ObjectMarkingGeometry.Frame(pivot, Eye, Array.Empty<ObjectMarkingBox>(), Camera, View, null);
         Check(HelperMarkers.Shows(renderers, false, 0), "a collider-only object shows a helper marker");
         var facts = new[] { new HelperCollider(true, false, true, new[] { On }), Solid(On), new HelperCollider(false, false, false, new[] { On }), Solid(On) };
         var cube = new List<WorldPoint>();
         foreach (var x in new[] { -1.0, 1 }) foreach (var y in new[] { 0.0, 2 }) foreach (var z in new[] { 49.0, 51 }) cube.Add(new WorldPoint(x, y, z));
         var read = new List<int>();
         IReadOnlyList<WorldPoint> Corners(int i) { read.Add(i); if (i == 3) throw new InvalidOperationException("collider destroyed"); return cube; }
-        var parts = HelperMarkers.ColliderParts(HelperMarkers.Framing(facts), Corners);
+        var boxes = HelperMarkers.ColliderBoxes(HelperMarkers.Framing(facts), Corners);
         Check(read.SequenceEqual(new[] { 1, 3 }), "only the colliders that count are read: " + String.Join(",", read));
-        Check(parts.Count == 1 && parts[0].Name == "collider #1" && Near1(parts[0].Center.Y, 1) && Near1(parts[0].Center.Z, 50) && Near1(parts[0].Extents.X, 1) && Near1(parts[0].Extents.Y, 1) && parts[0].Oriented.Count == 8,
-            "the click spot gives one part with its bounds and corners: " + String.Join(" | ", parts.Select(p => p.Name + " " + p.Center.X + "," + p.Center.Y + "," + p.Center.Z)));
-        var mark = HelperMarkers.Mark(pivot, Eye, parts, Camera, View);
+        Check(boxes.Count == 1 && boxes[0].Name == "collider #1" && Near1(boxes[0].Center.Y, 1) && Near1(boxes[0].Center.Z, 50) && Near1(boxes[0].Extents.X, 1) && Near1(boxes[0].Extents.Y, 1) && boxes[0].Oriented.Count == 8,
+            "the click spot gives one box with its bounds and corners: " + String.Join(" | ", boxes.Select(p => p.Name + " " + p.Center.X + "," + p.Center.Y + "," + p.Center.Z)));
+        var mark = HelperMarkers.Mark(pivot, Eye, boxes, Camera, View);
         Check(mark.ColliderFrame && mark.Frame.HasValue && Near1(mark.Frame.Value.Y, 720 * (1 - 2.0 / 49) - 4) && Near1(mark.Frame.Value.Bottom, 724) && Near1(mark.Frame.Value.Width, 2 * 1280 * .5625 / 49 + 8),
             "the collider-only object gets its collider frame around the click spot's bounds");
         Check(mark.Marker.HasValue && Near1(mark.Marker.Value.X, 1280) && Near1(mark.Marker.Value.Y, 720), "its marker stands on the pivot");
         // A collider that gives fewer than eight corners is left out; without a collider that counts, the least frame shows.
-        Check(HelperMarkers.ColliderParts(new[] { 0 }, i => cube.Take(7).ToArray()).Count == 0 && HelperMarkers.ColliderParts(new[] { 0 }, i => null).Count == 0, "a collider without eight corners gives no part");
-        var terrainOnly = HelperMarkers.Mark(pivot, Eye, HelperMarkers.ColliderParts(HelperMarkers.Framing(new[] { facts[0] }), Corners), Camera, View);
+        Check(HelperMarkers.ColliderBoxes(new[] { 0 }, i => cube.Take(7).ToArray()).Count == 0 && HelperMarkers.ColliderBoxes(new[] { 0 }, i => null).Count == 0, "a collider without eight corners gives no box");
+        var terrainOnly = HelperMarkers.Mark(pivot, Eye, HelperMarkers.ColliderBoxes(HelperMarkers.Framing(new[] { facts[0] }), Corners), Camera, View);
         Check(!terrainOnly.ColliderFrame && terrainOnly.Frame.HasValue && Near1(terrainOnly.Frame.Value.Width, 32), "an object with only a terrain collider keeps the least frame about its marker");
     }
 
     static void BeyondTheFrameDistanceOnlyTheMarkerShows() {
-        var far = HelperMarkers.Mark(new WorldPoint(0, 0, 600), Eye, Array.Empty<ObjectMarkingPart>(), Camera, View);
+        var far = HelperMarkers.Mark(new WorldPoint(0, 0, 600), Eye, Array.Empty<ObjectMarkingBox>(), Camera, View);
         Check(far.Marker.HasValue && !far.Frame.HasValue && far.Outline == null, "a light beyond 500 m shows only its square marker");
         var collider = HelperMarkers.Mark(new WorldPoint(0, 0, 600), Eye, new[] { Box("collider", 0, 1, 600, 1) }, Camera, View);
         Check(collider.Marker.HasValue && !collider.Frame.HasValue, "a collider beyond 500 m shows only its square marker");
@@ -156,14 +156,14 @@ static class HelperMarkerTests {
     }
 
     static void APivotBehindTheCameraShowsNothing() {
-        var behind = HelperMarkers.Mark(new WorldPoint(0, 0, -10), Eye, Array.Empty<ObjectMarkingPart>(), Camera, View);
+        var behind = HelperMarkers.Mark(new WorldPoint(0, 0, -10), Eye, Array.Empty<ObjectMarkingBox>(), Camera, View);
         Check(!behind.Marker.HasValue && !behind.Frame.HasValue, "a pivot behind the camera has no marker and no frame");
     }
 
     // A collider-only click spot whose pivot lies at the edge of its collider, beside a visible part.
     static void SelectInWorldPicksTheObjectByItsHelperMarker() {
         var spot = HelperMarkers.Mark(new WorldPoint(0, 0, 50), Eye, new[] { Box("collider", 0, 2, 50, 2) }, Camera, View);
-        var light = HelperMarkers.Mark(new WorldPoint(8, 0, 50), Eye, Array.Empty<ObjectMarkingPart>(), Camera, View);
+        var light = HelperMarkers.Mark(new WorldPoint(8, 0, 50), Eye, Array.Empty<ObjectMarkingBox>(), Camera, View);
         PickTarget Target(HelperMarking m, double x, double y) => new PickTarget(m.Marker.Value.X, m.Marker.Value.Y, true, ObjectMarkingGeometry.Contains(m.Outline, x, y));
         WorldPickResult Click(double x, double y) => WorldPick.Resolve(x, y, new[] { Target(spot, x, y), Target(light, x, y), new PickTarget(400, 400, true, false) }, new PickGroup[0]);
         var onSpot = Click(spot.Marker.Value.X, spot.Marker.Value.Y);
@@ -187,7 +187,7 @@ static class HelperMarkerTests {
         var store = new Store(); var history = new NativeMapEditor();
         var engine = new PatchEngine(scene); var session = new PatchEditingSession(engine, history, store); history.Session = session;
         var inventory = new SceneInventory(scene); inventory.Refresh();
-        HelperMarking Mark() => HelperMarkers.Mark(new WorldPoint(box.Position[0], box.Position[1], box.Position[2] + 50), Eye, Array.Empty<ObjectMarkingPart>(), Camera, View);
+        HelperMarking Mark() => HelperMarkers.Mark(new WorldPoint(box.Position[0], box.Position[1], box.Position[2] + 50), Eye, Array.Empty<ObjectMarkingBox>(), Camera, View);
         double ScreenX(double x) => 1280 * (1 + x * .5625 / 53);
         var start = Mark();
         Check(Near1(start.Marker.Value.X, ScreenX(7)), "the marker stands at the object's placement");

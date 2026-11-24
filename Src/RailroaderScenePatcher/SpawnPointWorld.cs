@@ -106,7 +106,7 @@ namespace RailroaderScenePatcher {
                 if (method == null || method.ReturnType != typeof(void)) throw new MissingMethodException("StateManager.ApplyNewGameSetup");
                 harmony = new Harmony(Id);
                 harmony.Patch(method, prefix: new HarmonyMethod(typeof(NewGameStartHook), nameof(Before)));
-            } catch (Exception e) { harmony?.UnpatchAll(Id); harmony = null; Error = "New game start hook unavailable: " + e.GetBaseException().Message; }
+            } catch (Exception e) { harmony?.UnpatchAll(Id); harmony = null; Error = "The patcher couldn't prepare to apply spawn point changes before a new game starts: " + e.GetBaseException().Message; }
         }
         internal static void Remove() { harmony?.UnpatchAll(Id); harmony = null; owner = null; }
         static void Before() {

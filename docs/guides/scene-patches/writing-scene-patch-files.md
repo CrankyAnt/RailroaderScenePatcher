@@ -2,16 +2,16 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Write a scene patch file
 
-You can use a text editor to create or correct the file that **Scene patches** reads and writes. Keep one `Data/scene-patches.json` in the supplying mod. Check your changes with a copy of the mod and a disposable save.
+Create or correct `Data/scene-patches.json` in a text editor. This is the file that **Scene Patcher** reads and writes. Keep one scene patch file in the supplying mod. Test your changes with a separate copy of the mod and a disposable save.
 
 ## Create the file
 
-1. Open the map in the native map editor, inspect each target in **Scene patches**, and click **Copy ID**. Use the scene target map and exact target members the editor supplies, including `padMarkerId` for a crossbuck with a shared path. See [Inspect scene objects](inspect-scene-objects.md).
+1. Open the map in the native map editor, inspect each target in **Scene Patcher**, and click **Copy ID**. Use the scene target map and exact target members the editor supplies, including `padMarkerId` for a crossbuck with a shared path. See [Inspect scene objects](inspect-scene-objects.md).
 2. Back up an existing file before editing it. For a new file, start with the [complete v1 example](scene-patch-file-v1.md#minimal-example). Save as strict UTF-8 JSON. Set `sourceMap.mapId` to the map you want to target. Maps that inherit it also receive the patch. If you're editing a map patch, target one of its map layers, such as the bottom map layer.
 3. Give each modification a unique key in `modifications`. Use the copied `target` and add only the settings you want to change. Use `dependsOn` for prerequisite modifications in that file, or `[]` when there are none. See the [v1 reference](scene-patch-file-v1.md#modification-fields) for placement, activity, and supported relationships, including when an explicit detach is valid.
 4. Check the [dependency minimum](scene-patch-file-v1.md#dependency-minimum) for every modification. In `Info.json`, include `crankyant/scene-patcher >=<minimum>` in `dependencies.required`, using a version sufficient for the whole file. Keep stricter compatible constraints.
 
-For a worked placement, see [Write fixed scene placement](writing-fixed-placement.md). For crossing edits, use the [operation guides in the manual](modder-manual.md#choose-an-operation) to check the circuit, source, and controller prerequisites.
+For a placement example, see [Write fixed scene placement](writing-fixed-placement.md). Before editing a crossing, check its circuit, source, and controller prerequisites in the [operation guides in the manual](modder-manual.md#choose-an-operation).
 
 ## Validate the result
 
@@ -22,5 +22,5 @@ For a worked placement, see [Write fixed scene placement](writing-fixed-placemen
 ## Correct a problem
 
 - If a target is missing or ambiguous, confirm the intended object again and replace the identity with the value from **Copy ID**. Check that the scene target map is in the loaded map context.
-- If an independent modification fails, read the reason and correct the target, value, or prerequisite it names. Dependent modifications can't apply while it fails. Test the corrected file on the next world load.
+- If an independent modification fails, read the reason and correct the target, value, or prerequisite it names. Modifications that depend on it can't apply until it succeeds. Test the corrected file on the next world load.
 - If the patcher protects the file from overwrite, follow [Recover a protected scene patch file](recover-scene-patch-files.md). Use **Read again** when that action is available. Keep the backup until you've checked the corrected file. Use a compatible patcher version to edit content written in a newer format.

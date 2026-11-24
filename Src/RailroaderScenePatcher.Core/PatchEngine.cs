@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace RailroaderScenePatcher.Core {
@@ -12,12 +11,6 @@ namespace RailroaderScenePatcher.Core {
     public sealed class InvalidPatchDefinitionException : InvalidOperationException {
         public InvalidPatchDefinitionException(string message) : base(message) { }
     }
-#if ISSUE39_OBSERVATION
-    // Only the explicitly instrumented integration-test build exposes this sink.
-    public static class JourneyObservation {
-        public static Action<string> Sink;
-    }
-#endif
     public enum Capability { Checked, Unchecked, Incompatible }
     public sealed class TargetIdentity {
         internal TargetIdentity() { }
@@ -28,19 +21,19 @@ namespace RailroaderScenePatcher.Core {
         public string Path { get; internal set; }
         public string Component { get; internal set; }
         public string Structure { get; internal set; }
-        // The marker id of the crossing pad beside a crossbuck whose hierarchy path several crossbucks share, as the
+        // The marker ID of the crossing pad beside a crossbuck whose hierarchy path several crossbucks share, as the
         // crossbucks of the three crossings below World/Roads Bryson/Old River Rd do; null for every other target. It
         // stands beside the path, which stays the raw hierarchy path.
         public string PadMarkerId { get; internal set; }
         public const string PadMarkerMember = "padMarkerId";
-        // Why a scene refuses a target with a pad marker id, when it names no crossbuck at a shared path.
+        // Why a scene refuses a target with a pad marker ID, when it names no crossbuck at a shared path.
         public const string PadMarkerNotAccepted = "padMarkerId only identifies a crossbuck at an unprotected crossing when other crossbucks share its path. Remove padMarkerId from this target.";
         // Whether a target object of a scene patch file names this identity's object: the same scene, path, component
-        // and pad marker id. The structure is compared by the caller.
+        // and pad marker ID. The structure is compared by the caller.
         internal static bool SameObject(JObject target, TargetIdentity identity) =>
             target != null && identity != null && (string)target["scene"] == identity.Scene && (string)target["path"] == identity.Path && (string)target["component"] == identity.Component
             && (target[PadMarkerMember]?.Type == JTokenType.String ? (string)target[PadMarkerMember] : null) == identity.PadMarkerId;
-        // The identity for a message: scene and path, the pad marker id where it has one, and the component.
+        // The identity for a message: scene and path, the pad marker ID where it has one, and the component.
         public string Label => Scene + "/" + Path + (PadMarkerId == null ? "" : " (pad marker " + PadMarkerId + ")") + " [" + Component + "]";
         public static bool SameObject(TargetIdentity a, TargetIdentity b) =>
             a != null && b != null && a.Scene == b.Scene && a.Path == b.Path && a.Component == b.Component && a.PadMarkerId == b.PadMarkerId;
@@ -52,7 +45,7 @@ namespace RailroaderScenePatcher.Core {
             return value;
         }
     }
-    // A scene that accepts a pad marker id beside a target's path: it says why it refuses the identity, or null.
+    // A scene that accepts a pad marker ID beside a target's path: it says why it refuses the identity, or null.
     public interface IPadMarkerIdentityScene {
         string PadMarkerRefusal(TargetIdentity identity);
     }
@@ -179,6 +172,7 @@ namespace RailroaderScenePatcher.Core {
         // What a failure did to the scene: refused before mutation, restored, or left with incomplete cleanup.
         public FailureKind Failure { get; internal set; }
         internal bool WasGuarded { get; set; }
+        internal EquipmentCleanupContext EquipmentCleanup { get; set; }
         // For an incomplete cleanup: the remaining or uncertain state, one line per setting.
         public IReadOnlyList<string> Remaining { get; internal set; } = Array.Empty<string>();
     }
@@ -242,17 +236,16 @@ namespace RailroaderScenePatcher.Core {
         internal sealed class Modification {
             internal string Id; internal TargetIdentity Identity; internal ObjectState State; internal string[] Dependencies;
         }
-        [Conditional("ISSUE39_OBSERVATION")]
+        // The start of an attempt trace line: the debug output of one engine stage, as JSON that the native observation
+        // and the attempt summary read.
+        public const string AttemptTrace = "Attempt trace: ";
         void Observe(string stage, string scenePatchFile, string id = null, string path = null, string error = null) {
-#if ISSUE39_OBSERVATION
-            try {
-                JourneyObservation.Sink?.Invoke(new JObject {
-                    ["stage"] = stage, ["document"] = scenePatchFile, ["id"] = id,
-                    ["path"] = path, ["error"] = error,
-                    ["engineRuntimeId"] = RuntimeHelpers.GetHashCode(this)
-                }.ToString(Newtonsoft.Json.Formatting.None));
-            } catch { /* Observation cannot alter application or failure handling. */ }
-#endif
+            // Observation cannot alter application or failure handling; with debug off it builds nothing.
+            PatcherLog.Debug(() => AttemptTrace + new JObject {
+                ["stage"] = stage, ["document"] = scenePatchFile, ["id"] = id,
+                ["path"] = path, ["error"] = error,
+                ["engineRuntimeId"] = RuntimeHelpers.GetHashCode(this)
+            }.ToString(Newtonsoft.Json.Formatting.None));
         }
         public PatchEngine(IScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
         void Track(TargetIdentity identity, object target) {
@@ -475,19 +468,21 @@ namespace RailroaderScenePatcher.Core {
 #endif
                     Observe("applied", scenePatchFileKey, id, identity.Path);
                 } catch (Exception e) {
-                    bool restored = false; string restoreError = null;
+                    bool restored = false; Exception restoreError = null;
                     Observe("restore-request", scenePatchFileKey, id, identity.Path);
                     try {
 #if SCENE_PATCHER_FAULTS
                         FaultInjection.TripRestoration();
 #endif
                         restored = scene.Restore(resolved, snapshot);
-                    } catch (Exception r) { restoreError = r.Message; }
+                    } catch (Exception r) { restoreError = r; }
                     Observe("restore-result", scenePatchFileKey, id, identity.Path, restored ? "verified" : "unverified");
                     if (!restored) {
-                        var left = RemainingState.Describe(before, () => scene.Read(resolved), restoreError);
+                        var left = RemainingState.Describe(before, () => scene.Read(resolved), out var settingsMatch, restoreError?.Message);
                         SetUnsafe(resolved, true, left);
-                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The change failed. Cleanup could not be verified. Reason: " + e.Message, left);
+                        var cleanup = e is EmptyEquipmentObjectException && restoreError is EmptyEquipmentObjectException && settingsMatch
+                            ? EquipmentCleanupContext.WorldLoad : EquipmentCleanupContext.None;
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The change failed. Cleanup could not be verified. Reason: " + e.Message, left, equipmentCleanup: cleanup);
                     }
                     if (AwaitOutput(resolved)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The change failed and the object is back as it was. The game is still regenerating its dependent output. Further changes must wait until that output is verified. Reason: " + e.Message);
                     throw new AttemptFailure(FailureKind.Restored, "The change failed. The object is back as it was. Reason: " + e.Message);
@@ -501,7 +496,7 @@ namespace RailroaderScenePatcher.Core {
                 if (outcome.Failure == FailureKind.None) {
                     var attempt = e as AttemptFailure;
                     outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
-                    if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; }
+                    if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; outcome.EquipmentCleanup = attempt.EquipmentCleanup; }
                 }
                 failed[key] = outcome; Observe("failed", scenePatchFileKey, id, error: e.Message);
             }
@@ -521,7 +516,7 @@ namespace RailroaderScenePatcher.Core {
         // Set for the duration of a reconciliation that resolves the same targets several times a second.
         internal Func<TargetIdentity, object> ResolveOverride;
         internal object ResolveUnique(TargetIdentity identity) { return ResolveOverride != null ? ResolveOverride(identity) : ResolveFresh(identity); }
-        // The objects the identity names. A pad marker id names a crossbuck at a shared path; every other target refuses
+        // The objects the identity names. A pad marker ID names a crossbuck at a shared path; every other target refuses
         // it with the reason, before anything is resolved.
         IReadOnlyList<object> Matches(TargetIdentity identity) {
             if (identity.PadMarkerId != null) {
@@ -870,7 +865,7 @@ namespace RailroaderScenePatcher.Core {
             }
             return new StarterSetting((string)starter["setup"], MarkerBinding.At(ParseLocation(track, "starter placement")), wreck);
         }
-        // Explicit crossing coverage: circuits holds each circuit this mod sets, keyed by its native island span, with selected
+        // Explicit crossing coverage: circuits holds each circuit this mod sets, keyed by the ID of the map's own island span, with selected
         // tracks or an explicit detach. An omitted circuit keeps its coverage; an omitted crossingCoverage leaves every
         // circuit untouched. additions holds the detection additions keyed by their IDs: circuits the patcher adds for their
         // selected tracks, which exist only while the scene patch file lists them. Neither the order of the two objects nor the
@@ -941,10 +936,10 @@ namespace RailroaderScenePatcher.Core {
                 EquipmentSource from;
                 // A bell loads the audio of a bell definition; a light or gate copies a loaded device.
                 if (pattern == EquipmentAddition.BellPattern) {
-                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with the identifier of a bell definition under definition");
+                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a bell definition as its source. In your mod's scene patch file (Data/scene-patches.json), set the source's definition to the bell definition's identifier and remove any other members from the source");
                     from = EquipmentSource.ForDefinition((string)source["definition"]);
                 } else {
-                    if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with scene and path");
+                    if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a light or gate in the map as its source. In your mod's scene patch file (Data/scene-patches.json), give this addition's source only a scene and a path that identify the light or gate to copy");
                     from = new EquipmentSource((string)source["scene"], (string)source["path"]);
                 }
                 var placement = addition["placement"] as JObject;

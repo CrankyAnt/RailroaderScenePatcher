@@ -8,7 +8,7 @@ Adding equipment doesn't create a crossing or edit a model. Bells use a differen
 
 ## Which devices qualify
 
-A device qualifies if it responds to the crossing controller's keys and meets the requirements below. This is the `crossing-light-gate-v1` pattern:
+To qualify for the `crossing-light-gate-v1` pattern, a device must respond to the crossing controller's keys and meet all these requirements:
 
 - Each lamp is a `Track.KeyValueLampMaterialController` that observes the controller's `lights` or `gates` key. Its lamp targets are inside the device. At least one renderer under those targets uses the lamp's material.
 - Each gate is a `RollingStock.Controls.KeyValueBoolAnimator` that observes the `lights` or `gates` key. It has an `Animator` on its own object and an animation clip.
@@ -17,9 +17,9 @@ A device qualifies if it responds to the crossing controller's keys and meets th
 - The device is in the same scene as the destination crossing, so its assets stay loaded as long as the copy exists.
 - The destination crossing controller has exactly one key-value object, on the controller's own object, and at most one culler.
 
-Within these requirements, the model, materials, colours, and animation don't matter. An unfamiliar device qualifies if it uses these mechanisms. A familiar name or appearance doesn't qualify a device that works differently.
+The model, materials, colors, and animation can vary as long as the device meets these requirements. An unfamiliar device qualifies if it uses these mechanisms. A familiar name or appearance doesn't qualify a device that works differently.
 
-The source must already be loaded in the map you're editing. The patcher doesn't load another scene to find it, or substitute another device if the named source is missing or ambiguous.
+The source must already be loaded in the map you're editing. The patcher doesn't load another scene to find it. If the named source is missing or ambiguous, it doesn't substitute another device.
 
 ### Ineligible sources
 
@@ -49,15 +49,15 @@ The editor lists every device beneath a loaded crossing controller, including th
 - The copy joins the controller's culler and takes its current culling state. It is shown and hidden with the crossing's own equipment. A culled copy initializes when it becomes visible.
 - The copy shares the source's model, materials, and animation. These assets belong to the scene that contains both the source and crossing, so they stay loaded while the copy exists. The copy keeps working when the source object is culled or removed from view. Removing the copy destroys only the objects the patcher created, leaving the shared assets and the working source intact.
 - Each addition is an added object. The outliner lists it once in the **Added light or gate** family, marked with `+`, and its state line shows **+ ADDED**. When two or more added lights or gates at the same crossing share a name, their display names end in `(added, N of M)`, such as `Signal 1 (added, 2 of 3)`. The copy's parts have no separate entries. Culling, initialization, and Undo/Redo steps for the copy do not mark the inventory stale. Edit the addition on its crossing's **Connections** tab.
-- An addition that fails its check blocks only equipment edits of that crossing until the world reloads. Coverage and detection edits of the same crossing stay available.
+- An addition that fails its check blocks only equipment edits of that crossing until the world reloads. An addition whose copy is gone doesn't block them; your next equipment change builds it again. Coverage and detection edits of the same crossing stay available.
 - The crossing object, its coverage, and its native equipment do not change.
 - Each addition needs an ID that is unique in your scene patch file. Only one modification may use it. If two modifications share an ID, both fail. The editor refuses an ID that another modification already uses. IDs are scoped to your mod, so another supplying mod can use the same ID without a conflict. Your scene patch file never moves or removes another mod's additions.
 
 ## Add equipment in the native map editor
 
-1. Open the Scene patches window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
+1. Open the Scene Patcher window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
 2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a light or gate** lists the devices, with a reason for each one that does not qualify. **Why a device isn't eligible** opens the table above.
-3. Click **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. A form opens at the top of the tab. It proposes an unused **Equipment ID**, adding a numeric suffix if the name is taken. The proposed placement uses the device's position relative to its own crossing at the inspected crossing, offset by five metres. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
+3. Click **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. A form opens at the top of the tab with an unused **Equipment ID**. If the name is taken, the proposed ID has a numeric suffix. The proposed placement puts the copy at the same position relative to the inspected crossing as the source has relative to its own crossing, with a five-meter offset. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab. Apply uses the previewed change; preview again after you change a field.
 
@@ -65,17 +65,21 @@ To move an addition, click **Edit** under its name, change the fields, preview, 
 
 **Remove modification** in the footer removes all of your mod's coverage, detection additions, lights, gates, and bells for this crossing. Native Undo and Redo reverse and repeat each applied change, including rebuilding a removed addition.
 
-**Lights, gates, and bells** lists the added equipment by name. It shows whether each light or gate is connected to the crossing, waiting to connect, or hidden with the crossing. If the patcher can't build an addition from your scene patch file, for example because its source is missing, it appears as **Not built** with a reason.
+**Lights, gates, and bells** lists the added equipment by name. It shows whether each light or gate is connected to the crossing, waiting to connect, or hidden with the crossing. If the patcher can't build an addition from your scene patch file, for example because its source is missing, it appears as **Not built** with a reason. Its name is its equipment ID followed by the source device. When the source is loaded, the row shows the device's name and its crossing, such as `west: Signal 3 at Allen`. When the source isn't loaded, the row shows the last part of the source path, such as `west: Signal 3`. An addition whose copy is gone also appears as **Not built**, under its own name. **Recheck** or your next equipment change builds it again from its source.
 
-The additions of one crossing are built together. One refused addition stops the others, which each appear as **Not built** and name the refused addition. **Recheck** is refused for the same reason and changes nothing. Click **Edit** to correct or remove each refused addition. To correct its source, keep its **Edit** form open and click **Use** for an eligible device or bell definition. The addition keeps its equipment ID and placement. Then click **Preview** and **Apply**.
+The patcher builds all additions for a crossing together. If one addition is refused, none are built. Each of the others appears as **Not built** and names the refused addition. **Recheck** is refused for the same reason and changes nothing.
 
-Correcting or removing one refused addition changes only the scene patch file while another refused addition remains. A correction is refused before anything changes if the modification would still be refused without the other refused additions, for example because of the correction's own source or the crossing's detection. The additions are built once no refused addition remains.
+Click **Edit** to correct or remove each refused addition. To change its source, leave its **Edit** form open and click **Use** for an eligible device or bell definition. The addition keeps its equipment ID and placement. Then click **Preview** and **Apply**.
+
+While another refused addition remains, correcting or removing an addition changes only the scene patch file. The patcher checks each correction as though the other refused additions were absent. If the modification would still be refused, for example because of the correction's own source or the crossing's detection, the patcher refuses the correction before anything changes. Once no refused additions remain, the patcher builds the additions.
 
 If incomplete cleanup blocks the crossing, you can't edit or remove the refused addition, and **Recheck** stays refused. Reload the native map editor to clear the block, then correct or remove the addition.
 
 Save writes the additions to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the copies in native map data. The patcher rebuilds them from the scene patch file on each load. If copies already exist on a repeated load, the patcher reconciles them without duplicating them.
 
 If an edit fails, the message area reports whether the prior equipment was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
+
+If an added light, gate, or bell leaves an empty object at the crossing, the message says it won't be saved with the map. After a failed edit, it says the change was undone. After **Recheck**, it says your edits are kept. Click **Recheck** to try removing the empty object, or reload the native map editor.
 
 ## Write equipment in the scene patch file
 
@@ -108,7 +112,7 @@ The scene, paths, and coordinates are placeholders. Use the values the editor sh
 
 Each player's game builds the copy beneath its own crossing controller when its world loads. The copy's lamps and gates follow that controller, and the crossing's culler shows and hides the copy in that game.
 
-A player who joins later or reconnects loads the map again. The patcher builds each addition once in the newly loaded world, under the same equipment ID. The copies of the earlier session went with the map when it unloaded. If an addition fails in one player's game, for example because its source is missing there, that game reports it, and the other players keep their equipment. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
+A player who joins later or reconnects loads the map again. The patcher builds each addition once in the newly loaded world, under the same equipment ID. The earlier session's copies were removed when its map unloaded. If an addition fails in one player's game, for example because its source is missing there, that game reports it. The other players keep their equipment. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
 
 These statements are based on the patcher's automated tests and the code of Railroader 0.6.3. They haven't been tested in a multiplayer session.
 

@@ -112,7 +112,7 @@ static class BakedPartTests {
         PartsTheGameAnimatesDoNotMakeTheInventoryStale();
         CullingContainersAreNoPartsButTheirPartsAre();
         CullingContainerPathFailsBeforeMutation();
-        FolderAndGroupRootPathsFailBeforeMutation();
+        ContainerAndGroupRootPathsFailBeforeMutation();
         Console.WriteLine("PASS: baked scenery parts: part rule, part-only edits, fixed placement through group moves and previews, ordering, removal, culling, refusal, restoration and scene patch editing");
     }
 
@@ -181,24 +181,36 @@ static class BakedPartTests {
             "The part rule refuses a culling container with its reason and refuses no part");
     }
 
-    // A modification that names a folder as a group, such as Bryson Yard, or a group root as a part, such as one of
+    // A modification that names a container object as a group, such as Bryson Yard, or a group root as a part, such as one of
     // its lamp posts, fails before mutation with its own reason, and the file's other modifications still apply.
-    static void FolderAndGroupRootPathsFailBeforeMutation() {
+    static void ContainerAndGroupRootPathsFailBeforeMutation() {
         const string Yard = "World/Large Scenery/Bryson/Bryson Yard", Post = Yard + "/Tall Post Shade";
         var f = new Fixture();
         var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Bulb").Solid()))))));
-        Assert(BakedSceneryRules.GroupRefusal(Yard) == BakedSceneryRules.FolderRefusal && BakedSceneryRules.GroupRefusal(Post) == null && BakedSceneryRules.GroupRefusal(Mill) == null, "Only a folder of the category table is refused as a group");
+        Assert(BakedSceneryRules.GroupRefusal(Yard) == "This path names a container object. A container object isn't a group. Edit the groups it holds." && BakedSceneryRules.GroupRefusal(Post) == null && BakedSceneryRules.GroupRefusal(Mill) == null, "Only a container object in the category table is refused with the container object message");
         var lamp = verdicts.Single(v => v.Path == Post);
         Assert(BakedSceneryRules.PartRefusal(null, lamp) == BakedSceneryRules.GroupRootRefusal && BakedSceneryRules.PartRefusal(null, null) == null, "A group root is refused as a part with its own reason");
-        Assert(BakedSceneryRules.ResolvesGroup(null, Yard) && BakedSceneryRules.ResolvesGroup(lamp, Post) && !BakedSceneryRules.ResolvesGroup(null, Post + "/Bulb"), "A folder resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
+        Assert(BakedSceneryRules.ResolvesGroup(null, Yard) && BakedSceneryRules.ResolvesGroup(lamp, Post) && !BakedSceneryRules.ResolvesGroup(null, Post + "/Bulb"), "A container object resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
         f.World.GroupVerdicts = verdicts.ToDictionary(v => v.Path);
         f.World.GroupVerdicts[Mill] = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Saw Mill", new Node("Platform").Solid()))))).Single();
         var post = new FakeGroup();
         f.World.Objects[Yard] = new List<object> { new FakeGroup() }; f.World.Objects[Post] = new List<object> { post };
         var before = f.World.Mutations;
-        var result = f.Engine.Apply(Doc(Mod("yard", Yard, BakedSceneryGroups.Structure, GroupTarget, null), Mod("post-as-part", Post, BakedSceneryParts.Structure, GroupTarget, null), Part("move-jetty", "Jetty", JettyTarget, JettyTurn)));
+        var json = Doc(Mod("yard", Yard, BakedSceneryGroups.Structure, active: false),
+            Mod("post-as-part", Post, BakedSceneryParts.Structure, GroupTarget, null), Part("move-jetty", "Jetty", JettyTarget, JettyTurn));
+        var diagnostics = new Diagnostics();
+        var runtime = new PatchRuntime(f.Engine, diagnostics, "0.5.0", "0.6.3");
+        var mod = new LoadedMod(new PatchSource("example/map", "Example Map", "1.0.0", "Example author"), json, null, editTarget: true);
+        var result = runtime.ApplyLoaded(new[] { mod }, null).Single().Result;
+        var warning = diagnostics.Failures.Single(failure => failure.Operation == "yard");
+        const string expectedWarning = "Example Map [example/map; version 1.0.0]. Definition Data/scene-patches.json; operation yard; object " +
+            "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Yard [UnityEngine.Transform]. " +
+            "This path names a container object. A container object isn't a group. Edit the groups it holds. " +
+            "Patcher 0.5.0; game 0.6.3. Report to the mod author. Mod author: Example author.";
+        Assert(warning.Message == expectedWarning, "The native warning gives the author the reason to correct the file entry: " + warning.Message);
+        Assert(warning.Cause == FailureCause.InvalidDefinition, "The container path is an invalid definition.");
         var yard = result.Outcomes["yard"]; var part = result.Outcomes["post-as-part"];
-        Assert(!yard.Applied && (yard.Error ?? "").Contains(BakedSceneryRules.FolderRefusal), "A group modification that names a folder fails with the folder's reason: " + yard.Error);
+        Assert(!yard.Applied && (yard.Error ?? "").Contains(BakedSceneryRules.ContainerRefusal), "A group modification that names a container object fails with the container object's reason: " + yard.Error);
         Assert(!part.Applied && (part.Error ?? "").Contains(BakedSceneryRules.GroupRootRefusal), "A part modification that names a group root fails with the group root's reason: " + part.Error);
         Assert(result.Outcomes["move-jetty"].Applied && f.World.Mutations == before + 1 && Near(f.MapOf(f.Jetty).Position, JettyTarget), "The other modification still applies, and the refused ones mutate nothing");
         // An identity without a structure names the group root once: the part capability claims a group root only
@@ -223,7 +235,7 @@ static class BakedPartTests {
         var before = f.World.Mutations;
         var result = f.Engine.Apply(Doc(Part("container", "Culled", JettyTarget), Part("move-jetty", "Jetty", JettyTarget, JettyTurn)));
         var failure = result.Outcomes["container"];
-        Assert(!failure.Applied && (failure.Error ?? "").Contains("culling container"), "A path that names a culling container fails that modification with the reason: " + failure.Error);
+        Assert(!failure.Applied && (failure.Error ?? "").Contains("This path names a culling container. It holds parts for the game's culling. Edit those parts directly."), "A path that names a culling container fails that modification with the reason: " + failure.Error);
         Assert(result.Outcomes["move-jetty"].Applied && f.World.Mutations == before + 1 && Near(f.MapOf(f.Jetty).Position, JettyTarget), "The other modification still applies, and the refused one mutates nothing");
     }
 

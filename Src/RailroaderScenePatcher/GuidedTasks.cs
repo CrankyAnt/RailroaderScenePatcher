@@ -79,7 +79,7 @@ namespace RailroaderScenePatcher {
         }
         string GuidedBlock(GuidedTaskKind kind) {
             if (selected == null) return "Inspect an object first.";
-            var block = (IsStarter ? StarterBlock() : EditBlock()) ?? GuidedTaskState.TargetBlock(kind, selected.Identity);
+            var block = (IsStarter ? StarterEditBlock() : EditBlock()) ?? GuidedTaskState.TargetBlock(kind, selected.Identity);
             if (block != null) return block;
             switch (kind) {
                 case GuidedTaskKind.Placement: return PadBlock ?? (IsStarter ? StarterPlacements.ObjectSettings : null);
@@ -156,7 +156,7 @@ namespace RailroaderScenePatcher {
             var fill = view.GetComponent<LayoutElement>();
             if (fill != null) { fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
             // Reserve the inspector tab action row, even though guided actions live in the footer.
-            ActionRow(builder, Array.Empty<Act>(), null); builder.Spacer(TabGap);
+            ActionRow(builder, Array.Empty<Act>(), null);
         }
         // Where the history holds a state; a state it cannot read stands.
         HistoryStep StepOf(long state) {
@@ -195,7 +195,9 @@ namespace RailroaderScenePatcher {
                     PlainLabel(builder, "Remove the logical track binding without changing the object's placement or activity.");
                     break;
                 case GuidedTaskKind.MarkerId:
-                    ValueRow(builder, "Replacement ID", null, new[] { "ID" }, guidedFields, 0, ChoiceBlock, "Enter an ID that no other scene marker or map object uses. It can't begin with passengerStop: or flare:.", column => false);
+                    // The same field as the Connections tab's: free text, with the instruction below it while it can be edited.
+                    ValueRow(builder, "Replacement ID", null, new[] { "ID" }, guidedFields, 0, ChoiceBlock, CommandBand.ReplacementIdTip, column => false, freeText: true);
+                    if (ChoiceBlock == null) PlainLabel(builder, CommandBand.ReplacementIdInstruction);
                     break;
                 default:
                     ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, guidedFields, 0, ChoiceBlock, "Enter the segment ID, end a or b, and distance in meters.", column => column == 2);

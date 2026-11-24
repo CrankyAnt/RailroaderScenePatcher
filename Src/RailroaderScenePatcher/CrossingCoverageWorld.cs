@@ -124,7 +124,7 @@ namespace RailroaderScenePatcher {
             roots[scene] = root;
             return root;
         }
-        // Builds the span disabled, as the native span loader does, and enables it once its ID and endpoints are set, so its own
+        // Builds the span disabled, as the game's track span loader does, and enables it once its ID and endpoints are set, so its own
         // lifecycle registers it.
         public object CreateSpan(object target, string id, SpanRange range) {
             var owner = (GameObject)target;

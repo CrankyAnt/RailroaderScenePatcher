@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
-// Road bridges: the road bridge constructions of the base-game map join the Baked scenery group family under Bridge /
+// The road bridges of the base-game map join the Baked scenery group family under Bridge /
 // Road bridges, each with its parts. A road bridge carries a renderer culler and its own scene ground mask on its root,
 // so a move takes the mask's registration along, with the terrain output at the old and the new place tracked to
 // completion. The roads themselves are native map data.

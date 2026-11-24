@@ -260,7 +260,7 @@ static class FileImportTests {
         world.Outside(Doc(Item("a", "p", 119)));
         Assert(world.Session.OpenImport().Applied, "Overview opens");
         var patch = world.Store.Patch; var nativeWrites = world.History.NativeWrites;
-        Assert(world.Session.SaveRefusalBeforeWrite() == "Click Import to finish the import before saving. After Cancel, choose a version in the Version choice panel before saving.",
+        Assert(world.Session.SaveRefusalBeforeWrite() == "An import is open in Scene Patcher. Click Import or Cancel first.",
             "Save is refused with the visible actions while the Import panel is open");
         var result = world.History.Save();
         Assert(result != null && world.Store.Patch == patch && world.Store.PatchWrites == 0 && world.History.NativeWrites == nativeWrites, "The refused Save writes nothing");

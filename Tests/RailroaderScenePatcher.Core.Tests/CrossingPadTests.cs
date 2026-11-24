@@ -75,14 +75,14 @@ class FakePadInspection : IInspectionScene {
     public IEnumerable<string> MapIds => world.MapIds;
     public IEnumerable<SceneObservation> Discover() => world.Objects.SelectMany(o => o.Value.Select(target => {
         var m = (FakeMarker)target;
-        var parts = new List<RailroaderScenePatcher.HierarchyPart> {
-            new RailroaderScenePatcher.HierarchyPart(o.Key + " [Track.TrackMarker]", true, false),
-            new RailroaderScenePatcher.HierarchyPart(o.Key + " [Track.TrackCurveMeshBuilder]", true, false) };
+        var components = new List<RailroaderScenePatcher.HierarchyComponent> {
+            new RailroaderScenePatcher.HierarchyComponent(o.Key + " [Track.TrackMarker]", true, false),
+            new RailroaderScenePatcher.HierarchyComponent(o.Key + " [Track.TrackCurveMeshBuilder]", true, false) };
         if (world.Geometry(m).Generated)
-            parts.Add(new RailroaderScenePatcher.HierarchyPart(o.Key + "/Mesh/Curve Mesh [UnityEngine.MeshRenderer]", !world.Visible.TryGetValue(m, out var visible) || visible, true));
+            components.Add(new RailroaderScenePatcher.HierarchyComponent(o.Key + "/Mesh/Curve Mesh [UnityEngine.MeshRenderer]", !world.Visible.TryGetValue(m, out var visible) || visible, true));
         return new SceneObservation(m, new TargetIdentity("BushnellWhittier", o.Key, "Track.TrackMarker", CrossingPadScene.Structure), "Crossing pad marker", m.Active,
             world.Position(m), world.Rotation(m), new[] { "Marker segment=" + m.Segment + "; end=" + m.End + "; distance=" + m.Distance },
-            RailroaderScenePatcher.HierarchyDependencies.Describe(DescribeAsPad, parts), Array.Empty<string>(), "pad binding");
+            RailroaderScenePatcher.HierarchyDependencies.Describe(DescribeAsPad, components), Array.Empty<string>(), "pad binding");
     }));
 }
 static class CrossingPadTests {
@@ -167,11 +167,11 @@ static class CrossingPadTests {
     // A pad can carry a mesh object that was saved with the scene under the builder's container. The first generation
     // destroys it and builds a runtime one. Neither is a dependency, so the pad's dependency lines stay the same.
     static void ASavedMeshUnderThePadContainerIsOutput() {
-        RailroaderScenePatcher.HierarchyPart Part(string label, bool createdAtRuntime, bool belowContainer) =>
-            new RailroaderScenePatcher.HierarchyPart(label, null, RailroaderScenePatcher.HierarchyDependencies.IsOutput(createdAtRuntime, belowContainer));
-        var before = new[] { Part("pad [Track.TrackMarker]", false, false), Part("pad [Track.TrackCurveMeshBuilder]", false, false), Part("pad/Curve Mesh [UnityEngine.MeshFilter]", false, true), Part("pad/Curve Mesh [UnityEngine.MeshRenderer]", false, true) };
-        var after = new[] { Part("pad [Track.TrackMarker]", false, false), Part("pad [Track.TrackCurveMeshBuilder]", false, false), Part("pad/Curve Mesh [UnityEngine.MeshFilter]", true, true), Part("pad/Curve Mesh [UnityEngine.MeshRenderer]", true, true) };
-        var never = new[] { Part("pad [Track.TrackMarker]", false, false), Part("pad [Track.TrackCurveMeshBuilder]", false, false) };
+        RailroaderScenePatcher.HierarchyComponent Component(string label, bool createdAtRuntime, bool belowContainer) =>
+            new RailroaderScenePatcher.HierarchyComponent(label, null, RailroaderScenePatcher.HierarchyDependencies.IsOutput(createdAtRuntime, belowContainer));
+        var before = new[] { Component("pad [Track.TrackMarker]", false, false), Component("pad [Track.TrackCurveMeshBuilder]", false, false), Component("pad/Curve Mesh [UnityEngine.MeshFilter]", false, true), Component("pad/Curve Mesh [UnityEngine.MeshRenderer]", false, true) };
+        var after = new[] { Component("pad [Track.TrackMarker]", false, false), Component("pad [Track.TrackCurveMeshBuilder]", false, false), Component("pad/Curve Mesh [UnityEngine.MeshFilter]", true, true), Component("pad/Curve Mesh [UnityEngine.MeshRenderer]", true, true) };
+        var never = new[] { Component("pad [Track.TrackMarker]", false, false), Component("pad [Track.TrackCurveMeshBuilder]", false, false) };
         var lines = RailroaderScenePatcher.HierarchyDependencies.Describe(true, before).ToArray();
         if (!lines.SequenceEqual(RailroaderScenePatcher.HierarchyDependencies.Describe(true, after)) || !lines.SequenceEqual(RailroaderScenePatcher.HierarchyDependencies.Describe(true, never)))
             throw new Exception("A saved mesh, a generated mesh and no mesh under the pad's container give the same dependency lines: " + String.Join(" | ", lines));
