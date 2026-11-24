@@ -70,14 +70,14 @@ static class ObjectMarkingGeometryTests {
         var boxes = new[] {
             new ObjectMarkingBox("shed", new WorldPoint(0, 4, 0), new WorldPoint(10, 4, 6), null, ObjectMarkingBoxKind.Mesh, ground),
             new ObjectMarkingBox("bin", new WorldPoint(18, 2, 4), new WorldPoint(4, 2, 4), null, ObjectMarkingBoxKind.Mesh, ground),
-            new ObjectMarkingBox("lamp", new WorldPoint(-25, 3, -8), new WorldPoint(.3, 3, .3), null, ObjectMarkingBoxKind.Mesh, ground),
+            new ObjectMarkingBox("lamp", new WorldPoint(-25, 3, 0), new WorldPoint(.3, 3, .3), null, ObjectMarkingBoxKind.Mesh, ground),
             // A pier footing runs 5 m into the ground: the cut box stands from the ground to the roof, the uncut box
             // reaches down to the footing.
             new ObjectMarkingBox("pier", new WorldPoint(5, -1, 0), new WorldPoint(1, 4, 1), null, ObjectMarkingBoxKind.Mesh, ground)
         };
-        // The one box around the boxes runs from x -25.3 to 22, y -5 to 8 and z -8.3 to 8; cut at the ground it runs
-        // from y 0 to 8.
-        var cut = new WorldPoint(-1.65, 4, -.15); var uncut = new WorldPoint(-1.65, 1.5, -.15);
+        // The one box around the boxes, square to the world, runs from x -25.3 to 22, y -5 to 8 and z -6 to 8; cut at
+        // the ground it runs from y 0 to 8.
+        var cut = new WorldPoint(-1.65, 4, 1); var uncut = new WorldPoint(-1.65, 1.5, 1);
         bool At(WorldPoint? p, WorldPoint q) => p.HasValue && Math.Abs(p.Value.X - q.X) < 1e-6 && Math.Abs(p.Value.Y - q.Y) < 1e-6 && Math.Abs(p.Value.Z - q.Z) < 1e-6;
         var anchor = new WorldPoint(0, 0, 0);
         var cameras = new[] { new WorldPoint(0, 40, -134), new WorldPoint(0, 60, -190), new WorldPoint(-120, 50, -110), new WorldPoint(70, 180, -40) };
@@ -686,7 +686,12 @@ static class ObjectMarkingGeometryTests {
         var along = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, slabs, slant, View, null, ObjectMarkingGeometry.FrameDistance, own);
         var world = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, slabs, slant, View, null, ObjectMarkingGeometry.FrameDistance, WorldBasis.World);
         var unknown = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, slabs, slant, View, null);
-        Check(along.Frame.HasValue && world.Frame.HasValue && Shoelace(along.Outline) < .35 * Shoelace(world.Outline), "the box of several boxes stands in the object's orientation: " + Shoelace(along.Outline) + " against " + Shoelace(world.Outline));
+        // In the world's directions the box would be a square of about 15 m: as a single box of those corners.
+        var square = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, new[] { new ObjectMarkingBox("square", new WorldPoint(5 * h, 0, 100 + 5 * h), new WorldPoint(10.5 * h, .5, 10.5 * h)) }, slant, View, null);
+        Check(along.Frame.HasValue && square.Frame.HasValue && Shoelace(along.Outline) < .35 * Shoelace(square.Outline), "the box of several boxes stands in the object's orientation: " + Shoelace(along.Outline) + " against " + Shoelace(square.Outline));
+        // An object whose own axes are the world's while its boxes lie along the diagonal is framed along them
+        // (FittedFrameTests).
+        Check(world.Frame.HasValue && Math.Abs(Shoelace(world.Outline) - Shoelace(along.Outline)) < 1e-3 * Shoelace(along.Outline), "the box lies along the boxes, not along axes that do not fit them");
         Check(Math.Abs(Shoelace(unknown.Outline) - Shoelace(along.Outline)) < 1e-3, "without an orientation the box takes the directions of the box at the marker");
         // Both ends of both slabs lie inside the frame.
         foreach (var slab in slabs) foreach (var point in slab.Oriented) {

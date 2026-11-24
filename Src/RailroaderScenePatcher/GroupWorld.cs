@@ -786,6 +786,8 @@ namespace RailroaderScenePatcher {
                 foreach (var owner in world.GetComponentsInChildren(driven.Item1, true))
                     if (owner != null && driven.Item2.GetValue(owner) is Component target && target != null) found.Add(target.transform);
         }
+        // The object or one above it is a transform the game animates, as of the last classification.
+        internal static bool MovesWhileRunning(Transform t) => Animated(t, null);
         // The part or an object above it, below the root, is a transform the game animates.
         static bool Animated(Transform part, Transform root) {
             if (driven.Count == 0) return false;
