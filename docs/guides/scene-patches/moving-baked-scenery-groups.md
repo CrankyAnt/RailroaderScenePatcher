@@ -23,7 +23,7 @@ A group contains only the objects saved below its root in the scene. Moving it l
 
 Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
-Groups containing track markers or spawn points are also marked `inspection only` and can't move as a whole. Edit their markers in the **Track marker** family and their spawn points in the **Spawn point** family. A group marked `inspection only` stays under its category in the outliner. A group that no rule recognises stands under **Unclassified**. These groups list no parts.
+Groups containing track markers or spawn points are also marked `inspection only` and can't move as a whole. Edit their markers in the **Track marker** family and their spawn points in the **Spawn point** family. A group marked `inspection only` stays under its category in the outliner. A group that fits no category stands under **Unclassified**. These groups list no parts.
 
 ## Which parts are listed
 
@@ -204,7 +204,7 @@ Two smoke decals at Dillsboro, `World/Roads Dillsboro/Bridge Smoke Decal Project
 
 ## Crossbucks at unprotected crossings
 
-You can move, rotate or disable a crossbuck at an unprotected crossing so that it stands beside the road where you moved the road or track in the native map editor. Each crossbuck is its own group under **Grade crossing**, wherever its crossing stands below `World`, such as `World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)`. Its row names the crossbuck at its crossing, for example `Sign-Crossing0 (1) at Crossing Unprotected - Bryson Everett`. When other crossings have the same name, the row also names the place where the crossing stands, for example `Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Andrews` and `Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Topton`. To find a crossing's crossbucks, search the outliner for the crossing's name. The row's tooltip shows the full path. A crossbuck is one entry: its model and LOD levels have no rows of their own.
+You can move, rotate or disable a crossbuck at an unprotected crossing so that it stands beside the road where you moved the road or track in the native map editor. Each crossbuck is its own group under **Grade crossing**, wherever its crossing stands below `World`, such as `World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)`. In the outliner, its row reads `Sign-Crossing0 (1)` and stands under the row of its crossing, for example `Crossing Unprotected - Bryson Everett`, with the crossing's pads. Crossings of one name stand under different places, such as `Crossing Unprotected - Robbinsville` under Andrews and under Topton. To find a crossing's crossbucks, search the outliner for the crossing's name. The row's tooltip shows the full path. A crossbuck is one entry: its model and LOD levels have no rows of their own.
 
 A crossbuck uses fixed placement and **Enabled**. Move it as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor), and disable it as described in [disable or enable a group](#disable-or-enable-a-group). Only the crossbuck changes. The crossing pad, the whistle signs, and the other crossbuck of the crossing keep their own families and stay where they are. To rebind the pad, see [rebind crossing pads](rebinding-crossing-pads.md); to move a whistle sign, see [repair track bindings](repairing-track-bindings.md).
 
@@ -226,7 +226,7 @@ The three unprotected crossings below `World/Roads Bryson/Old River Rd` have the
 }
 ```
 
-The outliner shows the ID in the row's name, for example `Sign-Crossing0 (1) at Crossing Unprotected in Old River Rd (pad marker Mbkd)`. On the **Object** tab, **Identity** shows it as **Pad marker ID** below the path. **Copy ID** copies it as `padMarkerId` beside the path. Without `padMarkerId`, the path names all three crossbucks, so the modification fails before anything changes. If `padMarkerId` matches no crossing pad at that path, it identifies no crossbuck and the modification also fails. When a crossing has a unique name, its crossbuck's path alone identifies it and the target refuses `padMarkerId`. Targets that aren't crossbucks also refuse this member.
+In the outliner, each of the three crossings is its own `Crossing Unprotected` row with its two crossbucks and its pad. The inspector's title shows the ID in the crossbuck's name, for example `Sign-Crossing0 (1) at Crossing Unprotected in Old River Rd (pad marker Mbkd)`. On the **Object** tab, **Identity** shows it as **Pad marker ID** below the path. **Copy ID** copies it as `padMarkerId` beside the path. Without `padMarkerId`, the path names all three crossbucks, so the modification fails before anything changes. If `padMarkerId` matches no crossing pad at that path, it identifies no crossbuck and the modification also fails. When a crossing has a unique name, its crossbuck's path alone identifies it and the target refuses `padMarkerId`. Targets that aren't crossbucks also refuse this member.
 
 ## Write the modification by hand
 
