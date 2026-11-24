@@ -46,7 +46,7 @@ namespace RailroaderScenePatcher.Core {
         // The reason a bell source is refused when this game version cannot provide crossing bells. Unlike the
         // other source refusals, it is no problem of the mod author's scene patch file.
         public const string BellsUnavailable = "crossing bells are unavailable in this version of the game";
-        public const string BellDefinitionsUnreadable = "cannot read bell definitions from the content library";
+        public const string BellDefinitionsUnreadable = "bells cannot be offered because the game's bell list could not be read. Report this to the patcher maintainer with the log";
         internal const string EmptyEquipmentObject = "An added light, gate, or bell left an empty object at this crossing";
         // Why the source kind does not fit the pattern, or null: a light or gate copies a loaded device, and a bell loads the
         // audio of a bell definition.
@@ -513,7 +513,7 @@ namespace RailroaderScenePatcher.Core {
             var problem = Coherence(owned);
             if (problem != null) { Diagnose(controller, null, null, "coherence: " + problem); return problem; }
             // Report a lone empty wrapper only after the remaining additions have passed their checks.
-            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return EquipmentAddition.EmptyEquipmentObject; }
+            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); throw new EmptyEquipmentObjectException(); }
             return null;
         }
         static string Quoted(string value) => value == null ? "null" : "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n") + "\"";

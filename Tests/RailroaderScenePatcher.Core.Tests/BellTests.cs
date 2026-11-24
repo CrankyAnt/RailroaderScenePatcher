@@ -62,7 +62,7 @@ static class BellTests {
     static void UnavailableBellRowsUseShortReasons() {
         foreach (var (problem, expected) in new[] {
             (EquipmentAddition.BellsUnavailable, "Crossing bells are unavailable in this version of the game."),
-            (EquipmentAddition.BellDefinitionsUnreadable, "Cannot read bell definitions from the content library.") }) {
+            (EquipmentAddition.BellDefinitionsUnreadable, "Bells cannot be offered because the game's bell list could not be read. Report this to the patcher maintainer with the log.") }) {
             var row = SourceCandidate.UnavailableBells(problem);
             Assert(!row.Eligible && RailroaderScenePatcher.CommandBand.Sentence(row.Problem) == expected,
                 "An unavailable bell row gives a short reason: " + row.Problem);

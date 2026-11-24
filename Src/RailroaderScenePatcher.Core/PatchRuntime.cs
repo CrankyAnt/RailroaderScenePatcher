@@ -178,7 +178,8 @@ namespace RailroaderScenePatcher.Core {
             return ReferenceEquals(row.Token, original.Token) && row.Originator == original.Originator && row.Description == original.Description ? row : null;
         }
         // An incomplete cleanup reports the state it left behind, so the report states what remains uncertain.
-        static string WithRemaining(Outcome outcome) => outcome.Remaining.Count == 0 || outcome.Failure != FailureKind.IncompleteCleanup ? outcome.Error
+        static string WithRemaining(Outcome outcome) => outcome.EquipmentCleanup != EquipmentCleanupContext.None ? EquipmentCleanupText.For(outcome.EquipmentCleanup)
+            : outcome.Remaining.Count == 0 || outcome.Failure != FailureKind.IncompleteCleanup ? outcome.Error
             : outcome.Error.TrimEnd('.') + ". Remaining state: " + String.Join("; ", outcome.Remaining);
         void Report(PatchSource source, string operation, TargetIdentity target, string error, FailureCause cause, bool scenePatchFile = false) {
             var key = (scenePatchFile ? "document/" : "operation/") + Key(source, operation);

@@ -80,7 +80,7 @@ namespace RailroaderScenePatcher {
                 if (transformer.GetMethods(Native.Flags).Count(m => m.Name == method && m.GetParameters().Length == 1) != 1) throw new MissingMethodException(TransformerType, method);
             try { bells = new CrossingBells(controller); } catch (Exception e) {
                 bellsUnavailable = EquipmentAddition.BellsUnavailable;
-                Debug.LogWarning("Scene Patcher crossing bells are unavailable: " + e);
+                Debug.LogWarning("Scene Patcher: crossing bells are unavailable: " + e);
             }
         }
         // Why bells are unavailable on this build, or null.
@@ -186,7 +186,7 @@ namespace RailroaderScenePatcher {
                     foreach (var bell in bells.All()) found.Add(SourceCandidate.Bell(bell.Identifier, bell.Name, SourceProblem(bell, destination, EquipmentAddition.BellPattern)));
                     result.AddRange(found);
                 } catch (Exception e) {
-                    Debug.LogWarning("Scene Patcher cannot read bell definitions from the content library: " + e);
+                    Debug.LogWarning("Scene Patcher: cannot read bell definitions from the content library: " + e);
                     result.Add(SourceCandidate.UnavailableBells(EquipmentAddition.BellDefinitionsUnreadable));
                 }
             }

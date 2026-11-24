@@ -79,7 +79,7 @@ Save writes the additions to `Data/scene-patches.json` and raises the patcher de
 
 If an edit fails, the message area reports whether the prior equipment was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
 
-If an added light, gate, or bell leaves an empty object at the crossing, the message says it won't be saved with the map and your edits are kept. Click **Recheck** to try removing it, or reload the Map Editor.
+If an added light, gate, or bell leaves an empty object at the crossing, the message says it won't be saved with the map. After a failed edit, it says the change was undone. After **Recheck**, it says your edits are kept. Click **Recheck** to try removing the empty object, or reload the native map editor.
 
 ## Write equipment in the scene patch file
 

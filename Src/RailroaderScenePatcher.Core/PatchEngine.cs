@@ -179,6 +179,7 @@ namespace RailroaderScenePatcher.Core {
         // What a failure did to the scene: refused before mutation, restored, or left with incomplete cleanup.
         public FailureKind Failure { get; internal set; }
         internal bool WasGuarded { get; set; }
+        internal EquipmentCleanupContext EquipmentCleanup { get; set; }
         // For an incomplete cleanup: the remaining or uncertain state, one line per setting.
         public IReadOnlyList<string> Remaining { get; internal set; } = Array.Empty<string>();
     }
@@ -475,19 +476,21 @@ namespace RailroaderScenePatcher.Core {
 #endif
                     Observe("applied", scenePatchFileKey, id, identity.Path);
                 } catch (Exception e) {
-                    bool restored = false; string restoreError = null;
+                    bool restored = false; Exception restoreError = null;
                     Observe("restore-request", scenePatchFileKey, id, identity.Path);
                     try {
 #if SCENE_PATCHER_FAULTS
                         FaultInjection.TripRestoration();
 #endif
                         restored = scene.Restore(resolved, snapshot);
-                    } catch (Exception r) { restoreError = r.Message; }
+                    } catch (Exception r) { restoreError = r; }
                     Observe("restore-result", scenePatchFileKey, id, identity.Path, restored ? "verified" : "unverified");
                     if (!restored) {
-                        var left = RemainingState.Describe(before, () => scene.Read(resolved), restoreError);
+                        var left = RemainingState.Describe(before, () => scene.Read(resolved), out var settingsMatch, restoreError?.Message);
                         SetUnsafe(resolved, true, left);
-                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The change failed. Cleanup could not be verified. Reason: " + e.Message, left);
+                        var cleanup = e is EmptyEquipmentObjectException && restoreError is EmptyEquipmentObjectException && settingsMatch
+                            ? EquipmentCleanupContext.WorldLoad : EquipmentCleanupContext.None;
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The change failed. Cleanup could not be verified. Reason: " + e.Message, left, equipmentCleanup: cleanup);
                     }
                     if (AwaitOutput(resolved)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The change failed and the object is back as it was. The game is still regenerating its dependent output. Further changes must wait until that output is verified. Reason: " + e.Message);
                     throw new AttemptFailure(FailureKind.Restored, "The change failed. The object is back as it was. Reason: " + e.Message);
@@ -501,7 +504,7 @@ namespace RailroaderScenePatcher.Core {
                 if (outcome.Failure == FailureKind.None) {
                     var attempt = e as AttemptFailure;
                     outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
-                    if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; }
+                    if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; outcome.EquipmentCleanup = attempt.EquipmentCleanup; }
                 }
                 failed[key] = outcome; Observe("failed", scenePatchFileKey, id, error: e.Message);
             }

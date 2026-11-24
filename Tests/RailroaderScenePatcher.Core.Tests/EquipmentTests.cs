@@ -66,6 +66,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     public readonly List<string> VerificationFailures = new List<string>();
     public void VerificationFailed(object controller, string detail) => VerificationFailures.Add(detail);
     public bool StickyDestroy, FailSetPlacementOnce, CullerVisible = true;
+    public Action OnDestroy;
     public FakeDevice Device(string path, Action<FakeDevice> setup = null) { var d = new FakeDevice { Path = path }; setup?.Invoke(d); Devices.Add(d); return d; }
     public IReadOnlyList<object> ResolveSource(EquipmentSource source) => source.IsDefinition ? Bells.Where(b => b.Identifier == source.Definition).Cast<object>().ToArray()
         : Devices.Where(d => d.Owner == null && d.Scene == source.Scene && d.Path == source.Path).Cast<object>().ToArray();
@@ -101,7 +102,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
         return added;
     }
     public void Destroy(object addition) {
-        Mutations++; if (StickyDestroy) return; Gone((Added)addition);
+        Mutations++; OnDestroy?.Invoke(); if (StickyDestroy) return; Gone((Added)addition);
     }
     void Gone(Added a) {
         // Destroying a destroyed object does nothing, as in the game.
@@ -195,6 +196,9 @@ static class EquipmentTests {
         AnImportRollbackAfterAVerifiedRebuildEndsCoherent();
         AnUnverifiedRebuildCleanupGuardsUntilRecheck();
         AStaleWrapperThatStaysAfterItsRebuildGuardsTheCrossing();
+        AnEditWithAnEmptyLeftoverReportsThatItWasUndone();
+        WorldLoadReportsAnEmptyLeftoverOnce();
+        EmptyLeftoverDoesNotHideOtherFailures();
         RecheckRemovesAStaleWrapperItsFileNoLongerNames();
         AnotherModsLostCopyStaysThroughFileVersionImportAndHistory();
         SourceRefusalsExplainTheProblem();
@@ -809,20 +813,8 @@ static class EquipmentTests {
         Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("An added light, gate, or bell left an empty object at this crossing"),
             "A stale wrapper that stays after its rebuild is reported: " + failed.Failure + " " + failed.Error);
         var recovery = RecoveryGuidance.For(failed, "Connections", "Recheck", null).Line("Recheck");
-        Assert(recovery == "An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map; your edits are kept. Click Recheck to try removing it, or reload the Map Editor.",
+        Assert(recovery == "An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map. Your edits are kept. Click Recheck to try removing it, or reload the native map editor.",
             "The cleanup reason composes with the recovery action: " + recovery);
-        // The short explanation is safe only when the empty wrapper is the sole unverified change.
-        var remaining = failed.Remaining;
-        foreach (var uncertain in new[] {
-            Array.Empty<string>(),
-            new[] { "Position: now 80, 2, 3, before 4, 2, 3" },
-            new[] { "The settings match their values before the attempt. The patcher could not verify the related changes. Reason: separate restoration failure" } }) {
-            typeof(Outcome).GetProperty(nameof(Outcome.Remaining)).SetValue(failed, uncertain);
-            var mixed = RecoveryGuidance.For(failed, "Connections", "Recheck", null).Line("Recheck");
-            Assert(!mixed.Contains("your edits are kept") && uncertain.All(mixed.Contains),
-                "A separate or unknown cleanup state keeps its uncertainty: " + mixed);
-        }
-        typeof(Outcome).GetProperty(nameof(Outcome.Remaining)).SetValue(failed, remaining);
         Assert(f.Live.Count(a => !a.CopyLost) == 1 && f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west") == "lamp and gate observers registered",
             "Status reads the rebuilt addition: " + f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west"));
         var again = session.Recheck(Crossing);
@@ -831,6 +823,94 @@ static class EquipmentTests {
         f.World.StickyDestroy = false;
         var recheck = session.Recheck(Crossing);
         Assert(recheck.Applied && lost.Destroyed && !session.CleanupUnverified(Crossing) && f.Live.Count == 1, "Recheck removes the stale wrapper and lifts the guard: " + recheck.Error);
+    }
+    static Fixture WithEmptyWrappers(int count = 1) {
+        var f = new Fixture();
+        var addition = West();
+        var owned = new EquipmentAddition(addition.Id, addition.Pattern, addition.Source, addition.Placement, "author/pack");
+        var source = f.World.ResolveSource(owned.Source).Single();
+        for (var i = 0; i < count; i++) {
+            var stale = (FakeEquipmentWorld.Added)f.World.Construct(f.Crossing, source, owned);
+            stale.CopyLost = true;
+        }
+        f.World.Construct(f.Crossing, source, owned);
+        return f;
+    }
+    static void AnEditWithAnEmptyLeftoverReportsThatItWasUndone() {
+        var f = WithEmptyWrappers();
+        var (_, session, mapEditor, store) = Session(Doc(Equip("signals", Addition("west"))), f);
+        var before = session.ScenePatchFileText;
+        f.World.StickyDestroy = true;
+        var failed = session.AddEquipment(Crossing, West(12));
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.ScenePatchFileText == before,
+            "The failed edit restores the scene patch file: " + failed.Error);
+        var line = RecoveryGuidance.For(failed, "Connections", "Equipment", null).Line("Equipment");
+        Assert(line == "The change was undone. An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map. Click Recheck to try removing it, or reload the native map editor.",
+            "An edit reports the rollback and leftover once: " + line);
+    }
+    sealed class EquipmentWarnings : IPatchDiagnostics {
+        public readonly List<PatchFailure> Failures = new List<PatchFailure>();
+        public void Warning(PatchFailure failure) => Failures.Add(failure);
+    }
+    static void WorldLoadReportsAnEmptyLeftoverOnce() {
+        var f = WithEmptyWrappers();
+        f.World.StickyDestroy = true;
+        var warnings = new EquipmentWarnings();
+        var runtime = new PatchRuntime(new PatchEngine(f.Scene), warnings, "0.5.0", "0.6.3");
+        runtime.Apply(Doc(Equip("signals", Addition("west", x: 12))), new PatchSource("author/pack", "Pack", "1.0.0"));
+        var message = warnings.Failures.Single().Message;
+        Assert(message.Contains("The change was undone. An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map.")
+            && message.Split(new[] { "empty object" }, StringSplitOptions.None).Length == 2
+            && !message.Contains("Remaining state:") && !message.Contains("Recheck") && message.EndsWith("Report to the patcher maintainer.", StringComparison.Ordinal),
+            "The world-load warning explains the leftover once and retains the player reporting route: " + message);
+        var mixed = WithEmptyWrappers();
+        mixed.World.StickyDestroy = true;
+        var destroys = 0;
+        mixed.World.OnDestroy = () => { if (++destroys == 2) throw new InvalidOperationException("separate restoration failure"); };
+        var mixedWarnings = new EquipmentWarnings();
+        new PatchRuntime(new PatchEngine(mixed.Scene), mixedWarnings, "0.5.0", "0.6.3")
+            .Apply(Doc(Equip("signals", Addition("west", x: 12))), new PatchSource("author/pack", "Pack", "1.0.0"));
+        var uncertain = mixedWarnings.Failures.Single().Message;
+        Assert(uncertain.Contains("Cleanup could not be verified") && uncertain.Contains("Remaining state:") && !uncertain.Contains("The change was undone."),
+            "The world-load warning keeps an independent restoration failure uncertain: " + uncertain);
+    }
+    static void EmptyLeftoverDoesNotHideOtherFailures() {
+        foreach (var forwardFails in new[] { true, false }) {
+            var f = WithEmptyWrappers();
+            var (_, session, _, _) = Session(Doc(Equip("signals", Addition("west"))), f);
+            f.World.StickyDestroy = true;
+            if (forwardFails) f.World.FailSetPlacementOnce = true;
+            else {
+                var destroys = 0;
+                f.World.OnDestroy = () => {
+                    // The same words in an ordinary exception must not stand in for a typed cleanup failure.
+                    if (++destroys == 2) throw new InvalidOperationException("An added light, gate, or bell left an empty object at this crossing");
+                };
+            }
+            var failed = session.AddEquipment(Crossing, West(12));
+            var line = RecoveryGuidance.For(failed, "Connections", "Equipment", null).Line("Equipment");
+            Assert(failed.Failure == FailureKind.IncompleteCleanup && line.Contains("What remains:") && !line.StartsWith("The change was undone.", StringComparison.Ordinal),
+                "An independent forward or restoration failure keeps the full uncertainty: " + line);
+            if (forwardFails) Assert(line.Contains("Placement injected"), "The original placement failure stays visible: " + line);
+        }
+        var changed = WithEmptyWrappers();
+        var (_, recheckSession, _, _) = Session(Doc(Equip("signals", Addition("west"))), changed);
+        changed.World.StickyDestroy = true;
+        changed.World.OnDestroy = () => changed.Crossing.Position[0] = 80;
+        var recheck = recheckSession.Recheck(Crossing);
+        var recovery = RecoveryGuidance.For(recheck, "Connections", "Recheck", null).Line("Recheck");
+        Assert(recheck.Failure == FailureKind.IncompleteCleanup && recovery.Contains("Position: now 80") && !recovery.Contains("Your edits are kept"),
+            "A Recheck with a separate state mismatch retains that mismatch: " + recovery);
+        var multiple = WithEmptyWrappers(2);
+        var (_, multipleSession, _, _) = Session(Doc(Equip("signals", Addition("west"))), multiple);
+        multiple.World.StickyDestroy = true;
+        var blocked = multipleSession.Recheck(Crossing);
+        var notice = RecoveryGuidance.For(blocked, "Connections", "Recheck", null).Line("Recheck");
+        Assert(blocked.Failure == FailureKind.IncompleteCleanup && notice.Split(new[] { "empty object" }, StringSplitOptions.None).Length == 2,
+            "Several empty wrappers produce one cleanup explanation: " + notice);
+        multiple.World.StickyDestroy = false;
+        Assert(multipleSession.Recheck(Crossing).Applied && multiple.Live.Count == 1,
+            "Recheck removes every empty wrapper while keeping the built addition");
     }
     // Recheck removes owned state its scene patch file no longer names, a stale wrapper included, although the observation
     // without it equals the desired state.

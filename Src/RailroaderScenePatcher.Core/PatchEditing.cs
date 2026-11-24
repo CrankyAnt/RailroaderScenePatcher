@@ -1256,7 +1256,7 @@ namespace RailroaderScenePatcher.Core {
             outcome.Error = e.Message;
             var attempt = e as AttemptFailure;
             outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
-            if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; }
+            if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; outcome.EquipmentCleanup = attempt.EquipmentCleanup; }
         }
         // Whether an earlier failure left the object's cleanup unverified, and the remaining or uncertain state it named.
         // Read from the identities the engine resolved, without searching or mutating the scene, so the panel can ask
@@ -1477,17 +1477,19 @@ namespace RailroaderScenePatcher.Core {
                 if (!mutating && !contentChecked) contentRefusal = e.Message;
                 // A rejection before the mutation started changed nothing in the scene and needs no restoration.
                 if (!mutating) throw;
-                var restored = false; string restoreError = null;
+                var restored = false; Exception restoreError = null;
                 try {
 #if SCENE_PATCHER_FAULTS
                     FaultInjection.TripRestoration();
 #endif
                     scene.Apply(target, prior); restored = Same(scene.Read(target), prior);
-                } catch (Exception r) { restoreError = r.Message; }
+                } catch (Exception r) { restoreError = r; }
                 if (!restored) {
-                    var left = Core.RemainingState.Describe(prior, () => scene.Read(target), restoreError);
+                    var left = Core.RemainingState.Describe(prior, () => scene.Read(target), out var settingsMatch, restoreError?.Message);
                     engine.SetUnsafe(target, true, left);
-                    throw new AttemptFailure(FailureKind.IncompleteCleanup, "The edit failed. Cleanup could not be verified. Reason: " + e.Message, left);
+                    var cleanup = e is EmptyEquipmentObjectException && restoreError is EmptyEquipmentObjectException && settingsMatch
+                        ? EquipmentCleanupContext.EditUndone : EquipmentCleanupContext.None;
+                    throw new AttemptFailure(FailureKind.IncompleteCleanup, "The edit failed. Cleanup could not be verified. Reason: " + e.Message, left, equipmentCleanup: cleanup);
                 }
                 if (engine.AwaitOutput(target)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The edit failed and the object is back as it was. The game is still regenerating its dependent output. Editing can resume once that output is verified. Reason: " + e.Message);
                 throw new AttemptFailure(FailureKind.Restored, "The edit failed. The object is back as it was. Reason: " + e.Message);
@@ -1524,9 +1526,10 @@ namespace RailroaderScenePatcher.Core {
                         if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("Applied state did not verify");
                     } catch (Exception e) {
                         // The scene patch file is the reference here: what still differs from it remains.
-                        var left = Core.RemainingState.Describe(desired, () => scene.Read(resolved), e.Message);
+                        var left = Core.RemainingState.Describe(desired, () => scene.Read(resolved), out var settingsMatch, e.Message);
                         engine.SetUnsafe(resolved, true, left);
-                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The object still does not match the scene patch file. Reason: " + e.Message, left);
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The object still does not match the scene patch file. Reason: " + e.Message, left,
+                            equipmentCleanup: e is EmptyEquipmentObjectException && settingsMatch ? EquipmentCleanupContext.Recheck : EquipmentCleanupContext.None);
                     }
                 }
                 engine.SetUnsafe(resolved, false);
