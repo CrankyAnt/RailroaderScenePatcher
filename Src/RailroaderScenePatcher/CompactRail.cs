@@ -22,13 +22,15 @@ namespace RailroaderScenePatcher {
         // body at its least height, the message area, the action row, the outliner's summary line, two rules, the grip
         // clearance, and the spacing between those eleven rows. The tallest context is the Placement body's.
         internal const float CollapsedContent = 6 * Row + PlacementCollapsedBody + MessageHeight + 2 * Rule + GripClearance + 10 * Spacing;
-        // With the outliner shown: the Placement body at its full height and the outliner rows at their least height.
-        internal const float ExpandedLeastContent = CollapsedContent + (PlacementBody - PlacementCollapsedBody) + CommandBand.OutlinerLeastHeight + Spacing;
         // The native outline row's height.
         internal const float OutlinerRow = 26;
         // The rows the outliner shows at the default height: six, so the rail leaves most of the screen's height to
         // the world and the outliner still shows a group with a few of its parts.
         internal const int OutlinerRows = 6;
+        // With the outliner shown: the Placement body at its full height and the outliner's six rows. This is the
+        // rail's default and least content height with the outliner shown. A view with a shorter context, such as the
+        // Object tab's three lines, gives the height left over to the message area, never to the outliner.
+        internal const float ExpandedLeastContent = CollapsedContent + (PlacementBody - PlacementCollapsedBody) + OutlinerRows * OutlinerRow + Spacing;
         // The context lines most views show: position, rotation, and enabled for an object with a placement of its own.
         internal const int ContextLines = 3;
 
@@ -54,11 +56,12 @@ namespace RailroaderScenePatcher {
         internal static float ContextPadding(int lines, float lineHeight, float spacing) =>
             lines >= ContextLines ? 0 : (ContextLines - lines) * (lineHeight + spacing) - spacing;
 
-        // The window height in pixels that gives the outliner exactly its default rows, from the current height and the
-        // outliner viewport's available height in canvas units, within the least height and the screen.
-        internal static float FittedHeight(float currentHeight, float availableRows, float scale, float leastHeight, float screenHeight) {
-            var height = currentHeight + (OutlinerRows * OutlinerRow - availableRows) * scale;
-            return Math.Min(Math.Max(height, leastHeight), screenHeight);
+        // The outliner rows a rail of windowHeight pixels shows: the default six at the default height, and one more
+        // for each whole row's height the user added by resizing. The outliner's height is always whole rows, so no
+        // row is cut off; the height left over goes to the message area.
+        internal static int OutlinerRowsFor(float windowHeight, float defaultHeight, float scale) {
+            var extra = (windowHeight - defaultHeight) / (OutlinerRow * (scale > 0 ? scale : 1));
+            return OutlinerRows + Math.Max(0, (int)Math.Floor(extra + 0.01f));
         }
 
         // The default place in pixels: at the right screen edge, bottom-aligned, no larger than the screen.
@@ -122,15 +125,50 @@ namespace RailroaderScenePatcher {
         internal string Rewrite(string current) => saved != null && current != saved ? saved : null;
     }
 
-    // The help and the session details move beside the window again when compact mode ends and on Reset layout. They
-    // move once the button that asked for it is up, since layout places nothing while it is down, and one tick later,
-    // once the window has its new place.
-    internal sealed class SecondaryWindowReset {
+    // Runs a window move once the mouse button that asked for it is up and one more tick has passed. A button acts on
+    // the release, and the native map editor reads that same release: a window that moved away in that frame left the
+    // pointer over the world, and the editor took the release as a click there and selected an object. Moves that
+    // follow a button therefore wait for this. The help and the session details wait for it too, after the window has
+    // its new place.
+    internal sealed class AfterRelease {
         const int Ticks = 2;
         int left;
         internal bool Pending => left > 0;
         internal void Request() { left = Ticks; }
-        // Counts one tick; true on the tick that places the windows.
+        internal void Cancel() { left = 0; }
+        // Counts one tick; true on the tick that runs the move.
         internal bool Tick(bool buttonDown) => left > 0 && !buttonDown && --left == 0;
+    }
+
+    // Where the compact rail stands. A rail the user dragged or resized keeps that place for the session, also through
+    // a UI scale change; a rail at its default place follows the default place. Rectangles are pixels.
+    internal sealed class RailPlacement {
+        PanelPlacement.Area placed;
+        float placedScale;
+        // The rectangle the user left the rail at, or null while it stands where the patcher placed it.
+        internal PanelPlacement.Area? Dragged { get; private set; }
+        // The patcher placed the rail at rect, at scale.
+        internal void Placed(PanelPlacement.Area rect, float scale) {
+            placed = rect; placedScale = scale;
+            if (Dragged != null) Dragged = rect;
+        }
+        // Looks at the rail's bounds each tick. Bounds that differ from the placed rectangle by more than a pixel, at the
+        // scale it was placed at and with no button down, are the user's drag or resize: true when that is new. A scale
+        // change resizes the native window by itself, so bounds at another scale are no drag.
+        internal bool Observe(PanelPlacement.Area bounds, float scale, bool buttonDown) {
+            if (buttonDown || scale != placedScale || bounds.Width <= 0 || bounds.Height <= 0) return false;
+            if (Math.Abs(bounds.X - placed.X) <= 1 && Math.Abs(bounds.Y - placed.Y) <= 1 && Math.Abs(bounds.Width - placed.Width) <= 1 && Math.Abs(bounds.Height - placed.Height) <= 1) return false;
+            placed = bounds; Dragged = bounds;
+            return true;
+        }
+        // On a UI scale change: the dragged rail's place at the new scale (CompactRail.Rescaled), or null for the
+        // default place.
+        internal PanelPlacement.Area? AfterScaleChange(float scale, float leastWidth, float leastHeight, float screenWidth, float screenHeight) {
+            if (Dragged == null) return null;
+            Dragged = CompactRail.Rescaled(Dragged.Value, placedScale, scale, leastWidth, leastHeight, screenWidth, screenHeight);
+            return Dragged;
+        }
+        // Reset layout: the rail opens at its default place again.
+        internal void Forget() { Dragged = null; }
     }
 }

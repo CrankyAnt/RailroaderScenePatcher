@@ -297,8 +297,10 @@ namespace RailroaderScenePatcher {
 
         void CompactFooter(UIPanelBuilder builder, CompactView view) {
             var area = DrawMessages(builder, CompactRail.MessageHeight);
-            // With the outliner hidden, the message area takes the free height unless the Placement body does.
-            area.flexibleHeight = !presentation.CompactOutlinerShown && !FillsRail(view) ? 10000 : 0;
+            // The message area takes the height the rows above leave free, so a short context, such as the Object tab's
+            // three lines, gives its room to the messages and never to the outliner. With the outliner hidden, the
+            // Placement body takes that height instead.
+            area.flexibleHeight = presentation.CompactOutlinerShown || !FillsRail(view) ? 10000 : 0;
             var acts = selection?.Pending != null || gizmo?.Active == true ? FooterActs() : selected == null && !guided.Enabled ? new Act[0] : view.Acts();
             ActionRow(builder, acts, null);
         }
@@ -360,8 +362,10 @@ namespace RailroaderScenePatcher {
                 toggle.Tooltip(open ? "Hide outliner" : "Show outliner", open ? "Hide the outliner to leave more of the world in view." : "Show the outliner in this rail.");
             }).ChildrenKeepHeight().Height(RowHeight);
             if (!presentation.CompactOutlinerShown) return;
+            // Exactly the presentation's whole rows: six at the default height, more when the user made the rail higher.
             var outliner = builder.VStack(column => DrawOutlinerRows(column, measure)).gameObject.AddComponent<LayoutElement>();
-            outliner.flexibleHeight = 10000; outliner.flexibleWidth = 10000;
+            outliner.minHeight = outliner.preferredHeight = presentation.CompactOutlinerHeight;
+            outliner.flexibleHeight = 0; outliner.flexibleWidth = 10000;
         }
 
         // One debug line per mode or outliner switch: the presentation's part, the active tab or guided task, the

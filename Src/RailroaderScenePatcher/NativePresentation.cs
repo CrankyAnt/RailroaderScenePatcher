@@ -668,15 +668,17 @@ namespace RailroaderScenePatcher {
             tooltip.DynamicTooltipInfo = () => new TooltipInfo("Outliner width", CommandBand.Tooltip("Drag to resize the outliner.", lockReason));
         }
         // Forgets the saved bounds and places the window at its default position again.
-        internal void ResetLayout() {
+        // The request comes from a button, so the window moves once the button is up and one tick has passed
+        // (AfterRelease): the native map editor reads the release too, and a window that moved away in that frame left
+        // the pointer over the world.
+        internal void ResetLayout() => Defer(() => {
+            if (disposed) return;
             if (Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=reset layout"); }
             ForgetCompactLayout();
             ResetSecondaryWindows();
             try { Game.GlobalPreferences.SetString("window." + ScenePatchWindow.WindowIdentifier, ""); } catch { }
-            // The request comes from a button press, and layout moves nothing while a button is down: the next layout
-            // after the release places the window.
             hadSavedBounds = false; panelPlaced = false; nextLayout = 0;
-        }
+        });
         // A native vertical scroll region that takes the remaining height and never less than minimumHeight. A content
         // refresh keeps the distance scrolled from the top of the region built last.
         internal RectTransform Scroll(UIPanelBuilder builder, float minimumHeight, Action<UIPanelBuilder> body, bool keepPosition = true) {

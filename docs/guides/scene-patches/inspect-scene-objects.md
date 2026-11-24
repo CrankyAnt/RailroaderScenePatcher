@@ -31,7 +31,7 @@ From top to bottom, the rail shows:
 
 The compact window has no tabs, search field, outliner filters, or **Reset filter**. A filter or search set in the full window stays active, and the object count shows it in amber. To change tabs, filters, or modes, or to finish a guided task, switch to the full window.
 
-The outliner shows only whole rows: scrolling stops on a row, and space left below the last row stays empty. Click **Hide outliner** to make the rail lower; click **Show outliner** to show the rows again.
+The outliner shows only whole rows, and scrolling stops on a row. When you make the compact window higher, the outliner shows one more row for each row's height you add, and the message area takes the rest. Click **Hide outliner** to make the rail lower; click **Show outliner** to show the rows again.
 
 You can drag and resize the compact window. It keeps that place and size until you leave the Map Editor or click **Reset layout**, also when you change the UI scale, and the full window keeps its own place and size. The patcher always starts in the full window, and the full window's place is the one saved for the next session. Each time you switch back to the full window, the help and the session details move beside it, wherever you placed them before. When a scene patch file needs a decision in the **Version choice** or **Repair** panel, the window switches to the full window.
 

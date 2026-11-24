@@ -16,8 +16,9 @@ namespace RailroaderScenePatcher {
         internal bool CompactOutlinerShown { get; private set; } = true;
         // Called after each mode or outliner switch with the presentation's part of the log line.
         internal Action<string> CompactSwitched;
-        // Where the user left the compact rail, in screen pixels, for this session only, and the rectangle last placed.
-        Rect compactRect, compactPlacedRect;
+        // Where the compact rail stands, and its height with the outliner shown and hidden once the user changed it, in
+        // screen pixels, for this session only.
+        readonly RailPlacement railPlace = new RailPlacement();
         float compactExpandedHeight, compactCollapsedHeight;
         // The UI scale the rail was last placed at. Its rectangles are screen pixels, which a scale change rescales.
         float compactScale;
@@ -61,17 +62,27 @@ namespace RailroaderScenePatcher {
             return fullSprite = Glyph("CrankyAnt Scene Patcher full window glyph", covers, out fullTexture);
         }
 
+        // The title-bar icon and the window help's button. The switch waits until the button is up and one tick has
+        // passed (AfterRelease), so the window does not move away from under the release.
         internal void ToggleCompact() {
-            if (disposed || !IsOpen || repairMode) return;
-            if (Compact) ExitCompact(); else EnterCompact();
-            CompactSwitched?.Invoke(CompactState());
+            if (disposed || !IsOpen || repairMode || afterRelease.Pending) return;
+            Defer(() => {
+                if (disposed || !IsOpen || repairMode) return;
+                if (Compact) ExitCompact(); else EnterCompact();
+                CompactSwitched?.Invoke(CompactState());
+            });
         }
 
-        // Hides or shows the outliner inside the compact rail, keeping the user's dragged X and width.
+        // A window move asked for by a button, run by CompactTick once the button is up.
+        Action deferredMove;
+        readonly AfterRelease afterRelease = new AfterRelease();
+        void Defer(Action move) { deferredMove = move; afterRelease.Request(); }
+
+        // Hides or shows the outliner inside the compact rail, keeping the user's dragged X and width. The rail's height
+        // changes by the outliner's rows, so the outliner's button stays under the pointer when the bottom edge is kept.
         internal void ToggleCompactOutliner() {
             if (disposed || !Compact || !IsOpen) return;
             var current = PanelBounds;
-            RememberCompactRect();
             if (current.height > 0) {
                 if (CompactOutlinerShown) compactExpandedHeight = current.height;
                 else compactCollapsedHeight = current.height;
@@ -79,10 +90,9 @@ namespace RailroaderScenePatcher {
             CompactOutlinerShown = !CompactOutlinerShown;
             if (resizer != null) { try { resizer.minSize = CompactMinimumSize(); } catch { } }
             var frame = WindowFrame();
-            if (CompactOutlinerShown && compactExpandedHeight <= 0 && compactRect.width <= 0) StartOutlinerFit();
             var targetHeight = CompactOutlinerShown
-                ? (compactExpandedHeight > 0 ? compactExpandedHeight : CompactDefaultExpandedHeight(frame.y))
-                : (compactCollapsedHeight > 0 ? compactCollapsedHeight : (CompactRail.CollapsedContent + frame.y) * scale);
+                ? (compactExpandedHeight > 0 ? compactExpandedHeight : CompactDefaultHeight(true, frame.y))
+                : (compactCollapsedHeight > 0 ? compactCollapsedHeight : CompactDefaultHeight(false, frame.y));
             targetHeight = Mathf.Clamp(targetHeight, CompactMinimumSize().y * scale, Screen.height);
             var width = current.width > 0 ? Mathf.Min(current.width, Screen.width) : Mathf.Min((CompactRail.Width + frame.x) * scale, Screen.width);
             var x = current.width > 0 ? Mathf.Clamp(current.x, 0, Mathf.Max(0, Screen.width - width)) : Mathf.Max(0, Screen.width - width);
@@ -91,7 +101,6 @@ namespace RailroaderScenePatcher {
             var y = anchorBottom ? current.yMax - targetHeight : current.y;
             y = Mathf.Clamp(y, 0, Mathf.Max(0, Screen.height - targetHeight));
             PlaceCompactRect(new Rect(x, y, width, targetHeight));
-            if (compactRect.width > 0) compactRect = compactPlacedRect;
             dirty = true;
             CompactSwitched?.Invoke(CompactState() + "; reason=" + (CompactOutlinerShown ? "show outliner" : "hide outliner"));
         }
@@ -116,20 +125,17 @@ namespace RailroaderScenePatcher {
             dirty = true;
         }
 
-        // A compact window the user dragged or resized keeps that rectangle for this session; it never snaps back.
-        void RememberCompactRect() {
-            var current = PanelBounds;
-            if (current.width <= 0) return;
-            if (Mathf.Abs(current.x - compactPlacedRect.x) > 1 || Mathf.Abs(current.y - compactPlacedRect.y) > 1 ||
-                Mathf.Abs(current.width - compactPlacedRect.width) > 1 || Mathf.Abs(current.height - compactPlacedRect.height) > 1) {
-                compactRect = current;
-                if (CompactOutlinerShown) compactExpandedHeight = current.height;
-                else compactCollapsedHeight = current.height;
-            }
+        // A rail the user dragged or resized keeps that rectangle for the session; the height it has with the outliner
+        // shown or hidden is kept for the next switch of the outliner.
+        void NoticeDrag() {
+            var bounds = PanelBounds;
+            if (!railPlace.Observe(Area(bounds), scale, Input.GetMouseButton(0))) return;
+            if (CompactOutlinerShown) compactExpandedHeight = bounds.height;
+            else compactCollapsedHeight = bounds.height;
         }
 
         void ExitCompact() {
-            RememberCompactRect();
+            NoticeDrag();
             ClearFocus();
             Compact = false;
             if (resizer != null) { try { resizer.minSize = fullResizerMinimum; } catch { } resizer = null; }
@@ -145,7 +151,7 @@ namespace RailroaderScenePatcher {
 
         // Reset layout: the rail opens at its default place and height again, with the outliner shown.
         void ForgetCompactLayout() {
-            compactRect = Rect.zero;
+            railPlace.Forget();
             compactExpandedHeight = 0;
             compactCollapsedHeight = 0;
             CompactOutlinerShown = true;
@@ -160,25 +166,21 @@ namespace RailroaderScenePatcher {
             if (compactScale != scale) {
                 var ratio = compactScale > 0 ? scale / compactScale : 1;
                 compactExpandedHeight *= ratio; compactCollapsedHeight *= ratio;
-                if (compactRect.width > 0) {
-                    var least = CompactMinimumSize() * scale;
-                    var kept = CompactRail.Rescaled(new PanelPlacement.Area { X = compactRect.x, Y = compactRect.y, Width = compactRect.width, Height = compactRect.height },
-                        compactScale, scale, least.x, least.y, Screen.width, Screen.height);
-                    compactRect = new Rect(kept.X, kept.Y, kept.Width, kept.Height);
-                }
-                PlaceCompact();
+                var least = CompactMinimumSize() * scale;
+                var kept = railPlace.AfterScaleChange(scale, least.x, least.y, Screen.width, Screen.height);
+                if (kept is PanelPlacement.Area dragged) { compactScale = scale; PlaceCompactRect(new Rect(dragged.X, dragged.Y, dragged.Width, dragged.Height)); }
+                else PlaceCompact();
                 CompactSwitched?.Invoke(CompactState() + "; reason=ui scale");
                 return;
             }
             var current = PanelBounds;
             if (current.width <= 0 || current.height <= 0) return;
-            var within = PanelPlacement.Within(new PanelPlacement.Area { X = current.x, Y = current.y, Width = current.width, Height = current.height }, Screen.width, Screen.height);
+            var within = PanelPlacement.Within(Area(current), Screen.width, Screen.height);
             if (within == null) { PlaceCompact(); return; }
             var inside = within.Value;
             if (Mathf.Abs(inside.X - current.x) <= 0.5f && Mathf.Abs(inside.Y - current.y) <= 0.5f &&
                 Mathf.Abs(inside.Width - current.width) <= 0.5f && Mathf.Abs(inside.Height - current.height) <= 0.5f) return;
             PlaceCompactRect(new Rect(inside.X, inside.Y, inside.Width, inside.Height));
-            if (compactRect.width > 0) compactRect = compactPlacedRect;
         }
 
         // The native persistence saves position and content size whenever the user drags or resizes the window. While
@@ -192,18 +194,21 @@ namespace RailroaderScenePatcher {
         }
 
         void CompactTick() {
-            if (secondaryReset.Tick(Input.GetMouseButton(0))) PlaceSecondaryWindowsBeside();
+            var buttonDown = Input.GetMouseButton(0);
+            if (afterRelease.Tick(buttonDown)) { var move = deferredMove; deferredMove = null; move?.Invoke(); }
+            if (secondaryReset.Tick(buttonDown)) PlaceSecondaryWindowsBeside();
             if (!Compact) return;
             // Closed by a route other than Close: the window gets its full rectangle back for the next open.
             if (!IsOpen) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=closed elsewhere"); return; }
             RestoreFullRecord();
+            if (compactScale == scale) NoticeDrag();
+            FollowOutlinerRows();
             TrimOutlinerToWholeRows();
-            if (outlinerFitFrames > 0 && --outlinerFitFrames == 0) FitOutlinerRows();
         }
 
         // ---- Help and session details ----
 
-        readonly SecondaryWindowReset secondaryReset = new SecondaryWindowReset();
+        readonly AfterRelease secondaryReset = new AfterRelease();
 
         // The help and the session details open beside the window again: their places are dropped on every exit from
         // compact mode, wherever they were placed, and on Reset layout. The full and compact window places are not
@@ -223,18 +228,29 @@ namespace RailroaderScenePatcher {
 
         // ---- Outliner rows ----
 
+        // The rows the compact outliner shows: six at the default height, more when the user made the rail higher. The
+        // rail gives the outliner exactly that many whole rows (OutlinerHeight), and the message area takes what is left.
+        internal int CompactOutlinerRows { get; private set; } = CompactRail.OutlinerRows;
+        internal float CompactOutlinerHeight => CompactOutlinerRows * CompactRail.OutlinerRow;
+
+        // Follows a resize by the user: a change of whole rows rebuilds the rail with the new outliner height.
+        void FollowOutlinerRows() {
+            var bounds = PanelBounds;
+            if (!CompactOutlinerShown || bounds.height <= 0) return;
+            var rows = CompactRail.OutlinerRowsFor(bounds.height, CompactDefaultHeight(true, WindowFrame().y), scale);
+            if (rows == CompactOutlinerRows) return;
+            CompactOutlinerRows = rows;
+            dirty = true;
+        }
+
         ScrollRect trimmedOutlinerView;
         // The viewport's bottom and top offsets as the native view made them, and the scroll offset last snapped to.
         Vector2 outlinerViewportBase;
         float outlinerSnappedOffset;
-        int outlinerFitFrames, outlinerFitTries;
 
-        // The height the viewport would have without trimming, in canvas units.
-        float OutlinerViewportAvailable(ScrollRect view) =>
-            ((RectTransform)view.transform).rect.height + outlinerViewportBase.y - outlinerViewportBase.x;
-
-        // The compact outliner shows whole rows: the viewport is cut down to a whole number of rows, and the scroll
-        // offset rests on a row boundary, in the direction it moved. The native view's rows start at the content's top.
+        // The compact outliner shows whole rows: its height is whole rows already, and the viewport is cut to whole
+        // rows in case the native view takes part of it, such as for a horizontal scroll bar. The scroll offset rests
+        // on a row boundary, in the direction it moved. The native view's rows start at the content's top.
         void TrimOutlinerToWholeRows() {
             var view = OutlinerView;
             if (view == null || !CompactOutlinerShown) return;
@@ -245,7 +261,7 @@ namespace RailroaderScenePatcher {
                 outlinerViewportBase = new Vector2(viewport.offsetMin.y, viewport.offsetMax.y);
                 outlinerSnappedOffset = view.content == null ? 0 : view.content.anchoredPosition.y;
             }
-            var available = OutlinerViewportAvailable(view);
+            var available = ((RectTransform)view.transform).rect.height + outlinerViewportBase.y - outlinerViewportBase.x;
             var whole = CompactRail.WholeRows(available);
             var bottom = outlinerViewportBase.x + Mathf.Max(0, available - whole);
             if (Mathf.Abs(viewport.offsetMin.y - bottom) > 0.25f) viewport.offsetMin = new Vector2(viewport.offsetMin.x, bottom);
@@ -258,25 +274,6 @@ namespace RailroaderScenePatcher {
             outlinerSnappedOffset = offset;
         }
 
-        // Fits the rail to the outliner's default rows a few frames after the content is laid out.
-        void StartOutlinerFit() { outlinerFitFrames = 3; outlinerFitTries = 2; }
-
-        // At its default place the rail takes the height that gives the outliner its default rows exactly, keeping
-        // its bottom edge. A rail the user resized or dragged keeps its size.
-        void FitOutlinerRows() {
-            if (!CompactOutlinerShown || compactRect.width > 0 || compactExpandedHeight > 0) return;
-            var view = OutlinerView;
-            if (view == null || trimmedOutlinerView != view) return;
-            var current = PanelBounds;
-            if (current.height <= 0) return;
-            var height = CompactRail.FittedHeight(current.height, OutlinerViewportAvailable(view), scale, CompactMinimumSize().y * scale, Screen.height);
-            if (Mathf.Abs(height - current.height) < 0.5f * scale) return;
-            var y = Mathf.Clamp(current.yMax - height, 0, Mathf.Max(0, Screen.height - height));
-            PlaceCompactRect(new Rect(current.x, y, current.width, height));
-            // The layout follows in a later frame; one more look corrects what it changed.
-            if (--outlinerFitTries > 0) outlinerFitFrames = 3;
-        }
-
         // The least window size in canvas units: the rail's content with the outliner shown or hidden, and the frame.
         Vector2 CompactMinimumSize() => new Vector2(CompactRail.Width, CompactOutlinerShown ? CompactRail.ExpandedLeastContent : CompactRail.CollapsedContent) + WindowFrame();
 
@@ -286,39 +283,38 @@ namespace RailroaderScenePatcher {
             return ((RectTransform)native.transform).rect.size - native.GetContentSize();
         }
 
-        // A first guess with the outliner's default rows in place of its least height; FitOutlinerRows corrects it
-        // once the content is laid out.
-        float CompactDefaultExpandedHeight(float frameY) =>
-            Mathf.Min(Screen.height, (CompactRail.ExpandedLeastContent - CommandBand.OutlinerLeastHeight + CompactRail.OutlinerRows * CompactRail.OutlinerRow + frameY) * scale);
+        // The rail's default height in pixels, with the outliner shown or hidden: its least content and the frame.
+        float CompactDefaultHeight(bool outlinerShown, float frameY) =>
+            Mathf.Min(Screen.height, ((outlinerShown ? CompactRail.ExpandedLeastContent : CompactRail.CollapsedContent) + frameY) * scale);
 
         // The compact rail's rectangle in screen pixels: at the right edge and bottom-aligned by default, or the
-        // rectangle the user dragged it to in this session.
+        // rectangle the user dragged it to in this session, inside the screen.
         void PlaceCompact() {
             compactScale = scale;
-            if (compactRect.width > 0 && compactRect.height > 0) {
-                var width = Mathf.Min(compactRect.width, Screen.width);
-                var height = Mathf.Min(compactRect.height, Screen.height);
-                var x = Mathf.Clamp(compactRect.x, 0, Mathf.Max(0, Screen.width - width));
-                var y = Mathf.Clamp(compactRect.y, 0, Mathf.Max(0, Screen.height - height));
+            if (railPlace.Dragged is PanelPlacement.Area dragged) {
+                var width = Mathf.Min(dragged.Width, Screen.width);
+                var height = Mathf.Min(dragged.Height, Screen.height);
+                var x = Mathf.Clamp(dragged.X, 0, Mathf.Max(0, Screen.width - width));
+                var y = Mathf.Clamp(dragged.Y, 0, Mathf.Max(0, Screen.height - height));
                 PlaceCompactRect(new Rect(x, y, width, height));
                 return;
             }
             var frame = WindowFrame();
-            var defaultHeight = CompactOutlinerShown ? CompactDefaultExpandedHeight(frame.y) : (CompactRail.CollapsedContent + frame.y) * scale;
-            var place = CompactRail.DefaultPlace((CompactRail.Width + frame.x) * scale, defaultHeight, Screen.width, Screen.height);
-            if (CompactOutlinerShown) StartOutlinerFit();
+            var place = CompactRail.DefaultPlace((CompactRail.Width + frame.x) * scale, CompactDefaultHeight(CompactOutlinerShown, frame.y), Screen.width, Screen.height);
             PlaceCompactRect(new Rect(place.X, place.Y, place.Width, place.Height));
         }
 
         void PlaceCompactRect(Rect rect) {
-            compactPlacedRect = rect;
+            railPlace.Placed(Area(rect), scale);
             Place((RectTransform)window.transform, rect);
             boundsFrame = -1;
         }
 
+        static PanelPlacement.Area Area(Rect rect) => new PanelPlacement.Area { X = rect.x, Y = rect.y, Width = rect.width, Height = rect.height };
+
         string CompactState() {
             var bounds = PanelBounds;
-            return "mode=" + (Compact ? "compact" : "full") + "; outliner=" + (CompactOutlinerShown ? "shown" : "hidden") +
+            return "mode=" + (Compact ? "compact" : "full") + "; outliner=" + (CompactOutlinerShown ? "shown (" + CompactOutlinerRows + " rows)" : "hidden") +
                 "; rect=(" + Mathf.RoundToInt(bounds.x) + ", " + Mathf.RoundToInt(bounds.y) + ", " + Mathf.RoundToInt(bounds.width) + " x " + Mathf.RoundToInt(bounds.height) + ") px; scale=" + scale.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 

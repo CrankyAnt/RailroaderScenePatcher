@@ -11,20 +11,21 @@ static class CompactRailTests {
         TheOutlinerShowsOnlyWholeRows();
         ScrollingRestsOnARowBoundaryInItsDirection();
         AShortContextKeepsTheRoomOfThreeLines();
-        TheRailFitsItsHeightToTheDefaultRows();
+        TheOutlinerKeepsSixRowsUntilTheUserAddsWholeRows();
         TheRailOpensAtTheRightEdgeBottomAligned();
         ATrackLocationReadsAsOneLine();
         FiltersKeepTheirFullWindowNames();
         TheFullWindowComesBackInCanvasUnits();
         ADraggedRailKeepsItsPlaceOnAScaleChange();
         TheFullRecordIsWrittenBackWhileCompact();
-        TheSecondaryWindowsMoveOnceTheButtonIsUp();
-        Console.WriteLine("PASS: compact window sizes, rows, scrolling, context room, places across scale changes, full record, secondary windows and one-line texts");
+        MovesWaitUntilTheButtonIsUp();
+        ADraggedRailIsNoticedBeforeAScaleChange();
+        Console.WriteLine("PASS: compact window sizes, rows, scrolling, context room, places across scale changes, full record, moves after the release and one-line texts");
     }
 
     static void TheRailSizesFollowFromItsRows() {
         Check(Near(CompactRail.CollapsedContent, 476), "With the outliner hidden, the least content height is 476");
-        Check(Near(CompactRail.ExpandedLeastContent, 656), "With the outliner shown, the least content height is 656");
+        Check(Near(CompactRail.ExpandedLeastContent, 692), "With the outliner shown, the default and least content height is 692: six rows above the hidden state's 476 with the full Placement body");
         Check(CompactRail.OutlinerRows == 6, "The default outliner shows six rows");
         Check(CompactRail.OutlinerRows * CompactRail.OutlinerRow > CommandBand.OutlinerLeastHeight, "The default rows stand above the outliner's least height");
     }
@@ -55,13 +56,14 @@ static class CompactRailTests {
         Check(Near(CompactRail.ContextPadding(1, 20, 4), 44), "One line keeps two more lines with their spacing");
     }
 
-    static void TheRailFitsItsHeightToTheDefaultRows() {
-        // Twelve rows' space at scale 1 gives up six rows of 26 units.
-        Check(Near(CompactRail.FittedHeight(800, 312, 1, 400, 1440), 644), "The rail gives up the rows above the default");
-        Check(Near(CompactRail.FittedHeight(800, 312, 1.25f, 400, 1440), 605), "The rows are scaled to pixels");
-        Check(Near(CompactRail.FittedHeight(800, 100, 1, 400, 1440), 856), "Too few rows make the rail higher");
-        Check(Near(CompactRail.FittedHeight(500, 400, 1, 450, 1440), 450), "The rail keeps its least height");
-        Check(Near(CompactRail.FittedHeight(1400, 0, 1, 400, 1440), 1440), "The rail stays within the screen");
+    static void TheOutlinerKeepsSixRowsUntilTheUserAddsWholeRows() {
+        // A default rail of 738 pixels at scale 1: the outliner shows six rows, and the message area takes what a
+        // shorter context leaves free.
+        Check(CompactRail.OutlinerRowsFor(738, 738, 1) == 6, "At the default height the outliner shows six rows");
+        Check(CompactRail.OutlinerRowsFor(763, 738, 1) == 6, "Less than a row more keeps six rows");
+        Check(CompactRail.OutlinerRowsFor(764, 738, 1) == 7, "A whole row more shows seven rows");
+        Check(CompactRail.OutlinerRowsFor(738 + 26 * 4 * 1.25f, 738, 1.25f) == 10, "The rows are scaled to pixels");
+        Check(CompactRail.OutlinerRowsFor(700, 738, 1) == 6, "A rail below the default keeps six rows");
     }
 
     static void TheRailOpensAtTheRightEdgeBottomAligned() {
@@ -120,13 +122,39 @@ static class CompactRailTests {
         Check(record.Rewrite("compact") == null, "A record that could not be read is not written");
     }
 
-    static void TheSecondaryWindowsMoveOnceTheButtonIsUp() {
-        var reset = new SecondaryWindowReset();
-        Check(!reset.Tick(false) && !reset.Pending, "Without a request nothing moves");
-        reset.Request();
-        Check(!reset.Tick(true) && !reset.Tick(true) && reset.Pending, "Nothing moves while the button is down");
-        Check(!reset.Tick(false), "The first tick after the release lets the window take its place");
-        Check(reset.Tick(false) && !reset.Pending, "The next tick moves the secondary windows");
-        Check(!reset.Tick(false), "They move once per request");
+    static void MovesWaitUntilTheButtonIsUp() {
+        var wait = new AfterRelease();
+        Check(!wait.Tick(false) && !wait.Pending, "Without a request nothing moves");
+        // The request comes from a button's click, which acts on the release frame.
+        wait.Request();
+        Check(!wait.Tick(false), "Nothing moves on the release frame, which the native map editor also reads");
+        Check(wait.Tick(false) && !wait.Pending, "The move runs one tick later");
+        Check(!wait.Tick(false), "It runs once per request");
+        wait.Request();
+        Check(!wait.Tick(true) && !wait.Tick(true) && wait.Pending, "Nothing moves while the button is down");
+        Check(!wait.Tick(false) && wait.Tick(false), "The move follows the release by a tick");
+        wait.Request(); wait.Cancel();
+        Check(!wait.Tick(false) && !wait.Tick(false), "A cancelled move does not run");
+    }
+
+    static void ADraggedRailIsNoticedBeforeAScaleChange() {
+        // At 1.25 the rail stands at its default place; the user drags it to the middle, then sets the scale to 1.0.
+        var place = new RailPlacement();
+        var fallback = new PanelPlacement.Area { X = 2085, Y = 518, Width = 475, Height = 922 };
+        place.Placed(fallback, 1.25f);
+        Check(place.AfterScaleChange(1, 380, 738, 2560, 1440) == null, "A rail at its default place goes to the default place");
+        place.Placed(fallback, 1.25f);
+        Check(!place.Observe(fallback, 1.25f, false), "The placed rectangle is no drag");
+        var middle = new PanelPlacement.Area { X = 1000, Y = 300, Width = 475, Height = 922 };
+        Check(!place.Observe(middle, 1.25f, true), "A drag in progress is not taken yet");
+        Check(place.Observe(middle, 1.25f, false) && place.Dragged != null, "A tick after the drag notices it");
+        var kept = place.AfterScaleChange(1, 380, 738, 2560, 1440);
+        Check(kept != null && Near(kept.Value.X, 1000) && Near(kept.Value.Y, 300) && Near(kept.Value.Width, 380) && Near(kept.Value.Height, 738),
+            "After the scale change the rail keeps its corner and takes the new scale's size");
+        place.Placed(kept.Value, 1);
+        var nativeResize = new PanelPlacement.Area { X = 1000, Y = 300, Width = 475, Height = 922 };
+        Check(!place.Observe(nativeResize, 1.25f, false), "The native resize on a scale change is no drag");
+        place.Forget();
+        Check(place.Dragged == null && place.AfterScaleChange(1.25f, 380, 738, 2560, 1440) == null, "Reset layout forgets the drag");
     }
 }
