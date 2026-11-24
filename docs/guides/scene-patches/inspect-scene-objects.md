@@ -10,11 +10,30 @@ Drag the title to move the window. Use its close control or click its entry agai
 
 The minimum size is 704 by 470 units. This leaves the outliner, command band, and a tab body in view, with independent scrolling for the tab body and message area. If the panel was open when you left the native map editor, it opens again when you return.
 
-The title bar has three glyphs to the left of the close control. Each has a tooltip with its name:
+The title bar has four glyphs to the left of the close control. Each has a tooltip with its name:
 
 - **?** opens help for the whole window.
-- **Reset layout**, a round arrow, restores the window's default position and the outliner width.
+- **Reset layout**, a round arrow, restores the window's default position and the outliner width. It also puts the help and the session details back beside the window, and the compact window back at its default place and height.
 - **Session details**, a page, opens or closes a separate window with the edited mod's scene patch file, supplied definitions, diagnostics and, during a world choice, its candidates. You can move and resize this window. It keeps its position and closes with the panel.
+- **Compact window**, four corners pointing inwards, switches to the compact window. In the compact window, the glyph shows four corners pointing outwards and is named **Full window**; click it to show the full window again.
+
+### Use the compact window
+
+The compact window is a narrow side rail at the right edge of the screen, bottom-aligned, that leaves more of the world in view. It follows the tab or guided task that was open in the full window and keeps the inspected object, a pending world choice, and a placement in progress.
+
+From top to bottom, the rail shows:
+
+- **Refresh** with the two status lamps, and **Select in world**, **Focus**, **Clear**, and **Copy ID**.
+- The object's name with the open tab, or **Guided**, at its right, and the object's state line.
+- A few lines about the object for the open tab, such as its position, rotation, and **Enabled**, or its track binding. On the **Placement** tab, the rail shows the tab's own controls.
+- The message area, six lines high, and one row of actions. During a world choice, the row holds **Confirm**, **Cancel**, **Focus**, and **Details**.
+- The outliner's object count with **Hide outliner** at its right, and the outliner rows. By default, the outliner shows six rows.
+
+The compact window has no tabs, search field, outliner filters, or **Reset filter**. A filter or search set in the full window stays active, and the object count shows it in amber. To change tabs, filters, or modes, or to finish a guided task, switch to the full window.
+
+The outliner shows only whole rows: scrolling stops on a row, and space left below the last row stays empty. Click **Hide outliner** to make the rail lower; click **Show outliner** to show the rows again.
+
+You can drag and resize the compact window. It keeps that place and size until you leave the Map Editor or click **Reset layout**, and the full window keeps its own place. The patcher always starts in the full window, and the full window's place is the one saved for the next session. Help and the session details that you open in the compact window move beside the full window when you switch back. When a scene patch file needs a decision in the **Version choice** or **Repair** panel, the window switches to the full window.
 
 Click **Refresh** in the command band to read the loaded scene and the edited mod's supplied definitions and verify stored target identities. Refresh doesn't apply scene patches, save files, change object activity, repair bindings, or regenerate dependent output. An object can appear without a scene patch or warning.
 
