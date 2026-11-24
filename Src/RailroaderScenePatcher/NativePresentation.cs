@@ -85,18 +85,19 @@ namespace RailroaderScenePatcher {
         bool hadSavedBounds;
         internal string EntryProblem { get; private set; }
         bool openOnTick;
-        // The title bar holds, left of the close button and from right to left, the window's "?", the Reset layout icon
-        // and the Session details icon: bare glyphs in the close glyph's colour, without a button face, each named in
-        // its tooltip. TitleHelpProblem says why the title bar could
-        // not take the "?"; the owner then keeps a "?" in the command band. TitleReset and TitleDetails say whether
-        // each icon stands in the title bar; without one the owner keeps a button for it in the window help.
+        // The title bar holds, left of the close button and from right to left, the window's "?", the Reset layout icon,
+        // the Session details icon and the Compact window icon: bare glyphs in the close glyph's colour, without a button
+        // face, each named in its tooltip. TitleHelpProblem says why the title bar could not take the "?"; the owner then
+        // keeps a "?" in the command band. TitleReset, TitleDetails and TitleCompact say whether each icon stands in the
+        // title bar; without one the owner keeps a button for it in the window help.
         internal Action ResetRequested;
         internal string TitleHelpProblem { get; private set; }
-        // Why the Reset layout or the Session details icon could not join the title bar, or null.
+        // Why the Reset layout, the Session details or the Compact window icon could not join the title bar, or null.
         internal string TitleIconProblem { get; private set; }
         internal bool TitleHelp => titleHelp != null;
         internal bool TitleReset => titleReset != null;
         internal bool TitleDetails => titleDetails != null;
+        internal bool TitleCompact => titleCompact != null;
         RectTransform titleHelp, titleReset, titleDetails, titleClose;
         // Why the window's own controls are unavailable while the file panel is open, or null. The session details stay
         // available: the Repair panel's Details opens them. The window help stays available too, so the help is at hand
@@ -320,7 +321,7 @@ namespace RailroaderScenePatcher {
             }, out detailsTexture);
         }
         // Directly left of the close button, as high as it, in the close button's own parent: the "?" first, the
-        // Reset layout icon left of that, the Session details icon left of that.
+        // Reset layout icon left of that, the Session details icon left of that, and the Compact window icon left of that.
         void PlaceTitleHelp() {
             if (titleHelp == null || titleClose == null) return;
             var parent = titleHelp.parent as RectTransform;

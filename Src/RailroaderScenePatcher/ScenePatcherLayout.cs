@@ -1835,7 +1835,7 @@ namespace RailroaderScenePatcher {
             ["main"] = new HelpText { Title = "Scene Patcher help", Intro = "Edit scene objects here, then save.",
                 Terms = new[] {
                     new[] { "Save", "The Map Editor's Save button writes map data, Data/scene-patches.json, and the patcher dependency in Info.json. Save never reloads." },
-                    new[] { "Title bar", "Reset layout restores the window position and outliner width. Session details shows information about this editing session." },
+                    new[] { "Title bar", "Reset layout restores the window position and outliner width. Session details shows information about this editing session. Compact window switches to a narrow side rail; Full window switches back." },
                     new[] { "Clear", "Ends the inspection and cancels a pending world choice, gizmo, or snap. Clicking the inspected row does the same. Applied changes stay. During guided Values or Review, either action cancels a pending world choice and keeps the target and draft. Without a pending choice, neither action is allowed. Return to Inspector to cancel the task. With the pointer over this window, Escape closes an open choice list first. Further presses cancel a drag or a pending world choice, gizmo, or snap, one action per press. Escape keeps the inspection and guided task." },
                     new[] { "Undo and Redo", "Every completed edit here is one Undo step. Use Undo and Redo in the Map Editor." },
                     new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after an edit in the native map editor, Undo, or Redo; a stale object list refuses edits." },
@@ -1907,9 +1907,10 @@ namespace RailroaderScenePatcher {
             if (!Help.TryGetValue(region, out var help)) return;
             builder.AddLabel("<style=H3>" + help.Title + "</style>");
             // The window commands stand in the title bar; where it could not take one, the window's help holds it.
-            if (region == NativePresentation.WindowHelpRegion && (!presentation.TitleReset || !presentation.TitleDetails)) builder.HStack(row => {
+            if (region == NativePresentation.WindowHelpRegion && (!presentation.TitleReset || !presentation.TitleDetails || !presentation.TitleCompact)) builder.HStack(row => {
                 if (!presentation.TitleReset) Button(row, "Reset layout", ResetLayout).Tooltip("Reset layout", "Put the window at its default place again and restore the outliner width.");
                 if (!presentation.TitleDetails) Button(row, "Session details", () => presentation.ToggleDetails()).Tooltip("Session details", "Open or close the session details in their own window.");
+                if (!presentation.TitleCompact) Button(row, "Compact window", () => presentation.ToggleCompact()).Tooltip("Compact window", "Switch to a compact side rail that leaves more of the world in view.");
             }).Height(RowHeight);
             builder.AddLabel(help.Intro);
             // Each term is a caption above its explanation, as a named value is in the tabs.

@@ -75,7 +75,7 @@ namespace RailroaderScenePatcher {
             return fullSprite = Glyph("CrankyAnt Scene Patcher full window glyph", covers, out fullTexture);
         }
 
-        void ToggleCompact() {
+        internal void ToggleCompact() {
             if (disposed || !IsOpen || repairMode) return;
             if (Compact) ExitCompact(); else EnterCompact();
             CompactSwitched?.Invoke(CompactState());
