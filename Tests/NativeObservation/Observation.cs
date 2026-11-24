@@ -18,6 +18,20 @@ public sealed class ObservationEntry : IModEntryPoint, IWorldLifecycle {
     public void OnWorldUnload() { probe.WorldUnload(); }
     public void OnModUnload() { if (host != null) UnityEngine.Object.Destroy(host); }
 }
+// How a buffered attempt trace is tied to a world load. It uses no Unity type, so a recorded observations.jsonl can be
+// replayed through it outside the game.
+public static class TraceLoad {
+    // A trace captured outside a load names none. Its sourceLoadId can be a JSON null or a string value that is null,
+    // which is what assigning a null string to a JObject member gives; both count as unassigned.
+    public static bool Unassigned(JObject trace) => trace != null && String.IsNullOrEmpty((string)trace["sourceLoadId"]);
+    // Gives an unassigned trace the load it was captured for, marked as assigned at the observer's world-load callback.
+    public static void Assign(JObject trace, string loadId) {
+        if (!Unassigned(trace) || String.IsNullOrEmpty(loadId)) return;
+        trace["sourceLoadId"] = loadId; trace["sourceLifecycle"] = "active-world"; trace["assignedAtWorldLoad"] = true;
+    }
+    // The event a buffered trace is written as once the observer is ready for the load.
+    public static string Event(JObject trace, string loadId) => (string)trace?["sourceLoadId"] == loadId ? "attempt-trace" : "unassigned-attempt-trace";
+}
 public sealed class Observation : MonoBehaviour {
     const BindingFlags F = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
     const string Home = @"C:\TMP\RailroaderMapResearch\RuntimeHome";
@@ -32,7 +46,7 @@ public sealed class Observation : MonoBehaviour {
     // this load: they get its load ID, and assignedAtWorldLoad marks that they arrived before this callback.
     public void WorldLoad() {
         Unsubscribe(); loaded = true; ready = false; mapId = null; loadId = Guid.NewGuid().ToString("N"); baselinePoint = null; referenceSource = null; referenceError = null;
-        foreach (var trace in buffered) if (trace["sourceLoadId"]?.Type == JTokenType.Null || trace["sourceLoadId"] == null) { trace["sourceLoadId"] = loadId; trace["sourceLifecycle"] = "active-world"; trace["assignedAtWorldLoad"] = true; }
+        foreach (var trace in buffered) TraceLoad.Assign(trace, loadId);
     }
     public void WorldUnload() { if (ready && GuardStillValid()) Emit("world-unload", new JObject()); loaded = false; ready = false; Unsubscribe(); buffered.Clear(); }
     void OnDestroy() { Application.logMessageReceived -= Log; Unsubscribe(); }
@@ -63,7 +77,7 @@ public sealed class Observation : MonoBehaviour {
             tileEvent = terrain.GetType().GetEvent("OnTileBuilt", F); if (tileEvent == null || tileEvent.EventHandlerType != typeof(Action<Bounds>)) throw new MissingMemberException("OnTileBuilt");
             if (railroaderHash == null) { var game = HashFile(TypeNamed("Game.ActiveMapDefinition").Assembly.Location); var observer = HashFile(Assembly.GetExecutingAssembly().Location); var patcher = HashFile(TypeNamed("RailroaderScenePatcher.PatcherBehaviour").Assembly.Location); railroaderHash = game; observerHash = observer; patcherHash = patcher; coreHash = HashFile(TypeNamed("RailroaderScenePatcher.Core.PatchEngine").Assembly.Location); } if (fixture) LoadReference(); file = Path.Combine(directory, "Evidence", loadId, "observations.jsonl"); Directory.CreateDirectory(Path.GetDirectoryName(file));
             if (fixture) { tileHandler = TileBuilt; tileEvent.AddEventHandler(terrain, tileHandler); } else tileEvent = null; ready = true;
-            Emit("world-ready", new JObject { ["path"] = file, ["fixtureMap"] = fixture, ["engineRuntimeId"] = EngineRuntimeId(), ["gameVersion"] = Application.version, ["referenceSource"] = referenceSource == null ? null : referenceSource.DeepClone(), ["referenceError"] = referenceError }); foreach (var trace in buffered) Emit((string)trace["sourceLoadId"] == loadId ? "attempt-trace" : "unassigned-attempt-trace", trace); buffered.Clear(); status = !fixture ? "Recording attempt traces on " + mapId + ". Snapshots need the fixture map." : referenceError == null ? "Ready. Record each phase explicitly." : "Invalid baseline reference: " + referenceError;
+            Emit("world-ready", new JObject { ["path"] = file, ["fixtureMap"] = fixture, ["engineRuntimeId"] = EngineRuntimeId(), ["gameVersion"] = Application.version, ["referenceSource"] = referenceSource == null ? null : referenceSource.DeepClone(), ["referenceError"] = referenceError }); foreach (var trace in buffered) Emit(TraceLoad.Event(trace, loadId), trace); buffered.Clear(); status = !fixture ? "Recording attempt traces on " + mapId + ". Snapshots need the fixture map." : referenceError == null ? "Ready. Record each phase explicitly." : "Invalid baseline reference: " + referenceError;
         } catch (Exception e) { status = "Waiting: " + e.GetBaseException().Message; }
     }
     void Unsubscribe() { if (tileEvent != null && terrain != null && tileHandler != null) tileEvent.RemoveEventHandler(terrain, tileHandler); tileEvent = null; tileHandler = null; terrain = null; }
@@ -72,7 +86,7 @@ public sealed class Observation : MonoBehaviour {
     // object, inside the game's log line, which ends with the line's properties.
     const string AttemptTrace = "Attempt trace: ";
     static JObject TracePayload(string condition) { var at = condition.IndexOf(AttemptTrace, StringComparison.Ordinal); if (at < 0) return null; try { using (var reader = new JsonTextReader(new StringReader(condition.Substring(at + AttemptTrace.Length)))) return JObject.Load(reader); } catch { return null; } }
-    void Log(string condition, string stack, LogType type) { if (condition == null || condition.IndexOf(AttemptTrace, StringComparison.Ordinal) < 0) return; var json = TracePayload(condition); var trace = new JObject { ["message"] = condition, ["trace"] = json?.DeepClone(), ["logType"] = type.ToString(), ["sourceFrame"] = Time.frameCount, ["sourceUtc"] = DateTime.UtcNow.ToString("O"), ["sourceLoadId"] = loaded ? loadId : null, ["sourceLifecycle"] = loaded ? "active-world" : "unassigned", ["engineRuntimeId"] = json?["engineRuntimeId"]?.DeepClone() }; if (!ready) { buffered.Add(trace); return; } try { GuardHome(); Emit("attempt-trace", trace); if (!tracingSnapshot && json != null && mapId == FixtureMap) { var stage = (string)json["stage"]; if (stage == "mutation" || stage == "applied" || stage == "restore-request" || stage == "restore-result") { tracingSnapshot = true; try { Snapshot("trace-" + stage); } finally { tracingSnapshot = false; } } } } catch (Exception e) { status = e.GetBaseException().Message; } }
+    void Log(string condition, string stack, LogType type) { if (condition == null || condition.IndexOf(AttemptTrace, StringComparison.Ordinal) < 0) return; var json = TracePayload(condition); var trace = new JObject { ["message"] = condition, ["trace"] = json?.DeepClone(), ["logType"] = type.ToString(), ["sourceFrame"] = Time.frameCount, ["sourceUtc"] = DateTime.UtcNow.ToString("O"), ["sourceLoadId"] = loaded ? (JToken)loadId : JValue.CreateNull(), ["sourceLifecycle"] = loaded ? "active-world" : "unassigned", ["engineRuntimeId"] = json?["engineRuntimeId"]?.DeepClone() }; if (!ready) { buffered.Add(trace); return; } try { GuardHome(); Emit("attempt-trace", trace); if (!tracingSnapshot && json != null && mapId == FixtureMap) { var stage = (string)json["stage"]; if (stage == "mutation" || stage == "applied" || stage == "restore-request" || stage == "restore-result") { tracingSnapshot = true; try { Snapshot("trace-" + stage); } finally { tracingSnapshot = false; } } } } catch (Exception e) { status = e.GetBaseException().Message; } }
     void Emit(string kind, JObject data) { data["schemaVersion"] = 1; data["evidenceKind"] = "native-observation"; data["railroaderSha256"] = railroaderHash; data["installedAssemblySha256"] = observerHash; data["patcherAssemblySha256"] = patcherHash; data["coreAssemblySha256"] = coreHash; data["event"] = kind; data["sequence"] = ++sequence; data["loadId"] = loadId; data["frame"] = Time.frameCount; data["processId"] = System.Diagnostics.Process.GetCurrentProcess().Id; data["mapId"] = mapId; data["utc"] = DateTime.UtcNow.ToString("O"); File.AppendAllText(file, data.ToString(Formatting.None) + "\n"); }
     static Type TypeNamed(string name) => AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType(name, false)).First(t => t != null);
     static object Read(object o, string name) { var t = o as Type ?? o.GetType(); var instance = o is Type ? null : o; for (; t != null; t = t.BaseType) { var p = t.GetProperty(name, F | BindingFlags.DeclaredOnly); if (p != null) return p.GetValue(instance, null); var f = t.GetField(name, F | BindingFlags.DeclaredOnly); if (f != null) return f.GetValue(instance); } throw new MissingMemberException(name); }
