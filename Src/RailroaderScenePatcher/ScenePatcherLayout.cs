@@ -974,11 +974,17 @@ namespace RailroaderScenePatcher {
         // The kind of the open equipment form, as its labels name it.
         string EquipmentKind => equipmentSource?.IsDefinition == true ? "bell" : "light or gate";
         static string AddedEquipmentFamily(EquipmentSource source) => source.IsDefinition ? CommandBand.AddedBellFamily : CommandBand.AddedEquipmentFamily;
+        bool revealEquipmentForm;
         void DrawEquipmentForm(UIPanelBuilder builder) {
             var block = EditBlock();
             var bell = equipmentSource.IsDefinition;
             {
                 var label = Section(builder, equipmentLabel);
+                // The form was just opened, as by Use or Edit in the list below it: it scrolls into view once.
+                if (revealEquipmentForm) presentation.Reveal(label, line => {
+                    revealEquipmentForm = false;
+                    PatcherLog.Debug(CommandBand.LogLine("Connections", selected?.Identity.Path, line));
+                });
                 if (equipmentEdited != null) {
                     label.Tooltip("Equipment", equipmentLabel);
                     FitEquipmentText(label.GetComponent<TMP_Text>(), AddedEquipmentFamily(equipmentSource), equipmentLabel, value => "<b>" + Literal(value) + "</b>");

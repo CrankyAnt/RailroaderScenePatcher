@@ -50,7 +50,14 @@ namespace RailroaderScenePatcher {
         }
 
         static void AttachViewIcon(RectTransform segment, Sprite fallback, string iconName) {
-            foreach (var label in segment.GetComponentsInChildren<TMP_Text>(true)) label.gameObject.SetActive(false);
+            // A native segment is a RailroaderButton. Its Awake reads the colour of the text it finds among active
+            // objects, so a switched-off text object left it none: the first Show of a window built while hidden threw
+            // in Awake for each segment. The text stays active and empty, and takes no room in the segment's layout.
+            foreach (var label in segment.GetComponentsInChildren<TMP_Text>(true)) {
+                label.text = "";
+                if (label.gameObject != segment.gameObject)
+                    (label.GetComponent<LayoutElement>() ?? label.gameObject.AddComponent<LayoutElement>()).ignoreLayout = true;
+            }
             var hlg = segment.GetComponent<HorizontalLayoutGroup>();
             if (hlg != null) {
                 hlg.childAlignment = TextAnchor.MiddleCenter;

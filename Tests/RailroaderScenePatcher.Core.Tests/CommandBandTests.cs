@@ -20,6 +20,7 @@ static class CommandBandTests {
         ADisabledControlKeepsItsDescription();
         HierarchyLinesHaveAShortForm();
         ChoiceLabelsLeadWithWhatTellsThemApart();
+        AnOpenedFormScrollsIntoView();
         PartsReadAsPartsInWorldChoicesAndTheStateLine();
         AConfirmedWorldChoiceIsADebugLineLikeItsRefusals();
         APendingWorldChoiceKeepsItsClickFromTheGamesClickTargets();
@@ -771,6 +772,20 @@ static class CommandBandTests {
         definitions.Written("pack", "{}");
         definitions.Reset();
         Check(!definitions.ShownOutdated, "A new load attempt starts over");
+    }
+    static void AnOpenedFormScrollsIntoView() {
+        // current, top, bottom, view, content: distances in units from the top of the scrolled content.
+        // The walkthrough: Use on a bell row near the bottom of the Connections tab opened the form at the tab's top.
+        Check(CommandBand.RevealOffset(900, 0, 220, 400, 1400) == 0, "A form at the top of the tab, above the view, scrolls the tab to its top");
+        Check(CommandBand.RevealOffset(100, 150, 300, 400, 1400) == 100, "A form already in view leaves the scroll where it is");
+        Check(CommandBand.RevealOffset(0, 600, 800, 400, 1400) == 400, "A form below the view comes up until its bottom is in view");
+        Check(CommandBand.RevealOffset(0, 600, 1300, 400, 1400) == 600, "A form taller than the view shows its top");
+        Check(CommandBand.RevealOffset(0, 1300, 1400, 400, 1400) == 1000, "The offset stays within what the region scrolls");
+        Check(CommandBand.RevealOffset(50, 0, 100, 400, 300) == 0, "Content shorter than the view does not scroll");
+        // The reveal says in the debug log what it did, so a game run shows whether it acted.
+        Check(CommandBand.RevealLog(new float[] { 900, 0, 0, 220, 400, 1400 }) == "Scrolled the opened form into view: from 900 to 0. Form 0 to 220, view 400 of 1400.", "A reveal that scrolls logs from where to where: " + CommandBand.RevealLog(new float[] { 900, 0, 0, 220, 400, 1400 }));
+        Check(CommandBand.RevealLog(new float[] { 100, 100, 150, 300, 400, 1400 }).StartsWith("The opened form is in view already at 100.", StringComparison.Ordinal), "A form in view is logged as such");
+        Check(CommandBand.RevealLog(null) == "The opened form wasn't scrolled into view: no scroll region holds it.", "A form outside a scroll region is logged");
     }
     static bool AddedChoicesKeepTheirVisibleName() {
         SceneObservation Added(string id) => new SceneObservation(new object(),

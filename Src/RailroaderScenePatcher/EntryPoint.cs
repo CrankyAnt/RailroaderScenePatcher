@@ -1473,6 +1473,7 @@ namespace RailroaderScenePatcher {
         // source and keeps its ID and the form's placement, so Preview and Apply save the correction (CorrectedAddition).
         void UseSource(PatchEditingSession session, SourceCandidate candidate) {
             CloseCoverageForm(); feedback.ClearPlace(LightGatePlace); feedback.ClearPlace(BellPlace);
+            revealEquipmentForm = true;
             if (CorrectedUse(session) != null) {
                 equipmentSource = candidate.Source; preparedEquipment = null;
                 equipmentLabel = InventoryPresentationState.EquipmentSourceName(candidate);
@@ -1495,6 +1496,7 @@ namespace RailroaderScenePatcher {
         // Opens the form for an addition of this mod as the scene patch file holds it.
         void ReadEquipment(EquipmentAddition addition, string name) {
             CloseCoverageForm(); feedback.ClearPlace(LightGatePlace); feedback.ClearPlace(BellPlace);
+            revealEquipmentForm = true;
             equipmentSource = addition.Source; preparedEquipment = null; equipmentOwn = null;
             equipmentLabel = name;
             equipmentFields[0] = addition.Id; equipmentEdited = addition.Id;
@@ -1539,7 +1541,7 @@ namespace RailroaderScenePatcher {
                 try { held = attachment.Session.EquipmentEntries(selected.Identity).Any(e => e.Addition.Id == equipmentEdited); } catch (Exception) { }
             if (held) ReadOpenEquipment(); else CloseEquipmentForm();
         }
-        void CloseEquipmentForm() { equipmentEdited = null; equipmentSource = null; equipmentLabel = null; preparedEquipment = null; equipmentOwn = null; equipmentAngles = null; for (var i = 0; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0"; }
+        void CloseEquipmentForm() { revealEquipmentForm = false; equipmentEdited = null; equipmentSource = null; equipmentLabel = null; preparedEquipment = null; equipmentOwn = null; equipmentAngles = null; for (var i = 0; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0"; }
         EquipmentAddition ParseEquipment(out string problem) {
             var id = (equipmentFields[0] ?? "").Trim();
             problem = EquipmentAddition.IdProblem(id);

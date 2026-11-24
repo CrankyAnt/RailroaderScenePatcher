@@ -855,6 +855,23 @@ namespace RailroaderScenePatcher {
         // full read, so it says that it is about that read; edits since then are on the Changes tab.
         internal static string InventoryRead(bool inspectedGone) =>
             "The last full read covered the object list and the supplied definitions. Reading applies no changes." + (inspectedGone ? " The inspected object is no longer present." : "");
+        // The distance scrolled from the top of a region that brings a control into view: a control above the view is
+        // shown at the view's top, one below it is shown with its top as high as it fits, and one in view stays where it
+        // is. The distances are from the top of the scrolled content; the result stays within what the region scrolls.
+        internal static float RevealOffset(float current, float top, float bottom, float view, float content) {
+            var offset = top < current ? top : bottom > current + view ? Math.Min(top, bottom - view) : current;
+            return Math.Max(0, Math.Min(offset, Math.Max(0, content - view)));
+        }
+        // The debug line of a reveal: the distances scrolled before and after, the control's top and bottom and the
+        // view and content heights, all from the top of the scrolled content in units; null when no scroll region
+        // holds the control.
+        internal static string RevealLog(float[] distances) {
+            if (distances == null) return "The opened form wasn't scrolled into view: no scroll region holds it.";
+            string N(float value) => Number(value);
+            var moved = Math.Abs(distances[1] - distances[0]) > 0.5f;
+            return (moved ? "Scrolled the opened form into view: from " + N(distances[0]) + " to " + N(distances[1]) : "The opened form is in view already at " + N(distances[0]))
+                + ". Form " + N(distances[2]) + " to " + N(distances[3]) + ", view " + N(distances[4]) + " of " + N(distances[5]) + ".";
+        }
         // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
         internal static string RoleCaption(string role) => CircuitCoverage.RoleCaption(role);
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for

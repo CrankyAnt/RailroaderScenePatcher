@@ -821,6 +821,37 @@ namespace RailroaderScenePatcher {
         }
         // The outliner's scroll view, set each time the outliner builds its rows, in the full and the compact window.
         internal ScrollRect OutlinerView;
+        // A control that was just opened inside a scrolling region, such as an equipment form at the top of the
+        // Connections tab. A rebuild keeps the distance scrolled, which could leave the control out of view; after the
+        // rebuild its region scrolls once so that the control is in view (CommandBand.RevealOffset).
+        // The request lasts until a reveal acts: a rebuild after the request destroys the control it named, and the
+        // owner then names the new one in the next build. done hears what the reveal did, and only then does the owner
+        // stop asking. A destroyed control is a Unity null, so the request is kept apart from the control it names.
+        RectTransform revealTarget;
+        Action<string> revealDone;
+        bool revealPending;
+        internal void Reveal(RectTransform target, Action<string> done) { revealTarget = target; revealDone = done; revealPending = true; }
+        void ApplyReveal() {
+            var target = revealTarget;
+            if (target == null) return;
+            var done = revealDone;
+            revealTarget = null; revealDone = null; revealPending = false;
+            var region = target.GetComponentInParent<ScrollRect>();
+            if (region == null || region.content == null) { done?.Invoke(CommandBand.RevealLog(null)); return; }
+            Canvas.ForceUpdateCanvases();
+            var body = region.content; var view = region.viewport != null ? region.viewport : (RectTransform)region.transform;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(body);
+            var corners = new Vector3[4];
+            target.GetWorldCorners(corners);
+            // Distances from the top of the scrolled content: corner 1 is the target's top left, corner 0 its bottom left.
+            var top = body.rect.yMax - body.InverseTransformPoint(corners[1]).y;
+            var bottom = body.rect.yMax - body.InverseTransformPoint(corners[0]).y;
+            var before = body.anchoredPosition.y;
+            var offset = CommandBand.RevealOffset(before, top, bottom, view.rect.height, body.rect.height);
+            region.StopMovement();
+            body.anchoredPosition = new Vector2(body.anchoredPosition.x, offset);
+            done?.Invoke(CommandBand.RevealLog(new[] { before, offset, top, bottom, view.rect.height, body.rect.height }));
+        }
 
         internal void Tick() {
             if (disposed) return;
@@ -843,6 +874,7 @@ namespace RailroaderScenePatcher {
                 body.anchoredPosition = new Vector2(body.anchoredPosition.x, Mathf.Clamp(restoreScroll.Value, 0, Mathf.Max(0, body.rect.height - view.rect.height)));
                 restoreScroll = null;
             }
+            if (revealPending && !dirty) ApplyReveal();
             // A background freshness/history update must not destroy an active text edit or pointer drag. The input
             // fields are searched only when a refresh is due.
             NoteFieldFocus();

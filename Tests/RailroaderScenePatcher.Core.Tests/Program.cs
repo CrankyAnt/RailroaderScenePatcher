@@ -283,6 +283,7 @@ class Program {
         Assert(traces.All(t => t["engineRuntimeId"] != null), "Each trace names its engine for the attempt summary");
         LogModeTests.Run();
         LogSourceTests.Run();
+        NativeButtonSourceTests.Run();
         WorldRibbonGeometryTests.Run();
         WorldStrokeGeometryTests.Run();
         ObjectMarkingGeometryTests.Run();
