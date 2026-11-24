@@ -312,6 +312,7 @@ class Program {
         GuidedTaskTests.Run();
         ProseTests.Run();
         CommandBandTests.Run();
+        CompactRailTests.Run();
         EnteredEditValuesTests.Run();
         BridgeTests.Run();
         BakedSceneryTests.Run();

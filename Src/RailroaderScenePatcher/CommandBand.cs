@@ -308,6 +308,8 @@ namespace RailroaderScenePatcher {
         internal const string AllFilter = "All", ChangedFilter = "Changed", DisabledFilter = "Disabled", ProblemsFilter = "Problems";
         internal static readonly float[] FilterSegments = { 20.64f + 12, 74.67f + 12, 71.2f + 12, 77.88f + 12 };
         internal const float OutlinerWidth = 296;
+        // The outliner rows' least height in the full window. The compact rail gives them whole rows of its own (CompactRail).
+        internal const float OutlinerLeastHeight = 120;
         // Whether the tooltip callout is hidden now: the game is paused, and either the panel is open or the tooltip
         // was hidden already in this pause. It so stays hidden until the pause menu closes, whatever the panel does.
         internal static bool HidesTooltip(bool paused, bool panelOpen, bool hidden) => paused && (panelOpen || hidden);

@@ -57,7 +57,7 @@ namespace RailroaderScenePatcher {
         internal void Refresh() { RebuildPanel(); }
     }
 
-    internal sealed class NativePresentation : IDisposable {
+    internal sealed partial class NativePresentation : IDisposable {
         // Canvas units. The default width holds the outliner filters beside the four tab titles, which is wider
         // than the native Map Editor window. The minimum keeps the outliner, the inspector's minimum and the footer in
         // view, and the band's buttons and states at their own widths: at 620 they needed about 24 more and overlapped; its height fits below the Map Editor window on a 1080-high screen.
@@ -86,18 +86,19 @@ namespace RailroaderScenePatcher {
         bool hadSavedBounds;
         internal string EntryProblem { get; private set; }
         bool openOnTick;
-        // The title bar holds, left of the close button and from right to left, the window's "?", the Reset layout icon
-        // and the Session details icon: bare glyphs in the close glyph's colour, without a button face, each named in
-        // its tooltip. TitleHelpProblem says why the title bar could
-        // not take the "?"; the owner then keeps a "?" in the command band. TitleReset and TitleDetails say whether
-        // each icon stands in the title bar; without one the owner keeps a button for it in the window help.
+        // The title bar holds, left of the close button and from right to left, the window's "?", the Reset layout icon,
+        // the Session details icon and the Compact window icon: bare glyphs in the close glyph's colour, without a button
+        // face, each named in its tooltip. TitleHelpProblem says why the title bar could not take the "?"; the owner then
+        // keeps a "?" in the command band. TitleReset, TitleDetails and TitleCompact say whether each icon stands in the
+        // title bar; without one the owner keeps a button for it in the window help.
         internal Action ResetRequested;
         internal string TitleHelpProblem { get; private set; }
-        // Why the Reset layout or the Session details icon could not join the title bar, or null.
+        // Why the Reset layout, the Session details or the Compact window icon could not join the title bar, or null.
         internal string TitleIconProblem { get; private set; }
         internal bool TitleHelp => titleHelp != null;
         internal bool TitleReset => titleReset != null;
         internal bool TitleDetails => titleDetails != null;
+        internal bool TitleCompact => titleCompact != null;
         RectTransform titleHelp, titleReset, titleDetails, titleClose;
         // Why the window's own controls are unavailable while the file panel is open, or null. The session details stay
         // available: the Repair panel's Details opens them. The window help stays available too, so the help is at hand
@@ -106,12 +107,14 @@ namespace RailroaderScenePatcher {
         bool repairMode => lockReason != null;
         internal void SetFileLock(string reason) {
             lockReason = reason;
+            // A file decision needs the full window: compact mode ends when one locks the window.
+            if (reason != null && Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=file lock"); }
             if (reason != null && HelpRegion != WindowHelpRegion) CloseHelp();
             if (divider != null) divider.enabled = reason == null;
             SetTitleRepairControls();
         }
         void SetTitleRepairControls() {
-            foreach (var rect in new[] { titleReset, titleClose }) {
+            foreach (var rect in new[] { titleReset, titleClose, titleCompact }) {
                 var button = rect == null ? null : rect.GetComponent<Button>();
                 if (button != null) button.interactable = !repairMode;
             }
@@ -250,7 +253,7 @@ namespace RailroaderScenePatcher {
             }
             try {
                 titleReset = TitleIcon(manager, close.transform.parent, "CrankyAnt Scene Patcher reset layout", ResetGlyph(), () => ResetRequested?.Invoke(),
-                    () => new TooltipInfo("Reset layout", CommandBand.Tooltip("Put the window at its default place again and restore the outliner width.", lockReason)), out _);
+                    () => new TooltipInfo("Reset layout", CommandBand.Tooltip("Put the window at its default place again, restore the outliner width, and move the help and session details back beside it. The compact window returns to the full window.", lockReason)), out _);
             } catch (Exception e) {
                 if (titleReset != null) UnityEngine.Object.Destroy(titleReset.gameObject);
                 titleReset = null;
@@ -264,6 +267,7 @@ namespace RailroaderScenePatcher {
                 titleDetails = null; detailsGlyph = null;
                 TitleIconProblem = (TitleIconProblem == null ? "" : TitleIconProblem + "; ") + "Session details: " + e.GetBaseException().Message;
             }
+            AddCompactIcon(manager, close.transform.parent);
             PlaceTitleHelp();
             SetTitleRepairControls();
         }
@@ -318,7 +322,7 @@ namespace RailroaderScenePatcher {
             }, out detailsTexture);
         }
         // Directly left of the close button, as high as it, in the close button's own parent: the "?" first, the
-        // Reset layout icon left of that, the Session details icon left of that.
+        // Reset layout icon left of that, the Session details icon left of that, and the Compact window icon left of that.
         void PlaceTitleHelp() {
             if (titleHelp == null || titleClose == null) return;
             var parent = titleHelp.parent as RectTransform;
@@ -332,7 +336,7 @@ namespace RailroaderScenePatcher {
             if (height <= 0 || width <= 0) return;
             var middle = (lowerLeft.y + upperLeft.y) * 0.5f;
             var right = lowerLeft.x - 2;
-            foreach (var icon in new[] { titleHelp, titleReset, titleDetails }) {
+            foreach (var icon in new[] { titleHelp, titleReset, titleDetails, titleCompact }) {
                 if (icon == null) continue;
                 icon.sizeDelta = new Vector2(width, height);
                 icon.localPosition = new Vector3(right, middle, 0);
@@ -443,15 +447,8 @@ namespace RailroaderScenePatcher {
                     details.Build = builder => Details?.Invoke(builder);
                 }
                 details.Show();
-                if (!detailsPlaced) {
-                    // Beside the panel, at its top: to its right where the screen has room, else to its left.
-                    var panel = PanelBounds;
-                    float width = SessionDetailsWindow.DefaultWidth * scale, height = SessionDetailsWindow.DefaultHeight * scale, gap = 8 * scale;
-                    var x = panel.xMax + gap + width <= Screen.width ? panel.xMax + gap : panel.xMin - gap - width >= 0 ? panel.xMin - gap - width : Mathf.Max(0, Screen.width - width);
-                    Place((RectTransform)details.transform, new Rect(x, Mathf.Clamp(panel.yMin, 0, Mathf.Max(0, Screen.height - height)), width, height));
-                    detailsPlaced = true;
-                    SaveBounds(details.NativeWindow);
-                } else {
+                if (!detailsPlaced) PlaceDetailsBeside();
+                else {
                     // Bounds saved smaller than the window's least size, such as by an earlier version with a lower
                     // minimum, are raised to the default size where they fall short.
                     var bounds = (RectTransform)details.transform;
@@ -464,6 +461,15 @@ namespace RailroaderScenePatcher {
                 boundsFrame = -1; dirty = true;
                 DetailsProblem = null;
             } catch (Exception e) { DetailsProblem = e.GetBaseException().Message; }
+        }
+        // Beside the panel, at its top: to its right where the screen has room, else to its left.
+        void PlaceDetailsBeside() {
+            var panel = PanelBounds;
+            float width = SessionDetailsWindow.DefaultWidth * scale, height = SessionDetailsWindow.DefaultHeight * scale, gap = 8 * scale;
+            var x = panel.xMax + gap + width <= Screen.width ? panel.xMax + gap : panel.xMin - gap - width >= 0 ? panel.xMin - gap - width : Mathf.Max(0, Screen.width - width);
+            Place((RectTransform)details.transform, new Rect(x, Mathf.Clamp(panel.yMin, 0, Mathf.Max(0, Screen.height - height)), width, height));
+            detailsPlaced = true;
+            SaveBounds(details.NativeWindow);
         }
         // Whether this is the window's first open: no bounds were saved for it.
         internal bool FirstOpen => !hadSavedBounds;
@@ -674,12 +680,17 @@ namespace RailroaderScenePatcher {
             tooltip.DynamicTooltipInfo = () => new TooltipInfo("Outliner width", CommandBand.Tooltip("Drag to resize the outliner.", lockReason));
         }
         // Forgets the saved bounds and places the window at its default position again.
-        internal void ResetLayout() {
+        // The request comes from a button, so the window moves once the button is up and one tick has passed
+        // (AfterRelease): the native map editor reads the release too, and a window that moved away in that frame left
+        // the pointer over the world.
+        internal void ResetLayout() => Defer(() => {
+            if (disposed) return;
+            if (Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=reset layout"); }
+            ForgetCompactLayout();
+            ResetSecondaryWindows();
             try { Game.GlobalPreferences.SetString("window." + ScenePatchWindow.WindowIdentifier, ""); } catch { }
-            // The request comes from a button press, and layout moves nothing while a button is down: the next layout
-            // after the release places the window.
             hadSavedBounds = false; panelPlaced = false; nextLayout = 0;
-        }
+        });
         // A native vertical scroll region that takes the remaining height and never less than minimumHeight. A content
         // refresh keeps the distance scrolled from the top of the region built last.
         internal RectTransform Scroll(UIPanelBuilder builder, float minimumHeight, Action<UIPanelBuilder> body, bool keepPosition = true) {
@@ -775,6 +786,7 @@ namespace RailroaderScenePatcher {
         }
         void Close() {
             if (disposed) return;
+            if (Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=close"); }
             ClearFocus();
             window.NativeWindow.CloseWindow();
             // Native close completes after the end-of-frame yield. Notify only from its transition event.
@@ -789,10 +801,14 @@ namespace RailroaderScenePatcher {
             HelpRegion = null;
             closed();
         }
+        // The outliner's scroll view, set each time the outliner builds its rows, in the full and the compact window.
+        internal ScrollRect OutlinerView;
+
         internal void Tick() {
             if (disposed) return;
             if (openOnTick) { openOnTick = false; if (!IsOpen) Toggle(); }
             Layout(false);
+            CompactTick();
             if (IsOpen) PlaceTitleHelp();
             RemoveClosedHelp();
             if (helpSizing > 0 && --helpSizing == 0) SizeHelp();
@@ -967,6 +983,8 @@ namespace RailroaderScenePatcher {
                 Place((RectTransform)entry.transform, entryRect);
             }
             if (!IsOpen) return;
+            // A compact window stays inside the screen without overwriting the full window's saved bounds.
+            if (Compact) { ClampCompactLayout(); return; }
             var current = PanelBounds;
             var within = PanelPlacement.Within(new PanelPlacement.Area { X = current.x, Y = current.y, Width = current.width, Height = current.height }, Screen.width, Screen.height);
             // A placed window stays where it is, as native windows do: native UI that opens over it, chrome rebuilds and
@@ -1049,6 +1067,8 @@ namespace RailroaderScenePatcher {
         }
         public void Dispose() {
             if (disposed) return;
+            // The window can go while compact, such as when the Map Editor is left.
+            if (Compact) { try { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=window removed (Map Editor left or reloaded)"); } catch { } }
             HideTooltip();
             ClearFocus(); disposed = true;
             entryPanel?.Dispose();
@@ -1059,6 +1079,7 @@ namespace RailroaderScenePatcher {
             if (resetTexture != null) UnityEngine.Object.Destroy(resetTexture);
             if (detailsSprite != null) UnityEngine.Object.Destroy(detailsSprite);
             if (detailsTexture != null) UnityEngine.Object.Destroy(detailsTexture);
+            DisposeCompact();
             if (window != null) {
                 window.Build = null;
                 window.NativeWindow.DelegateRequestClose = null;
