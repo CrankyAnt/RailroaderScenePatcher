@@ -252,7 +252,7 @@ namespace RailroaderScenePatcher {
             }
             try {
                 titleReset = TitleIcon(manager, close.transform.parent, "CrankyAnt Scene Patcher reset layout", ResetGlyph(), () => ResetRequested?.Invoke(),
-                    () => new TooltipInfo("Reset layout", CommandBand.Tooltip("Put the window at its default place again and restore the outliner width.", lockReason)), out _);
+                    () => new TooltipInfo("Reset layout", CommandBand.Tooltip("Put the window at its default place again, restore the outliner width, and move the help and session details back beside it.", lockReason)), out _);
             } catch (Exception e) {
                 if (titleReset != null) UnityEngine.Object.Destroy(titleReset.gameObject);
                 titleReset = null;

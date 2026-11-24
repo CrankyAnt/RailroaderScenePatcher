@@ -1908,7 +1908,7 @@ namespace RailroaderScenePatcher {
             builder.AddLabel("<style=H3>" + help.Title + "</style>");
             // The window commands stand in the title bar; where it could not take one, the window's help holds it.
             if (region == NativePresentation.WindowHelpRegion && (!presentation.TitleReset || !presentation.TitleDetails || !presentation.TitleCompact)) builder.HStack(row => {
-                if (!presentation.TitleReset) Button(row, "Reset layout", ResetLayout).Tooltip("Reset layout", "Put the window at its default place again and restore the outliner width.");
+                if (!presentation.TitleReset) Button(row, "Reset layout", ResetLayout).Tooltip("Reset layout", "Put the window at its default place again, restore the outliner width, and move the help and session details back beside it.");
                 if (!presentation.TitleDetails) Button(row, "Session details", () => presentation.ToggleDetails()).Tooltip("Session details", "Open or close the session details in their own window.");
                 if (!presentation.TitleCompact) Button(row, "Compact window", () => presentation.ToggleCompact()).Tooltip("Compact window", "Switch to a compact side rail that leaves more of the world in view.");
             }).Height(RowHeight);
