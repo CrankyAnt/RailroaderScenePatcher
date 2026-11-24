@@ -77,11 +77,11 @@ On a pile's **Object** tab, **Use in the game** names the storage it shows, such
 
 The industry itself is native map data. Its position, its track spans, and their delivery and loading points stay with the native map editor. The patcher does not move them, and moving a building or pile never moves a track span. To change where cars load and unload, edit the industry's track spans in the native map editor.
 
-The `Coal Loader` at Robinson Gap Mine is a decorative group under **Other**, like the other Robinson Gap Mine groups, and you move or disable it like any other group. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so moving or disabling the loader doesn't change where loading happens. On its **Object** tab, **Use in the game** shows the same decorative text as the other groups under **Other**.
+The `Coal Loader` at Robinson Gap Mine is a decorative group under **Industry building**, and you move or disable it like any other group. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so moving or disabling the loader doesn't change where loading happens. On its **Object** tab, **Use in the game** shows the same decorative text as the other groups under **Other**.
 
 ## Lake surfaces
 
-You can move, rotate, or disable a lake surface to fit a changed river or track. A lake surface is a water mesh that the scene saves. `Fontana Lake (1)` and `Fontana Lake (2)` below `World/Rivers` are lake surfaces, each its own group under **Other**. The `Whittier Log Pond` group at the Whittier saw mill, under **Storage display**, holds a lake surface and a log pond.
+You can move, rotate, or disable a lake surface to fit a changed river or track. A lake surface is a water mesh that the scene saves. `Fontana Lake (1)` and `Fontana Lake (2)` below `World/Rivers` are lake surfaces, each its own group under **Water**. The `Whittier Log Pond` group at the Whittier saw mill, under **Storage display**, holds a lake surface and a log pond.
 
 Edit lake masks and rivers from `Map.json` in the native map editor. Native masks shape and color the terrain. The lake surface is a separate scene object, so moving it with the patcher leaves the native mask in place. To reshape the terrain under the moved water, edit the mask in the native map editor.
 

@@ -491,7 +491,7 @@ static class RailBridgeTests {
         Assert(BakedSceneryRules.PartName(Almond, Almond + "/Steel") == "Almond Bridge / Steel", "A part is named with its construction");
         Assert(!BakedSceneryRules.Exclusions.Any(e => e.Ticket == "#95"), "No exclusion waits for #95 any more");
         // A group that holds a construction controller but is no supported rail bridge stays inspection only.
-        var other = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Trestle Scenery", new Node("Beam").Solid()).With(Controller))))), Large + "Sylva/Trestle Scenery");
+        var other = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Tipple Scenery", new Node("Beam").Solid()).With(Controller))))), Large + "Sylva/Tipple Scenery");
         Assert(other?.Disposition == GroupDisposition.InspectionOnly && other.Reason == BakedSceneryRules.ConstructionOutsideBridge && other.ReasonIsSentence,
             "A controller outside a supported rail bridge keeps its group inspection only: " + other?.Disposition + " " + other?.Reason);
         // A rail bridge that holds another excluded kind stays inspection only under its category.
@@ -503,6 +503,5 @@ static class RailBridgeTests {
             && BakedSceneryRules.TrackOwnedRefusal(new[] { "Track.TrackSegment" }) != null, "A generated trestle or a track component refuses the bridge");
         var road = At(verdicts, Large + "Almond/Almond Road Bridge");
         Assert(road?.Disposition == GroupDisposition.Group && road.Subcategory == BakedSceneryCategories.RoadBridges, "A road bridge is no rail bridge: it stands under Road bridges");
-        Assert(BakedSceneryCategories.Find(Almond)?.IsContainerObject == false && BakedSceneryCategories.Find(Almond + "/Abutments") == null, "The category table names the Almond Bridge itself as the group");
     }
 }

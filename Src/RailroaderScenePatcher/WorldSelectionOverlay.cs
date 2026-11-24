@@ -400,7 +400,7 @@ namespace RailroaderScenePatcher {
         // The component facts of a group, read from the family the inventory gave an object: a crossing controller
         // anchors a grade-crossing setup, a track marker that is no crossing pad is, below that controller's root, a
         // whistle sign, and a track span there is a detection span that the controller manages.
-        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span", ConstructionFamily = "Bridge construction scenery";
+        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span", ConstructionFamily = "Bridge construction scenery", PadFamily = "Crossing pad marker";
         // The inventory snapshot, set by the owner: a group holds inventory objects, whatever a choice offers, so
         // Select in world and a choice for a scene patch file show one crossing the same way.
         internal Func<IReadOnlyList<SceneObservation>> Inventory;
@@ -444,15 +444,28 @@ namespace RailroaderScenePatcher {
                     if (o.Family != ConstructionFamily) return null;
                     try { return NativeInventory.ConstructionTargets(go); } catch (Exception e) { Skipped(go, "its construction targets could not be read: " + e.GetBaseException().Message); return null; }
                 }
-                if (all.Any(o => o.Family == ControllerFamily || o.Family == ConstructionFamily) || roots.Any(r => r) || storage.Count != 0) {
+                // A crossing without a controller: its crossbucks and pads stand in one scene object. Where crossings
+                // share that object, each crossbuck names its crossing's pad by marker ID, and so does the pad itself.
+                bool Crossbuck(SceneObservation o) => o.Family == BakedSceneryRules.Family && o.GroupPath == null && o.Category == BakedSceneryCategories.GradeCrossing;
+                var sharedPads = new HashSet<Tuple<GameObject, string>>(all.Where(o => Crossbuck(o) && o.Identity.PadMarkerId != null && o.Handle is GameObject go && go != null && go.transform.parent != null)
+                    .Select(o => Tuple.Create(((GameObject)o.Handle).transform.parent.gameObject, o.Identity.PadMarkerId)));
+                object CrossingOf(SceneObservation o, GameObject go) {
+                    var crossbuck = Crossbuck(o);
+                    if (!crossbuck && o.Family != PadFamily) return null;
+                    var holder = go.transform.parent == null ? null : go.transform.parent.gameObject;
+                    if (holder == null) return null;
+                    var id = crossbuck ? o.Identity.PadMarkerId : InventoryPresentationState.MarkerIdOf(o);
+                    return id != null && sharedPads.Contains(Tuple.Create(holder, id)) ? (object)Tuple.Create(holder, id) : holder;
+                }
+                if (all.Any(o => o.Family == ControllerFamily || o.Family == ConstructionFamily || Crossbuck(o)) || roots.Any(r => r) || storage.Count != 0) {
                     var found = new List<InventoryGroup>();
                     foreach (var group in GameDefinedGroups.Of(all.Select((o, i) => {
                             if (!(o.Handle is GameObject go) || go == null) return null;
                             var targets = Targets(o, go);
                             return new GroupObject(go, Above(go), o.Family == ControllerFamily, o.Family == MarkerFamily, o.Family == SpanFamily, roots[i], o.GroupPath != null,
-                                storage.TryGetValue(go, out var filledBy) ? filledBy : null, targets != null, targets, targets?.Select(Above));
+                                storage.TryGetValue(go, out var filledBy) ? filledBy : null, targets != null, targets, targets?.Select(Above), CrossingOf(o, go));
                         }).ToArray())) {
-                        var root = group.Anchor as GameObject;
+                        var root = group.Anchor as GameObject ?? (group.Anchor as Tuple<GameObject, string>)?.Item1;
                         var read = skips.Read(() => RootPath(root), () => {
                             var placed = group.Members.Select(i => new { Object = SpatialSelectionScene.Observe(all[i]), Listed = group.Listed.Contains(i), Stands = i == group.Root }).Where(m => m.Object.Points.Length != 0).ToArray();
                             if (placed.Length == 0) { skips.Skip(RootPath(root), "none of its objects has a usable position"); return null; }

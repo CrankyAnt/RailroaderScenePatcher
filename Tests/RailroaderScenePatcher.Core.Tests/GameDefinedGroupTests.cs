@@ -18,6 +18,7 @@ static class GameDefinedGroupTests {
     public static void Run() {
         Membership();
         BakedSceneryGroupMembership();
+        CrossingWithoutControllerMembership();
         CategoryGroupMembership();
         RoadBridgeGroup();
         SkippedGroupLine();
@@ -27,6 +28,33 @@ static class GameDefinedGroupTests {
         Marking();
         Picking();
         Console.WriteLine("PASS: game-defined groups");
+    }
+
+    // A crossing without a crossing controller is a group too: the crossbucks and pads its crossing object holds,
+    // without its whistle signs. Crossings that share one crossing object are told apart by the marker ID of their
+    // pad. Below a crossing controller, a pad belongs to the controller's setup.
+    static void CrossingWithoutControllerMembership() {
+        const string Road = "World/Roads Whittier", Crossing = Road + "/Crossing Unprotected", Shared = "World/Roads Bryson/Old River Rd/Crossing Unprotected";
+        GroupObject Up(string at, string above, object crossing, bool baked = false, bool marker = false) =>
+            new GroupObject(at, above.Split('/').Reverse().ToArray(), trackMarker: marker, bakedGroupRoot: baked, crossing: crossing);
+        var groups = GameDefinedGroups.Of(new[] {
+            Up("Crossbuck 1", Crossing, Crossing, baked: true),                       // 0
+            Up("Crossbuck 2", Crossing, Crossing, baked: true),                       // 1
+            Up("Pad", Crossing, Crossing),                                            // 2
+            Up("Whistle Sign E", Crossing, null, marker: true),                       // 3: a whistle sign shows on its own
+            Up("A1", Shared, Tuple.Create(Shared, "Mgdu"), baked: true),              // 4
+            Up("A2", Shared, Tuple.Create(Shared, "Mgdu"), baked: true),              // 5
+            Up("B1", Shared, Tuple.Create(Shared, "Mbkd"), baked: true),              // 6
+            Up("B pad", Shared, Tuple.Create(Shared, "Mbkd")),                        // 7
+            Up("Lone crossbuck", "World/Roads Sylva/Crossing Unprotected Wye", "World/Roads Sylva/Crossing Unprotected Wye", baked: true), // 8: one object is no group
+        });
+        Check(Members(groups) == "GradeCrossingSetup:0,1,2 | GradeCrossingSetup:4,5 | GradeCrossingSetup:6,7",
+            "a crossing without a controller is its crossbucks and pads; shared crossing objects split by pad marker ID (got " + Members(groups) + ")");
+        var held = GameDefinedGroups.Of(new[] {
+            new GroupObject("Controller", new[] { "Roads Sylva", "World" }, crossingController: true),
+            new GroupObject("Controller pad", new object[] { "Controller", "Roads Sylva", "World" }, crossing: "Controller"),
+        });
+        Check(Members(held) == "GradeCrossingSetup:0,1" && Equals(held[0].Anchor, "Controller"), "below a crossing controller a pad belongs to the controller's setup (got " + Members(held) + ")");
     }
 
     // A baked scenery group whose parts share one group root, such as Bryson Coal Dealer: the listed group root and the

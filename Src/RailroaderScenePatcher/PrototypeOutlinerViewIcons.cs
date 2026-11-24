@@ -3,6 +3,7 @@
 // PROTOTYPE: throwaway view switch and layout helpers of the outliner grouping prototype.
 using System;
 using System.Linq;
+using RailroaderScenePatcher.Core;
 using TMPro;
 using UI.Builder;
 using UnityEngine;
@@ -44,7 +45,7 @@ namespace RailroaderScenePatcher {
                     }
                 });
             } catch (Exception e) {
-                Debug.LogWarning("Scene Patcher PROTOTYPE view icons unavailable, using text: " + e.GetBaseException().Message);
+                PatcherLog.Warning("The outliner view icons are unavailable, so the switch shows text", e);
                 Button(row, PrototypeOutlinerGrouping.ByPlace ? "By category" : "By place", () => SwitchOutlinerView(!PrototypeOutlinerGrouping.ByPlace));
             }
         }
@@ -85,8 +86,8 @@ namespace RailroaderScenePatcher {
                 spriteLibraryLogged = true;
                 try {
                     var names = UI.SpriteLibrary.Shared == null ? "no shared library" : String.Join(", ", UI.SpriteLibrary.Shared.entries.Select(entry => entry.name));
-                    Debug.Log("Scene Patcher PROTOTYPE sprite library: " + names);
-                } catch (Exception e) { Debug.Log("Scene Patcher PROTOTYPE sprite library unreadable: " + e.GetBaseException().Message); }
+                    PatcherLog.Debug("Outliner grouping sprite library: " + names);
+                } catch (Exception e) { PatcherLog.Debug("Outliner grouping sprite library unreadable: " + e.GetBaseException().Message); }
             }
             if (byCategorySprite == null) byCategorySprite = Draw(ByCategoryIcon, ListPixel);
             if (byPlaceSprite == null) byPlaceSprite = Draw(ByPlaceIcon, PinPixel);

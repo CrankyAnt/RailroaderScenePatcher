@@ -231,7 +231,7 @@ namespace RailroaderScenePatcher {
             var found = new List<OutlineNode>();
             foreach (var category in BakedSceneryCategories.All) {
                 var folder = new OutlineNode { Key = category, Label = category };
-                var members = sorted.Where(node => (node.Row?.Category ?? BakedSceneryCategories.Other) == category).ToArray();
+                var members = sorted.Where(node => (node.Row?.Category ?? BakedSceneryCategories.Unclassified) == category).ToArray();
                 var subgroups = BakedSceneryCategories.Subcategories(category);
                 foreach (var subgroup in subgroups) {
                     var inner = new OutlineNode { Key = category + "/" + subgroup, Label = subgroup };

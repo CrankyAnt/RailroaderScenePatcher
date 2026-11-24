@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 // PROTOTYPE: throwaway outliner grouping for the question "how should the outliner group about 1,900 scene objects,
-// by kind or by place?". Not production code: no tests, no persistence, state in memory only. Places are in
-// PrototypeOutlinerPlaces.cs, crossings in PrototypeOutlinerCrossings.cs.
+// by kind or by place?". Not production code: state in memory only. The rules that decide category, kind and place
+// are in the core (SceneClassification, ScenePlaces) and the tree is in OutlineTree.cs; places are read in
+// PrototypeOutlinerPlaces.cs and crossings are grouped in PrototypeOutlinerCrossings.cs.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text.RegularExpressions;
 using RailroaderScenePatcher.Core;
 using OutlineNode = RailroaderScenePatcher.InventoryPresentationState.OutlineNode;
 
@@ -15,21 +15,13 @@ namespace RailroaderScenePatcher {
     internal static partial class PrototypeOutlinerGrouping {
         // One tree across families; the top level by category or by place.
         internal static bool ByPlace;
-        // A kind folder needs at least this many objects; fewer stand loose in the folder above.
-        internal const int KindThreshold = 2;
-        // A place folder needs at least this many objects of one kind in one place; fewer stand loose, with their place.
-        internal const int PlaceThreshold = 3;
-        // Place folders appear only in a list longer than this; a shorter list reads well with each object's place.
-        internal const int PlaceListMinimum = 10;
-        internal const string NotSorted = "Not sorted", NoPlace = "No place", InspectionOnly = InventoryPresentationState.InspectionOnlyGroup;
-        const string TrackMarkerCategory = "Track marker", MilepostsKind = "Mileposts", LocationSignsKind = "Location signs", LocationMarkersKind = "Location markers";
         internal static bool LogPending = true;
-        // Where warnings go; the offline harness replaces it, because Unity's log needs the engine.
-        internal static Action<string> Warn = message => UnityEngine.Debug.LogWarning(message);
+        // Where warnings go; the offline harness replaces it, because the patcher's log needs the engine.
+        internal static Action<string> Warn = message => PatcherLog.Warning(message);
         static readonly HashSet<string> warned = new HashSet<string>(StringComparer.Ordinal);
         // One warning per kind of failure, so a failure on each of 1,900 objects writes one line.
         internal static void WarnOnce(string kind, string message) {
-            if (warned.Add(kind)) Warn("Scene Patcher PROTOTYPE outliner: " + message);
+            if (warned.Add(kind)) Warn("The outliner grouping could not read something: " + message);
         }
 
         // A scene object's identity in the hierarchy: its scene and path.
@@ -41,32 +33,28 @@ namespace RailroaderScenePatcher {
             public override int GetHashCode() => ((Scene?.GetHashCode() ?? 0) * 397) ^ (Path?.GetHashCode() ?? 0);
             public override string ToString() => Scene + "\n" + Path;
         }
-        // One level of a unit's place in the tree. A category level always makes a folder; a kind level makes one only
-        // from KindThreshold objects.
-        sealed class Level {
-            internal string Name; internal bool Forced;
-            internal static Level Category(string name) => new Level { Name = name, Forced = true };
-            internal static Level Kind(string name) => new Level { Name = name };
-        }
         // One node the tree places: an object with its parts, spans or crossing members beneath it, or an unprotected
         // crossing (Row null, Members set).
         sealed class Unit {
             internal OutlineNode Node;
             internal SceneObservation Row;
             internal List<Unit> Members = new List<Unit>();
-            internal List<Level> Levels = new List<Level>();
-            internal string Place, Inside, CrossingPath;
-            internal bool Conflict, Nearest;
+            internal string Category, Kind, Place, CrossingPath;
         }
+        // A node without an inventory row that stands for a game-defined group: where Focus goes, in map coordinates.
+        internal sealed class GroupNode { internal string Label; internal double[] Point; }
         internal sealed class Result {
             internal IReadOnlyList<OutlineNode> Tops;
             internal int Listed, Unplaced;
             internal List<string> Hidden = new List<string>();
             internal List<string> CatchAll = new List<string>();
-            internal List<string> Conflicts = new List<string>();
+            internal List<string> Violations = new List<string>();
             internal List<string> InspectionOnlyRows = new List<string>();
-            internal List<string> PositionalSigns = new List<string>();
             internal List<string> Crossings = new List<string>();
+            // The crossing nodes of the tree, by node key.
+            internal Dictionary<string, GroupNode> GroupNodes = new Dictionary<string, GroupNode>(StringComparer.Ordinal);
+            // Each row's category, kind and place, for its tooltip.
+            internal Dictionary<SceneObservation, string[]> Shown = new Dictionary<SceneObservation, string[]>();
         }
         // The state of one Build.
         sealed class BuildContext {
@@ -81,7 +69,7 @@ namespace RailroaderScenePatcher {
             internal readonly HashSet<ScenePath> ContainerObjects = new HashSet<ScenePath>();
             internal readonly HashSet<SceneObservation> Hidden = new HashSet<SceneObservation>();
             internal Unit Make(SceneObservation row, ScenePath at, bool context) {
-                var label = row == null ? Last(at.Path) : row.GroupPath == null && (row.Category != null || row.Family == BakedSceneryRules.Family) ? row.DisplayName : InventoryPresentationState.Name(row);
+                var label = row == null ? Last(at.Path) : OwnName(row);
                 var unit = new Unit { Row = row, Node = new OutlineNode { Key = at + (row?.Identity.PadMarkerId == null ? "" : "\n" + row.Identity.PadMarkerId), Label = label, Row = row, Context = context } };
                 Units.Add(unit);
                 if (!ByPath.ContainsKey(at)) ByPath[at] = unit;
@@ -89,117 +77,31 @@ namespace RailroaderScenePatcher {
             }
         }
         static IReadOnlyList<OutlineNode> lastTops;
+        static HashSet<string> kindCategories = new HashSet<string>(StringComparer.Ordinal);
+        static IReadOnlyList<SceneObservation> kindsFrom;
 
         static string Last(string path) => path.Substring(path.LastIndexOf('/') + 1);
+        // A row shows the game's own name of its object. A part is named with its group, and an object the patcher
+        // added has no scene name of the game: both keep the name the inventory gives them.
+        static string OwnName(SceneObservation row) =>
+            row.GroupPath != null || CommandBand.IsAddedFamily(row.Family) || row.Identity.Path.StartsWith(CrossingCoverageWorld.RootName, StringComparison.Ordinal) ? InventoryPresentationState.Name(row) : Last(row.Identity.Path);
         static string Parent(string path) { var at = path.LastIndexOf('/'); return at < 0 ? null : path.Substring(0, at); }
         static string Round(double v) => Math.Round(v).ToString(CultureInfo.InvariantCulture);
 
-        // ---- kinds ----
-        static readonly Regex SpeedSignWord = new Regex(@"\b(speed(\s*sign)?|speedlimit)\b", RegexOptions.IgnoreCase);
-        static readonly Regex YardLimitWord = new Regex(@"\byard\s+limit\b", RegexOptions.IgnoreCase);
-        static readonly Regex StationSignWord = new Regex(@"\b(station\s+sign|sign[-_\s]*station)\b", RegexOptions.IgnoreCase);
-        static readonly Regex WhistleWord = new Regex(@"\bwhistle\b", RegexOptions.IgnoreCase);
-        static readonly Regex CtcWord = new Regex(@"\bctc\b", RegexOptions.IgnoreCase);
-        static readonly Regex CircuitWord = new Regex(@"\bcircuit\b", RegexOptions.IgnoreCase);
-        static readonly Regex SignWord = new Regex(@"\bsigns?\b", RegexOptions.IgnoreCase);
-        static readonly Regex Ordinal = new Regex(@"\s*\(\d+\)\z");
-        internal static readonly string[] SignKinds = { "Station signs", LocationSignsKind, "Speed signs", "Yard limits", "Whistle signs", "CTC signs", MilepostsKind, "Other signs" };
-        static readonly string[] Tops = { BakedSceneryCategories.StationBuilding, BakedSceneryCategories.Platform, BakedSceneryCategories.Lights, BakedSceneryCategories.Sign, BakedSceneryCategories.GradeCrossing,
-            BakedSceneryCategories.Bridge, BakedSceneryCategories.IndustryBuilding, BakedSceneryCategories.StorageDisplay, BakedSceneryCategories.RailroadServiceBuilding,
-            TrackMarkerCategory, SpawnPoints.Family, StarterPlacements.Family, StationMapIconRules.Family, BakedSceneryCategories.Other };
-        // Kinds whose objects placed by position may still form place folders: long sign lists and boards. Bridges and
-        // mileposts never do.
-        static readonly HashSet<string> PositionalPlaceFolderKinds = new HashSet<string>(StringComparer.Ordinal) {
-            "Station signs", LocationSignsKind, "Speed signs", "Yard limits", "Whistle signs", "CTC signs", "Other signs", "Independent board"
-        };
-
-        // The kind of sign an object's own name says, matched on word boundaries, or null when its name names no sign.
-        internal static string SignKind(string name) {
-            if (String.IsNullOrEmpty(name)) return null;
-            if (SpeedSignWord.IsMatch(name)) return "Speed signs";
-            if (YardLimitWord.IsMatch(name)) return "Yard limits";
-            if (StationSignWord.IsMatch(name)) return "Station signs";
-            if (WhistleWord.IsMatch(name)) return "Whistle signs";
-            if (CtcWord.IsMatch(name) || CircuitWord.IsMatch(name) && SignWord.IsMatch(name)) return "CTC signs";
-            if (SignWord.IsMatch(name)) return "Other signs";
-            return null;
-        }
-        static string Stem(string label) => Ordinal.Replace(label ?? "", "");
-
-        // An inspection-only Sign group that a container object of signs holds only signs: it gets no row (Bryson Signs,
-        // Ela Signs, Sylva Signs); its signs are rows of their own.
+        // A Sign group that holds only signs other families list gets no row (Bryson Signs, Ela Signs, Sylva Signs);
+        // its signs are rows of their own.
         internal static bool IsContainer(SceneObservation r) => r.GroupPath == null && r.Category == BakedSceneryCategories.Sign && r.InspectionOnly != null;
         // A serialized track span that no crossing controller holds is a native track span and leaves the list.
         internal static bool IsNativeSpan(SceneObservation r) => r.Family == SpanFamily && r.HolderPath == null && !r.Identity.Path.StartsWith(CrossingCoverageWorld.RootName, StringComparison.Ordinal);
         internal static int HiddenCount(IReadOnlyList<SceneObservation> entries) => entries == null ? 0 : entries.Count(r => IsContainer(r) || IsNativeSpan(r));
 
-        // A milepost's line prefix and mileage, read from its Milepost bindings; without them it sorts by name.
-        static (string Prefix, double Mileage) MilepostKey(SceneObservation row) {
-            string prefix = null; double mileage = Double.PositiveInfinity;
-            foreach (var line in row?.Bindings ?? Array.Empty<string>()) {
-                if (line.StartsWith("Milepost prefix=", StringComparison.Ordinal)) prefix = line.Substring(16).Trim();
-                else if (line.StartsWith("Milepost mileage=", StringComparison.Ordinal) && Double.TryParse(line.Substring(17).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)) mileage = parsed;
-            }
-            return (prefix ?? "", mileage);
-        }
-
-        static List<Level> LevelsOf(SceneObservation r, string label, IEnumerable<OutlineNode> children) {
-            var levels = new List<Level>();
-            if (r == null) { levels.Add(Level.Category(NotSorted)); levels.Add(Level.Category("Group root not in the object list")); return levels; }
-            var name = Last(r.Identity.Path);
-            if (r.Category != null || r.Family == BakedSceneryRules.Family || children != null && children.Any(c => c.Row?.GroupPath != null)) {
-                var category = r.Category ?? BakedSceneryCategories.Other;
-                levels.Add(Level.Category(category));
-                if (category == BakedSceneryCategories.Bridge) levels.Add(Level.Kind(r.Subcategory ?? "Other bridges"));
-                else if (category == BakedSceneryCategories.Sign)
-                    levels.Add(Level.Kind(SignKind(name) ?? children?.Select(c => SignKind(Last(c.Row.Identity.Path))).FirstOrDefault(k => k != null) ?? "Other signs"));
-                else if (category != BakedSceneryCategories.GradeCrossing) levels.Add(Level.Kind(Stem(label)));
-                return levels;
-            }
-            // A Loc: object: a visible board under Sign / Location signs, an invisible marker under Track marker /
-            // Location markers, whichever family lists it.
-            if (IsLocObject(r)) {
-                var visible = LocVisible(r);
-                levels.Add(Level.Category(visible ? BakedSceneryCategories.Sign : TrackMarkerCategory)); levels.Add(Level.Kind(visible ? LocationSignsKind : LocationMarkersKind));
-                return levels;
-            }
-            // The bridge and construction controller of a rail bridge construction, should the inventory give no category.
-            if (BakedSceneryCategories.OfFamily(r.Family) is IReadOnlyList<string> byFamily) {
-                levels.Add(Level.Category(byFamily[0])); levels.Add(Level.Kind(byFamily[1])); return levels;
-            }
-            switch (r.Family) {
-                case ControllerFamily: case PadFamily: case MastFamily: case BellFamily: case SpanFamily:
-                case CommandBand.AddedEquipmentFamily: case CommandBand.AddedBellFamily:
-                    levels.Add(Level.Category(BakedSceneryCategories.GradeCrossing)); return levels;
-                case MilepostFamily: levels.Add(Level.Category(BakedSceneryCategories.Sign)); levels.Add(Level.Kind(MilepostsKind)); return levels;
-                case TrackMarkerFamily:
-                    if (SignKind(name) is string sign) { levels.Add(Level.Category(BakedSceneryCategories.Sign)); levels.Add(Level.Kind(sign)); }
-                    else if (CrossingMarkerName.IsMatch(name)) levels.Add(Level.Category(BakedSceneryCategories.GradeCrossing));
-                    else { levels.Add(Level.Category(TrackMarkerCategory)); levels.Add(Level.Kind(InventoryPresentationState.Subgroup(r) ?? "Other markers")); }
-                    return levels;
-                case "Track-relative scene object": case "Independent board":
-                    levels.Add(Level.Category(BakedSceneryCategories.Other)); levels.Add(Level.Kind(r.Family)); return levels;
-            }
-            if (r.Family == SpawnPoints.Family || r.Family == StarterPlacements.Family || r.Family == StationMapIconRules.Family) {
-                levels.Add(Level.Category(r.Family)); levels.Add(Level.Kind(Stem(label))); return levels;
-            }
-            levels.Add(Level.Category(r.InspectionOnly != null ? InspectionOnly : NotSorted)); levels.Add(Level.Category(String.IsNullOrEmpty(r.Family) ? "No family" : r.Family));
-            return levels;
-        }
-        static int Rank(int depth, string name) {
-            if (name == NotSorted || name == NoPlace || name == InspectionOnly) return 10000;
-            if (depth == 0) { var i = Array.IndexOf(Tops, name); return i < 0 ? 5000 : i; }
-            var s = Array.IndexOf(SignKinds, name);
-            return s >= 0 ? 100 + s : 1000;
-        }
-
         // ---- search covering place, kind and crossing ----
         static string GroupingSearchText(SceneObservation e, Func<SceneObservation, double[]> trackPoint) {
             if (searchTags.TryGetValue(e, out var cached)) return cached;
-            var label = e.GroupPath == null && (e.Category != null || e.Family == BakedSceneryRules.Family) ? e.DisplayName : InventoryPresentationState.Name(e);
-            var place = PlaceOf(e, trackPoint);
+            var found = e.GroupPath == null && e.HolderPath == null ? ClassOf(e) : null;
+            var place = e.GroupPath == null && e.HolderPath == null ? PlaceOf(e, trackPoint) : null;
             var crossing = CanJoinCrossing(e) ? Last(Parent(e.Identity.Path) ?? "") : null;
-            var text = String.Join(" ", LevelsOf(e, label, null).Select(l => l.Name).Concat(new[] { place.Named, place.Near, place.Inside, crossing }).Where(s => !String.IsNullOrEmpty(s)));
+            var text = String.Join(" ", new[] { found?.Category, found?.Kind, crossing }.Concat(place?.Names ?? new string[0]).Where(s => !String.IsNullOrEmpty(s)));
             return searchTags[e] = text;
         }
         static bool MatchesGrouping(SceneObservation e, string search, Func<SceneObservation, double[]> trackPoint) =>
@@ -223,20 +125,47 @@ namespace RailroaderScenePatcher {
         internal static Result Build(IReadOnlyList<SceneObservation> rows, IReadOnlyList<SceneObservation> inventory, string search, bool narrowed, Func<SceneObservation, double[]> trackPoint) {
             // A failed build leaves no tree behind for Fit to measure.
             lastTops = null;
-            var b = new BuildContext {
-                Rows = rows ?? Array.Empty<SceneObservation>(), Entries = inventory ?? rows ?? Array.Empty<SceneObservation>(),
-                Search = search, Narrowed = narrowed, PlaceView = ByPlace, Diagnostics = LogPending, TrackPoint = trackPoint
-            };
-            Prepare(b.Entries, trackPoint);
+            var entries = inventory ?? rows ?? Array.Empty<SceneObservation>();
+            Prepare(entries, trackPoint);
+            // Which categories show kinds is decided on the whole inventory, so a search or filter changes no level.
+            if (!ReferenceEquals(kindsFrom, entries) && entries.Count != 0) {
+                var whole = Shape(new BuildContext { Rows = entries, Entries = entries, Search = "", TrackPoint = trackPoint });
+                kindCategories = OutlineTree.KindCategories(whole.Units.Select(Entry));
+                kindsFrom = entries;
+            }
+            var b = Shape(new BuildContext { Rows = rows ?? Array.Empty<SceneObservation>(), Entries = entries, Search = search, Narrowed = narrowed, PlaceView = ByPlace, Diagnostics = LogPending, TrackPoint = trackPoint });
+            var shown = b.Units.Select(Entry).ToArray();
+            var tops = b.PlaceView ? OutlineTree.ByPlace(shown, kindCategories, narrowed ? null : places.All.Select(p => p.Name)) : OutlineTree.ByCategory(shown, kindCategories);
+            foreach (var u in b.Units) {
+                Remember(b, u.Node, u);
+                if (u.Row == null && u.CrossingPath != null) b.Result.GroupNodes[u.Node.Key] = new GroupNode { Label = u.Node.Label, Point = Centre(u) };
+            }
+            b.Result.Tops = lastTops = tops;
+            b.Result.Listed = tops.Sum(t => t.Count);
+            b.Result.Unplaced = tops.Where(t => t.Label == OutlineTree.NoPlace || t.Label == BakedSceneryCategories.Unclassified).Sum(t => t.Count);
+            if (b.Diagnostics) {
+                b.Result.CatchAll.AddRange(b.Units.Where(u => u.Place == null || u.Category == BakedSceneryCategories.Unclassified).Select(Describe));
+                b.Result.Violations.AddRange(OutlineTree.Violations(tops, b.PlaceView, places.All.Select(p => p.Name)));
+            }
+            return b.Result;
+        }
+        static BuildContext Shape(BuildContext b) {
             HideContainersAndNativeSpans(b);
             BuildUnits(b);
             GroupProtectedCrossings(b);
             GroupUnprotectedCrossings(b);
             PlaceUnits(b);
-            var tops = b.PlaceView ? PlaceTops(b) : CategoryTops(b);
-            b.Result.Tops = lastTops = tops;
-            b.Result.Listed = tops.Sum(t => t.Count);
-            return b.Result;
+            return b;
+        }
+        static OutlineEntry Entry(Unit u) => new OutlineEntry { Node = u.Node, Category = u.Category, Kind = u.Kind, Place = u.Place };
+        static void Remember(BuildContext b, OutlineNode node, Unit unit) {
+            if (node.Row != null) b.Result.Shown[node.Row] = new[] { unit.Category, unit.Kind, unit.Place };
+            foreach (var child in node.Children) Remember(b, child, unit);
+        }
+        // The middle of a crossing's members, in map coordinates, where Focus goes.
+        static double[] Centre(Unit u) {
+            var at = u.Members.Select(m => m.Row).Where(r => r != null && HasPosition(r)).Select(r => r.Position).ToArray();
+            return at.Length == 0 ? null : new[] { at.Average(p => p[0]), at.Average(p => p[1]), at.Average(p => p[2]) };
         }
 
         // Container objects and native track spans leave the list.
@@ -264,141 +193,67 @@ namespace RailroaderScenePatcher {
                     b.RootEntries.TryGetValue(holderAt, out var found);
                     holder = b.Make(found, holderAt, true);
                 }
-                holder.Node.Children.Add(new OutlineNode { Key = new ScenePath(row.Identity.Scene, row.Identity.Path).ToString(), Label = row.GroupPath != null ? InventoryPresentationState.PartLabel(row) : InventoryPresentationState.Name(row), Row = row, Count = 1 });
+                holder.Node.Children.Add(new OutlineNode { Key = new ScenePath(row.Identity.Scene, row.Identity.Path).ToString(), Label = row.GroupPath != null ? InventoryPresentationState.PartLabel(row) : OwnName(row), Row = row, Count = 1 });
                 holder.Node.Count++;
             }
             foreach (var u in b.Units) {
                 // A group that holds matching parts but does not match itself is shown dimmed, only to hold them.
                 if (!u.Node.Context && u.Row != null && u.Node.Children.Count != 0 && u.Row.GroupPath == null && u.Row.HolderPath == null && u.Row.Family == BakedSceneryRules.Family
                     && !u.Row.MatchesItself(b.Search) && !MatchesGrouping(u.Row, b.Search, b.TrackPoint)) { u.Node.Context = true; u.Node.Count--; }
-                u.Node.Children.Sort((x, y) => { var by = StringComparer.OrdinalIgnoreCase.Compare(x.Label, y.Label); return by != 0 ? by : StringComparer.Ordinal.Compare(x.Row.Identity.Path, y.Row.Identity.Path); });
-                u.Levels = LevelsOf(u.Row, u.Node.Label, u.Node.Children);
+                u.Node.Children.Sort((x, y) => { var by = OutlineTree.NaturalComparer.Instance.Compare(x.Label, y.Label); return by != 0 ? by : StringComparer.Ordinal.Compare(x.Row.Identity.Path, y.Row.Identity.Path); });
+                var found = u.Row == null ? SceneClassification.Class(BakedSceneryCategories.Unclassified, null) : ClassOf(u.Row);
+                u.Category = found.Category; u.Kind = found.Kind;
             }
         }
-        // The place of each unit; an unprotected crossing stands where its crossing object is, at the mean of its members.
+        // The place of each unit; an unprotected crossing stands where its crossing object is, at the mean of its
+        // members. A crossing is one with signals when a crossing controller holds it, and one without otherwise.
         static void PlaceUnits(BuildContext b) {
             foreach (var u in b.Units) {
-                PlaceInfo place;
-                if (u.Row != null) place = PlaceOf(u.Row, b.TrackPoint);
+                if (u.Row != null) u.Place = PlaceOf(u.Row, b.TrackPoint)?.Name;
                 else {
                     var positions = u.Members.Select(m => Measure(m.Row, b.TrackPoint)).Where(p => p != null).ToArray();
-                    place = PlaceAt(u.CrossingPath, positions.Length == 0 ? null : new[] { positions.Average(p => p[0]), positions.Average(p => p[1]) });
+                    u.Place = places.Of(u.CrossingPath, positions.Length == 0 ? null : new[] { positions.Average(p => p[0]), positions.Average(p => p[1]) })?.Name;
                 }
-                u.Place = place.Named ?? place.Near; u.Inside = place.Inside; u.Nearest = place.Positional; u.Conflict = IsConflict(place);
-                if (b.Diagnostics) CollectPlaceDiagnostics(b, u, place);
+                if (u.Category == BakedSceneryCategories.GradeCrossing) u.Kind = u.Row?.Family == ControllerFamily ? SceneClassification.ProtectedCrossings : SceneClassification.UnprotectedCrossings;
+                if (b.Diagnostics && u.Row?.InspectionOnly != null) b.Result.InspectionOnlyRows.Add(u.Node.Label + " (" + u.Row.Identity.Path + ") [" + u.Row.Family + "] under " + u.Category + ": " + u.Row.InspectionOnly);
             }
-            if (!b.Diagnostics) return;
-            foreach (var holder in b.Units.Where(u => u.Row == null || u.Row.Family == ControllerFamily))
-                foreach (var member in holder.Node.Children.Where(c => c.Row?.InspectionOnly != null))
-                    b.Result.InspectionOnlyRows.Add(member.Label + " (" + member.Row.Identity.Path + ") [" + member.Row.Family + "] under Grade crossing / " + holder.Node.Label + ": " + member.Row.InspectionOnly);
-        }
-        static void CollectPlaceDiagnostics(BuildContext b, Unit u, PlaceInfo place) {
-            var path = u.Row?.Identity.Path ?? u.CrossingPath;
-            if (u.Conflict) b.Result.Conflicts.Add(u.Node.Label + " (" + path + "): named " + place.Named + " at " + Round(place.NamedDistance) + " m (radius " + Round(places[place.Named].Radius) + "), inside " + place.Inside + " at " + Round(place.InsideDistance) + " m (radius " + Round(places[place.Inside].Radius) + ")");
-            if (u.Row?.InspectionOnly != null) b.Result.InspectionOnlyRows.Add(u.Node.Label + " (" + path + ") [" + u.Row.Family + "] under " + String.Join(" / ", u.Levels.Select(l => l.Name)) + ": " + u.Row.InspectionOnly);
-            if (u.Row == null || !u.Nearest || u.Levels.Count == 0 || u.Levels[0].Name != BakedSceneryCategories.Sign) return;
-            var at = Measure(u.Row, b.TrackPoint);
-            if (at != null) b.Result.PositionalSigns.Add(u.Node.Label + " (" + path + ") @" + Round(at[0]) + "," + Round(at[1]) + " -> " + u.Place + "; nearby: "
-                + String.Join(", ", primaryPlaced.OrderBy(p => DistanceSquared(at, p.Centre)).Take(4).Select(p => p.Name + " " + Round(Distance(at, p.Centre)) + " m (r" + Round(p.Radius) + ")")));
-        }
-
-        static string Note(Unit u) => u.Conflict ? "(stands in " + u.Inside + ")" : u.Nearest ? "(nearest place)" : null;
-        static string WithPlace(Unit u) => u.Place == null ? Note(u) : u.Place + (Note(u) == null ? "" : " " + Note(u));
-        static IEnumerable<Unit> OrderLoose(IEnumerable<Unit> units, bool mileposts) => mileposts
-            ? units.OrderBy(m => MilepostKey(m.Row).Prefix, StringComparer.OrdinalIgnoreCase).ThenBy(m => MilepostKey(m.Row).Mileage).ThenBy(m => m.Node.Label, StringComparer.OrdinalIgnoreCase).ThenBy(m => m.Node.Key, StringComparer.Ordinal)
-            : units.OrderBy(m => m.Node.Label, StringComparer.OrdinalIgnoreCase).ThenBy(m => m.Place ?? "", StringComparer.OrdinalIgnoreCase).ThenBy(m => m.Node.Key, StringComparer.Ordinal);
-
-        // One folder's contents: its kind folders, then its place folders, then its loose units with their places.
-        static void Fill(BuildContext b, OutlineNode folder, List<Unit> members, int depth, bool placeFolders) {
-            var loose = new List<Unit>();
-            var levels = members.GroupBy(m => depth < m.Levels.Count ? m.Levels[depth].Name : null).ToList();
-            var subfolders = new List<OutlineNode>();
-            foreach (var group in levels.Where(g => g.Key != null).OrderBy(g => Rank(depth, g.Key)).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)) {
-                var list = group.ToList();
-                if (!list.Any(m => m.Levels[depth].Forced) && list.Count < KindThreshold) { loose.AddRange(list); continue; }
-                var sub = new OutlineNode { Key = folder.Key + "/" + group.Key, Label = group.Key };
-                Fill(b, sub, list, depth + 1, placeFolders);
-                subfolders.Add(sub);
-            }
-            loose.AddRange(levels.Where(g => g.Key == null).SelectMany(g => g));
-            // A kind folder that would be the only thing in its folder only repeats it: its contents move up.
-            if (subfolders.Count == 1 && loose.Count == 0 && !members.Any(m => depth < m.Levels.Count && m.Levels[depth].Forced)) {
-                folder.Children.AddRange(subfolders[0].Children); folder.Count = subfolders[0].Count; return;
-            }
-            folder.Children.AddRange(subfolders);
-            var mileposts = folder.Label == MilepostsKind || loose.Count > 0 && loose.All(m => m.Row?.Family == MilepostFamily);
-            var positionalFolders = PositionalPlaceFolderKinds.Contains(folder.Label);
-            var placeGroups = placeFolders && !mileposts && loose.Count > PlaceListMinimum
-                ? loose.Where(m => m.Place != null && (!m.Nearest || positionalFolders)).GroupBy(m => m.Place, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() >= PlaceThreshold).ToList()
-                : new List<IGrouping<string, Unit>>();
-            // One place folder that would hold every loose object only repeats a place: the objects stand loose with it.
-            if (placeGroups.Count == 1 && placeGroups[0].Count() == loose.Count && subfolders.Count == 0) placeGroups.Clear();
-            var inFolders = new HashSet<Unit>(placeGroups.SelectMany(g => g));
-            foreach (var g in placeGroups.OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)) {
-                var placeFolder = new OutlineNode { Key = folder.Key + "/@" + g.Key, Label = g.Key };
-                foreach (var m in OrderLoose(g, mileposts)) { m.Node.Where = Note(m); placeFolder.Children.Add(m.Node); }
-                placeFolder.Count = placeFolder.Children.Sum(c => c.Count);
-                folder.Children.Add(placeFolder);
-            }
-            foreach (var m in OrderLoose(loose.Where(m => !inFolders.Contains(m)), mileposts)) {
-                m.Node.Where = b.PlaceView ? Note(m) : WithPlace(m);
-                folder.Children.Add(m.Node);
-            }
-            folder.Count = folder.Children.Sum(c => c.Count);
         }
         static string Describe(Unit u) => u.Node.Label + " [" + (u.Row?.Family ?? "no row") + "] " + (u.Row?.Identity.Path ?? u.Node.Key.Replace("\n", " "));
-        static List<OutlineNode> CategoryTops(BuildContext b) {
-            var tops = new List<OutlineNode>();
-            foreach (var group in b.Units.GroupBy(u => u.Levels[0].Name).OrderBy(g => Rank(0, g.Key)).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)) {
-                var top = new OutlineNode { Key = group.Key, Label = group.Key };
-                Fill(b, top, group.ToList(), 1, true);
-                tops.Add(top);
-                if (group.Key != NotSorted) continue;
-                b.Result.Unplaced += top.Count;
-                if (b.Diagnostics) b.Result.CatchAll.AddRange(group.Select(Describe));
-            }
-            return tops;
-        }
-        // Every place the game defines appears when unfiltered; under a search or filter only places with matches.
-        static List<OutlineNode> PlaceTops(BuildContext b) {
-            var tops = new List<OutlineNode>();
-            var byPlace = b.Units.GroupBy(u => u.Place ?? NoPlace, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
-            // A sub-location stands under its parent place, never at the top level.
-            var names = places.Values.Where(p => p.IsPrimary && (!b.Narrowed || byPlace.ContainsKey(p.Name))).Select(p => p.Name)
-                .Concat(byPlace.Keys.Where(k => !(places.TryGetValue(k, out var sub) && !sub.IsPrimary))).Distinct(StringComparer.OrdinalIgnoreCase);
-            foreach (var name in names.OrderBy(n => n == NoPlace ? 1 : 0).ThenBy(n => n, StringComparer.OrdinalIgnoreCase)) {
-                var top = new OutlineNode { Key = "@" + (places.TryGetValue(name, out var known) ? known.Name : name), Label = known?.Name ?? name };
-                byPlace.TryGetValue(name, out var members);
-                if (members != null) Fill(b, top, members, 0, false);
-                AddSubLocations(b, top, byPlace);
-                tops.Add(top);
-                if (name != NoPlace || members == null) continue;
-                b.Result.Unplaced += top.Count;
-                if (b.Diagnostics) b.Result.CatchAll.AddRange(members.Select(Describe));
-            }
-            return tops;
-        }
 
-        // The sub-locations of a place, after its categories: each a node of its own, also when empty (unfiltered), with
-        // any objects placed in it. Positional objects go to primary places only, so these are normally empty.
-        static void AddSubLocations(BuildContext b, OutlineNode top, Dictionary<string, List<Unit>> byPlace) {
-            foreach (var sub in places.Values.Where(p => !p.IsPrimary && top.Label.Equals(p.SubOf, StringComparison.OrdinalIgnoreCase)).OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)) {
-                byPlace.TryGetValue(sub.Name, out var members);
-                if (members == null && b.Narrowed) continue;
-                var node = new OutlineNode { Key = top.Key + "/@" + sub.Name, Label = sub.Name };
-                if (members != null) Fill(b, node, members, 0, false);
-                top.Children.Add(node);
-                top.Count += node.Count;
+        // What a row's tooltip says: the object's name and hierarchy path, where the outliner lists it, and what the
+        // row's markers mean. It names no internal family and no rule: only what the outliner itself shows.
+        internal static string Tooltip(Result result, SceneObservation item, bool changed, FailureKind? failure) {
+            var equipment = CommandBand.IsAddedFamily(item.Family);
+            string[] shown = null;
+            result?.Shown.TryGetValue(item, out shown);
+            var lines = new List<string> { OwnName(item) };
+            if (!equipment) lines.Add(item.Identity.Path);
+            if (shown != null) {
+                lines.Add(shown[0] + (shown[1] == null ? "" : " / " + shown[1]));
+                if (shown[2] != null) lines.Add("Place: " + shown[2]);
             }
+            if (!item.Active) lines.Add("Inactive");
+            if (item.InspectionOnly != null) lines.Add(CommandBand.InspectionOnlyLine(item.InspectionOnly));
+            if (failure != null) lines.Add(CommandBand.FailureTooltipLine(failure.Value));
+            else if (changed) lines.Add(ChangedLine);
+            if (item.Problems.Count != 0) {
+                if (equipment) lines.Add("Detected problems: " + item.Problems.Count + ". The Problems section of the Object tab lists them.");
+                else lines.AddRange(item.Problems.Select(problem => "Problem: " + problem));
+            }
+            return String.Join("\n", lines).Replace("<", "\\u003c").Replace(">", "\\u003e");
         }
+        // Why a row is marked as changed, also when nothing was edited in this session.
+        internal const string ChangedLine = "Changed: this mod's scene patch file (Data/scene-patches.json) changes this object. The Changes tab lists the changes.";
+        internal static string FolderTooltip(OutlineNode node) =>
+            (node.Label + "\n" + node.Count.ToString(CultureInfo.InvariantCulture) + (node.Count == 1 ? " object" : " objects")).Replace("<", "\\u003c").Replace(">", "\\u003e");
 
-        // Widths of the visible prototype rows including their nesting indent and place text, for Fit.
+        // Widths of the visible prototype rows including their nesting indent, for Fit.
         const float IndentPerLevel = 16f;
         internal static float[] FitWidths(TMPro.TMP_Text measure) {
             if (measure == null || lastTops == null || lastTops.Count == 0) return null;
             var widths = new List<float>();
             void Walk(OutlineNode node, int depth) {
-                var text = (node.Row == null ? "(" + node.Count.ToString(CultureInfo.InvariantCulture) + ") " : "") + (node.Label ?? "") + (String.IsNullOrEmpty(node.Where) ? "" : "  " + node.Where);
+                var text = (node.Row == null ? "(" + node.Count.ToString(CultureInfo.InvariantCulture) + ") " : "") + (node.Label ?? "");
                 // The row decoration already covers one folder level; each deeper level adds its indent.
                 widths.Add(measure.GetPreferredValues(text).x + Math.Max(0, depth - 1) * IndentPerLevel);
                 foreach (var child in node.Children) Walk(child, depth + 1);
@@ -408,23 +263,21 @@ namespace RailroaderScenePatcher {
         }
 
         static bool detailLogged;
-        // One line per view switch: view, top-level nodes, objects listed, objects not placed in any node. The detail
-        // lines follow with an empty search: places, Loc objects, signs placed by position, crossings, Inspection only,
-        // hidden objects.
+        // Debug lines, one per view switch: view, top-level nodes, objects listed, objects in a catch-all node, and
+        // what breaks the rules of the tree. The detail lines follow with an empty search: places, crossings,
+        // Inspection only, hidden objects.
         internal static void Log(Result result, int rowsShown, string search, string filter) {
             var tops = String.Join(", ", result.Tops.Select(t => t.Label + "=" + t.Count.ToString(CultureInfo.InvariantCulture)));
-            UnityEngine.Debug.Log("Scene Patcher PROTOTYPE outliner: view=" + (ByPlace ? "Place" : "Category") + " tops=" + result.Tops.Count
-                + " listed=" + result.Listed + " shown=" + rowsShown + " hidden=" + result.Hidden.Count + " notPlaced=" + result.Unplaced + " dropped=" + (rowsShown - result.Hidden.Count - result.Listed)
-                + " filter=" + filter + " search='" + search + "' [" + tops + "]");
-            UnityEngine.Debug.Log("Scene Patcher PROTOTYPE outliner detail: catchAll=" + result.CatchAll.Count + " {" + String.Join(" | ", result.CatchAll) + "} conflicts=" + result.Conflicts.Count + " {" + String.Join(" | ", result.Conflicts) + "}");
+            PatcherLog.Debug("Outliner grouping: view=" + (ByPlace ? "Place" : "Category") + " tops=" + result.Tops.Count
+                + " listed=" + result.Listed + " shown=" + rowsShown + " hidden=" + result.Hidden.Count + " catchAll=" + result.Unplaced + " dropped=" + (rowsShown - result.Hidden.Count - result.Listed)
+                + " filter=" + filter + " search='" + search + "' kinds={" + String.Join(", ", kindCategories.OrderBy(k => k, StringComparer.Ordinal)) + "} [" + tops + "]");
+            PatcherLog.Debug("Outliner grouping detail: catchAll=" + result.CatchAll.Count + " {" + String.Join(" | ", result.CatchAll) + "} violations=" + result.Violations.Count + " {" + String.Join(" | ", result.Violations) + "}");
             if (detailLogged && !String.IsNullOrEmpty(search)) return;
             detailLogged = true;
-            UnityEngine.Debug.Log("Scene Patcher PROTOTYPE places: " + placesLine);
-            UnityEngine.Debug.Log("Scene Patcher PROTOTYPE loc objects: " + locLine);
-            UnityEngine.Debug.Log("Scene Patcher PROTOTYPE signs by position: " + result.PositionalSigns.Count + " {" + String.Join(" | ", result.PositionalSigns) + "}");
-            UnityEngine.Debug.Log("Scene Patcher PROTOTYPE crossings: " + result.Crossings.Count + " {" + String.Join(" | ", result.Crossings) + "}");
-            UnityEngine.Debug.Log("Scene Patcher PROTOTYPE inspection only: " + result.InspectionOnlyRows.Count + " {" + String.Join(" | ", result.InspectionOnlyRows) + "}");
-            UnityEngine.Debug.Log("Scene Patcher PROTOTYPE hidden: " + result.Hidden.Count + " {" + String.Join(" | ", result.Hidden) + "}");
+            PatcherLog.Debug("Outliner grouping places: " + placesLine);
+            PatcherLog.Debug("Outliner grouping crossings: " + result.Crossings.Count + " {" + String.Join(" | ", result.Crossings) + "}");
+            PatcherLog.Debug("Outliner grouping inspection only: " + result.InspectionOnlyRows.Count + " {" + String.Join(" | ", result.InspectionOnlyRows) + "}");
+            PatcherLog.Debug("Outliner grouping hidden: " + result.Hidden.Count + " {" + String.Join(" | ", result.Hidden) + "}");
         }
     }
 }

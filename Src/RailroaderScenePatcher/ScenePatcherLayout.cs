@@ -318,10 +318,12 @@ namespace RailroaderScenePatcher {
                 var select = CommandBand.SelectInWorld(selection != null, pending);
                 Button(row, "Select in world", () => BeginSelection(SelectionKind.SceneObject, null)).Inactive(select != null)
                     .Tooltip("Select in world", CommandBand.Tooltip("Click a marking in the world to choose the object to inspect.", select));
-                var focus = CommandBand.Focus(selected != null, FocusUnavailable());
+                // PROTOTYPE: a crossing node of the outliner is a game-defined group: Focus goes to the crossing.
+                var groupNode = selected == null ? prototypeGroupNode : null;
+                var focus = groupNode != null ? (groupNode.Point == null ? "This crossing has no position." : null) : CommandBand.Focus(selected != null, FocusUnavailable());
                 var starter = selected != null && selected.Family == StarterPlacements.Family;
-                Button(row, "Focus", () => { if (selected != null) Focus(selected); }).Inactive(focus != null)
-                    .Tooltip("Focus", CommandBand.Tooltip(starter ? "Move the camera to the marker's track point, where the start setup places its cars." : "Move the camera to the inspected object.", focus));
+                Button(row, "Focus", () => { if (selected != null) Focus(selected); else FocusGroupNode(); }).Inactive(focus != null)
+                    .Tooltip("Focus", CommandBand.Tooltip(groupNode != null ? "Move the camera to the selected crossing." : starter ? "Move the camera to the marker's track point, where the start setup places its cars." : "Move the camera to the inspected object.", focus));
                 // Beside Focus, as the native map editor has Focus and Clear on its selection row.
                 var keepDraft = guided.Enabled && (guided.Step == GuidedTaskStep.Values || guided.Step == GuidedTaskStep.Review);
                 var clear = keepDraft && !pending ? "No world choice is pending." : CommandBand.Clear(selected != null, pending);
@@ -421,6 +423,8 @@ namespace RailroaderScenePatcher {
                 var shown = PrototypeRows();
                 var rows = new List<UIOutlineItem>();
                 var byKey = new Dictionary<string, SceneObservation>();
+                // PROTOTYPE: the crossing nodes, by the key of their outline row.
+                var groupNodeKeys = new Dictionary<string, string>();
                 string selectedKey = null;
                 var narrowed = !String.IsNullOrEmpty(filter) || outlinerFilter != OutlinerFilter.All;
                 var state = narrowed ? filteredOutline : inventoryOutline;
@@ -429,7 +433,7 @@ namespace RailroaderScenePatcher {
                 // PROTOTYPE: the top-level nodes come from the one-tree grouping.
                 PrototypeOutlinerGrouping.Result proto = null;
                 try { proto = PrototypeOutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, PrototypeTrackPoint); }
-                catch (Exception e) { Debug.LogWarning("Scene Patcher PROTOTYPE outliner failed, showing the current outliner: " + e); }
+                catch (Exception e) { PatcherLog.Warning("The outliner grouping failed, so the outliner lists objects by family", e); }
                 // PROTOTYPE: header count matches the visible tree (excluding hidden container objects and native track spans).
                 var summary = inventory == null ? "Inspection is unavailable"
                     : proto != null ? proto.Listed.ToString(CultureInfo.InvariantCulture) + " of " + Math.Max(0, inventory.Entries.Count - PrototypeOutlinerGrouping.HiddenCount(inventory.Entries)).ToString(CultureInfo.InvariantCulture) + " objects"
@@ -451,6 +455,7 @@ namespace RailroaderScenePatcher {
                     // The count stands first, so a narrow column cuts the family name and never the count; the name
                     // follows it directly.
                     var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + (protoTop != null ? "(" + protoTop.Count.ToString(CultureInfo.InvariantCulture) + ")" : group.Value.Count.ToString(CultureInfo.InvariantCulture)) + "<alpha=#FF> " + Literal(protoTop?.Label ?? group.Key));
+                    if (protoTop != null) parent.Tooltip = PrototypeOutlinerGrouping.FolderTooltip(protoTop);
                     var repeated = new HashSet<string>(group.Value.GroupBy(InventoryPresentationState.Name).Where(names => names.Count() > 1).Select(names => names.Key));
                     // A family whose objects the game itself tells apart shows them under subgroups; a family group
                     // only, never the Inspection only group.
@@ -495,7 +500,7 @@ namespace RailroaderScenePatcher {
                         var text = NameMarkup(shown);
                         if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
                         return new UIOutlineItem(key, prefix + text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
-                            Tooltip = InventoryPresentationState.OutlinerTooltip(item, changed, failure)
+                            Tooltip = proto != null ? PrototypeOutlinerGrouping.Tooltip(proto, item, changed, failure) : InventoryPresentationState.OutlinerTooltip(item, changed, failure)
                         };
                     }
                     // The Baked scenery group family lists its groups under their categories and each group's parts
@@ -505,6 +510,13 @@ namespace RailroaderScenePatcher {
                         if (node.Row == null) {
                             key = groupKey + "/" + node.Key;
                             made = new UIOutlineItem(key, "<alpha=#99>" + (protoTop != null ? "(" + node.Count.ToString(CultureInfo.InvariantCulture) + ")" : node.Count.ToString(CultureInfo.InvariantCulture)) + "<alpha=#FF> " + Literal(node.Label) + (node.Where == null ? "" : "  <alpha=#99>" + Literal(node.Where) + "<alpha=#FF>"));
+                            if (protoTop != null) {
+                                made.Tooltip = PrototypeOutlinerGrouping.FolderTooltip(node);
+                                if (proto.GroupNodes.ContainsKey(node.Key)) {
+                                    groupNodeKeys[key] = node.Key;
+                                    if (selected == null && prototypeGroupKey == node.Key) { selectedKey = key; prototypeGroupNode = proto.GroupNodes[node.Key]; }
+                                }
+                            }
                         } else {
                             key = indices[node.Row].ToString(CultureInfo.InvariantCulture);
                             made = Row(node.Row, node.Label, above, node.Where, node.Context);
@@ -527,15 +539,22 @@ namespace RailroaderScenePatcher {
                     rows.Add(parent);
                 }
                 var outline = items.AddOutlineView(rows, state, new UIState<string>(selectedKey), key => {
-                    if (!byKey.TryGetValue(key, out var observation)) return;
+                    if (!byKey.TryGetValue(key, out var observation)) {
+                        // PROTOTYPE: a click on a crossing node selects the crossing, so Focus goes to it.
+                        if (proto != null && groupNodeKeys.TryGetValue(key, out var nodeKey) && proto.GroupNodes.TryGetValue(nodeKey, out var node)) presentation.Action(() => SelectGroupNode(nodeKey, node))();
+                        return;
+                    }
                     presentation.Action(() => {
                         if (!GuidedSelect(observation)) return;
+                        prototypeGroupKey = null; prototypeGroupNode = null;
                         // A click on the row that is inspected already clears the inspection.
                         if (CommandBand.ClearsInspection(selected, observation)) { ClearInspection(); return; }
                         if (!inventoryPresentation.CanSelect(inventory, observation)) return;
                         CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, observation); ReadPlacement();
                     })();
                 });
+                // PROTOTYPE: a row's tooltip waits as long as a button's, also while the pointer moves from row to row.
+                if (outline.GetComponent<PrototypeOutlineTooltips>() == null) outline.gameObject.AddComponent<PrototypeOutlineTooltips>();
                 var listLayout = outline.GetComponent<LayoutElement>();
                 listLayout.minHeight = 120; listLayout.flexibleHeight = 10000;
             });
@@ -1833,7 +1852,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Changed", "Objects this mod changes, marked *. An object whose modification is refused is marked × instead. Its Changes tab gives the reason." },
                     new[] { "Disabled", "Objects that are switched off, whatever their parents are. They are never listed under Problems; find them here." },
                     new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
-                    new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building, and Other. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },
+                    new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building, Water, and Road scenery. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },
                     new[] { "Spawn point", "Scene spawn points are where players start, teleport to, or return after rescue. Edit native spawns in the Map Editor's Spawns category." },
                     new[] { StarterPlacements.Family, "An active new-game setup reads these markers' track locations to place its starting cars. The marker's own position has no effect. Click Focus to move the camera to where the cars stand." },
                     new[] { StationMapIconRules.Family, "The icons that show stations on the map. After moving a station in the Map Editor, move its icon to the station's new location." },

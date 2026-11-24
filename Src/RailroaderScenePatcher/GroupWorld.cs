@@ -357,7 +357,7 @@ namespace RailroaderScenePatcher {
         static GameObject PartObject(object part) => part as GameObject ?? throw new InvalidOperationException("The part no longer exists");
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         public IReadOnlyList<object> Find(string scene, string path) =>
-            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.ResolvesGroup(VerdictOf(g), path)).Cast<object>().ToArray();
+            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.ResolvesGroup(VerdictOf(g))).Cast<object>().ToArray();
         public string Refusal(object group) => Problem(group as GameObject);
         // The construction segments of the controller on the group root itself, such as on Bryson Bridge 1 and the
         // Almond Bridge group root; a group without one has no construction-segment relationship.
@@ -369,9 +369,8 @@ namespace RailroaderScenePatcher {
         // Why a group root cannot be edited, or null. Shared with the inventory.
         internal static string Problem(GameObject root) {
             if (!Loaded(root)) return "The group's scene is not loaded";
-            // A container object in the category table, such as Bryson Yard, has no verdict and resolves so that it fails with this
-            // reason.
-            var refusal = VerdictOf(root) == null ? BakedSceneryRules.GroupRefusal(BoardScene.PathOf(root.transform)) : null;
+            // A container object, such as Bryson Yard, resolves so that it fails with this reason.
+            var refusal = BakedSceneryRules.GroupRefusal(VerdictOf(root));
             if (refusal != null) return refusal;
             if (VerdictOf(root)?.Disposition != GroupDisposition.Group) return "This object is not a group root of the Baked scenery group family";
             var components = root.GetComponentsInChildren<Component>(true);

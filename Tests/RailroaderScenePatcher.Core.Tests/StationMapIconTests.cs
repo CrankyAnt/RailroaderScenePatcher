@@ -46,7 +46,7 @@ static class StationMapIconTests {
 
         var rows = new[] { Bryson, Cochran, Whittier }.Select(path => Row(path)).ToList();
         rows.Add(new SceneObservation(new object(), new TargetIdentity(SceneName, "World/Large Scenery/Bryson/Bryson House Track", BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure),
-            BakedSceneryRules.Family, true, new[] { 0.0, 0, 0 }, new[] { 0.0, 0, 0, 1 }, new string[0], new string[0], new string[0], CommandBand.GroupOperations, category: BakedSceneryCategories.Other));
+            BakedSceneryRules.Family, true, new[] { 0.0, 0, 0 }, new[] { 0.0, 0, 0, 1 }, new string[0], new string[0], new string[0], CommandBand.GroupOperations, category: BakedSceneryCategories.Platform));
         var groups = InventoryPresentationState.Groups(rows);
         var icons = groups.Where(g => g.Key == StationMapIconRules.Family).ToArray();
         Assert(icons.Length == 1 && icons[0].Value.Select(r => r.Identity.Path).SequenceEqual(new[] { Bryson, Cochran, Whittier }), "The outliner lists every icon once in the Station map icon family: "

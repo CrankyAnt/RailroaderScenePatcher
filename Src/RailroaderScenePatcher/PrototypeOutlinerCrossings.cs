@@ -13,7 +13,11 @@ namespace RailroaderScenePatcher {
         const string ControllerFamily = InventoryPresentationState.HolderFamily, MastFamily = "Crossing mast", BellFamily = "Crossing bell",
             PadFamily = "Crossing pad marker", SpanFamily = FocusTarget.Span, TrackMarkerFamily = "Track marker", MilepostFamily = "Milepost";
         static readonly Regex CrossingWord = new Regex(@"crossing", RegexOptions.IgnoreCase);
-        static readonly Regex CrossingMarkerName = new Regex(@"\b(grade\s+crossing|crossing\s+pad)\b", RegexOptions.IgnoreCase);
+        const string Scenery = "World/Large Scenery/";
+        // World, World/Large Scenery and a place's own object directly below it stop every upward walk for a crossing.
+        static bool IsPlaceLevel(string path) =>
+            String.IsNullOrEmpty(path) || path == "World" || path == "World/Large Scenery"
+            || path.StartsWith(Scenery, StringComparison.Ordinal) && path.IndexOf('/', Scenery.Length) < 0;
         static readonly HashSet<string> CrossingEquipmentFamilies = new HashSet<string>(StringComparer.Ordinal) {
             MastFamily, BellFamily, PadFamily, CommandBand.AddedEquipmentFamily, CommandBand.AddedBellFamily
         };
@@ -28,10 +32,10 @@ namespace RailroaderScenePatcher {
 
         // A Loc: object, whatever family lists it: a track marker, or an independent board (a culler and a mask, no
         // track marker), as the base map's Loc: boards are.
-        static bool IsLocObject(SceneObservation r) => Last(r.Identity.Path).StartsWith(LocPrefix, StringComparison.Ordinal);
+        static bool IsLocObject(SceneObservation r) => Last(r.Identity.Path).StartsWith(SceneClassification.LocPrefix, StringComparison.Ordinal);
         static bool IsCrossbuck(SceneObservation r) => r.Family == BakedSceneryRules.Family && r.GroupPath == null && r.Category == BakedSceneryCategories.GradeCrossing;
         // A track marker of a crossing, such as Crossing Pad (1): no sign and no Loc: object.
-        static bool IsCrossingTrackMarker(SceneObservation r) => r.Family == TrackMarkerFamily && !IsLocObject(r) && SignKind(Last(r.Identity.Path)) == null;
+        static bool IsCrossingTrackMarker(SceneObservation r) => r.Family == TrackMarkerFamily && !IsLocObject(r) && SceneClassification.ByName(Last(r.Identity.Path))?.Category != BakedSceneryCategories.Sign;
         static bool CanJoinCrossing(SceneObservation r) =>
             r != null && (CrossingEquipmentFamilies.Contains(r.Family) || IsCrossbuck(r) || IsCrossingTrackMarker(r));
 
@@ -152,7 +156,7 @@ namespace RailroaderScenePatcher {
                 var unit = new Unit { Node = node, Members = crossing.Members, CrossingPath = crossing.Crossing.Path };
                 foreach (var m in crossing.Members) { Join(unit, m); joined.Add(m); }
                 SortCrossingChildren(node);
-                unit.Levels.Add(Level.Category(BakedSceneryCategories.GradeCrossing));
+                unit.Category = BakedSceneryCategories.GradeCrossing;
                 b.Units.Add(unit);
                 if (b.Diagnostics) b.Result.Crossings.Add("unprotected " + node.Label + " (" + crossing.Crossing.Path + (crossing.PadMarkerId == null ? "" : ", pad marker " + crossing.PadMarkerId) + "): "
                     + String.Join(", ", crossing.Members.Select(m => m.Row.Family + " " + m.Node.Label)));

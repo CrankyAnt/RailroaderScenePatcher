@@ -43,14 +43,14 @@ static class CoalLoaderTests {
         Console.WriteLine("PASS: coal loader");
     }
 
-    // The loader group is listed under Other, with the Mine Office beside it, and its parts follow the part rule as in
-    // any other group.
+    // The loader group is listed under Industry building, as a loader that fills cars is, with the Mine Office beside
+    // it, and its parts follow the part rule as in any other group.
     static void TheLoaderGroupIsListedUnderOther() {
         var verdicts = BakedSceneryRules.Classify(World());
         var group = verdicts.SingleOrDefault(v => v.Path == Loader);
         var office = verdicts.SingleOrDefault(v => v.Path == Neighbour);
-        Assert(group?.Disposition == GroupDisposition.Group && group.Reason == null && group.Ticket == null && group.Category == BakedSceneryCategories.Other && group.Subcategory == null,
-            "The loader group is listed under Other: " + group?.Disposition + " " + group?.Reason + " " + group?.Category);
+        Assert(group?.Disposition == GroupDisposition.Group && group.Reason == null && group.Ticket == null && group.Category == BakedSceneryCategories.IndustryBuilding && group.Subcategory == null,
+            "The loader group is listed under Industry building: " + group?.Disposition + " " + group?.Reason + " " + group?.Category);
         Assert(office?.Disposition == GroupDisposition.Group && office.Category == group.Category, "The loader stands where the other Robinson Gap Mine groups stand: " + office?.Category);
         Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.InspectionOnly), "Nothing of the loader stands in the Inspection only group");
         Assert(!BakedSceneryRules.Exclusions.Any(e => e.Component == "RollingStock.CarContentSwapper"), "No inspection-only exclusion names the car loader");
@@ -64,10 +64,10 @@ static class CoalLoaderTests {
         Assert(elsewhere.Disposition == GroupDisposition.Group && elsewhere.Reason == null, "A car loader deeper in a group keeps it listed: " + elsewhere.Disposition + " " + elsewhere.Reason);
     }
 
-    // The Object tab shows the decorative Use in the game text of the groups under Other, for the group and for its part.
+    // The Object tab shows the decorative Use in the game text of a group without a function of its own, for the group and for its part.
     static void TheObjectTabShowsTheDecorativeText() {
-        var group = CommandBand.UseInGame(false, BakedSceneryCategories.Other, null, new string[0]);
-        var part = CommandBand.UseInGame(true, BakedSceneryCategories.Other, null, new string[0]);
+        var group = CommandBand.UseInGame(false, BakedSceneryCategories.Unclassified, null, new string[0]);
+        var part = CommandBand.UseInGame(true, BakedSceneryCategories.Unclassified, null, new string[0]);
         Assert(group == CommandBand.Decorative && part == CommandBand.PartDecorative, "The decorative texts: " + group + " | " + part);
         Assert(group.IndexOf(CarLoaderWord, StringComparison.OrdinalIgnoreCase) < 0 && part.IndexOf(CarLoaderWord, StringComparison.OrdinalIgnoreCase) < 0, "No car loader reason");
     }

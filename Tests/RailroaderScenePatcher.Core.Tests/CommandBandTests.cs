@@ -241,7 +241,7 @@ static class CommandBandTests {
             new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
             new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
             new[] { CommandBand.ModeBlock(CommandBand.SnapMode, false, false, CommandBand.NotYetSupported("the Track span family")), "The Track span family cannot be edited." },
-            new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects share this hierarchy path and component, so a patch cannot name one of them." },
+            new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects have this same hierarchy path, so a scene patch file can't tell them apart." },
             new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
             new[] { "Inspect an object first.", "Inspect an object first." },
             new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
@@ -477,7 +477,7 @@ static class CommandBandTests {
             "The added bell has its own family folder: " + String.Join(", ", withBell.Select(g => g.Key)));
         // A hierarchy path that more than one object holds: no edit, with the reason under Supported edits.
         Check(CommandBand.SharedPath(1) == null && CommandBand.SharedPath(0) == null, "A path one object holds can be edited");
-        Check(CommandBand.SharedPath(2) == "2 objects share this hierarchy path and component, so a patch cannot name one of them"
+        Check(CommandBand.SharedPath(2) == "2 objects have this same hierarchy path, so a scene patch file can't tell them apart"
             && CommandBand.Refusal(CommandBand.NotEditable(CommandBand.SharedPath(2))) == CommandBand.SharedPath(2), "A path two objects hold reads Not editable with its reason");
         // An object without edits is not told what Disable would do.
         Check(CommandBand.TrackGroup(false) == "Activity follows the track group." && CommandBand.TrackGroup(true).Contains("Disable holds it inactive"), "The track-group line names edits only where the object offers them");
@@ -537,7 +537,7 @@ static class CommandBandTests {
         foreach (var row in new[] {
             new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
             new[] { CommandBand.NotEditable("the marker is inside a crossing"), "The marker is inside a crossing." },
-            new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", "2 objects share this hierarchy path and component, so a patch cannot name one of them." },
+            new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", "2 objects have this same hierarchy path, so a scene patch file can't tell them apart." },
             new[] { "Fixed placement and activity", "This object cannot be edited here." }, new[] { null, "This object cannot be edited here." }, new[] { " ", "This object cannot be edited here." } })
             Check(CommandBand.EditReason(row[0]) == row[1], "The editing message gives the object's own reason: " + row[1] + " / " + CommandBand.EditReason(row[0]));
         Check(!CommandBand.EditReason(CommandBand.NotYetSupported("x")).Contains("Object tab"), "The editing message does not send the user to another tab");

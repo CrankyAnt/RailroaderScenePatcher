@@ -156,7 +156,7 @@ namespace RailroaderScenePatcher {
         internal static string NotEditable(string reason) => NotEditablePrefix + reason;
         // Why an object whose hierarchy path and component more than one loaded object holds cannot be edited, or null:
         // a patch names its target by them, so it cannot name one of the holders.
-        internal static string SharedPath(int holders) => holders > 1 ? holders + " objects share this hierarchy path and component, so a patch cannot name one of them" : null;
+        internal static string SharedPath(int holders) => holders > 1 ? holders + " objects have this same hierarchy path, so a scene patch file can't tell them apart" : null;
         // The Track group line of the Object tab. An object without edits is told what its activity follows, not what
         // Disable and Clear activity would do.
         internal static string TrackGroup(bool editable) => editable
