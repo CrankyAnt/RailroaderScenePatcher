@@ -826,6 +826,31 @@ namespace RailroaderScenePatcher {
         // is for one; a choice that only inspects names none.
         internal static string ChoiceLog(string forObject, string problem, IReadOnlyList<string> offers) =>
             LogLine("World choice", forObject, problem + (offers == null || offers.Count < 2 ? "" : " Candidates: " + String.Join("; ", offers.Select((label, i) => (i + 1) + " " + ChoiceLabel(label, offers, 80)))));
+        // The debug line of a confirmed world choice, beside the line of its refusals: the object the choice is for, when
+        // it is for one, and the confirmed candidate's full label.
+        internal static string ChoiceConfirmedLog(string forObject, string label) =>
+            LogLine("World choice", forObject, "Confirmed choice: " + label + ".");
+        // The family the panel shows for an object. A part of a baked scenery group is a Part, as the glossary and the
+        // Object tab's "Part of" line name it; its observed family stays Baked scenery group for every rule.
+        internal const string PartFamily = "Part";
+        internal static string ShownFamily(SceneObservation entry) => entry == null ? null : entry.GroupPath != null ? PartFamily : entry.Family;
+        // A scene object's label as a world choice offers it: "Family: path", with "[inactive]" for an inactive object.
+        internal static string CandidateLabel(SceneObservation entry) =>
+            ShownFamily(entry) + ": " + entry.Identity.Path + (entry.Active ? "" : " [inactive]");
+        // Whether the game's own world click targets, such as a station's click spot that opens its window, are off.
+        // While the Scene Patcher gizmo is shown they take no hover and no click. A click (an activation) is off while
+        // an edit is open, a world label shields the pointer, or a world choice is pending: that click is the choice's.
+        internal static bool BlocksPickable(bool gizmoShown, bool activation, bool editOpen, bool overlayShielded, bool choicePending) =>
+            gizmoShown || activation && (editOpen || overlayShielded || choicePending);
+        // Whether the window of the attached native map editor is built now: none stands yet, the pointer input it needs
+        // is available, and no earlier build for this map editor failed. The input can become available frames after
+        // the map editor appeared, as after a Map Editor reload in the same world.
+        internal static bool BuildsPresentation(bool presentationStands, bool inputAvailable, bool buildFailed) =>
+            !presentationStands && inputAvailable && !buildFailed;
+        // The Inventory line of Session details: what the last full read of the scene was. It stays until the next
+        // full read, so it says that it is about that read; edits since then are on the Changes tab.
+        internal static string InventoryRead(bool inspectedGone) =>
+            "The last full read covered the object list and the supplied definitions. Reading applies no changes." + (inspectedGone ? " The inspected object is no longer present." : "");
         // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
         internal static string RoleCaption(string role) => CircuitCoverage.RoleCaption(role);
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for

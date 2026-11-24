@@ -13,7 +13,7 @@ Use world markings to inspect a supported inventory object or choose a target fo
 
 Each square marker is at its object's position. Click its `+` to choose the object. If you click inside object frames without hitting a `+`, the patcher chooses the object whose `+` is nearest on screen. The candidate is blue and becomes a more saturated blue under the pointer. After you click, it stays plain blue. Click **Confirm** to turn its object frame and square marker gold. For an editable object, **Numeric** mode on the **Placement** tab shows the inspected placement.
 
-The footer's first message slot, **World choice**, tells you what to choose, for example `Choose an object in the world.` The native map editor can still respond to world clicks while **Select in world** is open.
+The footer's first message slot, **World choice**, tells you what to choose, for example `Choose an object in the world.` The native map editor can still respond to world clicks while **Select in world** is open. The game's own click spots, such as a station agent, don't open their windows while the choice is open.
 
 After you click a candidate, the footer shows it on a blue `Object <n>: …` line and enables **Details**. Click **Details** to show its scene, path, component, and any binding identifiers below that line. Click it again to hide them.
 
@@ -141,7 +141,7 @@ If the candidate is missing, ambiguous, or has changed since you selected it, ch
 
 A scene patch identifies an object by its scene, path, and component. It can't distinguish two objects that share all three. Confirmation for an edit is then refused, with the shared identity in the reason. Choose an object with a unique path instead. Replacement choices exclude ambiguous objects because the scene patch couldn't identify them.
 
-**Select in world** can still confirm such an object for inspection. **Supported edits** then explains why it cannot be edited. A refused confirmation shows its reason in the footer. With **Debug logging** on, the Player log also records it.
+**Select in world** can still confirm such an object for inspection. **Supported edits** then explains why it cannot be edited. A refused confirmation shows its reason in the footer. With **Debug logging** on, the Player log records each refusal and each confirmed choice.
 
 Click **Cancel** in the footer to close a pending choice. Pending choices don't change scene objects, the scene patch file, or completed edit history. Confirmation records a choice for an edit. The [v1 scene patch file reference](scene-patch-file-v1.md) describes the supported fields and how they apply.
 

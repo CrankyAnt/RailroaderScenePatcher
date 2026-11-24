@@ -13,6 +13,8 @@ namespace RailroaderScenePatcher {
 
         internal static bool EditOpen { get; set; }
         internal static bool OverlayShielded { get; set; }
+        // A world choice is pending: the click in the world is the choice's, so the game's own click targets take none.
+        internal static bool ChoicePending { get; set; }
 
         internal static void Acquire() {
             if (owners != 0) { owners++; return; }
@@ -54,7 +56,7 @@ namespace RailroaderScenePatcher {
 
         static bool FindPickable(PickableActivation? __1, ref IPickable __2, ref float __3, ref bool __result) {
             // The picker can activate a world object directly before it falls back to the track context menu.
-            if (!GizmoController.IsShown && !(__1.HasValue && (EditOpen || OverlayShielded))) return true;
+            if (!CommandBand.BlocksPickable(GizmoController.IsShown, __1.HasValue, EditOpen, OverlayShielded, ChoicePending)) return true;
             __2 = null;
             __3 = float.MaxValue;
             __result = false;

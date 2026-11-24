@@ -55,7 +55,7 @@ namespace RailroaderScenePatcher {
             var position = entry.Position.Count == 3
                 ? new[] { new Vector3((float)entry.Position[0], (float)entry.Position[1], (float)entry.Position[2]) }
                 : Array.Empty<Vector3>();
-            var label = entry.Family + ": " + entry.Identity.Path + (entry.Active ? "" : " [inactive]");
+            var label = CommandBand.CandidateLabel(entry);
             return new SpatialCandidate(new SelectionCandidate(entry.Handle, SelectionIdentity.SceneObject(entry.Identity), label),
                 position, String.Join("\n", entry.Bindings), entry);
         }

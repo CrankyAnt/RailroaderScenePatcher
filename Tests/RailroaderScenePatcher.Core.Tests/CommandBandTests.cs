@@ -20,6 +20,11 @@ static class CommandBandTests {
         ADisabledControlKeepsItsDescription();
         HierarchyLinesHaveAShortForm();
         ChoiceLabelsLeadWithWhatTellsThemApart();
+        PartsReadAsPartsInWorldChoicesAndTheStateLine();
+        AConfirmedWorldChoiceIsADebugLineLikeItsRefusals();
+        APendingWorldChoiceKeepsItsClickFromTheGamesClickTargets();
+        ThePatcherWindowIsBuiltOnceItsInputIsAvailableAgain();
+        SessionDetailsSayTheyShowTheLastFullRead();
         AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing();
         AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates();
         AddedEquipmentIsNamedFromItsStoredSource();
@@ -703,6 +708,69 @@ static class CommandBandTests {
         Check(CommandBand.ChoiceLabel("Track segment Sdb78", new[] { "Track segment Sdb78", "Track segment S9728" }) == "Track segment Sdb78", "A track's label is kept");
         Check(CommandBand.ChoiceLabel(offered[0], offered, 12) == "wh-e-wate...", "A label longer than its room is cut at the end");
         Check(CommandBand.ChoiceLabel(null, offered) == "" && AddedChoicesKeepTheirVisibleName(), "No label gives none; added-object list rows and candidate captions keep their visible name");
+    }
+    static SceneObservation Baked(string path, string groupPath, bool active = true) => new SceneObservation(new object(),
+        new TargetIdentity("scene", path, "UnityEngine.Transform"), BakedSceneryRules.Family, active, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement", groupPath: groupPath);
+    static void PartsReadAsPartsInWorldChoicesAndTheStateLine() {
+        // A part of a baked scenery group keeps its family for every rule, and the panel calls it a Part.
+        var part = Baked("World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)", "World/Large Scenery/Bryson/Bryson Depot");
+        var root = Baked("World/Large Scenery/Bryson/Bryson Depot", null);
+        Check(part.Family == BakedSceneryRules.Family, "The observed family of a part stays Baked scenery group");
+        Check(CommandBand.ShownFamily(part) == "Part" && CommandBand.ShownFamily(root) == BakedSceneryRules.Family, "A part shows as Part, a group root as Baked scenery group: " + CommandBand.ShownFamily(part));
+        Check(CommandBand.CandidateLabel(part) == "Part: World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)", "A part's candidate label names it a Part: " + CommandBand.CandidateLabel(part));
+        Check(CommandBand.CandidateLabel(Baked(part.Identity.Path, part.GroupPath, active: false)).EndsWith(" [inactive]", StringComparison.Ordinal), "An inactive part says so");
+        var labels = new[] { CommandBand.CandidateLabel(part), CommandBand.CandidateLabel(root) };
+        var line = CommandBand.ChoiceLine("Object", 0, 1, labels[0], new[] { labels[0] }, part);
+        Check(line == "Object: Spotlight Outdoor (1) (Part).", "The world choice's line reads the part as a Part: " + line);
+        Check(CommandBand.ChoiceLabel(labels[0], labels) == "Spotlight Outdoor (1) (Part)" && CommandBand.ChoiceLabel(labels[1], labels) == "Bryson Depot (Baked scenery group)",
+            "The world choice list reads the part as a Part and the group as a group: " + String.Join(" | ", labels.Select(label => CommandBand.ChoiceLabel(label, labels))));
+        Check(!line.Contains("(Baked scenery group)"), "No part reads as a Baked scenery group");
+    }
+    static void AConfirmedWorldChoiceIsADebugLineLikeItsRefusals() {
+        var label = "Part: World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)";
+        var inspect = CommandBand.ChoiceConfirmedLog(null, label);
+        Check(inspect == "[World choice] Confirmed choice: " + label + ".", "A confirmed choice that only inspects logs the confirmed candidate and no object: " + inspect);
+        Check(CommandBand.ChoiceLog(null, "x", null).StartsWith("[World choice] ", StringComparison.Ordinal), "It carries the place of the choice's refusals");
+        Check(CommandBand.ChoiceConfirmedLog("World/Signs/Whistle Sign E", "Track segment Sdb78") == CommandBand.LogLine("World choice", "World/Signs/Whistle Sign E", "Confirmed choice: Track segment Sdb78."), "A choice for an object names that object, as its refusals do");
+        // The line goes through the debug entry point: written with Debug logging on, never in player mode.
+        var player = RecordingLog.Capture(false, () => PatcherLog.Debug(() => CommandBand.ChoiceConfirmedLog(null, label)));
+        Check(player.Lines.Count == 0, "Player mode writes no confirmed-choice line");
+        var debug = RecordingLog.Capture(true, () => PatcherLog.Debug(() => CommandBand.ChoiceConfirmedLog(null, label))).At(LogLevel.Debug).ToArray();
+        Check(debug.Length == 1 && debug[0] == inspect, "Debug logging writes the confirmed-choice line: " + String.Join(" | ", debug));
+    }
+    static void APendingWorldChoiceKeepsItsClickFromTheGamesClickTargets() {
+        // gizmoShown, activation, editOpen, overlayShielded, choicePending
+        Check(CommandBand.BlocksPickable(false, true, false, false, true), "A click during a pending world choice that only inspects does not open a station window");
+        Check(!CommandBand.BlocksPickable(false, false, false, false, true), "A hover during the choice still reaches the game");
+        Check(!CommandBand.BlocksPickable(false, true, false, false, false), "Without a choice, edit, shielding label or gizmo the click reaches the game");
+        Check(CommandBand.BlocksPickable(false, true, true, false, false) && CommandBand.BlocksPickable(false, true, false, true, false), "An open edit and a shielding world label still block the click");
+        Check(CommandBand.BlocksPickable(true, false, false, false, false) && CommandBand.BlocksPickable(true, true, false, false, false), "A shown gizmo still blocks hover and click");
+    }
+    static void ThePatcherWindowIsBuiltOnceItsInputIsAvailableAgain() {
+        // After a Map Editor reload in the same world the pointer input comes back frames after the map editor appeared.
+        Check(!CommandBand.BuildsPresentation(false, false, false), "No window is built while its input is unavailable");
+        Check(CommandBand.BuildsPresentation(false, true, false), "The window, with its entry icon, is built as soon as the input is available again");
+        Check(!CommandBand.BuildsPresentation(true, true, false), "A standing window is not built again");
+        Check(!CommandBand.BuildsPresentation(false, true, true), "A build that failed for this map editor is not retried every frame");
+    }
+    static void SessionDetailsSayTheyShowTheLastFullRead() {
+        var line = CommandBand.InventoryRead(false);
+        Check(line.StartsWith("The last full read ", StringComparison.Ordinal) && !line.Contains("Nothing was applied"), "The Inventory line says it is about the last full read, not about edits since: " + line);
+        Check(CommandBand.InventoryRead(true).EndsWith(" The inspected object is no longer present.", StringComparison.Ordinal), "A lost inspection is still said");
+        RailroaderScenePatcher.Core.LoadedMod Loaded(string json) => new RailroaderScenePatcher.Core.LoadedMod(new RailroaderScenePatcher.Core.PatchSource("pack", "pack", "1.0"), json, null, true, null);
+        var definitions = new SuppliedDefinitions();
+        definitions.Written("pack", "{}");
+        Check(!definitions.ShownOutdated, "Before the first read there is nothing shown to follow a write");
+        definitions.Read(new[] { Loaded("{\"modifications\":{}}") });
+        Check(!definitions.ShownOutdated, "A refresh shows what it read");
+        definitions.Written("pack", "{\"modifications\":{\"place-bryson-depot\":{}}}");
+        Check(definitions.ShownOutdated && !definitions.Stale, "The patcher's own Save keeps the lamp Current and marks the shown supplied definitions for reading again");
+        definitions.Shown();
+        Check(!definitions.ShownOutdated, "Once read again the shown supplied definitions follow the saved file");
+        definitions.Written("pack", "{}");
+        definitions.Reset();
+        Check(!definitions.ShownOutdated, "A new load attempt starts over");
     }
     static bool AddedChoicesKeepTheirVisibleName() {
         SceneObservation Added(string id) => new SceneObservation(new object(),

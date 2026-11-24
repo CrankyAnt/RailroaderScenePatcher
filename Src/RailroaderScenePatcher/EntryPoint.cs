@@ -504,30 +504,12 @@ namespace RailroaderScenePatcher {
             if (!inMapEditor || engine == null) return;
             var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared");
             var found = controller as UnityEngine.Object == null ? null : Native.Read(controller, "MapEditor");
-            if (ReferenceEquals(found, attachedMapEditor)) return;
+            if (ReferenceEquals(found, attachedMapEditor)) { if (found != null) Present(); return; }
             presentation?.Dispose(); presentation = null;
             selection?.Cancel(); selectionProblem = null; ClearSnap();
-            Detach(); attachedMapEditor = found; refusedMapEditor = null; presentationSnapshot = null;
+            Detach(); attachedMapEditor = found; refusedMapEditor = null; presentationSnapshot = null; presentationFailed = false;
             if (found == null) return;
-            if (inputBlocker != null && inputBlocker.Available) {
-                try {
-                    presentation = new NativePresentation(DrawWindow, () => {
-                        CancelGuided();
-                        CancelGizmo(); selection?.Cancel(); selectionProblem = null; ClearSnap();
-                        CancelRequest("the panel was closed before the request ran");
-                    });
-                    presentation.ResetRequested = ResetLayout;
-                    presentation.CompactSwitched = LogCompactSwitch;
-                    presentation.Details = builder => presentation.Scroll(builder, 120, content => { content.ConfigureLayout(4f); DrawSession(content); }, false);
-                    presentation.Help = (builder, region) => presentation.Scroll(builder, 80, content => { content.ConfigureLayout(4f); DrawHelp(content, region); }, false);
-                    if (presentation.TitleIconProblem != null) PatcherLog.Debug("The patcher couldn't add one or both of the Reset layout and Session details icons to the title bar (" + presentation.TitleIconProblem + "). Open the Scene Patcher window help to use the Reset layout or Session details button for each missing icon.");
-                    if (presentation.TitleHelpProblem != null) PatcherLog.Debug("The patcher couldn't add the help button to the title bar (" + presentation.TitleHelpProblem + "). It is shown in the command band.");
-                }
-                catch (Exception e) {
-                    Report("inspection-presentation", "The Scene Patcher window couldn't open: " + e.GetBaseException().Message);
-                    PatcherLog.Debug(() => "The Scene Patcher window couldn't open: " + e);
-                }
-            }
+            Present();
             if (Hooks.Error != null) { refusedMapEditor = found; editingStatus = Hooks.Error; return; }
             try {
                 attachment = new MapEditorAttachment(engine, found); Hooks.Current = attachment;
@@ -548,6 +530,38 @@ namespace RailroaderScenePatcher {
                 // The native map editor built its title before this session could account for the scene patch file.
                 attachment.RefreshChrome();
             } catch (Exception e) { refusedMapEditor = found; editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
+        }
+        // The window, its entry icon and its title-bar help button for the attached native map editor. They need the
+        // pointer input of the blocker, whose native boundary a Map Editor reload in the same world can leave behind
+        // with the old window system: the blocker renews it, and the window is built as soon as the input is available,
+        // not only in the frame the native map editor appeared. A build that failed is not tried again for this map editor.
+        bool presentationFailed;
+        void Present() {
+            if (inputBlocker == null || presentation != null || presentationFailed) return;
+            inputBlocker.Renew();
+            if (inputBlocker.RenewProblem != null)
+                Report("inspection-input-renew", "The patcher couldn't set up mouse and keyboard input for scene inspection again after the Map Editor reload: " + inputBlocker.RenewProblem);
+            if (!CommandBand.BuildsPresentation(presentation != null, inputBlocker.Available, presentationFailed)) return;
+            try {
+                presentation = new NativePresentation(DrawWindow, () => {
+                    CancelGuided();
+                    CancelGizmo(); selection?.Cancel(); selectionProblem = null; ClearSnap();
+                    CancelRequest("the panel was closed before the request ran");
+                });
+                presentation.ResetRequested = ResetLayout;
+                presentation.CompactSwitched = LogCompactSwitch;
+                presentation.Details = builder => presentation.Scroll(builder, 120, content => { content.ConfigureLayout(4f); DrawSession(content); }, false);
+                presentation.Help = (builder, region) => presentation.Scroll(builder, 80, content => { content.ConfigureLayout(4f); DrawHelp(content, region); }, false);
+                if (presentation.TitleIconProblem != null) PatcherLog.Debug("The patcher couldn't add one or both of the Reset layout and Session details icons to the title bar (" + presentation.TitleIconProblem + "). Open the Scene Patcher window help to use the Reset layout or Session details button for each missing icon.");
+                if (presentation.TitleHelpProblem != null) PatcherLog.Debug("The patcher couldn't add the help button to the title bar (" + presentation.TitleHelpProblem + "). It is shown in the command band.");
+                // A window built after the attachment takes the file lock the attachment already set.
+                if (attachment != null) presentation.SetFileLock(FileLockReason);
+            }
+            catch (Exception e) {
+                presentation = null; presentationFailed = true;
+                Report("inspection-presentation", "The Scene Patcher window couldn't open: " + e.GetBaseException().Message);
+                PatcherLog.Debug(() => "The Scene Patcher window couldn't open: " + e);
+            }
         }
         void Detach() {
             reloadRequirement = null;
@@ -808,6 +822,7 @@ namespace RailroaderScenePatcher {
                 CheckFileVersion();
             }
             MapEditorReload.Poll(attachment);
+            ShowWrittenDefinitions();
             if (attachment != null && Time.unscaledTime >= nextReloadCheck) {
                 reloadRequirement = attachment.Session.ReloadRequirement;
                 nextReloadCheck = Time.unscaledTime + 1f;
@@ -1193,9 +1208,12 @@ namespace RailroaderScenePatcher {
             var snapping = choosingSnap;
             try {
                 var inspectOnly = selection.Pending?.InspectOnly == true;
+                var forObject = selection.Pending?.Source == null ? null : selected?.Identity.Path;
                 var candidate = selection.Confirm();
                 // A refused confirmation says why in the footer, beside Confirm, and in the log (LogChoiceProblem).
                 if (candidate == null) { presentation?.RequestRefresh(); return; }
+                // A confirmed choice is a debug line, as its refusals are.
+                PatcherLog.Debug(() => CommandBand.ChoiceConfirmedLog(forObject, candidate.Choice.Label));
                 if (!inspectOnly) feedback.ChoiceConfirmed(attachment?.Session);
                 pickedTrackLocation = null; pickedTrackSelection = null;
                 selectionProblem = null;
@@ -1641,22 +1659,35 @@ namespace RailroaderScenePatcher {
                 comparedKey = idleKey = ChangeStamp(); comparedAt = Time.unscaledTime;
                 var inspectedBefore = selected != null;
                 if (selected != null) selected = inventoryPresentation.CurrentSelection(inventory, selected);
-                var lines = new List<string>();
                 var scenePatchFiles = ModScenePatchFiles.Discover().ToArray();
-                foreach (var mod in scenePatchFiles) {
-                    if (mod.Error != null) { lines.Add(mod.Source.Identifier + ": " + mod.Error); continue; }
-                    foreach (var item in inventory.InspectScenePatchFile(mod.Json))
-                                                // A field without a value is left out.
-                        lines.Add(String.Join("; ", new[] { mod.Source.Identifier + "/" + (item.Id ?? "scene patch file") + ": matches " + item.MatchCount + (item.MatchCount == 1 ? " object" : " objects"),
-                            item.Dependencies.Count == 0 ? null : "dependsOn=" + String.Join(", ", item.Dependencies) }.Concat(item.Problems).Where(f => !String.IsNullOrEmpty(f))));
-                }
-                scenePatchFileInspection = String.Join("\n", lines);
+                scenePatchFileInspection = SuppliedLines(scenePatchFiles);
                 definitions.Read(scenePatchFiles);
                 // Setups that could not be read leave every marker in its own family; each marker notes it, and the
                 // diagnostics say it once for the inventory.
                 if (NativeInventory.StartersError != null) MapEditorDiagnostic(StarterPlacements.Unreadable(NativeInventory.StartersError));
-                status = "Refreshed the object list and the supplied definitions. Nothing was applied." + (inspectedBefore && selected == null ? " The inspected object is no longer present." : "");
+                status = CommandBand.InventoryRead(inspectedBefore && selected == null);
             } catch (Exception e) { MapEditorDiagnostic(e.GetBaseException().Message); }
+        }
+        // The Supplied definitions lines of Session details: per scene patch file modification, how many objects it matches.
+        string SuppliedLines(IEnumerable<LoadedMod> scenePatchFiles) {
+            var lines = new List<string>();
+            foreach (var mod in scenePatchFiles) {
+                if (mod.Error != null) { lines.Add(mod.Source.Identifier + ": " + mod.Error); continue; }
+                foreach (var item in inventory.InspectScenePatchFile(mod.Json))
+                    // A field without a value is left out.
+                    lines.Add(String.Join("; ", new[] { mod.Source.Identifier + "/" + (item.Id ?? "scene patch file") + ": matches " + item.MatchCount + (item.MatchCount == 1 ? " object" : " objects"),
+                        item.Dependencies.Count == 0 ? null : "dependsOn=" + String.Join(", ", item.Dependencies) }.Concat(item.Problems).Where(f => !String.IsNullOrEmpty(f))));
+            }
+            return String.Join("\n", lines);
+        }
+        // After the patcher's own Save the shown supplied definitions are read again from the files, so Session details
+        // does not show the scene patch file of the last refresh.
+        void ShowWrittenDefinitions() {
+            if (!definitions.ShownOutdated || inventory == null) return;
+            definitions.Shown();
+            try { scenePatchFileInspection = SuppliedLines(ModScenePatchFiles.Discover().ToArray()); }
+            catch (Exception e) { MapEditorDiagnostic(e.GetBaseException().Message); }
+            presentation?.RequestRefresh();
         }
         // Copy ID names the scene target map of the edited mod's scene patch file, or the one scene patch editing would write for it.
         string Identity(SceneObservation entry) =>

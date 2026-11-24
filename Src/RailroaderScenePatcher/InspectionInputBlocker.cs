@@ -22,7 +22,11 @@ namespace RailroaderScenePatcher {
         Rect toggle, panel;
         bool panelOpen, captured, worldCaptured, worldHoverShield, navigating, worldHooks;
         internal bool WorldPicking { get; set; }
-        internal bool WorldInspecting { get; set; }
+        internal bool WorldInspecting {
+            get => inspecting;
+            set { inspecting = value; if (worldHooks) WorldInputHooks.ChoicePending = value; }
+        }
+        bool inspecting;
         internal bool WorldEditing {
             get => WorldInputHooks.EditOpen;
             set { if (worldHooks) WorldInputHooks.EditOpen = value; }
@@ -89,6 +93,30 @@ namespace RailroaderScenePatcher {
             group.alpha = 0; group.interactable = false; group.blocksRaycasts = false;
             foreach (var graphic in root.GetComponentsInChildren<Graphic>(true)) { graphic.raycastTarget = false; graphic.enabled = false; }
             Native.Call(nativeWindow, "CloseWindow");
+        }
+        // The native pointer boundary is a window under the WindowManager it was made in. A Map Editor reload in the same
+        // world builds a new WindowManager and leaves the boundary destroyed, or under the old manager, so the blocker
+        // is no longer Available and no Scene Patcher window or entry icon is built. Renew makes the boundary again
+        // under the current WindowManager. A failure is kept for that manager and not tried again every frame.
+        Component failedManager;
+        internal string RenewProblem { get; private set; }
+        internal void Renew() {
+            if (canvasRoot == null) return;
+            var manager = Native.Read(Native.Type("UI.Windows.WindowManager"), "Shared") as Component;
+            if (manager == null) return;
+            if (nativeWindow != null && nativeWindow.transform.parent == manager.transform) return;
+            if (ReferenceEquals(failedManager, manager)) return;
+            if (nativeWindow != null) {
+                var old = nativeWindow.gameObject;
+                old.transform.SetParent(null, false);
+                old.SetActive(false); Destroy(old);
+            }
+            nativeWindow = null; nativeWindowBounds = null;
+            try { InitializeNativeWindow(); failedManager = null; RenewProblem = null; }
+            catch (Exception e) {
+                failedManager = manager; nativeWindow = null; nativeWindowBounds = null;
+                RenewProblem = e.GetBaseException().Message;
+            }
         }
         RectTransform Region(string name, int layer) {
             var region = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -206,7 +234,7 @@ namespace RailroaderScenePatcher {
         }
         void OnDisable() {
             captured = worldCaptured = worldHoverShield = WorldPicking = WorldInspecting = WorldEditing = GizmoShown = false;
-            if (worldHooks) WorldInputHooks.OverlayShielded = false;
+            if (worldHooks) { WorldInputHooks.OverlayShielded = false; WorldInputHooks.ChoicePending = false; }
             WorldClick = candidate = confirmed = null; candidateInspectOnly = false;
             SetNativeWindow(false, panel); if (canvasRoot != null) canvasRoot.SetActive(false);
         }
@@ -217,6 +245,7 @@ namespace RailroaderScenePatcher {
             captured = worldCaptured = worldHoverShield = WorldPicking = WorldInspecting = WorldEditing = GizmoShown = false;
             if (worldHooks) {
                 WorldInputHooks.OverlayShielded = false;
+                WorldInputHooks.ChoicePending = false;
                 worldHooks = false;
                 WorldInputHooks.Release();
             }

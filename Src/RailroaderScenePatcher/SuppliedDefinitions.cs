@@ -15,10 +15,15 @@ namespace RailroaderScenePatcher {
         Dictionary<string, KeyValuePair<string, string>> baseline;
         // True until the first refresh, and from an outside change until the next refresh.
         internal bool Stale { get; private set; } = true;
+        // True from the patcher's own write until what Session details shows of the supplied definitions is read again:
+        // the write changed the file, not the lamp, so the shown lines follow the file without a refresh.
+        internal bool ShownOutdated { get; private set; }
         // A new load attempt starts over: nothing is read yet.
-        internal void Reset() { baseline = null; Stale = true; }
+        internal void Reset() { baseline = null; Stale = true; ShownOutdated = false; }
         // A refresh read these scene patch files: they are current.
-        internal void Read(IEnumerable<LoadedMod> scenePatchFiles) { baseline = Copy(scenePatchFiles); Stale = false; }
+        internal void Read(IEnumerable<LoadedMod> scenePatchFiles) { baseline = Copy(scenePatchFiles); Stale = false; ShownOutdated = false; }
+        // The shown lines were read again after a write.
+        internal void Shown() { ShownOutdated = false; }
         // The scene patch files as they are now. A difference from the baseline marks them stale; only a refresh clears that.
         internal void Compare(IEnumerable<LoadedMod> scenePatchFiles) {
             if (baseline == null) { Stale = true; return; }
@@ -37,6 +42,7 @@ namespace RailroaderScenePatcher {
         internal void Written(string mod, string text) {
             if (baseline == null || String.IsNullOrEmpty(mod)) return;
             baseline[mod] = new KeyValuePair<string, string>(text, null);
+            ShownOutdated = true;
         }
         static Dictionary<string, KeyValuePair<string, string>> Copy(IEnumerable<LoadedMod> scenePatchFiles) {
             var copy = new Dictionary<string, KeyValuePair<string, string>>(StringComparer.Ordinal);

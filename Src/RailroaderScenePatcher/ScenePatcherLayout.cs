@@ -625,7 +625,7 @@ namespace RailroaderScenePatcher {
         RectTransform StateLineRow(UIPanelBuilder builder, string state, string states) => Line(builder, state, "State", states, RowHeight);
         string StateLine(out string plain) {
             if (selected == null) { plain = "Select an outliner object or click Select in world."; return plain; }
-            var text = new List<string> { selected.Family };
+            var text = new List<string> { CommandBand.ShownFamily(selected) };
             if (!selected.Active) text.Add("Inactive");
             // The native map editor's badges, as its inspector shows them beside the row marker.
             var badges = CommandBand.Badges(IsChanged(selected), IsAdded(selected), FailureOf(selected));
@@ -635,7 +635,7 @@ namespace RailroaderScenePatcher {
             if (count != null) text.Add(count);
             plain = String.Join("; ", text);
             if (!IsAdded(selected)) plain += "\n" + selected.Identity.Path;
-            var parts = CommandBand.StateParts(Literal(selected.Family), selected.Active ? null : "Inactive", badges.Select(badge => badge.Markup),
+            var parts = CommandBand.StateParts(Literal(CommandBand.ShownFamily(selected)), selected.Active ? null : "Inactive", badges.Select(badge => badge.Markup),
                 selected.InspectionOnly == null ? null : "Inspection only", count == null ? null : "<color=" + Red + ">" + count + "</color>");
             return String.Join("   ", parts);
         }
