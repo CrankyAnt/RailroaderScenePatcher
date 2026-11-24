@@ -101,9 +101,9 @@ static class GameDefinedGroupTests {
             Object("Abutments", "World/Large Scenery/Somewhere", baked: true),             // 3
         };
         Check(Members(GameDefinedGroups.Of(targetsAsRoots)) == "RailBridgeConstruction:0,1,2,3", "a construction whose targets are group roots holds those roots and their parts (got " + Members(GameDefinedGroups.Of(targetsAsRoots)) + ")");
-        // The Almond Bridge as the game holds it in Railroader 0.6.3: the folder carries the controller and the culler and
+        // The Almond Bridge as the game holds it in Railroader 0.6.3: the scene object carries the controller and the culler and
         // is the group root, its abutments and steel are parts, and the controller is no inventory object of its own. The
-        // construction is one baked scenery group with the folder as its root.
+        // construction is one baked scenery group with that scene object as its root.
         var almond = new[] {
             Object("Almond Bridge", "World/Large Scenery", baked: true),                       // 0
             new GroupObject("Steel", Up("World/Large Scenery/Almond Bridge"), bakedPart: true),     // 1
@@ -112,7 +112,7 @@ static class GameDefinedGroupTests {
             Object("Almond Depot", "World/Large Scenery/Almond", baked: true),                  // 4: another town
         };
         var almondGroups = GameDefinedGroups.Of(almond);
-        Check(Members(almondGroups) == "BakedSceneryGroup:0,1,2,3" && almondGroups[0].Root == 0, "the Almond Bridge is one group with the folder as its root and its abutments and steel as parts (got " + Members(almondGroups) + ")");
+        Check(Members(almondGroups) == "BakedSceneryGroup:0,1,2,3" && almondGroups[0].Root == 0, "the Almond Bridge is one group with that scene object as its root and its abutments and steel as parts (got " + Members(almondGroups) + ")");
 
         // An industry storage display holds the storage piles or log pond that one industry's storage fills. An
         // industry building is its own group and no member of a storage display or another group.
@@ -338,8 +338,8 @@ static class GameDefinedGroupTests {
         double depth = p.Z - eye.Z;
         return new ClipPoint((p.X - eye.X) * View.Height / View.Width, p.Y - eye.Y, (Far + Near) / (Far - Near) * depth - 2 * Far * Near / (Far - Near), depth);
     };
-    static ObjectMarkingPart Box(string name, double x, double y, double z, double ex, double ey, double ez) =>
-        new ObjectMarkingPart(name, new WorldPoint(x, y, z), new WorldPoint(ex, ey, ez));
+    static ObjectMarkingBox Box(string name, double x, double y, double z, double ex, double ey, double ez) =>
+        new ObjectMarkingBox(name, new WorldPoint(x, y, z), new WorldPoint(ex, ey, ez));
 
     // Where a world point shows on screen from a camera of Camera(eye).
     static ScreenPoint Screen(WorldPoint p, WorldPoint eye) {
@@ -381,7 +381,7 @@ static class GameDefinedGroupTests {
         Check(spanned.Frame.HasValue && Math.Abs(spanned.Frame.Value.X - g.X) < 1e-6 && Math.Abs(spanned.Frame.Value.Right - g.Right) < 1e-6 && Math.Abs(spanned.Frame.Value.Y - g.Y) < 1e-6 && Math.Abs(spanned.Frame.Value.Bottom - g.Bottom) < 1e-6,
             "a detection span does not count for the group's frame");
         var counted = ObjectMarkingGeometry.GroupFrame(eye800, anchors.Concat(new[] { span }).ToArray(), frames.Concat(new ObjectMarkingFrame[] { null }).ToArray(), null, null, Camera(eye800), View);
-        Check(counted.Frame.Value.Right > g.Right + 1, "without the listed members every object counts, the span included");
+        Check(counted.Spread && !counted.Frame.HasValue, "without the listed members every object counts: the span 300 m off makes the objects stand apart");
         // The frame is one box around the members, not the outline of the members: the place above the low post,
         // at the height of the mast's top, lies inside it, although no member reaches there.
         var above = Screen(new WorldPoint(10, 5.5, 999), eye800);
@@ -414,9 +414,11 @@ static class GameDefinedGroupTests {
         foreach (var point in diagonal) Check(turned.Any(c => Math.Abs(c.X - point.X) < 1e-9 && Math.Abs(c.Y - point.Y) < 1e-9 && Math.Abs(c.Z - point.Z) < 1e-9), "the turned box has the objects at its corners");
         Check(ObjectMarkingGeometry.Enclose(new WorldPoint[0], WorldBasis.World) == null, "no points have no box");
         Check(Edge(ObjectMarkingGeometry.Enclose(diagonal, new WorldBasis(new WorldPoint(0, 0, 0), new WorldPoint(0, 1, 0), new WorldPoint(0, 0, 1))), 1) == 20, "a basis without a direction gives the world's directions");
-        // The group's frame follows that orientation: the same members give another outline in another orientation.
+        // The group's frame lies along its objects: an anchor turned a quarter against the row of masts, whose box
+        // would be far larger, gives the same frame as the world's directions, along the row (FittedFrameTests).
         var quarter = At(800, out _, new WorldBasis(new WorldPoint(1, 0, 1), new WorldPoint(0, 1, 0), new WorldPoint(-1, 0, 1))).Frame.Value;
-        Check(quarter.Right > g.Right + 1e-3 && quarter.X < g.X - 1e-3, "the group's box turns with the scene object that anchors the group");
+        Check(Math.Abs(quarter.Right - g.Right) < 1e-6 && Math.Abs(quarter.X - g.X) < 1e-6 && Math.Abs(quarter.Y - g.Y) < 1e-6 && Math.Abs(quarter.Bottom - g.Bottom) < 1e-6,
+            "the group's box lies along its objects, not along an anchor turned against them");
 
         // On each side of 125 metres: the bounds begin at z 999.
         Check(At(999 - 125, out _).Shows == GroupShows.Objects && At(999 - 125.5, out _).Shows == GroupShows.MarkerAndFrame, "at 125 metres from its bounds a group shows its objects, beyond it one marker and one frame");

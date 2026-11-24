@@ -92,8 +92,15 @@ namespace RailroaderScenePatcher {
                     if (text.StartsWith(label, StringComparison.Ordinal)) { text = text.Substring(label.Length).TrimStart(); stripped = true; }
             }
             if (text.Length == 0) return text;
-            text = Char.ToUpperInvariant(text[0]) + text.Substring(1);
-            return text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) ? text : text + ".";
+            return FullStop(Char.ToUpperInvariant(text[0]) + text.Substring(1));
+        }
+        // The text with a full stop at its end unless it already ends a sentence.
+        static string FullStop(string text) =>
+            text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) ? text : text + ".";
+        // The footer's amber Editing line for an edit block: the block as it stands, ending in a full stop as its tooltip does.
+        internal static string EditingLine(string block) {
+            var text = (block ?? "").Trim();
+            return text.Length == 0 ? text : FullStop(text);
         }
         // The footer report of a completed preview: the preview's own lines, as the form shows them, then the click that
         // applies it. A removal or correction that builds nothing says so here too, wherever the form stands in the tab.
@@ -106,12 +113,12 @@ namespace RailroaderScenePatcher {
         // the form of an addition that is built or that the scene patch file no longer holds.
         internal static string CorrectedAddition(string editedId, IEnumerable<EquipmentEntry> entries) =>
             editedId == null ? null : (entries ?? Enumerable.Empty<EquipmentEntry>()).Any(e => e?.Addition?.Id == editedId && e.Problem != null) ? editedId : null;
-        // The native alert for a refused Save while the Scene patches window is closed, or null while it is open, where the
+        // The native alert for a refused Save while the Scene Patcher window is closed, or null while it is open, where the
         // message area shows the refusal. The Map Editor's Save button stays enabled, so a refusal must never look like an
         // ignored click.
         internal static (string Title, string Message)? SaveRefusalAlert(bool windowOpen, string reason, bool versionChoice = false) =>
             windowOpen ? ((string Title, string Message)?)null : ("Save refused", versionChoice
-                ? "Nothing was saved. The scene patch file changed outside the Map Editor. Open Scene patches to choose which version to keep."
+                ? "Nothing was saved. The scene patch file changed outside the Map Editor. Open Scene Patcher to choose which version to keep."
                 : "Nothing was saved. " + Sentence(reason));
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
@@ -166,9 +173,6 @@ namespace RailroaderScenePatcher {
             foreach (var name in tabs) if (name == openRegion) return true;
             return false;
         }
-        // How far the footer's row stands above the window's lower edge beyond its own padding, so that it clears the
-        // native resize grip in the lower right corner: the grip's height less the padding below the row.
-        internal static float GripClearance(float gripHeight, float paddingBelowRow) => Math.Max(0, gripHeight - paddingBelowRow);
         // One padding rule for every button of the panel: the band, a tab's row, the footer's row and the buttons inside
         // a tab. A button is as wide as its label and the native compact padding on both sides, 6 units each (measured
         // on the band: "Refresh" is 62.15 wide in a button of 74.15). A button whose label changes in place, such as
@@ -417,14 +421,14 @@ namespace RailroaderScenePatcher {
             var use = UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings);
             return GroundMaskUse(use, isPart, selected.Dependencies, (isPart ? group?.Subcategory : selected.Subcategory) == BakedSceneryCategories.RoadBridges);
         }
-        // A road bridge construction is decorative, and its road is native map data: moving the bridge does not move
+        // A road bridge is decorative, and its road is native map data: moving the bridge does not move
         // the road.
         internal const string RoadBridgeDecorative = "The bridge is decorative. Its road is native map data that the Map Editor edits.";
         // An object with a scene ground mask at or below it is not only decorative: the mask shapes the terrain where it
         // stands. The part that holds the mask says what the mask does; an object above it adds that to its own text.
         // An object whose mask flattens the terrain height cannot be moved, so its text names disabling alone.
         internal const string GroundMaskHolderUse = "Ground mask: it shapes the ground and the vegetation where this part stands. Moving or disabling this part changes the terrain there.";
-        // roadBridge: the object is a road bridge construction or a part of one; the group root then names the bridge
+        // roadBridge: the object is a road bridge or a part of one; the group root then names the bridge
         // and its native road.
         internal static string GroundMaskUse(string use, bool part, IEnumerable<string> dependencies, bool roadBridge = false) {
             var line = dependencies?.FirstOrDefault(dependency => dependency != null && dependency.StartsWith(GroundMaskPrefix, StringComparison.Ordinal));
@@ -489,7 +493,7 @@ namespace RailroaderScenePatcher {
         // the Connections tab is open: a marker's segment, a span's lower and upper, and each construction segment of a
         // rail bridge construction or of the Ela controller, its remark left off. A binding slot does not offer its own
         // current binding as a candidate (BindingSlotSegments, a coverage role's segment, a construction's segments).
-        static readonly string[] BoundPrefixes = { "Marker segment=", "Lower segment=", "Upper segment=", SegmentPrefix, "Construction scenery segment=" };
+        static readonly string[] BoundPrefixes = { "Marker segment=", "Lower segment=", "Upper segment=", SegmentPrefix };
         // The current binding of a marker's binding slot, a crossing pad's included: its marker segment, or nothing for
         // a detached marker. Segment on the slot does not offer it; a new distance on it is typed.
         internal static IReadOnlyList<string> BindingSlotSegments(IEnumerable<string> bindings) =>
@@ -569,6 +573,20 @@ namespace RailroaderScenePatcher {
         // inspected marker, or null when it is offered: only a generic track marker whose native id another scene marker
         // shares takes one, and a marker that already has one keeps the row to change or clear it.
         internal const string SetMarkerId = "Set ID", ClearMarkerId = "Clear ID", RepairDuplicateId = "Repair duplicate ID";
+        // The Inspector route of the same repair, beside Repair duplicate ID: the Marker ID section of the Connections tab.
+        internal const string SetIdOnConnections = "Set ID on the Connections tab";
+        internal const string SetIdOnConnectionsTip = "Open the Connections tab. In its Marker ID section, enter a replacement ID and click Set ID.";
+        // Whether the Object tab shows Repair duplicate ID and Set ID on the Connections tab: on a generic track marker
+        // that holds a duplicate marker ID (offersRepair), or that has this mod's replacement ID, the repaired state, where
+        // they stay visible with their reasons. A marker that never shared its ID shows neither.
+        internal static bool ShowsDuplicateRepairs(string structure, bool offersRepair, bool hasReplacementId) =>
+            structure == TrackMarkerScene.Structure && (offersRepair || hasReplacementId);
+        // Why Repair duplicate ID is unavailable, or null. With a duplicate marker ID it follows replacementIdReason, the
+        // reason the replacement ID can't be set now. Without one the marker already has its replacement ID, named when
+        // it could be read. Set ID on the Connections tab follows the Marker ID section's own reason instead.
+        internal static string DuplicateRepairReason(bool offersRepair, string replacementIdReason, string currentId) =>
+            offersRepair ? replacementIdReason
+            : String.IsNullOrWhiteSpace(currentId) ? "This marker already has a replacement ID." : "This marker already has replacement ID " + currentId + ".";
         // Whether the Object tab offers Repair duplicate ID: for a generic track marker whose explanation names a
         // duplicate marker ID, active or not.
         internal static bool OffersDuplicateRepair(string structure, IEnumerable<string> dependencies) =>
@@ -578,6 +596,30 @@ namespace RailroaderScenePatcher {
         internal static string NoDetectedProblems(bool offersDuplicateRepair) => offersDuplicateRepair
             ? "None while this marker is inactive. The patcher refuses changes to its activity, binding, and track-following placement until its duplicate marker ID is repaired."
             : "None detected";
+        // The tooltip of the disclosure triangle after the Dependencies and Runtime state headings.
+        internal static string DisclosureTip(bool longForm) => longForm
+            ? "Show the short form, with paths relative to this object and grouped per object."
+            : "Show the full lines, with each component's scene and full path.";
+        // The Detected problems section of a stale object list: its problems are those of the last refresh.
+        internal const string StaleProblems = "The object list is stale, so these problems might be out of date. Click Refresh to check them again.";
+        // A detected problem as the Object tab shows it. On a marker whose replacement ID repaired a duplicate marker ID,
+        // the binding rule's own problem for a bound segment that doesn't resolve, a missing segment or an empty binding
+        // (BindingRules.Problem with resolves false for the marker's need, activity and bound segment), is told in plain
+        // words instead of the rule text: first that the duplicate is repaired, then what is wrong with the binding,
+        // named by the bound segment, then the two routes that repair it. Every other problem keeps its text, also a
+        // track location problem whose segment exists. repairedId is the duplicate marker ID the replacement ID
+        // repaired, or null; segment is the marker's bound segment, empty when it has none.
+        internal static string ProblemText(string problem, string repairedId, string segment, bool enabled, BindingNeed need) {
+            if (repairedId == null || problem == null || problem != BindingRules.Problem(need, enabled, "Marker", segment, false)) return problem;
+            return "Duplicate marker ID " + repairedId + " is repaired, but this is a different problem: "
+                + (String.IsNullOrWhiteSpace(segment) ? "the marker has no track binding." : "the track binding names segment " + segment + ", which doesn't exist.")
+                + " Click Repair with guided task, or set an existing track on the Connections tab.";
+        }
+        // What to enter in a Replacement ID field, on the Connections tab and in the guided task, shown as text beside the
+        // field: a new ID that the modder makes up, which is neither an existing marker ID nor a segment ID.
+        internal const string ReplacementIdInstruction = "Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.";
+        // The tooltip of a Replacement ID field: what the ID does, beside the instruction that stands below the field.
+        internal const string ReplacementIdTip = "The game registers this marker's track location under this ID. A replacement ID repairs a duplicate marker ID. The patcher doesn't check Lua scripts or other mods that look up markers by ID.";
         internal static string MarkerIdUnavailable(string family, bool generic, string underlying, int sharers, bool hasValue) =>
             !generic ? ReplacementMarkerIds.NotSupportedFor(family)
             : hasValue ? null
@@ -776,9 +818,9 @@ namespace RailroaderScenePatcher {
             controller ? (mode == NumericMode ? null : ControllerNoPlacement) : pad ? PadModeBlock(mode) : !editable && (mode != NumericMode || equipment) ? EditReason(operations) : moveBlock != null && mode != NumericMode ? moveBlock
             : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow
             : railBridge && mode == FollowMode ? RailBridgeNoFollow : roadBridge && mode == FollowMode ? RoadBridgeNoFollow : null;
-        // A road bridge construction does not follow track: move the road natively, then the bridge onto it.
+        // A road bridge does not follow track: move the road natively, then the bridge onto it.
         internal const string RoadBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RoadBridgeNoFollowing + " Move the road in the native map editor, then move the bridge onto it.";
-        // A rail bridge construction does not follow its track: move the track natively, then the construction onto it.
+        // A rail bridge uses fixed placement. Move the track in the native map editor, then move the bridge onto it.
         internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RailBridgeNoFollowing + " Move the track in the native map editor, then move the bridge onto it.";
         // Why Follow is inactive for an existing crossing mast or bell: the capability covers fixed placement and activity.
         internal const string EquipmentNoFollow = ExistingEquipmentScene.NoFollowing + ".";
@@ -796,6 +838,27 @@ namespace RailroaderScenePatcher {
         // What the Supported edits of a detection span says: no placement of its own, and where its one supported
         // edit, crossing coverage, is made.
         internal const string DetectionSpanOperations = NotEditablePrefix + "A span's track locations determine its position, so you cannot set its placement. To change which tracks the crossing detects, use its controller's Connections tab.";
+        // The families whose objects hold a track marker, and so a track binding, whether or not the adapter accepts
+        // the object: a refused one keeps its binding fields, disabled with its own reason.
+        internal static bool HoldsMarker(string family) =>
+            family == StarterPlacements.Family || family == "Track marker" || family == "Crossing pad marker" || family == "Milepost";
+        // The label of a track location registered under a marker's ID, as the inventory lists it.
+        internal const string ListedTrackLocation = "Named location:";
+        // The binding lines of an inventory entry that the Track binding section shows as its current binding.
+        internal static string[] CurrentBindings(SceneObservation entry) =>
+            (entry?.Bindings ?? (IReadOnlyList<string>)Array.Empty<string>()).Where(b => b.StartsWith("Marker", StringComparison.Ordinal) || b.StartsWith(ListedTrackLocation, StringComparison.Ordinal)).ToArray();
+        // Whether the Track binding section shows location fields: for an object the marker adapter edits, an object of
+        // a family that holds a marker, or one that reports a current binding. Another object shows the reason it has
+        // no binding as one line instead, so the section stays visible with its reason and is never an empty block of
+        // fields and a current binding of None.
+        internal static bool ShowsBindingFields(SceneObservation entry, bool editableMarker) =>
+            editableMarker || HoldsMarker(entry?.Family) || CurrentBindings(entry).Length > 0;
+        // Why an object that holds no marker has no editable track binding. A detection span, the one object a crossing
+        // controller holds (its inventory entry names that holder), takes its tracks from the controller's crossing
+        // coverage; any other object names the families whose binding the patcher edits.
+        internal const string DetectionSpanNoBinding = "A detection span's tracks come from its controller's crossing coverage. To change which tracks it detects, edit the coverage on its controller's Connections tab.";
+        internal const string NoTrackBinding = "Only track markers, mileposts, and crossing pads have editable track bindings.";
+        internal static string NoBindingReason(SceneObservation entry) => entry?.HolderPath != null ? DetectionSpanNoBinding : NoTrackBinding;
         // The guide link offered for a mast or bell that does not conform to its pattern: its label and the guide page
         // with the anchor of the refusal reasons.
         internal static readonly string[] EquipmentGuide = { "Why this equipment cannot be edited", "moving-crossing-equipment.md#refusal-reasons" };

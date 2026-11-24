@@ -68,7 +68,10 @@ namespace RailroaderScenePatcher {
         // The action group of the newest message, and its text.
         internal string Place => messages.Count == 0 ? null : messages[0].Source;
         internal string Result => messages.Count == 0 ? "" : messages[0].Text;
-        internal Action<string> Log;
+        // Adds the log context of a result, such as its action group, object and outstanding work. Each result is a debug
+        // line: the message area shows it in both modes.
+        internal Func<string, string> Describe;
+        void Log() { var result = Result; var describe = Describe; PatcherLog.Debug(() => describe == null ? result : describe(result)); }
         string pendingHistoryNotice;
         internal void QueueHistoryNotice(string message) { pendingHistoryNotice = message; }
         internal void FlushHistoryNotice() { if (pendingHistoryNotice == null) return; var message = pendingHistoryNotice; pendingHistoryNotice = null; Report("Undo/Redo", message); }
@@ -110,13 +113,13 @@ namespace RailroaderScenePatcher {
             if (place == CommandBand.GizmoPlace) messages.RemoveAll(m => m.Source != CopyIdPlace || m.FollowUp);
             else messages.Clear();
             messages.Insert(0, New(place, message, false));
-            try { Log?.Invoke(Result); } catch { }
+            Log();
         }
         // Reports a follow-up of the last action. It replaces the follow-up before it and never the result.
         internal void Follow(string place, string message) {
             messages.RemoveAll(m => m.FollowUp);
             messages.Insert(0, New(place, message, true));
-            try { Log?.Invoke(Result); } catch { }
+            Log();
         }
         // Track file state even when another caller performs the check, such as Save.
         PatchEditingSession observedSession;

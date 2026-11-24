@@ -8,7 +8,7 @@ using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // Crossbucks at unprotected crossings: each crossbuck is a group of its own under Grade crossing, identified through its
-// crossing's pad marker id where crossings share one hierarchy path, as the three crossings below Old River Rd do.
+// crossing's pad marker ID where crossings share one hierarchy path, as the three crossings below Old River Rd do.
 static class CrossbuckTests {
     const string Scene = "BushnellWhittier-MapManager";
     const string OldRiver = "World/Roads Bryson/Old River Rd/Crossing Unprotected", Own = "World/Roads Bryson/Crossing Unprotected (1)",
@@ -51,7 +51,7 @@ static class CrossbuckTests {
         Check(bucks.Length == 10 && bucks.All(v => v.Disposition == GroupDisposition.Group && v.Crossbuck && v.Category == BakedSceneryCategories.GradeCrossing && v.Subcategory == null && v.Ticket == null),
             "each of the ten crossbucks is a group of its own under Grade crossing (got " + String.Join(", ", bucks.Select(v => v.Path + " " + v.Disposition + " " + v.Category)) + ")");
         Check(bucks.Select(v => v.Path + "|" + v.PadMarkerId).Distinct().Count() == 10 && bucks.Count(v => v.Path.StartsWith(OldRiver + "/", StringComparison.Ordinal)) == 6,
-            "each crossbuck is listed once; the six of Old River Rd share their raw paths and differ by their crossing's pad marker id");
+            "each crossbuck is listed once; the six of Old River Rd share their raw paths and differ by their crossing's pad marker ID");
         Check(!verdicts.Any(v => v.Crossbuck && (v.Disposition == GroupDisposition.InspectionOnly || v.Category != BakedSceneryCategories.GradeCrossing)), "no crossbuck is inspection only or under another category");
         Check(At(verdicts, Nantahala + "/Sign-Crossing0 (1)")?.Category == BakedSceneryCategories.GradeCrossing && At(verdicts, Own + "/Sign-Crossing0 (2)")?.Category == BakedSceneryCategories.GradeCrossing,
             "a crossbuck below World/Large Scenery and one below World/Roads both stand under Grade crossing");
@@ -65,22 +65,22 @@ static class CrossbuckTests {
             "the model and LOD levels below each crossbuck are not listed, under their coverage rule (got " + below.Length + ")");
         Check(parts.Any(p => p.Disposition == PartDisposition.Part && p.GroupPath == "World/Large Scenery/Nantahala/Nantahala Station"), "another group keeps its parts");
     }
-    // Each crossbuck knows its crossing's pad marker id; its path stays the raw hierarchy path, shared below Old River Rd.
+    // Each crossbuck knows its crossing's pad marker ID; its path stays the raw hierarchy path, shared below Old River Rd.
     static void CrossbucksKnowTheirPadMarkerId() {
         var verdicts = BakedSceneryRules.Classify(World(OldRiverIds));
         foreach (var buck in new[] { "/Sign-Crossing0 (1)", "/Sign-Crossing0 (2)" })
             Check(verdicts.Where(v => v.Path == OldRiver + buck).Select(v => v.PadMarkerId).OrderBy(id => id, StringComparer.Ordinal).SequenceEqual(new[] { "M0sh", "Mbkd", "Mgdu" }),
-                OldRiver + buck + " is the raw path of three crossbucks, one per pad marker id");
+                OldRiver + buck + " is the raw path of three crossbucks, one per pad marker ID");
         Check(At(verdicts, Own + "/Sign-Crossing0 (1)").PadMarkerId == "Mown" && At(verdicts, Nantahala + "/Sign-Crossing0 (1)") != null, "a crossbuck with a path of its own keeps its plain path");
         var none = BakedSceneryRules.Classify(World(null, "M0sh"));
-        Check(none.Count(v => v.Path == OldRiver + "/Sign-Crossing0 (2)" && v.PadMarkerId == null) == 1, "a crossing without a pad marker id gives its crossbucks none");
+        Check(none.Count(v => v.Path == OldRiver + "/Sign-Crossing0 (2)" && v.PadMarkerId == null) == 1, "a crossing without a pad marker ID gives its crossbucks none");
     }
 
     // The controlled world of the crossbucks: one FakeGroup per crossbuck, at the hierarchy path the scene gives it, with
     // its renderer culler on the root and its model and LOD levels below. The pads and whistle signs stand beside them.
     sealed class Fixture {
         internal readonly FakeGroupWorld World = new FakeGroupWorld();
-        // By raw path, and by raw path and pad marker id for the crossbucks of crossings that share one path.
+        // By raw path, and by raw path and pad marker ID for the crossbucks of crossings that share one path.
         internal readonly Dictionary<string, FakeGroup> Bucks = new Dictionary<string, FakeGroup>();
         internal readonly List<FakeGroup> Others = new List<FakeGroup>();
         internal readonly BakedSceneryGroups Scene;
@@ -120,14 +120,14 @@ static class CrossbuckTests {
         (placement ? ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + x.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",0,25],\"rotation\":[0,0.707107,0,0.707107]}" : "") + extra + ",\"dependsOn\":[]}";
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
 
-    // The shared path with a pad marker id names that crossing's crossbuck alone; the shared path without one names
+    // The shared path with a pad marker ID names that crossing's crossbuck alone; the shared path without one names
     // three and an unknown id none. Both fail that modification before mutation, and the others still apply.
     static void PadMarkerIdentityResolvesOneCrossbuck() {
         var fixture = new Fixture();
         var buck = fixture.Bucks[Key(OldRiver + "/Sign-Crossing0 (1)", "M0sh")];
         TargetIdentity Id(string path, string pad = null) => new TargetIdentity(Scene, path, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure, pad);
-        Check(fixture.Scene.Resolve(Id(OldRiver + "/Sign-Crossing0 (1)", "M0sh")).Single() == buck, "the shared path with the pad marker id resolves to the crossbuck of that crossing");
-        Check(fixture.Scene.Resolve(Id(OldRiver + "/Sign-Crossing0 (1)")).Count == 3, "the shared path without a pad marker id resolves to the three crossbucks");
+        Check(fixture.Scene.Resolve(Id(OldRiver + "/Sign-Crossing0 (1)", "M0sh")).Single() == buck, "the shared path with the pad marker ID resolves to the crossbuck of that crossing");
+        Check(fixture.Scene.Resolve(Id(OldRiver + "/Sign-Crossing0 (1)")).Count == 3, "the shared path without a pad marker ID resolves to the three crossbucks");
         Check(fixture.Scene.Resolve(Id(Own + "/Sign-Crossing0 (2)")).Single() == fixture.Bucks[Own + "/Sign-Crossing0 (2)"], "a crossbuck with a path of its own resolves by its path");
         var result = new PatchEngine(fixture.Scene).Apply(Doc(Modification("shared", OldRiver + "/Sign-Crossing0 (1)"), Modification("unknown", OldRiver + "/Sign-Crossing0 (1)", pad: "Mzzz"),
             Modification("m0sh", OldRiver + "/Sign-Crossing0 (1)", pad: "M0sh")));
@@ -138,7 +138,7 @@ static class CrossbuckTests {
         var empty = new PatchEngine(fixture.Scene).Apply(Doc(Modification("empty", OldRiver + "/Sign-Crossing0 (1)", pad: ""))).Outcomes["empty"];
         Check(!empty.Applied && empty.Error.Contains("Invalid or unsupported target"), "an empty padMarkerId is refused as an invalid target: " + empty.Error);
     }
-    // A pad marker id names a crossbuck at a shared path only: a crossbuck whose path names it alone, another group and
+    // A pad marker ID names a crossbuck at a shared path only: a crossbuck whose path names it alone, another group and
     // another adapter refuse it with the reason, before anything changes.
     static void PadMarkerIdIsRefusedElsewhere() {
         var fixture = new Fixture();
@@ -152,7 +152,7 @@ static class CrossbuckTests {
         var viaParts = new PatchEngine(composed).Apply(Doc(Modification("part", OldRiver + "/Sign-Crossing0 (1)", pad: "Mbkd").Replace("baked-scenery-group-v1", "baked-scenery-part-v1"))).Outcomes["part"];
         Check(!viaParts.Applied && viaParts.Error.Contains(TargetIdentity.PadMarkerNotAccepted), "the composed capabilities refuse padMarkerId for another structure: " + viaParts.Error);
         var viaGroups = new PatchEngine(composed).Apply(Doc(Modification("group", OldRiver + "/Sign-Crossing0 (2)", pad: "Mgdu"))).Outcomes["group"];
-        Check(viaGroups.Applied && fixture.Bucks[Key(OldRiver + "/Sign-Crossing0 (2)", "Mgdu")].Position[0] == 500, "the composed capabilities resolve the crossbuck through its pad marker id: " + viaGroups.Error);
+        Check(viaGroups.Applied && fixture.Bucks[Key(OldRiver + "/Sign-Crossing0 (2)", "Mgdu")].Position[0] == 500, "the composed capabilities resolve the crossbuck through its pad marker ID: " + viaGroups.Error);
         Check(fixture.World.Mutations == 1, "the refusals mutate nothing");
         // A target with padMarkerId needs the patcher that knows the crossbuck identity, whatever its other content.
         var store = new Store { Patch = Doc(Modification("hand", OldRiver + "/Sign-Crossing0 (1)", pad: "Mbkd").Replace("\"component\":\"UnityEngine.Transform\",\"structure\":\"baked-scenery-group-v1\"", "\"component\":\"Other.Component\"")) };
@@ -239,7 +239,7 @@ static class CrossbuckTests {
         var item = (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
         var target = (JObject)item["target"];
         Check((string)target["path"] == OldRiver + "/Sign-Crossing0 (1)" && (string)target["padMarkerId"] == "Mbkd" && (string)target["structure"] == BakedSceneryGroups.Structure && item["placement"] != null && (bool)item["active"] == false,
-            "the scene patch file names the crossbuck by its raw path and its crossing's pad marker id and records its placement and Enabled");
+            "the scene patch file names the crossbuck by its raw path and its crossing's pad marker ID and records its placement and Enabled");
         Check(target.Properties().Select(p => p.Name).SequenceEqual(new[] { "scene", "path", "component", "structure", "padMarkerId" }), "padMarkerId stands after structure in the canonical order");
         var all = new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata };
         void Persistence(bool dirty, string[] outstanding, string step) {
@@ -276,7 +276,7 @@ static class CrossbuckTests {
         public IEnumerable<SceneObservation> Discover() => Objects;
     }
     // The Object tab names what the game uses a crossbuck for and its supported edits; the outliner lists the crossbucks
-    // under Grade crossing and names the crossing, with its pad marker id where crossings share one path.
+    // under Grade crossing and names the crossing, with its pad marker ID where crossings share one path.
     static void ObjectTabAndOutliner() {
         Check(CommandBand.UseInGame(false, BakedSceneryCategories.GradeCrossing, null, false) == CommandBand.CrossbuckUse && CommandBand.CrossbuckUse.Contains("the game doesn't read it")
             && CommandBand.CrossbuckUse.Contains("Moving or disabling the crossbuck doesn't affect game functions"), "the Object tab names the crossbuck's use and that moving or disabling it changes no game function");
@@ -298,7 +298,7 @@ static class CrossbuckTests {
             && BakedSceneryRules.CrossbuckName(Andrews + "/Sign-Crossing0 (1)", null, shared) == "Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Andrews"
             && BakedSceneryRules.CrossbuckName(Topton + "/Sign-Crossing0 (1)", null, shared) == "Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Topton"
             && BakedSceneryRules.CrossbuckName(Andrews + "/Sign-Crossing0 (1)") == "Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville",
-            "a crossbuck is named with its crossing, with the place where crossings share a name and the pad marker id where crossings share one path");
+            "a crossbuck is named with its crossing, with the place where crossings share a name and the pad marker ID where crossings share one path");
         SceneObservation Row(string path, string pad = null) => new SceneObservation(new object(), new TargetIdentity(Scene, path, "UnityEngine.Transform", BakedSceneryGroups.Structure, pad), BakedSceneryRules.Family, true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], CommandBand.CrossbuckOperations,
             displayName: BakedSceneryRules.CrossbuckName(path, pad, shared), category: BakedSceneryCategories.GradeCrossing);
@@ -315,9 +315,9 @@ static class CrossbuckTests {
         Check(found.Count() == 4 && found.Select(row => row.DisplayName).Distinct().Count() == 4 && found.Count(row => row.DisplayName.EndsWith("Robbinsville in Andrews", StringComparison.Ordinal)) == 2,
             "a search by crossing name finds the crossbucks of both crossings of that name, each label alike to no other");
         Check(InventoryPresentationState.Rows(inventory, "Robbinsville in Topton", OutlinerFilter.All, null).Count() == 2, "a search by crossing name and place finds that crossing's crossbucks");
-        Check(InventoryPresentationState.Rows(inventory, "pad marker M0sh", OutlinerFilter.All, null).Single().Identity.PadMarkerId == "M0sh", "a search by pad marker id finds the Old River Rd crossbuck");
+        Check(InventoryPresentationState.Rows(inventory, "pad marker M0sh", OutlinerFilter.All, null).Single().Identity.PadMarkerId == "M0sh", "a search by pad marker ID finds the Old River Rd crossbuck");
         var copied = JObject.Parse(PatchEditingSession.CopyId(new[] { "map" }, listed.Objects[0]))["target"];
-        Check((string)copied["path"] == OldRiver + "/Sign-Crossing0 (1)" && (string)copied["padMarkerId"] == "Mbkd", "Copy ID shows the pad marker id beside the raw path: " + copied);
+        Check((string)copied["path"] == OldRiver + "/Sign-Crossing0 (1)" && (string)copied["padMarkerId"] == "Mbkd", "Copy ID shows the pad marker ID beside the raw path: " + copied);
         var tip = InventoryPresentationState.OutlinerTooltip(listed.Objects[0], false);
         Check(tip.StartsWith("Sign-Crossing0 (1) at Crossing Unprotected in Old River Rd (pad marker Mbkd)\n" + OldRiver + "/Sign-Crossing0 (1)", StringComparison.Ordinal), "the tooltip shows the full name and path: " + tip);
     }

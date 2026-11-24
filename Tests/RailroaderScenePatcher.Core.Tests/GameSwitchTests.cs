@@ -17,7 +17,7 @@ static class GameSwitchTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception("Game switches: " + message); }
     const string SceneName = "level5", Large = "World/Large Scenery/";
     const string Cochran = Large + "Cochran/Cochran flagstopstation", Alarka = Large + "Alarka/Alarka Depot", Almond = Large + "Almond/Almond Depot";
-    const string Icons = StationMapIconRules.Folder + "/", CochranIcon = Icons + "Cochran Station", AlarkaIcon = Icons + "Alarka Station";
+    const string Icons = StationMapIconRules.IconsPath + "/", CochranIcon = Icons + "Cochran Station", AlarkaIcon = Icons + "Alarka Station";
     const string Sylva = "World/Signs/Sign Begin CTC Sylva", Andrews = "World/Signs/Sign Begin CTC Andrews";
 
     public static void Run() {

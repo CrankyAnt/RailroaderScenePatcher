@@ -85,7 +85,7 @@ static class StarterPlacementTests {
                 var family = Setups.Family(marker, "Track marker");
                 if (family == null) continue;
                 var starter = family == StarterPlacements.Family;
-                var bindings = new List<string> { "Marker id=" + marker.Name + "; type=Generic", "Marker segment=" + segment + "; end=b; distance=45" };
+                var bindings = new List<string> { "Marker ID=" + marker.Name + "; type=Generic", "Marker segment=" + segment + "; end=b; distance=45" };
                 // The inventory's reading of the marker: what the game needs from its binding, its readers and a note.
                 var reading = Setups.Reading(marker, "Generic", false);
                 bindings.AddRange(reading.Readers);

@@ -64,6 +64,8 @@ static class ReplacementMarkerIdTests {
         ParseRefusesEmptyAndReservedIdsBeforeMutation();
         UniquenessNamesTheMarkerOrMapObjectThatUsesTheId();
         YardLimitRepairAppliesBeforeEnableAndRebind();
+        ARepairedHolderShowsItsMissingSegmentAsAnotherProblem();
+        AnIdEditReobservesTheHoldersOfBothIds();
         WhistleRepairLetsOneHolderBeDisabled();
         LoadOrderCollisionFailsTheLaterModification();
         TheSameIdInTwoModificationsFailsBoth();
@@ -100,7 +102,7 @@ static class ReplacementMarkerIdTests {
             var w = new World(); var before = w.Registrations();
             var outcome = w.Engine.Apply(Doc(Item("yard", YardPath, "\"markerId\":" + value + ",\"active\":true"))).Outcomes["yard"];
             Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && outcome.Cause == FailureCause.InvalidDefinition && outcome.Error.Contains(expected),
-                "A replacement id " + value + " fails before mutation with the reason: " + outcome.Error);
+                "A replacement ID " + value + " fails before mutation with the reason: " + outcome.Error);
             Assert(w.Registrations() == before && w.Markers.Mutations == 0, value + ": nothing changed: " + w.Registrations());
         }
         Assert(ReplacementMarkerIds.Problem("flare:12").Contains("begins with flare:"), "The refusal names the reserved prefix: " + ReplacementMarkerIds.Problem("flare:12"));
@@ -111,32 +113,100 @@ static class ReplacementMarkerIdTests {
             var w = new World(); var before = w.Registrations();
             var outcome = w.Engine.Apply(Doc(Item("yard", YardPath, "\"markerId\":\"" + id + "\""))).Outcomes["yard"];
             Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && outcome.Error.Contains(id) && outcome.Error.Contains(named),
-                "Replacement id " + id + " that another holder already uses is refused naming it: " + outcome.Error);
+                "Replacement ID " + id + " that another holder already uses is refused naming it: " + outcome.Error);
             Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Yard.Id == "Mg6m", id + ": the marker keeps its id: " + w.Registrations());
         }
     }
-    // The Yard Limit takes a replacement id, Enable and a rebind to pi3pzp in the same modification; the speed sign keeps
+    // The Yard Limit takes a replacement ID, Enable and a rebind to pi3pzp in the same modification; the speed sign keeps
     // its registration under Mg6m.
     static void YardLimitRepairAppliesBeforeEnableAndRebind() {
         var w = new World();
         var speedBefore = w.Own(w.Speed);
         var outcome = w.Engine.Apply(Doc(Item("yard", YardPath, "\"markerId\":\"Mg6m-yard\",\"active\":true,\"relationships\":{\"trackMarker\":{\"segment\":\"pi3pzp\",\"end\":\"a\",\"distance\":3}}"))).Outcomes["yard"];
         Assert(outcome.Applied, "The repair, Enable and rebind apply in one modification: " + outcome.Error);
-        Assert(w.Yard.Id == "Mg6m-yard" && w.Yard.Active && w.Own(w.Yard) == "pi3pzp|a|3", "The Yard Limit carries the replacement id and is registered under it at pi3pzp: " + w.Registrations());
+        Assert(w.Yard.Id == "Mg6m-yard" && w.Yard.Active && w.Own(w.Yard) == "pi3pzp|a|3", "The Yard Limit carries the replacement ID and is registered under it at pi3pzp: " + w.Registrations());
         Assert(w.Speed.Id == "Mg6m" && w.Own(w.Speed) == speedBefore && speedBefore == "Sjdl|a|10", "The speed sign stays registered under Mg6m: " + w.Registrations());
-        // Without the replacement id the same Enable is refused, as before.
+        // Without the replacement ID the same Enable is refused, as before.
         var refused = new World();
         var enable = refused.Engine.Apply(Doc(Item("yard", YardPath, "\"active\":true"))).Outcomes["yard"];
         Assert(!enable.Applied && enable.Error.Contains("Mg6m"), "Enable alone stays refused: " + enable.Error);
+    }
+    // An active holder A and an inactive holder B of Mg6m, B bound to a segment that does not exist. A shows the duplicate
+    // problem and B none. After a replacement ID on B and a refresh A shows none; enabling B shows the missing segment as
+    // a problem of its own that says the duplicate is repaired; binding B to an existing segment clears it. The problems
+    // are composed as the inventory composes them for a generic track marker.
+    static void ARepairedHolderShowsItsMissingSegmentAsAnotherProblem() {
+        var w = new World();
+        w.Yard.Segment = "z5w8si";
+        var yard = Marker(YardPath);
+        string[] Problems(FakeMarker m, string path) {
+            var all = new List<string>();
+            var holders = w.Markers.IdHolders(m).With(w.Markers.Registrations(m));
+            if (holders.Problem(m, true) is string duplicate) all.Add(duplicate);
+            if (BindingRules.Problem(BindingNeed.Optional, m.Active, "Marker", m.Segment, w.Markers.Segments.ContainsKey(m.Segment)) is string binding) all.Add(binding);
+            var repaired = w.Session.RepairedMarkerId(Marker(path));
+            return BindingRules.Problems(m.Active, all, null).Select(problem => CommandBand.ProblemText(problem, repaired, m.Segment, m.Active, BindingNeed.Optional)).ToArray();
+        }
+        Assert(Problems(w.Speed, SpeedPath).SequenceEqual(new[] { "Duplicate marker ID Mg6m is shared with 1 other scene marker. Give one of them a replacement ID to repair it." }), "A shows the duplicate problem: " + String.Join(" | ", Problems(w.Speed, SpeedPath)));
+        Assert(Problems(w.Yard, YardPath).Length == 0, "The inactive B shows none: " + String.Join(" | ", Problems(w.Yard, YardPath)));
+        Assert(w.Session.SetMarkerId(yard, "Mg6m-yard", null).Applied, "B takes a replacement ID");
+        Assert(Problems(w.Speed, SpeedPath).Length == 0, "After a refresh A shows none: " + String.Join(" | ", Problems(w.Speed, SpeedPath)));
+        Assert(w.Session.RepairedMarkerId(Marker(SpeedPath)) == null && w.Session.RepairedMarkerId(Marker(UnrelatedPath)) == null, "Only the holder that took a replacement ID has a repaired duplicate");
+        Assert(w.Session.RepairedMarkerId(yard) == "Mg6m", "B repaired duplicate marker ID Mg6m");
+        var enable = w.Session.Edit(yard, null, true);
+        Assert(enable.Applied && w.Yard.Active, "B is enabled: " + enable.Error);
+        Assert(Problems(w.Yard, YardPath).SequenceEqual(new[] { "Duplicate marker ID Mg6m is repaired, but this is a different problem: the track binding names segment z5w8si, which doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab." }),
+            "Enabled B shows the missing segment as another problem: " + String.Join(" | ", Problems(w.Yard, YardPath)));
+        var rebind = w.Session.Bind(yard, MarkerBinding.At(new TrackLocation("pi3pzp", "a", 3)));
+        Assert(rebind.Applied && Problems(w.Yard, YardPath).Length == 0, "Binding B to an existing segment clears it: " + rebind.Error + " " + String.Join(" | ", Problems(w.Yard, YardPath)));
+        // Without a repaired duplicate, a problem reads as before.
+        Assert(CommandBand.ProblemText("Marker broken binding: missing segment z5w8si", null, "z5w8si", true, BindingNeed.Optional) == "Marker broken binding: missing segment z5w8si", "A problem without a repaired duplicate is unchanged");
+        // The rewrite follows the binding rule's own missing-segment and empty-binding problems for the marker's bound
+        // segment, not the wording of a problem.
+        Assert(CommandBand.ProblemText("Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Mg6m", "Sjdl", true, BindingNeed.Optional) == "Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Another kind of problem keeps its text");
+        Assert(CommandBand.ProblemText("Marker broken binding: missing segment z5w8si", "Mg6m", "pi3pzp", true, BindingNeed.Optional) == "Marker broken binding: missing segment z5w8si", "A problem that isn't the rule's missing-segment problem for the bound segment keeps its text");
+        Assert(CommandBand.ProblemText("Marker binding validity unknown: graph unavailable", "Mg6m", "z5w8si", true, BindingNeed.Optional) == "Marker binding validity unknown: graph unavailable", "A line about a segment that couldn't be checked keeps its text");
+        Assert(CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", "", true, BindingNeed.Required) == "Duplicate marker ID Mg6m is repaired, but this is a different problem: the marker has no track binding. Click Repair with guided task, or set an existing track on the Connections tab.",
+            "The rule's empty-binding problem says so in plain words: " + CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", "", true, BindingNeed.Required));
+        // The two repairs on the Object tab stand where they mean something: on a generic track marker that holds a
+        // duplicate marker ID, or that has a replacement ID. With a duplicate both follow the replacement ID's reason. A
+        // marker that already has its replacement ID can't start the repair again, and says so with its ID; Set ID on
+        // the Connections tab stays available there, because its Marker ID section changes or clears the ID.
+        Assert(CommandBand.ShowsDuplicateRepairs(TrackMarkerScene.Structure, true, false) && CommandBand.ShowsDuplicateRepairs(TrackMarkerScene.Structure, false, true), "A holder of a duplicate and a marker with a replacement ID show the repairs");
+        Assert(!CommandBand.ShowsDuplicateRepairs(TrackMarkerScene.Structure, false, false) && !CommandBand.ShowsDuplicateRepairs(CrossingPadScene.Structure, true, true) && !CommandBand.ShowsDuplicateRepairs(null, true, false), "A marker that never shared its ID, and any other kind, shows none");
+        Assert(CommandBand.DuplicateRepairReason(true, null, "Mg6m") == null && CommandBand.DuplicateRepairReason(true, "Confirm or cancel the pending world choice first.", "Mg6m") == "Confirm or cancel the pending world choice first.", "With a duplicate the repair follows the replacement ID's reason");
+        Assert(CommandBand.DuplicateRepairReason(false, null, "Mg6m-yard") == "This marker already has replacement ID Mg6m-yard.", "The repaired marker says that it has its replacement ID: " + CommandBand.DuplicateRepairReason(false, null, "Mg6m-yard"));
+        Assert(CommandBand.DuplicateRepairReason(false, null, "") == "This marker already has a replacement ID." && CommandBand.DuplicateRepairReason(false, null, null) == "This marker already has a replacement ID.", "An ID that could not be read is never printed empty");
+    }
+    // After a marker ID edit, its Undo or its Redo, the inventory observes again every other entry that holds the
+    // edited marker's old or new ID, so their problems agree with the edit at once. Entries of other IDs, the edited
+    // object itself and objects without a marker ID stay as they were.
+    static void AnIdEditReobservesTheHoldersOfBothIds() {
+        SceneObservation Entry(object handle, string path, params string[] bindings) =>
+            new SceneObservation(handle, Marker(path), "Track marker", true, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "");
+        object yard = new object(), speed = new object(), other = new object(), sign = new object();
+        var before = Entry(yard, YardPath, "Marker ID=Mg6m; type=Generic", "Marker segment=z5w8si; end=b; distance=78.7");
+        var after = Entry(yard, YardPath, "Marker ID=Mg6m-yard; type=Generic", "Marker segment=z5w8si; end=b; distance=78.7");
+        var entries = new[] { after, Entry(speed, SpeedPath, "Marker ID=Mg6m; type=Generic"), Entry(other, UnrelatedPath, "Marker ID=Mown; type=Generic"), Entry(sign, "World/Sign", "Board") };
+        Assert(InventoryPresentationState.MarkerIdOf(before) == "Mg6m" && InventoryPresentationState.MarkerIdOf(entries[3]) == null, "The observed marker ID is read from the entry's marker line");
+        var parsed = InventoryPresentationState.BindingValues("Circuit 0 lower=Sa; upper=Sb; note=a; b");
+        Assert(parsed?.Group == "Circuit 0" && String.Join("|", parsed.Value.Values.Select(v => v.Key + "=" + v.Value)) == "lower=Sa|upper=Sb|note=a; b" && InventoryPresentationState.BindingValues("Graph registration: none") == null,
+            "One parser reads a binding line's group and named values, the Object tab's fields and the marker ID alike");
+        var holders = InventoryPresentationState.OtherMarkerIdHolders(entries, before, after);
+        Assert(holders.Count == 1 && ReferenceEquals(holders[0].Handle, speed), "Only the speed sign, which holds the old ID, is observed again: " + String.Join(", ", holders.Select(h => h.Identity.Path)));
+        // Undo: the yard limit returns from Mg6m-yard to Mg6m; the speed sign is again the other holder.
+        var undone = InventoryPresentationState.OtherMarkerIdHolders(new[] { before, entries[1], entries[2] }, after, before);
+        Assert(undone.Count == 1 && ReferenceEquals(undone[0].Handle, speed), "Undo observes the speed sign again too");
+        Assert(InventoryPresentationState.OtherMarkerIdHolders(entries, entries[3], entries[3]).Count == 0 && InventoryPresentationState.OtherMarkerIdHolders(entries, null, null).Count == 0, "An object without a marker ID observes nothing else");
     }
     static void WhistleRepairLetsOneHolderBeDisabled() {
         var w = new World();
         var others = new[] { w.Own(w.Whistles[0]), w.Own(w.Whistles[2]) };
         var outcome = w.Engine.Apply(Doc(Item("whistle", WhistlePaths[1], "\"markerId\":\"Mkft-b\",\"active\":false"))).Outcomes["whistle"];
-        Assert(outcome.Applied && w.Whistles[1].Id == "Mkft-b" && !w.Whistles[1].Active && w.Own(w.Whistles[1]) == "none", "One whistle sign takes a replacement id and is disabled: " + outcome.Error + " " + w.Registrations());
+        Assert(outcome.Applied && w.Whistles[1].Id == "Mkft-b" && !w.Whistles[1].Active && w.Own(w.Whistles[1]) == "none", "One whistle sign takes a replacement ID and is disabled: " + outcome.Error + " " + w.Registrations());
         Assert(w.Own(w.Whistles[0]) == others[0] && w.Own(w.Whistles[2]) == others[1] && others.All(o => o != "none"), "Every other holder of Mkft keeps its registration: " + w.Registrations());
     }
-    // A replacement id that an earlier scene patch file in load order applied is present in the world when a later one applies.
+    // A replacement ID that an earlier scene patch file in load order applied is present in the world when a later one applies.
     static void LoadOrderCollisionFailsTheLaterModification() {
         var w = new World();
         var first = w.Engine.Apply(Doc(Item("yard", YardPath, "\"markerId\":\"Mnew\"")), "a/first").Outcomes["yard"];
@@ -151,7 +221,7 @@ static class ReplacementMarkerIdTests {
         var result = w.Engine.Apply(Doc(Item("speed", SpeedPath, "\"markerId\":\"Mtwice\"") + "," + Item("yard", YardPath, "\"markerId\":\"Mtwice\"") + "," + Item("unrelated", UnrelatedPath, "\"active\":false")));
         foreach (var key in new[] { "speed", "yard" })
             Assert(!result.Outcomes[key].Applied && result.Outcomes[key].Cause == FailureCause.InvalidDefinition && result.Outcomes[key].Error.Contains("Mtwice") && result.Outcomes[key].Error.Contains("more than one modification"),
-                key + " fails for the shared replacement id: " + result.Outcomes[key].Error);
+                key + " fails for the shared replacement ID: " + result.Outcomes[key].Error);
         Assert(result.Outcomes["unrelated"].Applied && w.Speed.Id == "Mg6m" && w.Yard.Id == "Mg6m", "The other modifications still apply and neither holder changes its id: " + w.Registrations());
         Assert(w.Registrations() == before.Replace("Mown:True:Nnew:Nnew|a|5", "Mown:False:Nnew:"), "Only the unrelated marker changed: " + w.Registrations());
     }
@@ -167,11 +237,11 @@ static class ReplacementMarkerIdTests {
         var engine = new PatchEngine(new CrossingPadScene(world, Capability.Unchecked));
         var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"pad\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + PadPath + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"" + CrossingPadScene.Structure + "\"},\"markerId\":\"Mpad-2\",\"dependsOn\":[]}}}";
         var outcome = engine.Apply(json).Outcomes["pad"];
-        Assert(!outcome.Applied && outcome.Error == ReplacementMarkerIds.NotSupported && pad.Id == "Mpad" && world.Mutations == 0, "A crossing pad refuses a replacement id with the reason: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error == ReplacementMarkerIds.NotSupported && pad.Id == "Mpad" && world.Mutations == 0, "A crossing pad refuses a replacement ID with the reason: " + outcome.Error);
         // An object without a track marker refuses it too.
         var board = new Scene(); board.Objects["b"] = new List<object> { new Box { Rotation = new[] { 0.0, 0, 0, 1 } } };
         var boxed = new PatchEngine(board).Apply("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"b\":{\"target\":{\"scene\":\"s\",\"path\":\"b\",\"component\":\"c\"},\"markerId\":\"Mx\",\"dependsOn\":[]}}}").Outcomes["b"];
-        Assert(!boxed.Applied && boxed.Error == ReplacementMarkerIds.NotSupported && board.MutationCalls == 0, "An object without a marker refuses a replacement id: " + boxed.Error);
+        Assert(!boxed.Applied && boxed.Error == ReplacementMarkerIds.NotSupported && board.MutationCalls == 0, "An object without a marker refuses a replacement ID: " + boxed.Error);
     }
     static void RepeatedApplicationAndReentryConverge() {
         var w = new World();
@@ -185,7 +255,7 @@ static class ReplacementMarkerIdTests {
         var reentered = w.Engine.Apply(json, "pack").Outcomes["yard"];
         Assert(reentered.Applied && w.Registrations() == after, "Retained-world re-entry converges: " + reentered.Error + " " + w.Registrations());
         Assert(w.Markers.Buckets.Values.Count(b => b.ContainsKey("Mg6m-yard")) == 1 && w.Markers.Buckets.Values.Count(b => b.ContainsKey("Mg6m")) == 1,
-            "One registration under the replacement id, and the speed sign's one under Mg6m: " + w.Registrations());
+            "One registration under the replacement ID, and the speed sign's one under Mg6m: " + w.Registrations());
     }
     static void FailedAttemptRestoresTheIdAndEveryRegistration() {
         var w = new World(); var before = w.Registrations();
@@ -211,7 +281,7 @@ static class ReplacementMarkerIdTests {
         // removal fails as the id returns, and its restoration fails as the binding returns.
         var e = new World();
         var yard = Marker(YardPath);
-        Assert(e.Session.SetMarkerId(yard, "Mg6m-yard", null).Applied && e.Session.Bind(yard, MarkerBinding.At(new TrackLocation("Sjdl", "a", 30))).Applied, "The Yard Limit takes a replacement id and a rebind");
+        Assert(e.Session.SetMarkerId(yard, "Mg6m-yard", null).Applied && e.Session.Bind(yard, MarkerBinding.At(new TrackLocation("Sjdl", "a", 30))).Applied, "The Yard Limit takes a replacement ID and a rebind");
         e.Markers.FailMarkerId = "Mg6m"; e.Markers.FailRestoreLocation = true;
         var removed = e.Session.Remove(yard);
         Assert(!removed.Applied && removed.Failure == FailureKind.IncompleteCleanup && removed.Remaining.Contains("Track binding: now S9sc / b / 20, before Sjdl / a / 30"),
@@ -257,7 +327,7 @@ static class ReplacementMarkerIdTests {
     static void RefusalOffersTheReplacementIdForGenericMarkers() {
         var w = new World();
         var refusal = w.Session.Edit(Marker(WhistlePaths[1]), null, false).Error;
-        Assert(refusal.Contains(ReplacementMarkerIds.Offer), "The refusal of a generic marker offers the replacement id: " + refusal);
+        Assert(refusal.Contains(ReplacementMarkerIds.Offer), "The refusal of a generic marker offers the replacement ID: " + refusal);
         Assert(!refusal.Contains(": "), "The refusal stays plain sentences: " + refusal);
         var pads = new FakePadWorld();
         pads.Segments["Sj7c"] = new List<double> { 400 }; pads.Segments["Sx"] = new List<double> { 100 };
@@ -266,13 +336,13 @@ static class ReplacementMarkerIdTests {
         pads.Objects["World/Roads/Crossing/Crossing Pad"] = new List<object> { pad }; pads.Objects["World/Roads/Crossing (1)/Crossing Pad"] = new List<object> { other };
         foreach (var m in new[] { pad, other }) { pads.Load(m); pads.Relative(m); pads.Generated(m); }
         var padRefusal = new PatchEngine(new CrossingPadScene(pads, Capability.Unchecked)).Apply("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"pad\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"World/Roads/Crossing/Crossing Pad\",\"component\":\"Track.TrackMarker\",\"structure\":\"" + CrossingPadScene.Structure + "\"},\"active\":false,\"dependsOn\":[]}}}").Outcomes["pad"].Error;
-        Assert(padRefusal.Contains("Mpad") && !padRefusal.Contains(ReplacementMarkerIds.Offer), "A crossing pad's refusal does not offer the replacement id: " + padRefusal);
+        Assert(padRefusal.Contains("Mpad") && !padRefusal.Contains(ReplacementMarkerIds.Offer), "A crossing pad's refusal does not offer the replacement ID: " + padRefusal);
     }
     static void ActiveHolderShowsTheProblemAndInactiveHolderTheExplanation() {
         var w = new World();
         MarkerIdHolders Holders(FakeMarker m) => w.Markers.IdHolders(m).With(w.Markers.Registrations(m));
         var speed = Holders(w.Speed).Problem(w.Speed, true);
-        Assert(speed != null && speed.Contains("Mg6m") && speed.Contains(ReplacementMarkerIds.Offer) && !speed.Contains(": "), "The active speed sign shows a duplicate-id problem that names the id and offers the replacement id: " + speed);
+        Assert(speed != null && speed.Contains("Mg6m") && speed.Contains(ReplacementMarkerIds.Offer) && !speed.Contains(": "), "The active speed sign shows a duplicate-id problem that names the id and offers the replacement ID: " + speed);
         Assert(Holders(w.Yard).Problem(w.Yard, true) == null && Holders(w.Yard).Dependencies(w.Yard, true).Count == 3, "The inactive Yard Limit shows the explanation without a problem");
         Assert(Holders(w.Yard).Dependencies(w.Yard, true)[0].EndsWith(ReplacementMarkerIds.Offer, StringComparison.Ordinal), "The explanation of a holder that can receive a replacement ID offers the repair, also when it is inactive");
         Assert(!Holders(w.Yard).Dependencies(w.Yard)[0].Contains(ReplacementMarkerIds.Offer), "The explanation of a holder that cannot receive one does not offer it");
@@ -337,7 +407,7 @@ static class ReplacementMarkerIdTests {
         Assert(w.Session.Bind(unrelated, MarkerBinding.At(new TrackLocation("Sa", "a", 10))).Applied && w.Session.HasTrackBinding(unrelated), "A rebind sets the track binding value");
         Assert(w.Session.Edit(Marker(WhistlePaths[0]), new Placement(new[] { 1080.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied && !w.Session.HasTrackBinding(Marker(WhistlePaths[0])), "A placement alone sets no track binding value");
     }
-    // The Marker ID row of the Connections tab and its guided task: the replacement id stays visible and disabled with its
+    // The Marker ID row of the Connections tab and its guided task: the replacement ID stays visible and disabled with its
     // reason for any marker that does not take one, and Set id and Clear id state why they cannot be used.
     static void MarkerIdRowStatesItsReasons() {
         // A milepost and a starter placement marker are native track markers of type Generic too, so the reason names the
@@ -348,7 +418,7 @@ static class ReplacementMarkerIdTests {
             "The refusal names the family, not the marker type Generic that a milepost also shows: " + ReplacementMarkerIds.NotSupported);
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Track marker", true, "Mown", 0, false) == "Only this marker holds marker ID Mown, so it doesn't need a replacement ID.", "A marker ID of its own needs no replacement");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Track marker", true, "Mg6m", 1, false) == null && RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Track marker", true, "Mg6m", 0, true) == null,
-            "A shared native id offers the replacement id, and a marker that already has one keeps the row");
+            "A shared native id offers the replacement ID, and a marker that already has one keeps the row");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "", "Mg6m") == ReplacementMarkerIds.Empty, "An empty field states the reason");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "flare:1", "Mg6m").StartsWith("Replacement ID flare:1 begins with flare:", StringComparison.Ordinal), "A reserved prefix states the reason");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "Mg6m", "Mg6m") == "The field already contains the marker's current ID.", "The current id has nothing to set");
@@ -518,7 +588,7 @@ static class ReplacementMarkerIdTests {
 
     // In scene patch editing: the repair, Enable and rebind of the Yard Limit, Undo and Redo with matching dirty state, Remove
     // modification back to the underlying id, Save in canonical order with the patcher dependency, a stricter constraint
-    // kept, and a reload that reproduces the replacement id and every holder's registration.
+    // kept, and a reload that reproduces the replacement ID and every holder's registration.
     static void ScenePatchEditingAppliesUndoesRemovesAndSaves() {
         var w = new World();
         var all = new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata };
@@ -528,12 +598,12 @@ static class ReplacementMarkerIdTests {
         }
         var before = w.Registrations();
         var yard = Marker(YardPath);
-        Assert(w.Session.SetMarkerId(yard, "Mg6m-yard", null).Applied && w.Yard.Id == "Mg6m-yard", "The Yard Limit takes the replacement id");
+        Assert(w.Session.SetMarkerId(yard, "Mg6m-yard", null).Applied && w.Yard.Id == "Mg6m-yard", "The Yard Limit takes the replacement ID");
         Assert(w.Session.MarkerIdOf(yard) == "Mg6m-yard" && w.Session.HasMarkerId(yard), "The session reads the id and that this mod sets it");
-        Assert(w.Session.Changes(yard).Contains("Marker ID: from Mg6m to Mg6m-yard"), "The Changes tab names the replacement id: " + String.Join(" | ", w.Session.Changes(yard)));
-        Persistence(true, all, "After the replacement id");
+        Assert(w.Session.Changes(yard).Contains("Marker ID: from Mg6m to Mg6m-yard"), "The Changes tab names the replacement ID: " + String.Join(" | ", w.Session.Changes(yard)));
+        Persistence(true, all, "After the replacement ID");
         var enable = w.Session.Edit(yard, null, true);
-        Assert(enable.Applied && w.Yard.Active && w.Own(w.Yard) == "S9sc|b|20", "Enable now applies and registers the Yard Limit under its replacement id: " + enable.Error + " " + w.Registrations());
+        Assert(enable.Applied && w.Yard.Active && w.Own(w.Yard) == "S9sc|b|20", "Enable now applies and registers the Yard Limit under its replacement ID: " + enable.Error + " " + w.Registrations());
         var rebind = w.Session.Bind(yard, MarkerBinding.At(new TrackLocation("pi3pzp", "a", 3)));
         Assert(rebind.Applied && w.Own(w.Yard) == "pi3pzp|a|3", "The rebind to pi3pzp applies: " + rebind.Error);
         Assert(w.Own(w.Speed) == "Sjdl|a|10" && w.Speed.Id == "Mg6m", "The speed sign stays registered under Mg6m: " + w.Registrations());
@@ -542,7 +612,7 @@ static class ReplacementMarkerIdTests {
         Assert(w.Registrations() == before, "Undo returns the underlying id and every registration: " + w.Registrations());
         Persistence(false, new string[0], "After Undo");
         w.MapEditor.Redo(); w.MapEditor.Redo(); w.MapEditor.Redo();
-        Assert(w.Registrations() == repaired, "Redo reapplies the replacement id, Enable and rebind: " + w.Registrations());
+        Assert(w.Registrations() == repaired, "Redo reapplies the replacement ID, Enable and rebind: " + w.Registrations());
         Persistence(true, all, "After Redo");
         var removed = w.Session.Remove(yard);
         Assert(removed.Applied && w.Registrations() == before, "Remove modification returns the underlying id and every registration: " + removed.Error + " " + w.Registrations());
@@ -552,17 +622,17 @@ static class ReplacementMarkerIdTests {
         var cleared = w.Session.SetMarkerId(yard, null, null);
         Assert(!cleared.Applied && cleared.Error.Contains("Mg6m") && w.Registrations() == repaired, "Clearing the id while Enable and the rebind need it is refused before mutation: " + cleared.Error);
         // The speed sign takes an id of its own too; Save writes both.
-        Assert(w.Session.SetMarkerId(Marker(SpeedPath), "Mg6m-speed", null).Applied && w.Own(w.Speed) == "Sjdl|a|10" && w.Speed.Id == "Mg6m-speed", "An active holder takes a replacement id and keeps its registration under it: " + w.Registrations());
+        Assert(w.Session.SetMarkerId(Marker(SpeedPath), "Mg6m-speed", null).Applied && w.Own(w.Speed) == "Sjdl|a|10" && w.Speed.Id == "Mg6m-speed", "An active holder takes a replacement ID and keeps its registration under it: " + w.Registrations());
         Assert(w.MapEditor.Save() == null && w.Store.Info.Contains("crankyant/scene-patcher >=" + ReplacementMarkerIds.RequiredVersion) && (int)JObject.Parse(w.Store.Patch)["formatVersion"] == 1,
             "Save keeps format version 1 and raises the minimum patcher dependency: " + w.Store.Info);
         var saved = JObject.Parse(w.Store.Patch)["modifications"].Children<JProperty>().Select(p => (JObject)p.Value).ToArray();
         var yardItem = saved.Single(i => (string)i["target"]["path"] == YardPath);
         Assert(yardItem.Properties().Select(p => p.Name).SequenceEqual(new[] { "target", "markerId", "relationships", "dependsOn", "active" }) && (string)yardItem["markerId"] == "Mg6m-yard",
-            "Save writes the replacement id at its place in the canonical order: " + yardItem.ToString(Newtonsoft.Json.Formatting.None));
+            "Save writes the replacement ID at its place in the canonical order: " + yardItem.ToString(Newtonsoft.Json.Formatting.None));
         Persistence(false, new string[0], "After Save");
         var fresh = new World();
         var reload = fresh.Engine.Apply(w.Store.Patch);
-        Assert(reload.Outcomes.Values.All(o => o.Applied) && fresh.Registrations() == w.Registrations(), "A reloaded world reproduces the replacement ids and every holder's registration: " + String.Join(" | ", reload.Outcomes.Values.Select(o => o.Error)) + " " + fresh.Registrations());
+        Assert(reload.Outcomes.Values.All(o => o.Applied) && fresh.Registrations() == w.Registrations(), "A reloaded world reproduces the replacement IDs and every holder's registration: " + String.Join(" | ", reload.Outcomes.Values.Select(o => o.Error)) + " " + fresh.Registrations());
         var strict = new World(new Store { Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.9.0\"]}}" });
         Assert(strict.Session.SetMarkerId(yard, "Mg6m-yard", null).Applied && strict.MapEditor.Save() == null && strict.Store.Info.Contains(">=0.9.0") && !strict.Store.Info.Contains(">=" + ReplacementMarkerIds.RequiredVersion),
             "A stricter existing constraint is kept: " + strict.Store.Info);
@@ -575,15 +645,15 @@ static class ReplacementMarkerIdTests {
         foreach (var (id, expected) in new[] { ("", ReplacementMarkerIds.Empty), ("Mown", UnrelatedPath), ("water-tower-1", "map object water-tower-1"), ("passengerStop:x", "passengerStop:"), ("Mkft", WhistlePaths[0]) }) {
             var w = new World(); var before = w.Registrations(); var text = w.Session.ScenePatchFileText;
             var outcome = w.Session.SetMarkerId(Marker(YardPath), id, null);
-            Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && outcome.Error.Contains(expected), "Replacement id \"" + id + "\" is refused before mutation: " + outcome.Error);
+            Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && outcome.Error.Contains(expected), "Replacement ID \"" + id + "\" is refused before mutation: " + outcome.Error);
             Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.ScenePatchFileText == text && !w.MapEditor.IsDirty && !w.MapEditor.CanUndo, id + ": nothing changed");
         }
-        // Any sharer can receive the replacement id: here the active speed sign, then one whistle sign of the group.
+        // Any sharer can receive the replacement ID: here the active speed sign, then one whistle sign of the group.
         var any = new World();
-        Assert(any.Session.SetMarkerId(Marker(SpeedPath), "Mg6m-speed", null).Applied && any.Own(any.Speed) == "Sjdl|a|10", "The active speed sign can receive the replacement id");
+        Assert(any.Session.SetMarkerId(Marker(SpeedPath), "Mg6m-speed", null).Applied && any.Own(any.Speed) == "Sjdl|a|10", "The active speed sign can receive the replacement ID");
         Assert(any.Session.Edit(Marker(YardPath), null, true).Applied && any.Own(any.Yard) == "S9sc|b|20" && any.Yard.Id == "Mg6m", "With the speed sign repaired, the Yard Limit keeps Mg6m and can be enabled: " + any.Registrations());
         var group = new World(); var others = new[] { group.Own(group.Whistles[0]), group.Own(group.Whistles[1]) };
-        Assert(group.Session.SetMarkerId(Marker(WhistlePaths[2]), "Mkft-c", null).Applied && group.Session.Edit(Marker(WhistlePaths[2]), null, false).Applied, "A whistle sign takes a replacement id and is disabled");
+        Assert(group.Session.SetMarkerId(Marker(WhistlePaths[2]), "Mkft-c", null).Applied && group.Session.Edit(Marker(WhistlePaths[2]), null, false).Applied, "A whistle sign takes a replacement ID and is disabled");
         Assert(group.Own(group.Whistles[0]) == others[0] && group.Own(group.Whistles[1]) == others[1], "The other whistle signs keep their registrations: " + group.Registrations());
         // A sign that still shares Mkft with another holder stays refused.
         var still = group.Session.Edit(Marker(WhistlePaths[1]), null, false);

@@ -64,7 +64,7 @@ namespace RailroaderScenePatcher.Core {
     // start state. A change to an entry without scene patch editing steps in this session applies as unsaved work; an entry
     // with such steps is a conflict for the modder to decide. Import is outside native Undo and Redo and writes nothing.
     public sealed partial class PatchEditingSession {
-        public const string ImportSaveRefusal = "Click Import to finish the import before saving. After Cancel, choose a version in the Version choice panel before saving.";
+        public const string ImportSaveRefusal = "An import is open in Scene Patcher. Click Import or Cancel first.";
         // The scene patch file's content when the session started, or after Use file version replaced it; kept apart from the
         // text last read or written.
         JToken startContent;

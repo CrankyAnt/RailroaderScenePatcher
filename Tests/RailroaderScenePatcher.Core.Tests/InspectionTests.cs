@@ -12,7 +12,12 @@ static class InspectionTests {
         public readonly List<SceneObservation> Objects = new List<SceneObservation>();
         public IEnumerable<SceneObservation> Discover() => Objects;
     }
+    // Edit results are debug lines, so these checks read them with the debug option on.
     internal static void Run() {
+        var debug = PatcherLog.DebugEnabled; PatcherLog.DebugEnabled = true;
+        try { RunWithDebug(); } finally { PatcherLog.DebugEnabled = debug; }
+    }
+    static void RunWithDebug() {
         var fixture = new Fixture();
         fixture.Objects.Add(new SceneObservation(new object(), new TargetIdentity("scene", "World/Board", "Culler"), "Independent board", false,
             new double[] { 12, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new[] { "Culling registration", "Terrain mask" }, new string[0], "Inspection only"));
@@ -298,7 +303,7 @@ static class InspectionTests {
         var scenePatchFile = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var log = new List<string>(); var calls = 0;
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         Func<InspectedTarget, Outcome> move = inspection => { calls++; return new PatchEngine(scene).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inspection }).Outcomes["move"]; };
 
         box.X = 8;
@@ -920,7 +925,7 @@ static class InspectionTests {
         SceneObservation Of(object handle, string path, string binding) => new SceneObservation(handle, new TargetIdentity("scene", path, "Component"), "Family", true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { binding }, new string[0], new string[0], "Inspection only");
         var scene = new RelatedScene();
-        scene.All.AddRange(new[] { Of(crossing, "crossing", "native spans"), Of(bell, "crossing/bell", "native spans"), Of(other, "other", "none") });
+        scene.All.AddRange(new[] { Of(crossing, "crossing", "detection spans"), Of(bell, "crossing/bell", "detection spans"), Of(other, "other", "none") });
         scene.Related = handle => scene.All.Where(o => !ReferenceEquals(o.Handle, other)).ToArray();
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var unrelated = inventory.Entries[2];
@@ -934,7 +939,7 @@ static class InspectionTests {
         while (inventory.CompletedPasses == 0 && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
         Check(!inventory.IsStale, "A stepped pass agrees as well: " + inventory.StaleReason);
         // Clearing removes the owned span and returns the bindings.
-        scene.All.RemoveAt(3); scene.All[0] = Of(crossing, "crossing", "native spans"); scene.All[1] = Of(bell, "crossing/bell", "native spans");
+        scene.All.RemoveAt(3); scene.All[0] = Of(crossing, "crossing", "detection spans"); scene.All[1] = Of(bell, "crossing/bell", "detection spans");
         updated = inventory.ReobserveRelated(updated);
         Check(updated != null && inventory.Entries.Count == 3 && inventory.Entries.Any(e => ReferenceEquals(e, unrelated)), "An object the change removed leaves the inventory: " + inventory.Entries.Count);
         inventory.CheckFreshness();
@@ -992,7 +997,7 @@ static class InspectionTests {
     // The message area shows the result of the last action and the latest follow-up of that action above it.
     static void FollowUpsKeepTheActionResultVisible() {
         var log = new List<string>();
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         string Line(RailroaderScenePatcher.EditFeedback.Message m) => m.Source + ": " + m.Text;
         feedback.Follow("Terrain output", "Terrain output complete.");
         Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Terrain output: Terrain output complete." }), "A follow-up without a result is shown");
@@ -1137,13 +1142,13 @@ static class InspectionTests {
         var twin = new object();
         SceneObservation Twin(string binding) => new SceneObservation(twin, new TargetIdentity("scene", "CTC/Module/BC-E/BC-E", "Track.TrackSpan"), "Track span", true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { binding }, none, none, reason, null, null, null, reason);
-        var twins = new Fixture(); twins.Objects.Add(Twin("Span id=A")); twins.Objects.Add(Twin("Span id=B"));
+        var twins = new Fixture(); twins.Objects.Add(Twin("Span ID=A")); twins.Objects.Add(Twin("Span ID=B"));
         var doubled = new SceneInventory(twins); doubled.Refresh();
         var state = new RailroaderScenePatcher.InventoryPresentationState();
         var first = doubled.Entries[0]; var second = doubled.Entries[1];
         Check(state.CanSelect(doubled, first) && state.CanSelect(doubled, second), "Both rows of a shared identity can be selected");
         Check(ReferenceEquals(state.CurrentSelection(doubled, first), first) && ReferenceEquals(state.CurrentSelection(doubled, second), second), "A row of a shared identity selects itself, not nothing");
-        twins.Objects[0] = Twin("Span id=A"); twins.Objects[1] = Twin("Span id=B");
+        twins.Objects[0] = Twin("Span ID=A"); twins.Objects[1] = Twin("Span ID=B");
         doubled.Refresh();
         Check(ReferenceEquals(state.CurrentSelection(doubled, second), doubled.Entries[1]) && ReferenceEquals(state.CurrentSelection(doubled, first), doubled.Entries[0]), "After a refresh the inspected one of the two is found again by what it reads");
         // The state is part of what an inspection pins and of the stale reason.
@@ -1156,10 +1161,10 @@ static class InspectionTests {
     static void SubgroupsFollowTheGame() {
         SceneObservation Row(string family, string path, params string[] bindings) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Marker"), family, true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "Track binding");
-        var station = Row("Track marker", "World/Bryson Station Sign", "Marker id=M1; type=Generic", "Marker segment=S1; end=a; distance=2");
-        var whistle = Row("Track marker", "World/Whistle Sign E", "Marker id=M2; type=Generic");
-        var stop = Row("Track marker", "World/Stop", "Marker id=M3; type=PassengerStop");
-        var starter = Row("Track marker", "World/Setups/starter-ewh-coaling", "Marker id=M4; type=Generic");
+        var station = Row("Track marker", "World/Bryson Station Sign", "Marker ID=M1; type=Generic", "Marker segment=S1; end=a; distance=2");
+        var whistle = Row("Track marker", "World/Whistle Sign E", "Marker ID=M2; type=Generic");
+        var stop = Row("Track marker", "World/Stop", "Marker ID=M3; type=PassengerStop");
+        var starter = Row("Track marker", "World/Setups/starter-ewh-coaling", "Marker ID=M4; type=Generic");
         var board = Row("Board", "World/Board", "Culler");
         var bare = Row("Track marker", "World/Bare");
         foreach (var row in new[] { new object[] { station, "Type Generic" }, new object[] { whistle, "Type Generic" }, new object[] { starter, "Type Generic" }, new object[] { stop, "Type PassengerStop" }, new object[] { board, null }, new object[] { bare, null }, new object[] { null, null } })
@@ -1209,7 +1214,7 @@ static class InspectionTests {
     // history moves: after a native Undo, "Enable completed" would be untrue.
     static void RepeatedMessagesCollapse() {
         var log = new List<string>();
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         feedback.Refuse("Placement", "Placement", "The object list is stale");
         feedback.Refuse("Placement", "Placement", "The object list is stale");
         Check(feedback.Messages.Count == 1 && log.Count == 2, "The same refusal again is one message, and both are logged");
@@ -1248,7 +1253,7 @@ static class InspectionTests {
     // Each message keeps the action group it came from, and inspecting another object clears the messages.
     static void MessagesKeepTheirSourceNewestFirst() {
         var log = new List<string>();
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         Check(feedback.Messages.Count == 0, "No message before the first result");
         feedback.Refuse("Track binding", "Track binding", "enter a segment ID");
         Check(feedback.Messages.Select(m => m.Source + ": " + m.Text).SequenceEqual(new[] { "Track binding: Track binding refused. Enter a segment ID." }), "A message keeps its source");
@@ -1265,7 +1270,7 @@ static class InspectionTests {
     // A result or refusal is about the object that was inspected when it was reported.
     static void ResultsBelongToTheInspectedObject() {
         var log = new List<string>();
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         object first = new object(), second = new object();
         feedback.Inspecting(first);
         feedback.Refuse("placement", "Placement", "Target must resolve uniquely");

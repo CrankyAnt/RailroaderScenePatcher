@@ -83,7 +83,7 @@ namespace RailroaderScenePatcher {
         static double[] OriginOffset() => Doubles((Vector3)Native.Call(Native.Type("Helpers.WorldTransformer"), "GameToWorld", Vector3.zero));
         static double[] Doubles(Vector3 v) => new double[] { v.x, v.y, v.z };
         static Vector3 Vector(double[] v) => new Vector3((float)v[0], (float)v[1], (float)v[2]);
-        const string GameObjectCuller = "Helpers.Culling.GameObjectCuller";
+        const string GameObjectCuller = CullerTypes.GameObjectCuller;
         // The equipment of a crossing whose activity the game switches by camera distance through a culler.
         static readonly HashSet<string> CulledFamilies = new HashSet<string>(StringComparer.Ordinal) { MastFamily, BellFamily };
         const string MastFamily = ExistingEquipmentScene.MastFamily, BellFamily = ExistingEquipmentScene.BellFamily;
@@ -96,7 +96,7 @@ namespace RailroaderScenePatcher {
         internal NativeInventory(Func<GameObject, string> boardRefusal = null) { this.boardRefusal = boardRefusal; }
         static bool Loaded(Component c) => c != null && c.gameObject.scene.IsValid() && c.gameObject.scene.isLoaded;
         static string TypeName(Component c) => c == null ? "missing component" : c.GetType().FullName;
-        static Component Get(GameObject go, string type) => go.GetComponents<Component>().FirstOrDefault(c => c != null && TypeName(c) == type);
+        static Component Get(GameObject go, string type) => TrackMarkerWorld.Get(go, type);
         static Component Parent(Component c, string type) {
             for (var t = c.transform; t != null; t = t.parent) { var found = Get(t.gameObject, type); if (found != null) return found; }
             return null;
@@ -231,7 +231,7 @@ namespace RailroaderScenePatcher {
             // Each light or gate the patcher added is one added object: its wrapper, not the parts of its copy.
             if (c is OwnedEquipment owned) {
                 if (owned.Retired) return null;
-                return owned.Pattern == EquipmentAddition.BellPattern ? CommandBand.AddedBellFamily : AddedEquipmentFamily;
+                return owned.IsBell ? CommandBand.AddedBellFamily : AddedEquipmentFamily;
             }
             var type = TypeName(c); var go = c.gameObject;
             // Every object below a scene root that holds signals, CTC and interlocking, game logic, native operations data or
@@ -345,12 +345,16 @@ namespace RailroaderScenePatcher {
                     ReadStarters();
                     LastReferrers = referrerError == null ? markerReferrers : null;
                     setups = TrackMarkerWorld.SetupHolders();
-                    Dictionary<string, List<Component>> ids = null; string idsError = null;
+                    // The index is the discovery's until the patcher writes a marker ID; an observation after that reads
+                    // it again, so the other holders of an edited marker's old and new ID are named by their IDs now.
+                    Dictionary<string, List<Component>> ids = null; string idsError = null; var idsAt = -1;
                     markerIds = () => {
-                        if (ids != null) return ids;
+                        // TrackMarkerWorld.IdWrites counts every SetMarkerId, by an edit, Undo, Redo or restoration, so
+                        // the cached index lives only until the next marker ID write.
+                        if (ids != null && idsAt == TrackMarkerWorld.IdWrites) return ids;
                         if (idsError == null) {
-                            try { return ids = TrackMarkerWorld.MarkerIds(); }
-                            catch (Exception e) { idsError = "The scene's marker IDs couldn't be read: " + e.GetBaseException().Message; Debug.LogWarning("Scene Patcher inventory: " + idsError); }
+                            try { idsAt = TrackMarkerWorld.IdWrites; return ids = TrackMarkerWorld.MarkerIds(); }
+                            catch (Exception e) { idsError = "The scene's marker IDs couldn't be read: " + e.GetBaseException().Message; PatcherLog.Warning(idsError + ". Marker ID checks in the Scene Patcher window don't work."); }
                         }
                         throw new InvalidOperationException(idsError);
                     };
@@ -397,7 +401,7 @@ namespace RailroaderScenePatcher {
             // by distance. Which components exist is a dependency; whether each is enabled is runtime state.
             var runtime = new List<string>();
             var components = go.GetComponentsInChildren<Component>(true);
-            var parts = new List<HierarchyPart>();
+            var hierarchyComponents = new List<HierarchyComponent>();
             // A crossing pad's builder generates its mesh into a container and destroys whatever is there first.
             Transform container = null;
             if (family == "Crossing pad marker") try { container = Field(Get(go, "Track.TrackCurveMeshBuilder"), "meshContainer") as Transform; } catch { }
@@ -414,12 +418,12 @@ namespace RailroaderScenePatcher {
                 }
                 if (HierarchyDependencies.IsRuntimeComponent(TypeName(child))) { runtime.Add("Runtime component " + Label(child)); continue; }
                 // Which components exist, and who references them from an authored field, is a dependency; whether a
-                // behaviour is enabled is runtime state, so the part carries no enabled value.
-                parts.Add(new HierarchyPart(Label(child), null, false, incoming.TryGetValue(child, out var refs) ? refs : null));
+                // behaviour is enabled is runtime state, so the component carries no enabled value.
+                hierarchyComponents.Add(new HierarchyComponent(Label(child), null, false, incoming.TryGetValue(child, out var refs) ? refs : null));
                 if (child is Behaviour behaviour) runtime.Add(Label(child) + " enabled=" + behaviour.enabled);
                 if (working.TryGetValue(child, out var held)) runtime.AddRange(held);
             }
-            dependencies.AddRange(HierarchyDependencies.Describe(family == "Crossing pad marker", parts));
+            dependencies.AddRange(HierarchyDependencies.Describe(family == "Crossing pad marker", hierarchyComponents));
             if (incoming.TryGetValue(go, out var rootRefs)) dependencies.AddRange(rootRefs);
             if (working.TryGetValue(go, out var rootHeld)) runtime.AddRange(rootHeld);
             if (scanErrors != 0) problems.Add("Direct-reference scan incomplete: " + scanErrors + " unreadable fields");
@@ -429,7 +433,7 @@ namespace RailroaderScenePatcher {
             MarkerIdHolders markerHolders = null;
             if (marker != null) Read(() => {
                 var kind = Text(Field(marker, "type"));
-                bindings.Add("Marker id=" + Text(Field(marker, "id")) + "; type=" + kind);
+                bindings.Add(InventoryPresentationState.MarkerIdLine + Text(Field(marker, "id")) + "; type=" + kind);
                 // What the game needs from this kind's binding decides whether its state is a problem; the setups say
                 // whether a new-game car placement reads it whatever its activity, and which ones do.
                 var reading = starters.Reading(marker, kind, family == "Crossing pad marker");
@@ -451,7 +455,7 @@ namespace RailroaderScenePatcher {
                 }
             });
             if (TypeName(c) == Span) Read(() => {
-                bindings.Add("Span id=" + Text(Field(c, "id")));
+                bindings.Add("Span ID=" + Text(Field(c, "id")));
                 Location(Field(c, "_lower"), "Lower", bindings, problems, segmentIds, graphError); Location(Field(c, "_upper"), "Upper", bindings, problems, segmentIds, graphError);
                 dependencies.Add("Track graph span registration and occupancy consumers.");
             });
@@ -472,8 +476,8 @@ namespace RailroaderScenePatcher {
             });
             if (TypeName(c) == ConstructionScenery) Read(() => {
                 var ids = Field(c, "segmentIds") as string[];
-                if (ids == null) throw new InvalidOperationException("Construction scenery segment IDs unavailable");
-                foreach (var id in ids) bindings.Add("Construction scenery segment=" + id);
+                if (ids == null) throw new InvalidOperationException("Construction segment IDs unavailable");
+                foreach (var id in ids) bindings.Add(CommandBand.SegmentBinding(id, null));
                 constructionIds = ids;
                 var entries = Field(c, "entries") as IEnumerable;
                 if (entries == null) throw new InvalidOperationException("Construction scenery entries unavailable");
@@ -649,7 +653,7 @@ namespace RailroaderScenePatcher {
             if (mast || ownBell) Read(() => runtime.AddRange(CrossingDeviceWorld.CullingState(go)));
             // Who names an object above the equipment in an authored field, such as a culler's list or a map feature's
             // or a progression's switch list: those can switch the equipment with the object above it.
-            // Every object up to the scene root counts: a progression list on a town folder can name the crossing.
+            // Every object up to the scene root counts: a progression list on a place's scene object can name the crossing.
             if (mast || ownBell)
                 for (var t = go.transform.parent; t != null; t = t.parent)
                     if (incoming.TryGetValue(t.gameObject, out var above)) foreach (var line in above) runtime.Add("Above this object, " + BoardScene.PathOf(t) + ": " + line);
@@ -711,7 +715,7 @@ namespace RailroaderScenePatcher {
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {
-                // A crossbuck that a pad marker id identifies counts the crossbucks at its path that hold that id.
+                // A crossbuck that a pad marker ID identifies counts the crossbucks at its path that hold that id.
                 var holders = padMarkerId != null ? GroupWorld.Crossbucks(go.scene.name, BoardScene.PathOf(go.transform)).Count(pair => pair.Value == padMarkerId)
                     : BoardScene.LoadedAt(go.scene.name, BoardScene.PathOf(go.transform)).Count(held => held != null && Get(held, TypeName(c)) != null);
                 var shared = CommandBand.SharedPath(holders);
@@ -765,7 +769,7 @@ namespace RailroaderScenePatcher {
             // Existence is not proof that the binding names the intended track.
         }
         // The track graph's named-location entries under the marker's ID: the registration that ID lookups find.
-        internal const string ListedTrackLocation = "Track location listed by the game:";
+        internal const string ListedTrackLocation = CommandBand.ListedTrackLocation;
         static void Registrations(Component marker, List<string> bindings) {
             var id = Text(Field(marker, "id"));
             var graph = Native.Read(Native.Type("Track.Graph"), "Shared") ?? throw new InvalidOperationException("Track graph unavailable");

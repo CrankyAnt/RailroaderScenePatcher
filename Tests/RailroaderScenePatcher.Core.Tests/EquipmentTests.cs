@@ -24,6 +24,8 @@ class FakeBell {
     public string Identifier = "rr/bell-uss-teardrop-crossing-rh", Name = "Crossing Bell";
     public BellFacts Facts = new BellFacts { Audio = "rr/bell-crossing", Indexes = new double[] { 0.4, 1.2 }, Volume = 0.8 };
     public double ClipSeconds = 3;
+    // The reason crossing bells are unavailable on this game build, or null: the source then resolves to a placeholder.
+    public string BuildUnavailable;
 }
 // Controlled equipment world: devices by scene and path, bell definitions by identifier, and additions the patcher owns
 // beneath each crossing controller.
@@ -32,6 +34,8 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     public sealed class Added {
         public FakeCrossing Controller; public FakeDevice Copy; public EquipmentAddition Record;
         public double[] Position, Rotation; public bool Destroyed, Culled, InCuller = true;
+        // The wrapper stays while its copy or player is gone, as when something else destroys the copy object.
+        public bool CopyLost;
         // A bell: its definition, whether its audio is loaded or failed to load, and the observers it holds on its
         // controller's bell key.
         public FakeBell Bell; public bool AudioLoaded; public string LoadProblem; public int Observers;
@@ -62,10 +66,12 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     public readonly List<string> VerificationFailures = new List<string>();
     public void VerificationFailed(object controller, string detail) => VerificationFailures.Add(detail);
     public bool StickyDestroy, FailSetPlacementOnce, CullerVisible = true;
+    public Action OnDestroy;
     public FakeDevice Device(string path, Action<FakeDevice> setup = null) { var d = new FakeDevice { Path = path }; setup?.Invoke(d); Devices.Add(d); return d; }
     public IReadOnlyList<object> ResolveSource(EquipmentSource source) => source.IsDefinition ? Bells.Where(b => b.Identifier == source.Definition).Cast<object>().ToArray()
         : Devices.Where(d => d.Owner == null && d.Scene == source.Scene && d.Path == source.Path).Cast<object>().ToArray();
     public string SourceProblem(object source, object controller, string pattern) {
+        if (source is FakeBell unavailable && unavailable.BuildUnavailable != null) return EquipmentAddition.BellsUnavailable;
         if (source is FakeBell bell) return pattern != EquipmentAddition.BellPattern ? "the pattern " + pattern + " is not supported for a definition" : BellPattern.Problem(bell.Facts);
         if (pattern == EquipmentAddition.BellPattern) return "a loaded device is no bell definition";
         var d = (FakeDevice)source;
@@ -96,7 +102,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
         return added;
     }
     public void Destroy(object addition) {
-        Mutations++; if (StickyDestroy) return; Gone((Added)addition);
+        Mutations++; OnDestroy?.Invoke(); if (StickyDestroy) return; Gone((Added)addition);
     }
     void Gone(Added a) {
         // Destroying a destroyed object does nothing, as in the game.
@@ -109,6 +115,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     // patcher. A bell gives up its observer and audio as it does when the patcher removes it.
     public void SceneUnloaded(FakeCrossing crossing) { foreach (var a in Live(crossing).ToList()) Gone(a); }
     public bool Present(object addition) => !((Added)addition).Destroyed;
+    public bool Built(object addition) => !((Added)addition).CopyLost;
     public Placement Placement(object addition) { var a = (Added)addition; return new Placement((double[])a.Position.Clone(), (double[])a.Rotation.Clone()); }
     public void SetPlacement(object addition, Placement placement) {
         Mutations++; var a = (Added)addition;
@@ -117,11 +124,13 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     }
     public string Problem(object addition) {
         var a = (Added)addition;
+        if (a.CopyLost) return "its copy is missing";
         if (a.Bell != null) return a.LoadProblem != null ? "its audio failed to load: " + a.LoadProblem : a.Observers != 1 ? "it observes its controller's bell key " + a.Observers + " times" : null;
         return a.InCuller ? null : "the copy is not in the controller's culler";
     }
     public string Status(object addition) {
         var a = (Added)addition;
+        if (a.CopyLost) return "copy missing";
         if (a.Bell != null) return a.LoadProblem != null ? "audio failed to load" : !a.AudioLoaded ? "audio loading" : "audio loaded; observing the controller's bell key";
         return a.Culled ? "culled; it initializes when visible" : "lamp and gate observers registered";
     }
@@ -136,6 +145,8 @@ static class EquipmentTests {
     static string N(double value) => value.ToString(CultureInfo.InvariantCulture);
     static string Addition(string id, string source = SignalPath, double x = 10, string pattern = EquipmentAddition.LightGatePattern, string extra = "", double[] position = null) =>
         "\"" + id + "\":{\"pattern\":\"" + pattern + "\",\"source\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + source + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", (position ?? new[] { x, 0, 7 }).Select(N)) + "],\"rotation\":[0,0,0,1]}" + extra + "}";
+    static string BellAddition(string id, string definition = "rr/bell") =>
+        "\"" + id + "\":{\"pattern\":\"" + EquipmentAddition.BellPattern + "\",\"source\":{\"definition\":\"" + definition + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[30,0,7],\"rotation\":[0,0,0,1]}}";
     static string Equip(string id, string additions, string path = CrossingPath, string deps = "[]") => EquipRaw(id, "{" + additions + "}", path, deps);
     // A modification whose crossingEquipment value is the given JSON text, keyed by equipment ID when it is valid.
     static string EquipRaw(string id, string equipment, string path = CrossingPath, string deps = "[]") =>
@@ -176,6 +187,22 @@ static class EquipmentTests {
         TheEditingProposesADistinctIdAndAPlacementAtTheCrossing();
         EditingKeepsAnotherModsEquipment();
         AFailedAdditionIsListedAndRemovable();
+        AdditionsInSeparateModificationsAreAllListed();
+        AnAdditionWithoutItsCopyIsRebuiltFromItsSource();
+        AnAdditionWithoutItsCopyIsRefusedWhileItsSourceIsNotLoaded();
+        AnAdditionWithoutItsCopyCanBeRemoved();
+        AnotherModsLostCopyNeitherRebuildsNorRefusesThisModsEdits();
+        AFailedRebuildLeavesTheAdditionNotBuilt();
+        AnImportRollbackAfterAVerifiedRebuildEndsCoherent();
+        AnUnverifiedRebuildCleanupGuardsUntilRecheck();
+        AStaleWrapperThatStaysAfterItsRebuildGuardsTheCrossing();
+        AnEditWithAnEmptyLeftoverReportsThatItWasUndone();
+        WorldLoadReportsAnEmptyLeftoverOnce();
+        EmptyLeftoverDoesNotHideOtherFailures();
+        RecheckRemovesAStaleWrapperItsFileNoLongerNames();
+        AnotherModsLostCopyStaysThroughFileVersionImportAndHistory();
+        SourceRefusalsExplainTheProblem();
+        SourceRefusalsAreReportedToTheModAuthor();
         RecheckRefusesARefusedAdditionWithoutMutation();
         RecheckChecksOnlyTheModificationsThatTakeEffect();
         RecheckRefusalKeepsAnIndependentModificationOfTheObject();
@@ -210,7 +237,7 @@ static class EquipmentTests {
         Assert(f.Crossing.Position.SequenceEqual(new double[] { 5, 0, 7 }) && f.Crossing.Circuits.Count == 1
             && refusal.Outcomes["signals"].Error == "The change failed. The object is back as it was. Reason: Applied crossing equipment did not verify: equipment west differs from the mod's source or placement"
             && failed.World.VerificationFailures.Count == 1
-            && failed.World.VerificationFailures[0] == "reason=\"mismatch\" identity=true source=true position=false rotation=true positionTolerance=0.0005-per-axis-or-equal-float32 rotationTolerance=normalized-absolute-dot>=0.99999999 desired={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10,0,7],rotation=[0,0,0,1]} observed={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10.125,0,7],rotation=[0,0,0,1]}", "Equipment leaves the crossing unchanged and a failed verification records the difference without changing the refusal");
+            && failed.World.VerificationFailures[0] == "Equipment differs from the requested equipment. Mod, equipment ID, pattern, and source match: true; source matches: true; position matches: false; rotation matches: true. Positions match when each coordinate has a finite 32-bit floating-point value and either differs by at most 0.0005 or has the same stored 32-bit value. Rotations match when the absolute dot product of the normalized rotations is at least 0.99999999. Requested: {mod=\"author/pack\", ID=\"west\", pattern=\"crossing-light-gate-v1\", source scene=\"BushnellWhittier\", source path=\"" + SignalPath + "\", position=[10,0,7], rotation=[0,0,0,1]}. Found: {mod=\"author/pack\", ID=\"west\", pattern=\"crossing-light-gate-v1\", source scene=\"BushnellWhittier\", source path=\"" + SignalPath + "\", position=[10.125,0,7], rotation=[0,0,0,1]}.", "Equipment leaves the crossing unchanged and a failed verification records the difference without changing the refusal");
     }
     static bool FloatStoredPlacementsVerify() {
         // Desired and observed values from the Allen journey, plus negative and larger map coordinates.
@@ -296,7 +323,7 @@ static class EquipmentTests {
             var error = result.Outcomes["bad"].Error ?? "";
             Assert(!result.Outcomes["bad"].Applied && f.World.Mutations == 0 && f.Live.Count == before, c.Key + " source is refused before any change: " + error);
             Assert(!f.World.Live(f.Crossing).Any(a => a.Record.Id == "west"), c.Key + " source is not replaced by another device");
-            if (c.Key == "missing" || c.Key == "absent scene") Assert(error.Contains("not loaded in this map") && error.Contains("will not substitute another source or load another scene"), "A missing source neither substitutes nor loads a scene: " + error);
+            if (c.Key == "missing" || c.Key == "absent scene") Assert(error.Contains("is not in the map") && error.Contains("only copies lights and gates already in the map and will not choose a replacement"), "A missing source neither substitutes nor loads a scene: " + error);
             if (c.Key == "ambiguous") Assert(error.Contains("ambiguous"), "An ambiguous source is named: " + error);
             if (c.Key == "nonconforming") Assert(error.Contains("does not conform to " + EquipmentAddition.LightGatePattern) && error.Contains("bell"), "A nonconforming source gives its reason: " + error);
         }
@@ -429,8 +456,8 @@ static class EquipmentTests {
     static void EditingRefusalAndFailureRestore() {
         var (f, session, mapEditor, store) = Session();
         var refused = session.AddEquipment(Crossing, West(path: CrossingPath + "/Missing"));
-        Assert(!refused.Applied && f.World.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && refused.Error.Contains("not loaded"), "A missing source is refused without a change or history entry: " + refused.Error);
-        Assert(session.PreviewEquipment(Crossing, West(path: CrossingPath + "/Missing"), null).Error.Contains("not loaded"), "The preview names the refusal");
+        Assert(!refused.Applied && f.World.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && refused.Error.Contains("is not in the map"), "A missing source is refused without a change or history entry: " + refused.Error);
+        Assert(session.PreviewEquipment(Crossing, West(path: CrossingPath + "/Missing"), null).Error.Contains("is not in the map"), "The preview names the refusal");
         session.AddEquipment(Crossing, West());
         f.World.FailConstructAfter = 0;
         var failed = session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east"));
@@ -563,10 +590,424 @@ static class EquipmentTests {
         var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
         var entries = session.EquipmentEntries(Crossing);
-        Assert(entries.Count == 1 && entries[0].Built == null && entries[0].Addition.Id == "lost" && entries[0].Problem.Contains("not loaded"), "The failed addition is listed from the scene patch file with its reason: " + entries.FirstOrDefault()?.Problem);
+        Assert(entries.Count == 1 && entries[0].Built == null && entries[0].Addition.Id == "lost" && entries[0].Problem.Contains("is not in the map"), "The failed addition is listed from the scene patch file with its reason: " + entries.FirstOrDefault()?.Problem);
         var removed = session.RemoveEquipment(Crossing, "lost");
         Assert(removed.Applied && session.EquipmentEntries(Crossing).Count == 0 && !session.ScenePatchFileText.Contains("lost"), "The failed addition is removed from the scene patch file: " + removed.Error);
         Assert(session.AddEquipment(Crossing, West()).Applied && f.Live.Count == 1, "Afterwards the crossing takes equipment again");
+    }
+    // A scene patch file may hold the crossing's coverage and each of its additions in a modification of its own, as the
+    // CrossingReroute62 fixture does. The crossing lists every addition of this mod, not only those of its first modification.
+    static void AdditionsInSeparateModificationsAreAllListed() {
+        var f = new Fixture();
+        f.World.Bell("rr/bell", b => b.Name = "Teardrop bell"); f.World.LoadsPending = false;
+        var engine = new PatchEngine(f.Scene);
+        string Loc(double d) => "{\"segment\":\"Snew\",\"end\":\"a\",\"distance\":" + N(d) + "}";
+        string Range(double a, double b) => "{\"from\":" + Loc(a) + ",\"to\":" + Loc(b) + "}";
+        var coverage = "\"cover\":{" + Target() + ",\"relationships\":{\"crossingCoverage\":{\"circuits\":{\"Pipr\":{\"approachA\":" + Range(308, 550) + ",\"island\":" + Range(292, 308) + ",\"approachB\":" + Range(292, 50) + "}}}},\"dependsOn\":[]}";
+        var scenePatchFile = Doc(coverage + "," + Equip("equip-signal-copy", Addition("west")) + "," + Equip("equip-bell-added", BellAddition("ring")));
+        var load = engine.Apply(scenePatchFile, "author/pack");
+        Assert(load.Outcomes.Values.All(o => o.Applied) && f.Live.Count == 2, "The coverage and both additions apply at load: " + String.Join("; ", load.Outcomes.Where(o => !o.Value.Applied).Select(o => o.Key + " " + o.Value.Error)));
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var entries = session.EquipmentEntries(Crossing);
+        Assert(entries.Select(e => e.Addition.Id).SequenceEqual(new[] { "ring", "west" }) && entries.All(e => e.Built != null && e.Problem == null),
+            "Both additions are listed as built, in the ordinal order of their IDs: " + String.Join(", ", entries.Select(e => e.Addition.Id + " " + e.Problem)));
+        // The crossing's edit controls are inactive ahead of time with the reason.
+        Assert(session.SeveralModificationsBlock(Crossing) == PatchEditingSession.SeveralModifications, "The crossing's edits are blocked ahead of time: " + session.SeveralModificationsBlock(Crossing));
+        // Every edit those controls start still refuses with the same reason before any change: Edit and Remove of an addition,
+        // Use for a new light, gate or bell, the coverage and detection edits, and the removal of the modification.
+        var mutations = f.World.Mutations;
+        SpanRange Span(double a, double b) => new SpanRange(new TrackLocation("Snew", "a", a), new TrackLocation("Snew", "a", b));
+        var tracks = CircuitCoverage.Tracks(Span(300, 540), Span(292, 300), Span(292, 60));
+        var refusals = new (string Control, string Error)[] {
+            ("Remove", session.RemoveEquipment(Crossing, "west").Error),
+            ("Edit", session.AddEquipment(Crossing, West(12)).Error),
+            ("Use", session.AddEquipment(Crossing, West(14, id: "new")).Error),
+            ("Equipment preview", session.PreviewEquipment(Crossing, West(12), null).Error),
+            ("Coverage preview", session.PreviewCoverage(Crossing, "Pipr", tracks).Error),
+            ("Coverage", session.Cover(Crossing, "Pipr", tracks).Error),
+            ("Add detection", session.AddDetection(Crossing, "extra", tracks).Error),
+            ("Remove modification", session.Remove(Crossing).Error),
+        };
+        foreach (var refusal in refusals)
+            Assert(refusal.Error != null && refusal.Error.Contains(PatchEditingSession.SeveralModifications), refusal.Control + " still refuses with the same reason: " + refusal.Error);
+        Assert(f.World.Mutations == mutations && f.Live.Count == 2, "The refusals change nothing");
+        var single = Session(Doc(Equip("equip-crossing", Addition("west"))));
+        Assert(single.session.SeveralModificationsBlock(Crossing) == null, "One modification of the crossing blocks nothing");
+    }
+    // An added light, gate or bell whose copy is gone while its wrapper stays counts as not built: the editing lists it with
+    // its reason, and Recheck rebuilds it from its source like a fresh construction, without a refusal or a reload.
+    static void AnAdditionWithoutItsCopyIsRebuiltFromItsSource() {
+        foreach (var bell in new[] { false, true }) {
+            var f = new Fixture();
+            if (bell) { f.World.Bell("rr/bell", b => b.Name = "Teardrop bell"); f.World.LoadsPending = false; }
+            var engine = new PatchEngine(f.Scene);
+            var scenePatchFile = Doc(Equip("equip-crossing", bell ? BellAddition("ring") : Addition("west")));
+            Assert(engine.Apply(scenePatchFile, "author/pack").Outcomes["equip-crossing"].Applied && f.Live.Count == 1, "The addition is built at load");
+            var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+            var lost = f.Live[0]; lost.CopyLost = true;
+            var entries = session.EquipmentEntries(Crossing);
+            Assert(entries.Count == 1 && entries[0].Built == null && entries[0].Problem == "it is not built in this world; Recheck builds it",
+                "An addition without its copy is listed as not built with what to do: " + entries.FirstOrDefault()?.Problem);
+            var recheck = session.Recheck(Crossing);
+            Assert(recheck.Applied && lost.Destroyed && f.Live.Count == 1 && !f.Live[0].CopyLost && f.World.Constructed == 2,
+                "Recheck replaces the wrapper without its copy by a fresh construction from its source: " + recheck.Error);
+            Assert(session.EquipmentEntries(Crossing).Single().Built != null && !session.CleanupUnverified(Crossing), "Afterwards the addition is built and the crossing stays editable");
+        }
+        var next = new Fixture();
+        var write = new PatchEngine(next.Scene);
+        write.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
+        next.Live[0].CopyLost = true;
+        var moved = write.Apply(Doc(Equip("signals", Addition("west", x: 12))), "author/pack");
+        Assert(moved.Outcomes["signals"].Applied && next.Live.Count == 1 && !next.Live[0].CopyLost && next.Live[0].Position[0] == 12 && next.World.Constructed == 2,
+            "The next write rebuilds an addition without its copy at its placement: " + moved.Outcomes["signals"].Error);
+    }
+    // Without its source loaded, the addition cannot be rebuilt: Recheck refuses before any change and names the source.
+    static void AnAdditionWithoutItsCopyIsRefusedWhileItsSourceIsNotLoaded() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("west")));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var lost = f.Live[0]; lost.CopyLost = true;
+        f.World.Devices.RemoveAll(d => d.Path == SignalPath);
+        var mutations = f.World.Mutations;
+        var recheck = session.Recheck(Crossing);
+        const string Refusal = "Equipment west: the added equipment is missing, and light or gate Signal 1 is not in the map, so the equipment cannot be rebuilt. The patcher only copies lights and gates already in the map and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition";
+        Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains(Refusal),
+            "Recheck refuses the rebuild and names the source by its name, with the standard tail: " + recheck.Failure + " " + recheck.Error);
+        Assert(f.World.Mutations == mutations && !lost.Destroyed && !session.CleanupUnverified(Crossing), "The refusal changes nothing");
+        var entry = session.EquipmentEntries(Crossing).Single();
+        Assert(entry.Built == null && entry.Problem.Contains(Refusal), "The listed addition gives the refusal that names its source: " + entry.Problem);
+        var b = new Fixture();
+        b.World.Bell("rr/bell", d => d.Name = "Teardrop bell"); b.World.LoadsPending = false;
+        var bellEngine = new PatchEngine(b.Scene);
+        var bellFile = Doc(Equip("equip-crossing", BellAddition("ring")));
+        bellEngine.Apply(bellFile, "author/pack");
+        var bellStore = new Store { Patch = bellFile }; var bellEditor = new NativeMapEditor();
+        var bellSession = new PatchEditingSession(bellEngine, bellEditor, bellStore, scenePatchFileKey: "author/pack"); bellEditor.Session = bellSession;
+        b.Live.Single().CopyLost = true;
+        b.World.Bells.Clear();
+        var bellRecheck = bellSession.Recheck(Crossing);
+        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell is unavailable in the content library, so the equipment cannot be rebuilt. The patcher only uses bell definitions already available and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition"),
+            "A lost bell whose definition is unavailable is refused with its recorded name and a next step: " + bellRecheck.Error);
+    }
+    static void AnAdditionWithoutItsCopyCanBeRemoved() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("west") + "," + Addition("east", CrossingPath + "/Signal 2", 20)));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var lost = f.Live.Single(a => a.Record.Id == "west"); lost.CopyLost = true;
+        var removed = session.RemoveEquipment(Crossing, "west");
+        Assert(removed.Applied && lost.Destroyed && f.Live.Count == 1 && f.Live[0].Record.Id == "east" && !session.ScenePatchFileText.Contains("\"west\""),
+            "Removing an addition without its copy removes its wrapper and its entry: " + removed.Error);
+    }
+    // A lost copy belongs to its own mod: another mod's equipment write neither rebuilds it nor is refused because of it,
+    // with its source loaded or not. Its own mod's Recheck rebuilds it, or refuses with its own error.
+    static void AnotherModsLostCopyNeitherRebuildsNorRefusesThisModsEdits() {
+        foreach (var loaded in new[] { true, false }) {
+            var f = new Fixture();
+            var engine = new PatchEngine(f.Scene);
+            var theirsFile = Doc(Equip("signals", Addition("theirs", CrossingPath + "/Signal 2", 40)));
+            Assert(engine.Apply(theirsFile, "other/pack").Outcomes["signals"].Applied, "The other mod's addition is built at load");
+            var store = new Store(); var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+            var theirs = f.Live.Single(); theirs.CopyLost = true;
+            if (!loaded) f.World.Devices.RemoveAll(d => d.Path == CrossingPath + "/Signal 2");
+            var constructed = f.World.Constructed;
+            var added = session.AddEquipment(Crossing, West());
+            Assert(added.Applied, "This mod's addition applies beside the other mod's lost copy (source loaded: " + loaded + "): " + added.Error);
+            Assert(f.World.Constructed == constructed + 1 && !theirs.Destroyed && theirs.CopyLost, "This mod's write leaves the other mod's lost copy as it is");
+            Assert(session.AddEquipment(Crossing, West(12)).Applied && !theirs.Destroyed && theirs.CopyLost, "A move of this mod's addition leaves it too");
+            Assert(session.Recheck(Crossing).Applied && !theirs.Destroyed && theirs.CopyLost, "This mod's Recheck leaves it too");
+            var otherStore = new Store { Patch = theirsFile }; var otherEditor = new NativeMapEditor();
+            var other = new PatchEditingSession(engine, otherEditor, otherStore, scenePatchFileKey: "other/pack"); otherEditor.Session = other;
+            var recheck = other.Recheck(Crossing);
+            if (loaded) Assert(recheck.Applied && theirs.Destroyed && f.Live.Count(a => a.Record.Scope == "other/pack" && !a.CopyLost) == 1, "Its own mod's Recheck rebuilds it: " + recheck.Error);
+            else Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains("Equipment theirs: the added equipment is missing, and light or gate Signal 2 is not in the map") && !theirs.Destroyed,
+                "Its own mod's Recheck refuses with its own error: " + recheck.Error);
+        }
+    }
+    // A rebuild that fails, in construction or in verification, is restored to "not built": the scene patch file keeps the
+    // addition, its row offers Recheck, and nothing reports an incomplete cleanup.
+    static void AFailedRebuildLeavesTheAdditionNotBuilt() {
+        foreach (var verification in new[] { false, true }) {
+            var f = new Fixture();
+            var engine = new PatchEngine(f.Scene);
+            var scenePatchFile = Doc(Equip("signals", Addition("west")));
+            engine.Apply(scenePatchFile, "author/pack");
+            var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+            f.Live.Single().CopyLost = true;
+            if (verification) f.World.ConstructOffset = 0.125; else f.World.FailConstructAfter = 0;
+            var moved = session.AddEquipment(Crossing, West(12));
+            Assert(!moved.Applied && moved.Failure == FailureKind.Restored, "A failed rebuild is restored (verification: " + verification + "): " + moved.Failure + " " + moved.Error);
+            Assert(!f.Live.Any(a => !a.CopyLost) && !session.CleanupUnverified(Crossing), "Nothing built stays and no cleanup is unverified");
+            var entry = session.EquipmentEntries(Crossing).Single();
+            Assert(entry.Built == null && entry.Problem == "it is not built in this world; Recheck builds it", "The addition stays in the scene patch file as not built: " + entry.Problem);
+            f.World.ConstructOffset = 0;
+            Assert(session.Recheck(Crossing).Applied && f.Live.Count(a => !a.CopyLost) == 1, "Recheck builds it afterwards");
+        }
+    }
+    // A rebuild that verified is rolled back with the rest of an Import when a later target fails. The crossing ends with the
+    // addition not built and coherent: no incomplete cleanup is reported and nothing is guarded.
+    static void AnImportRollbackAfterAVerifiedRebuildEndsCoherent() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("a-crossing", Addition("west")));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        f.Live.Single().CopyLost = true;
+        store.Patch = Doc(Equip("a-crossing", Addition("west", x: 12)) + "," + Equip("b-other", Addition("north", x: 30), OtherPath));
+        session.CheckFileVersion();
+        Assert(session.OpenImport().Applied, "The Import overview opens");
+        f.World.FailConstructAfter = 1;
+        var import = session.ApplyImport();
+        Assert(!import.Applied && import.Error.StartsWith("Scene patch editing is back as it was before Import.", StringComparison.Ordinal) && !import.Error.Contains("could not be verified"),
+            "The Import is rolled back without an incomplete cleanup: " + import.Error);
+        Assert(f.World.Constructed >= 2 && !session.CleanupUnverified(Crossing) && !session.CleanupUnverified(new TargetIdentity("BushnellWhittier", OtherPath, CrossingCoverageScene.ComponentType, CrossingCoverageScene.Structure)),
+            "The rebuild happened and nothing is guarded after the rollback");
+        Assert(!f.World.Live(f.Crossing).Any(a => !a.CopyLost) && !f.World.Live(f.Other).Any(), "The rebuilt copy and the failed addition are gone");
+        var entry = session.EquipmentEntries(Crossing).Single();
+        Assert(entry.Built == null && entry.Problem == "it is not built in this world; Recheck builds it", "The addition is listed as not built: " + entry.Problem);
+    }
+    // When cleanup after a failed rebuild cannot be verified, the crossing is guarded; Recheck then rebuilds the lost copy
+    // and lifts the guard.
+    static void AnUnverifiedRebuildCleanupGuardsUntilRecheck() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("signals", Addition("west")));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var lost = f.Live.Single(); lost.CopyLost = true;
+        f.World.ConstructOffset = 0.125; f.World.StickyDestroy = true;
+        var failed = session.Recheck(Crossing);
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing), "An unverified cleanup guards the crossing: " + failed.Failure + " " + failed.Error);
+        var recovery = RecoveryGuidance.For(failed, "Connections", "Recheck", null).Line("Recheck");
+        Assert(!recovery.Contains("your edits are kept") && recovery.Contains("differs from the mod's source or placement"),
+            "A stale wrapper with a misplaced rebuilt addition keeps the placement failure visible: " + recovery);
+        Assert(!session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east")).Applied, "Another edit is blocked while it is guarded");
+        f.World.ConstructOffset = 0; f.World.StickyDestroy = false;
+        var recheck = session.Recheck(Crossing);
+        Assert(recheck.Applied && !session.CleanupUnverified(Crossing) && lost.Destroyed && f.Live.Count == 1 && !f.Live[0].CopyLost && f.Live[0].Position[0] == 10,
+            "Recheck rebuilds the lost copy at its placement and lifts the guard: " + recheck.Error);
+    }
+    // A cleared wrapper that a destroy leaves standing fails verification, so the rebuild guards the crossing instead of
+    // verifying. Status reads the rebuilt addition, not the stale wrapper of the same ID.
+    static void AStaleWrapperThatStaysAfterItsRebuildGuardsTheCrossing() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("signals", Addition("west")));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var lost = f.Live.Single(); lost.CopyLost = true;
+        f.World.StickyDestroy = true;
+        var failed = session.Recheck(Crossing);
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("An added light, gate, or bell left an empty object at this crossing"),
+            "A stale wrapper that stays after its rebuild is reported: " + failed.Failure + " " + failed.Error);
+        var recovery = RecoveryGuidance.For(failed, "Connections", "Recheck", null).Line("Recheck");
+        Assert(recovery == "An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map. Your edits are kept. Click Recheck to try removing it, or reload the native map editor.",
+            "The cleanup reason composes with the recovery action: " + recovery);
+        Assert(f.Live.Count(a => !a.CopyLost) == 1 && f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west") == "lamp and gate observers registered",
+            "Status reads the rebuilt addition: " + f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west"));
+        var again = session.Recheck(Crossing);
+        Assert(!again.Applied && again.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && !lost.Destroyed && f.Live.Count(a => !a.CopyLost) == 1,
+            "A second Recheck while the destroy is still stuck stays guarded and builds no extra copy: " + again.Failure + " " + again.Error);
+        f.World.StickyDestroy = false;
+        var recheck = session.Recheck(Crossing);
+        Assert(recheck.Applied && lost.Destroyed && !session.CleanupUnverified(Crossing) && f.Live.Count == 1, "Recheck removes the stale wrapper and lifts the guard: " + recheck.Error);
+    }
+    static Fixture WithEmptyWrappers(int count = 1) {
+        var f = new Fixture();
+        var addition = West();
+        var owned = new EquipmentAddition(addition.Id, addition.Pattern, addition.Source, addition.Placement, "author/pack");
+        var source = f.World.ResolveSource(owned.Source).Single();
+        for (var i = 0; i < count; i++) {
+            var stale = (FakeEquipmentWorld.Added)f.World.Construct(f.Crossing, source, owned);
+            stale.CopyLost = true;
+        }
+        f.World.Construct(f.Crossing, source, owned);
+        return f;
+    }
+    static void AnEditWithAnEmptyLeftoverReportsThatItWasUndone() {
+        var f = WithEmptyWrappers();
+        var (_, session, mapEditor, store) = Session(Doc(Equip("signals", Addition("west"))), f);
+        var before = session.ScenePatchFileText;
+        f.World.StickyDestroy = true;
+        var failed = session.AddEquipment(Crossing, West(12));
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.ScenePatchFileText == before,
+            "The failed edit restores the scene patch file: " + failed.Error);
+        var line = RecoveryGuidance.For(failed, "Connections", "Equipment", null).Line("Equipment");
+        Assert(line == "The change was undone. An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map. Click Recheck to try removing it, or reload the native map editor.",
+            "An edit reports the rollback and leftover once: " + line);
+    }
+    sealed class EquipmentWarnings : IPatchDiagnostics {
+        public readonly List<PatchFailure> Failures = new List<PatchFailure>();
+        public void Warning(PatchFailure failure) => Failures.Add(failure);
+    }
+    static void WorldLoadReportsAnEmptyLeftoverOnce() {
+        var f = WithEmptyWrappers();
+        f.World.StickyDestroy = true;
+        var warnings = new EquipmentWarnings();
+        var runtime = new PatchRuntime(new PatchEngine(f.Scene), warnings, "0.5.0", "0.6.3");
+        runtime.Apply(Doc(Equip("signals", Addition("west", x: 12))), new PatchSource("author/pack", "Pack", "1.0.0"));
+        var message = warnings.Failures.Single().Message;
+        Assert(message.Contains("The change was undone, but an empty object remains where a light, gate, or bell was added at this crossing. This leftover object won't be saved with the map.")
+            && message.Split(new[] { "empty object" }, StringSplitOptions.None).Length == 2
+            && !message.Contains("Remaining state:") && !message.Contains("Recheck") && message.EndsWith("Report to the patcher maintainer.", StringComparison.Ordinal),
+            "The world-load warning explains the leftover once and retains the player reporting route: " + message);
+        var mixed = WithEmptyWrappers();
+        mixed.World.StickyDestroy = true;
+        var destroys = 0;
+        mixed.World.OnDestroy = () => { if (++destroys == 2) throw new InvalidOperationException("separate restoration failure"); };
+        var mixedWarnings = new EquipmentWarnings();
+        new PatchRuntime(new PatchEngine(mixed.Scene), mixedWarnings, "0.5.0", "0.6.3")
+            .Apply(Doc(Equip("signals", Addition("west", x: 12))), new PatchSource("author/pack", "Pack", "1.0.0"));
+        var uncertain = mixedWarnings.Failures.Single().Message;
+        Assert(uncertain.Contains("Cleanup could not be verified") && uncertain.Contains("Remaining state:") && !uncertain.Contains("The change was undone."),
+            "The world-load warning keeps an independent restoration failure uncertain: " + uncertain);
+    }
+    static void EmptyLeftoverDoesNotHideOtherFailures() {
+        foreach (var forwardFails in new[] { true, false }) {
+            var f = WithEmptyWrappers();
+            var (_, session, _, _) = Session(Doc(Equip("signals", Addition("west"))), f);
+            f.World.StickyDestroy = true;
+            if (forwardFails) f.World.FailSetPlacementOnce = true;
+            else {
+                var destroys = 0;
+                f.World.OnDestroy = () => {
+                    // The same words in an ordinary exception must not stand in for a typed cleanup failure.
+                    if (++destroys == 2) throw new InvalidOperationException("An added light, gate, or bell left an empty object at this crossing");
+                };
+            }
+            var failed = session.AddEquipment(Crossing, West(12));
+            var line = RecoveryGuidance.For(failed, "Connections", "Equipment", null).Line("Equipment");
+            Assert(failed.Failure == FailureKind.IncompleteCleanup && line.Contains("What remains:") && !line.StartsWith("The change was undone.", StringComparison.Ordinal),
+                "An independent forward or restoration failure keeps the full uncertainty: " + line);
+            if (forwardFails) Assert(line.Contains("Placement injected"), "The original placement failure stays visible: " + line);
+        }
+        var changed = WithEmptyWrappers();
+        var (_, recheckSession, _, _) = Session(Doc(Equip("signals", Addition("west"))), changed);
+        changed.World.StickyDestroy = true;
+        changed.World.OnDestroy = () => changed.Crossing.Position[0] = 80;
+        var recheck = recheckSession.Recheck(Crossing);
+        var recovery = RecoveryGuidance.For(recheck, "Connections", "Recheck", null).Line("Recheck");
+        Assert(recheck.Failure == FailureKind.IncompleteCleanup && recovery.Contains("Position: now 80") && !recovery.Contains("Your edits are kept"),
+            "A Recheck with a separate state mismatch retains that mismatch: " + recovery);
+        var multiple = WithEmptyWrappers(2);
+        var (_, multipleSession, _, _) = Session(Doc(Equip("signals", Addition("west"))), multiple);
+        multiple.World.StickyDestroy = true;
+        var blocked = multipleSession.Recheck(Crossing);
+        var notice = RecoveryGuidance.For(blocked, "Connections", "Recheck", null).Line("Recheck");
+        Assert(blocked.Failure == FailureKind.IncompleteCleanup && notice.Split(new[] { "empty object" }, StringSplitOptions.None).Length == 2,
+            "Several empty wrappers produce one cleanup explanation: " + notice);
+        multiple.World.StickyDestroy = false;
+        Assert(multipleSession.Recheck(Crossing).Applied && multiple.Live.Count == 1,
+            "Recheck removes every empty wrapper while keeping the built addition");
+    }
+    // Recheck removes owned state its scene patch file no longer names, a stale wrapper included, although the observation
+    // without it equals the desired state.
+    static void RecheckRemovesAStaleWrapperItsFileNoLongerNames() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        engine.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
+        var lost = f.Live.Single(); lost.CopyLost = true;
+        var store = new Store { Patch = Doc(Equip("other", Addition("north", x: 30), OtherPath)) }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var recheck = session.Recheck(Crossing);
+        Assert(recheck.Applied && lost.Destroyed && !f.World.Live(f.Crossing).Any(), "Recheck removes the stale wrapper the file no longer names: " + recheck.Error);
+    }
+    // Another mod's lost copy stays as it is through this mod's Use file version, Import, and native Undo and Redo.
+    static void AnotherModsLostCopyStaysThroughFileVersionImportAndHistory() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        Assert(engine.Apply(Doc(Equip("signals", Addition("theirs", CrossingPath + "/Signal 2", 40))), "other/pack").Outcomes["signals"].Applied, "The other mod's addition is built at load");
+        var store = new Store { Patch = Doc(Equip("equip-crossing", Addition("west"))) }; var mapEditor = new NativeMapEditor();
+        engine.Apply(store.Patch, "author/pack");
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var theirs = f.Live.Single(a => a.Record.Scope == "other/pack"); theirs.CopyLost = true;
+        bool Untouched() => !theirs.Destroyed && theirs.CopyLost && f.Live.Count(a => a.Record.Scope == "other/pack") == 1;
+        store.Patch = Doc(Equip("equip-crossing", Addition("west", x: 12))); session.CheckFileVersion();
+        var used = session.UseFileVersion();
+        Assert(used.Applied && Untouched(), "Use file version leaves the other mod's lost copy: " + used.Error);
+        store.Patch = Doc(Equip("equip-crossing", Addition("west", x: 14))); session.CheckFileVersion();
+        Assert(session.OpenImport().Applied, "The Import overview opens");
+        var imported = session.ApplyImport();
+        Assert(imported.Applied && Untouched(), "Import leaves it: " + imported.Error);
+        Assert(session.AddEquipment(Crossing, West(16)).Applied && Untouched(), "An edit leaves it");
+        var constructed = f.World.Constructed; var mutations = f.World.Mutations;
+        var recheck = session.Recheck(Crossing);
+        Assert(recheck.Applied && Untouched() && f.World.Constructed == constructed && f.World.Mutations == mutations,
+            "This mod's Recheck leaves it and applies nothing for it: " + recheck.Error);
+        mapEditor.Undo();
+        Assert(Untouched() && f.Live.Single(a => a.Record.Scope == "author/pack").Position[0] == 14, "Undo leaves it");
+        mapEditor.Redo();
+        Assert(Untouched() && f.Live.Single(a => a.Record.Scope == "author/pack").Position[0] == 16, "Redo leaves it");
+    }
+    // Source refusals explain the problem; content refusals also say what the modder can do.
+    static void SourceRefusalsExplainTheProblem() {
+        var f = new Fixture();
+        f.World.Device(SignalPath + " twin"); f.World.Device(CrossingPath + "/Twin"); f.World.Device(CrossingPath + "/Twin");
+        f.World.Device(CrossingPath + "/Bell", d => d.Facts.Bells = 1);
+        var at = new Placement(new[] { 10.0, 0, 7 }, new[] { 0.0, 0, 0, 1 });
+        string Refusal(EquipmentAddition addition) {
+            try { f.Scene.CheckRelationships(f.Crossing, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { addition }, false))); return null; }
+            catch (InvalidOperationException e) { return e.Message; }
+        }
+        var device = new EquipmentSource("BushnellWhittier", SignalPath);
+        var cases = new[] {
+            (Refusal(new EquipmentAddition("x", "crossing-custom-v1", device, at, "author/pack")), "Equipment x: pattern crossing-custom-v1 is not supported. Use pattern crossing-light-gate-v1 or crossing-bell-v1. Otherwise remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack")), "Equipment x: a light or gate needs a light or gate in the map as its source, not a bell definition. Change its source in your scene patch file or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Twin"), at, "author/pack")), "Equipment x: source Twin is ambiguous; 2 objects in the map share its scene and path. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Bell"), at, "author/pack")), ". Select an eligible source or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack")), "Equipment x needs a fixed placement. Give it a position and rotation or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.BellPattern, device, at, "author/pack")), "Equipment x: a bell needs a bell definition as its source, not a light or gate in the map. Change its source in your scene patch file or remove the addition"),
+        };
+        foreach (var (error, tail) in cases) Assert(error != null && error.EndsWith(tail, StringComparison.Ordinal), "The refusal gives its reason and any next step: " + error);
+        Assert(cases[3].Item1.StartsWith("Equipment x: source Bell does not conform to " + EquipmentAddition.LightGatePattern, StringComparison.Ordinal), "A non-conforming source is named: " + cases[3].Item1);
+    }
+    // A refused source is a problem of the mod author's scene patch file, as an invalid source shape is: the world load's
+    // warning names the mod author. A source that is missing, unavailable, ambiguous or nonconforming, of the wrong kind,
+    // or an addition without a fixed placement is such a problem. Crossing bells that this game build cannot provide are not.
+    static void SourceRefusalsAreReportedToTheModAuthor() {
+        var loads = new (string Case, Action<FakeEquipmentWorld> Setup, string Addition)[] {
+            ("missing light or gate", w => { }, Addition("west", CrossingPath + "/Missing")),
+            ("unavailable bell definition", w => { }, BellAddition("ring", "rr/bell-does-not-exist")),
+            ("ambiguous light or gate", w => { w.Device(CrossingPath + "/Twin"); w.Device(CrossingPath + "/Twin"); }, Addition("west", CrossingPath + "/Twin")),
+            ("nonconforming light or gate", w => w.Device(CrossingPath + "/Bell", d => d.Facts.Bells = 1), Addition("west", CrossingPath + "/Bell")),
+        };
+        foreach (var (name, setup, addition) in loads) {
+            var f = new Fixture();
+            setup(f.World);
+            var outcome = new PatchEngine(f.Scene).Apply(Doc(Equip("bad", addition)), "author/pack").Outcomes["bad"];
+            Assert(!outcome.Applied && outcome.Cause == FailureCause.InvalidDefinition && f.World.Mutations == 0,
+                "A " + name + " is the mod author's problem: " + outcome.Cause + " " + outcome.Error);
+        }
+        var g = new Fixture();
+        var at = new Placement(new[] { 10.0, 0, 7 }, new[] { 0.0, 0, 0, 1 });
+        Exception Refusal(EquipmentAddition addition) {
+            try { g.Scene.CheckRelationships(g.Crossing, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { addition }, false))); return null; }
+            catch (InvalidOperationException e) { return e; }
+        }
+        var device = new EquipmentSource("BushnellWhittier", SignalPath);
+        foreach (var (name, refusal) in new[] {
+            ("wrong source kind for a light or gate", Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack"))),
+            ("wrong source kind for a bell", Refusal(new EquipmentAddition("x", EquipmentAddition.BellPattern, device, at, "author/pack"))),
+            ("unsupported pattern", Refusal(new EquipmentAddition("x", "crossing-custom-v1", device, at, "author/pack"))),
+            ("missing placement", Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack"))) })
+            Assert(refusal is InvalidPatchDefinitionException, "A " + name + " is the mod author's problem: " + refusal?.GetType().Name + " " + refusal?.Message);
+        var h = new Fixture();
+        h.World.Bell("rr/bell", b => b.BuildUnavailable = "the bell player type is missing"); h.World.LoadsPending = false;
+        var build = new PatchEngine(h.Scene).Apply(Doc(Equip("bad", BellAddition("ring"))), "author/pack").Outcomes["bad"];
+        Assert(!build.Applied && build.Error.Contains(EquipmentAddition.BellsUnavailable) && !build.Error.Contains("the bell player type is missing") && build.Cause != FailureCause.InvalidDefinition,
+            "Bells this game build cannot provide stay a patcher problem: " + build.Cause + " " + build.Error);
     }
     // A modification whose additions include one with a nonconforming source is refused as one coherent operation, as the
     // world load refuses it. Recheck refuses it the same way before any change: nothing was mutated, so no cleanup is

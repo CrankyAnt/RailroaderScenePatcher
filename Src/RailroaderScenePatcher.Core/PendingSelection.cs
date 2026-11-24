@@ -127,12 +127,12 @@ namespace RailroaderScenePatcher.Core {
             Problem = bound != null ? CurrentBindingOffer(bound.Identity) : Offers.Count == 0 ? NoOffer :
                 Offers.Count > 1 ? SeveralOffers : null;
         }
-        // A group's objects or overlapping markers offer a list beside the pointer. The same number names each
+        // A group's objects or overlapping markers offer a list next to the pointer. The same number names each
         // offer wherever the panel lists it.
         public const string SeveralOffers = "Select a row from the list next to the pointer.";
-        public string OfferCountText => Offers.Count + (crossingSetup && ListOpen ? " objects in this crossing setup." :
+        public string OfferCountText => Offers.Count + (crossingSetup && ListOpen ? " objects from the crossing you clicked are listed next to the pointer." :
             Kind == SelectionKind.SceneObject ? " objects." : " candidates.");
-        public string OfferListInstruction => SeveralOffers;
+        public string OfferListInstruction => crossingSetup && ListOpen ? "Select a row from that list." : SeveralOffers;
         // A click that met no candidate, and one that met only the slot's current binding, which cannot be picked.
         public const string NoOffer = "No candidate at this point. Nothing available for this selection is under the pointer.";
         const string NoOfferStart = "No candidate at this point. ";

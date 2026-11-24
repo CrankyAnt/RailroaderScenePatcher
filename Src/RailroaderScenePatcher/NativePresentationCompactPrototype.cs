@@ -24,6 +24,9 @@ namespace RailroaderScenePatcher {
         // The native outline row's height, and the rows the compact outliner shows by default: the three rows down to
         // the inspected group and half of the eighteen below them that round 8's default showed.
         internal const float PrototypeOutlinerRow = 26; internal const int PrototypeOutlinerRows = 12;
+        // The rail ends with the outliner or its summary line, whose Hide outliner button stands at the right: the rail
+        // keeps clear of the native resize grip, 22 units high, less the 10 units of padding below the last row.
+        internal const float PrototypeGripClearance = 12;
         // Where the user left the compact rail, in screen pixels, for this session only.
         Rect prototypeCompactRect, prototypePlacedRect;
         float prototypeExpandedHeight, prototypeCollapsedHeight;

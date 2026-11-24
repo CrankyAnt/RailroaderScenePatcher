@@ -34,9 +34,9 @@ namespace RailroaderScenePatcher {
             var session = attachment.Session;
             var result = useFile ? session.UseFileVersion() : session.KeepEditorVersion();
             feedback.ObserveFileVersion(session, RecoveryPlace);
-            if (!result.Applied) { attachment.Fault = result.Error; feedback.Refuse(RecoveryPlace, useFile ? "Use file version" : "Keep editor version", result.Error); }
+            if (!result.Applied) { attachment.Fault.Refuse(result.Error); feedback.Refuse(RecoveryPlace, useFile ? "Use file version" : "Keep editor version", result.Error); }
             else {
-                attachment.Fault = null;
+                attachment.Fault.Clear();
                 if (useFile) { ReplaceScenePatchFileDiagnostics(session.LastVersionApplication); Inspect(); }
                 // The fields show the object as it now stands: a draft or a value from before the choice never stays
                 // behind to be applied.

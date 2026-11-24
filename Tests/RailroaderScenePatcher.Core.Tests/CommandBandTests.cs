@@ -18,9 +18,11 @@ static class CommandBandTests {
         TheWindowOpensBelowTheMapEditorOrAtTheTopRight();
         OwnSaveKeepsTheDefinitionsCurrent();
         ADisabledControlKeepsItsDescription();
+        HierarchyLinesHaveAShortForm();
         ChoiceLabelsLeadWithWhatTellsThemApart();
         AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing();
         AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates();
+        AddedEquipmentIsNamedFromItsStoredSource();
         EquipmentCopyNumbersSurviveNarrowLabels();
         EquipmentDisplayHidesInternalIdentities();
         WorldChoicesKeepAddedOrdinals();
@@ -31,6 +33,7 @@ static class CommandBandTests {
         SharedRulesHoldAtEveryCallSite();
         NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
         ReasonsReadAsOnePlainSentence();
+        EditingLinesEndWithAFullStop();
         GroupVerdictsSayNotYetOnlyWithATicket();
         ARefusedAdditionTakesItsCorrectionFromUse();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
@@ -87,36 +90,48 @@ static class CommandBandTests {
         Check(!CommandBand.ClearsConnectionsPreviewOnQueue(CommandBand.GizmoPlace), "Queuing gizmo setup must preserve a prepared Connections preview");
         Check(CommandBand.ClearsConnectionsPreviewOnQueue("Placement"), "Queuing a placement edit invalidates a prepared Connections preview");
     }
+    // The name comes from the source the addition was built from, stored with it, so it reads the same whether or not its copy
+    // object still exists; the inventory passes every live addition of the crossing, with or without its copy, as a sibling.
     static void AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing() {
-        var first = (Scope: "alpha", Id: "signal-1", CopyName: "Signal 1", IsBell: false);
-        var second = (Scope: "alpha", Id: "signal-2", CopyName: "Signal 1", IsBell: false);
-        var third = (Scope: "beta", Id: "signal-1", CopyName: "Signal 1", IsBell: false);
-        var gate = (Scope: "alpha", Id: "gate", CopyName: "Gate 1", IsBell: false);
-        var missing = (Scope: "alpha", Id: "missing", CopyName: (string)null, IsBell: false);
-        var crossing = new[] { third, gate, second, missing, first };
+        var first = (Scope: "alpha", Id: "signal-1", Name: "Signal 1", IsBell: false);
+        var second = (Scope: "alpha", Id: "signal-2", Name: "Signal 1", IsBell: false);
+        var third = (Scope: "beta", Id: "signal-1", Name: "Signal 1", IsBell: false);
+        var gate = (Scope: "alpha", Id: "gate", Name: "Gate 1", IsBell: false);
+        var crossing = new[] { third, gate, second, first };
         foreach (var reopened in new[] { crossing, crossing.Reverse().ToArray() }) {
             Check(InventoryPresentationState.AddedEquipmentName(first, reopened) == "Signal 1 (added, 1 of 3)", "The first copy keeps its ordinal when the list reopens");
             Check(InventoryPresentationState.AddedEquipmentName(second, reopened) == "Signal 1 (added, 2 of 3)", "Two copies from the same mod are distinguishable by their names");
             Check(InventoryPresentationState.AddedEquipmentName(third, reopened) == "Signal 1 (added, 3 of 3)", "A copy from another mod at the same crossing is also numbered");
             Check(InventoryPresentationState.AddedEquipmentName(gate, reopened) == "Gate 1 (added)", "A unique device name has no ordinal");
-            Check(InventoryPresentationState.AddedEquipmentName(missing, reopened) == "Added light or gate", "A missing copy keeps the fallback name");
         }
         Check(InventoryPresentationState.AddedEquipmentName(first, new[] { first }) == "Signal 1 (added)", "The same device name at a different crossing has its own count");
         Check(InventoryPresentationState.AddedEquipmentName(second, new[] { second, first }) == "Signal 1 (added, 2 of 2)", "Removing a copy updates the remaining ordinals");
     }
     static void AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates() {
-        var firstBell = (Scope: "alpha", Id: "bell", CopyName: "Signal 1", IsBell: true);
-        var secondBell = (Scope: "beta", Id: "bell", CopyName: "Signal 1", IsBell: true);
-        var missingBell = (Scope: "alpha", Id: "missing-bell", CopyName: (string)null, IsBell: true);
-        var light = (Scope: "alpha", Id: "light", CopyName: "Signal 1", IsBell: false);
-        var gate = (Scope: "beta", Id: "gate", CopyName: "Signal 1", IsBell: false);
-        var crossing = new[] { gate, secondBell, light, firstBell, missingBell };
+        var firstBell = (Scope: "alpha", Id: "bell", Name: "Signal 1", IsBell: true);
+        var secondBell = (Scope: "beta", Id: "bell", Name: "Signal 1", IsBell: true);
+        var light = (Scope: "alpha", Id: "light", Name: "Signal 1", IsBell: false);
+        var gate = (Scope: "beta", Id: "gate", Name: "Signal 1", IsBell: false);
+        var crossing = new[] { gate, secondBell, light, firstBell };
         Check(InventoryPresentationState.AddedEquipmentName(firstBell, crossing) == "Signal 1 (added, 1 of 2)", "The first bell counts only the matching bells");
         Check(InventoryPresentationState.AddedEquipmentName(secondBell, crossing) == "Signal 1 (added, 2 of 2)", "The second bell keeps its ordinal among matching bells");
         Check(InventoryPresentationState.AddedEquipmentName(light, crossing) == "Signal 1 (added, 1 of 2)", "The light counts the matching gate");
         Check(InventoryPresentationState.AddedEquipmentName(gate, crossing) == "Signal 1 (added, 2 of 2)", "The gate counts the matching light");
-        Check(InventoryPresentationState.AddedEquipmentName(missingBell, crossing) == "Added bell", "A missing bell keeps the bell fallback name");
         Check(InventoryPresentationState.AddedEquipmentName(firstBell, new[] { light, gate, firstBell }) == "Signal 1 (added)", "A single bell with this name has no ordinal");
+    }
+    // A light or gate is named after the source device, a bell after its definition's name; the stored kind, not the shape
+    // of the source, separates a bell from a light or gate.
+    static void AddedEquipmentIsNamedFromItsStoredSource() {
+        var light = (Scope: "alpha", Id: "west", Name: new EquipmentSource("scene", "World/Crossings/Signal 1").StoredName(), IsBell: false);
+        var bell = (Scope: "alpha", Id: "ring", Name: EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName("US&S Teardrop Crossing Bell"), IsBell: true);
+        var unnamedBell = (Scope: "alpha", Id: "ring-2", Name: EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName(" "), IsBell: true);
+        var crossing = new[] { light, bell, unnamedBell };
+        Check(InventoryPresentationState.AddedEquipmentName(light, crossing) == "Signal 1 (added)", "A light or gate is named after its source device");
+        Check(InventoryPresentationState.AddedEquipmentName(bell, crossing) == "US&S Teardrop Crossing Bell (added)", "A bell is named after its definition's name");
+        Check(InventoryPresentationState.AddedEquipmentName(unnamedBell, crossing) == "bell-uss-teardrop (added)", "A bell definition without a name is named after its identifier, as its player is");
+        var asLight = (Scope: "alpha", Id: "x", Name: "Signal 1", IsBell: false);
+        var asBell = (Scope: "alpha", Id: "y", Name: "Signal 1", IsBell: true);
+        Check(InventoryPresentationState.AddedEquipmentName(asLight, new[] { asLight, asBell }) == "Signal 1 (added)", "The stored kind keeps a bell out of a light or gate's count");
     }
     static void EquipmentCopyNumbersSurviveNarrowLabels() {
         const string name = "US&S Teardrop Crossing Bell (added, 2 of 2)";
@@ -145,8 +160,20 @@ static class CommandBandTests {
         var unbuiltName = InventoryPresentationState.UnbuiltEquipmentName(addition, new[] { source });
         Check(InventoryPresentationState.NarrowName(CommandBand.AddedEquipmentFamily, unbuiltName, 27, value => ("Edit " + value).Length)
             == "signal-1-added: Signa…", "A narrow Edit button can shorten an unbuilt name without losing its Equipment ID");
-        Check(InventoryPresentationState.EquipmentSourceName(EquipmentSource.ForDefinition("rr/missing-bell"), Array.Empty<SourceCandidate>()) == "Bell",
-            "An unavailable definition falls back to the equipment kind without showing its identifier");
+        Check(InventoryPresentationState.EquipmentSourceName(EquipmentSource.ForDefinition("rr/missing-bell"), Array.Empty<SourceCandidate>()) == "missing-bell",
+            "An unavailable bell definition is named after the last part of its identifier, not its kind");
+        var unloaded = new EquipmentAddition("west", EquipmentAddition.LightGatePattern, new EquipmentSource("scene", "World/Crossings/Gone/Signal 3"), null);
+        Check(InventoryPresentationState.UnbuiltEquipmentName(unloaded, Array.Empty<SourceCandidate>()) == "west: Signal 3",
+            "An unbuilt light or gate whose source is not loaded is named after the last element of its source path");
+        var unavailableBell = new EquipmentAddition("ring", EquipmentAddition.BellPattern, EquipmentSource.ForDefinition("rr/bell-uss-teardrop"), null);
+        Check(InventoryPresentationState.UnbuiltEquipmentName(unavailableBell, null) == "ring: bell-uss-teardrop",
+            "An unbuilt bell whose definition is unavailable is named after its identifier's last part");
+        Check(InventoryPresentationState.UnbuiltEquipmentName(unavailableBell, new[] { SourceCandidate.Bell("rr/bell-uss-teardrop", "US&S Teardrop Crossing Bell", "refused") }) == "ring: US&S Teardrop Crossing Bell",
+            "An unbuilt bell whose definition is available uses its metadata name");
+        Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.Bell("rr/bell-plain", null, null)) == "bell-plain",
+            "A bell definition without a name is offered under its identifier's last part");
+        Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.UnavailableBells(EquipmentAddition.BellsUnavailable)) == "Bell",
+            "The rejected row that stands for unavailable bell definitions is not an addition and keeps the name Bell");
         var identity = new TargetIdentity("scene", "World/Crossings/CrankyAnt Scene Patcher equipment author:pack signal-1-added", "OwnedEquipment");
         var added = new SceneObservation(new object(), identity, CommandBand.AddedEquipmentFamily, true, Array.Empty<double>(), Array.Empty<double>(),
             Array.Empty<string>(), Array.Empty<string>(), new[] { "Missing object at " + identity.Path }, null, displayName: "Signal 1 (added, 1 of 2)");
@@ -188,6 +215,17 @@ static class CommandBandTests {
     }
     // A tooltip of a control that cannot be used carries one label, Unavailable:, and the reason after it as one plain
     // sentence: a reason's own label, such as Not editable: or Track binding unavailable:, is not repeated after it.
+    // The footer's amber Editing line ends each edit block with a full stop, as its tooltip does, and keeps the text as it
+    // stands: a block that already ends a sentence keeps its ending, and a label is not stripped.
+    static void EditingLinesEndWithAFullStop() {
+        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications) == PatchEditingSession.SeveralModifications + ".",
+            "The several-modifications block ends with a full stop: " + CommandBand.EditingLine(PatchEditingSession.SeveralModifications));
+        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications).EndsWith(CommandBand.Tooltip("x", PatchEditingSession.SeveralModifications).Substring("Unavailable: ".Length), StringComparison.Ordinal),
+            "The footer line ends as the tooltip does");
+        Check(CommandBand.EditingLine("Confirm or cancel the world selection to edit.") == "Confirm or cancel the world selection to edit.", "A block that ends a sentence keeps one full stop");
+        Check(CommandBand.EditingLine("Ready?") == "Ready?" && CommandBand.EditingLine(" Stop! ") == "Stop!", "A question or exclamation keeps its mark");
+        Check(CommandBand.EditingLine(CommandBand.NotEditable("this object")) == CommandBand.NotEditable("this object").TrimEnd('.') + ".", "A labelled block keeps its label: " + CommandBand.EditingLine(CommandBand.NotEditable("this object")));
+    }
     static void ReasonsReadAsOnePlainSentence() {
         Check(CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }) == null && CommandBand.WreckAction(true) == "Start derailed: Yes" && CommandBand.WreckAction(false) == "Start derailed: No", "The Wreck checkbox is usable for one reader and names its edit by the new state");
         // The Inspection only line of a tooltip or state line carries one label, with the reason as one plain sentence.
@@ -267,7 +305,7 @@ static class CommandBandTests {
             ("Blocked", "The scene patch file needs repair. Resolve the issue before saving."), "The Blocked tooltip body gives repair guidance.");
         Check(CommandBand.LampTooltip(CommandBand.Save(false, false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.Changed, false)) ==
             ("Blocked", "The scene patch file changed outside scene patch editing. Choose a file version before saving."), "The Blocked tooltip body retains the reason and action for a file version choice.");
-        Check(CommandBand.SaveRefusalAlert(false, "Save requires a choice", true).Value.Message.EndsWith("Open Scene patches to choose which version to keep.", StringComparison.Ordinal), "The closed-window alert tells the player where to make a file version choice.");
+        Check(CommandBand.SaveRefusalAlert(false, "Save requires a choice", true).Value.Message.EndsWith("Open Scene Patcher to choose which version to keep.", StringComparison.Ordinal), "The closed-window alert tells the player where to make a file version choice.");
         Check(CommandBand.InventoryWord >= 60 && CommandBand.SaveWord >= CommandBand.InventoryWord, "The reserved widths hold the longer word of each lamp");
     }
     static void CommandsAreDisabledOnlyForTheirOwnReason() {
@@ -447,8 +485,6 @@ static class CommandBandTests {
         var tabs = new[] { "object", "placement", "connections", "changes" };
         Check(CommandBand.ClosesHelp("object", "placement", tabs) && !CommandBand.ClosesHelp("placement", "placement", tabs), "A tab's help closes on a switch to another tab");
         Check(!CommandBand.ClosesHelp("outliner", "placement", tabs) && !CommandBand.ClosesHelp("main", "changes", tabs) && !CommandBand.ClosesHelp(null, "object", tabs), "The outliner's and the window's help stay through a tab switch");
-        // The footer's row clears the resize grip: the grip is 22 high and 10 units of padding lie below the row.
-        Check(CommandBand.GripClearance(22, 10) == 12 && CommandBand.GripClearance(10, 22) == 0, "The row stands as much higher as the grip reaches into it");
         // A component the game adds while it runs is no dependency.
         Check(HierarchyDependencies.IsRuntimeComponent("Helpers.Animation.PlayableGraphAnimatorAdapter") && !HierarchyDependencies.IsRuntimeComponent("RollingStock.Controls.KeyValueBoolAnimator")
             && !HierarchyDependencies.IsRuntimeComponent("UnityEngine.Animator") && !HierarchyDependencies.IsRuntimeComponent(null), "The playable-graph adapter an animator adds while running is runtime state; the animator itself is authored");
@@ -598,6 +634,47 @@ static class CommandBandTests {
                 && CommandBand.ChoiceLine((string)row[0], (int)row[1], (int)row[2], "Track segment Se6a", Array.Empty<string>()) == (string)row[3] + ": Track segment Se6a.",
                 "A candidate keeps its number and ends its label before the confirmation instruction: " + row[3]);
         Check(new[] { CommandBand.ClearActivity, CommandBand.DiscardPrepared, CommandBand.RemoveModification }.Distinct().Count() == 3, "The three controls that take something back have three names");
+    }
+    // The Object tab's Dependencies and Runtime state show a short form by default: paths relative to the inspected
+    // object, one line per object of its hierarchy with its components after it, the inspected object first. Lines that
+    // name no object of the hierarchy stay as they are, before the objects. The long form is the lines themselves.
+    static void HierarchyLinesHaveAShortForm() {
+        const string Scene = "BushnellWhittier", Path = "World/Roads/Crossing";
+        var dependencies = new[] {
+            "Duplicate marker ID Mg6m is held by 2 scene markers.",
+            "Component BushnellWhittier/World/Roads/Crossing [Track.CrossingController]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate [Track.CrossingGate]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate [UnityEngine.MeshRenderer]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate/Arm [UnityEngine.MeshFilter]; enabled=False",
+            "Component BushnellWhittier/World/Roads/Crossing (1)/Gate [Track.CrossingGate]",
+            "Referenced by BushnellWhittier/World/Roads/Crossing/Gate [Track.CrossingGate].controller",
+            "Track-relative placement and track-group subscription."
+        };
+        var shortForm = HierarchyDependencies.ShortForm(Scene, Path, dependencies);
+        var expected = new[] {
+            "Duplicate marker ID Mg6m is held by 2 scene markers.",
+            "Component BushnellWhittier/World/Roads/Crossing (1)/Gate [Track.CrossingGate]",
+            "Referenced by Gate [Track.CrossingGate].controller",
+            "Track-relative placement and track-group subscription.",
+            "This object: CrossingController",
+            "Gate: CrossingGate, MeshRenderer",
+            "Gate/Arm: MeshFilter disabled"
+        };
+        Check(shortForm.SequenceEqual(expected), "The short form groups the hierarchy's components per object: " + String.Join(" | ", shortForm));
+        var runtime = new[] {
+            "BushnellWhittier/World/Roads/Crossing/Bell [UnityEngine.AudioSource] enabled=True",
+            "BushnellWhittier/World/Roads/Crossing/Bell [CrossingBell] enabled=False",
+            "Runtime object BushnellWhittier/World/Roads/Crossing/Bell/Pool [UnityEngine.AudioSource]",
+            "Culled by SimpleCuller: World/Roads/Crossing/Lamp active=True"
+        };
+        var shortRuntime = HierarchyDependencies.ShortForm(Scene, Path, runtime);
+        var expectedRuntime = new[] {
+            "Culled by SimpleCuller: World/Roads/Crossing/Lamp active=True",
+            "Bell: AudioSource enabled, CrossingBell disabled",
+            "Bell/Pool: AudioSource (runtime object)"
+        };
+        Check(shortRuntime.SequenceEqual(expectedRuntime), "The short form of the runtime state: " + String.Join(" | ", shortRuntime));
+        Check(HierarchyDependencies.ShortForm(Scene, Path, new string[0]).Count == 0 && HierarchyDependencies.ShortForm(null, null, new[] { "x" }).SequenceEqual(new[] { "x" }), "No lines stay none, and without a path the lines stay as they are");
     }
     // The labels of overlapping candidates differ at their end, which is the object's own name: the short label leads
     // with it, and a cut falls on the family.

@@ -60,7 +60,7 @@ namespace RailroaderScenePatcher {
             else PrototypeContextBlock(builder, view);
             PrototypeFooter(builder, view);
             PrototypeOutlinerSection(builder);
-            builder.Spacer(CommandBand.GripClearance(GripHeight, RowPadding));
+            builder.Spacer(NativePresentation.PrototypeGripClearance);
         }
 
         // The left band at the rail's width. The full window's width stays as it was for its next build.
@@ -389,7 +389,7 @@ namespace RailroaderScenePatcher {
             var pending = selection?.Pending;
             var view = PrototypeCurrentView();
             var contextName = guided.Enabled ? view.Title + " (" + (guided.Kind == null ? "Target" : GuidedName(guided.Kind.Value) + "/" + guided.Step) + ")" : view.Title;
-            context?.Log.Info("Compact prototype: " + state + "; tab=" + contextName +
+            PatcherLog.Debug("Compact prototype: " + state + "; tab=" + contextName +
                 "; inspected=" + (selected == null ? "none" : selected.DisplayName + " (" + selected.Identity.Path + ")") +
                 "; pending world choice=" + (pending == null ? "no" : "yes (" + pending.Kind + ", candidate " + (selection.Find(pending.Candidate) == null ? "none" : "clicked") + ")"));
         }

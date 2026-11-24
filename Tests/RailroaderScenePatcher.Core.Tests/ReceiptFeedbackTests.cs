@@ -142,7 +142,7 @@ static class ReloadRequestTests {
         try {
             var id = owner.Capture("map", 1, new[] { 1.0, 2.0, 3.0 }, now);
             string reason = null;
-            if (owner.CanReload(now, text => reason = text) || reason == null || !reason.Contains("completes or expires"))
+            if (owner.CanReload(now, text => reason = text) || reason == null || !reason.Contains("Wait for the return to finish or time out before reloading again."))
                 throw new Exception("A blocked reload explains the pending working-location return");
             if (!owner.CanReload(now.AddMinutes(6), _ => throw new Exception("Expired return still blocks reload")))
                 throw new Exception("Reload becomes available after the return expires");

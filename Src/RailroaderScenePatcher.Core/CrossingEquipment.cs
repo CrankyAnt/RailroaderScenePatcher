@@ -27,6 +27,12 @@ namespace RailroaderScenePatcher.Core {
         public bool IsDefinition => Definition != null;
         internal static bool Same(EquipmentSource a, EquipmentSource b) => a == null ? b == null : b != null && a.Scene == b.Scene && a.Path == b.Path && a.Definition == b.Definition;
         public override string ToString() => IsDefinition ? "definition " + Definition : Scene + "/" + Path;
+        // The name an addition keeps from this source: for a loaded device the last element of its path, which is the device's
+        // name; for a bell definition its definition name, or the last part of its identifier without one.
+        public string StoredName(string definitionName = null) {
+            if (!IsDefinition) return Path.Substring(Path.LastIndexOf('/') + 1);
+            return String.IsNullOrWhiteSpace(definitionName) ? Definition.Substring(Definition.LastIndexOf('/') + 1) : definitionName;
+        }
     }
     // One piece of crossing equipment a mod adds to an existing crossing controller: a copy of an eligible source built
     // with the required pattern and addressed by that controller. Its ID is persistent and unique within the supplying
@@ -37,12 +43,17 @@ namespace RailroaderScenePatcher.Core {
         // The audio priority of an added bell's player: the native crossing bell's own, so the game sorts both alike.
         // Railroader 0.6.3, Track.Crossings.GradeCrossingController.CreateBellPlayer.
         public const int BellPriority = 9;
+        // The reason a bell source is refused when this game version cannot provide crossing bells. Unlike the
+        // other source refusals, it is no problem of the mod author's scene patch file.
+        public const string BellsUnavailable = "crossing bells are unavailable in this version of the game";
+        public const string BellDefinitionsUnreadable = "the patcher couldn't read the bell definitions from the game's content library, so it can't list bells. Report this to the patcher maintainer and include the Player log";
+        internal const string EmptyEquipmentObject = "An added light, gate, or bell left an empty object at this crossing";
         // Why the source kind does not fit the pattern, or null: a light or gate copies a loaded device, and a bell loads the
         // audio of a bell definition.
         public static string SourceKindProblem(string pattern, EquipmentSource source) {
             if (source == null) return "it needs a source";
-            if (pattern == BellPattern && !source.IsDefinition) return "pattern " + BellPattern + " requires a bell definition as its source; a loaded device cannot be used";
-            if (pattern == LightGatePattern && source.IsDefinition) return "pattern " + LightGatePattern + " requires a loaded device as its source; a definition cannot be used";
+            if (pattern == BellPattern && !source.IsDefinition) return "a bell needs a bell definition as its source, not a light or gate in the map";
+            if (pattern == LightGatePattern && source.IsDefinition) return "a light or gate needs a light or gate in the map as its source, not a bell definition";
             return null;
         }
         public EquipmentAddition(string id, string pattern, EquipmentSource source, Placement placement) : this(id, pattern, source, placement, "") { }
@@ -100,8 +111,11 @@ namespace RailroaderScenePatcher.Core {
         }
         public IReadOnlyList<EquipmentAddition> Additions => additions;
         public bool Complete { get; }
+        // The mod whose scene patch file a complete set states, or null. Only its own additions that are not built leave with
+        // the set: another mod's addition without its copy is that mod's to build or remove.
+        internal string Owner { get; private set; }
         internal CrossingEquipment In(string scope) => new CrossingEquipment(additions.Select(a => a.In(scope)), Complete);
-        internal CrossingEquipment Without(string scope) => new CrossingEquipment(additions.Where(a => a.Scope != scope), Complete);
+        internal CrossingEquipment Without(string scope) => new CrossingEquipment(additions.Where(a => a.Scope != scope), Complete) { Owner = scope };
         internal EquipmentAddition Find(string key) => additions.FirstOrDefault(a => a.Key == key);
         // The mod's equipment additions laid over a base set: each mod addition replaces its namesake or is added.
         internal static CrossingEquipment Overlay(CrossingEquipment basis, CrossingEquipment modEquipment) {
@@ -109,7 +123,7 @@ namespace RailroaderScenePatcher.Core {
             if (basis == null) return modEquipment;
             var result = basis.additions.Select(a => modEquipment.Find(a.Key) ?? a).ToList();
             result.AddRange(modEquipment.additions.Where(a => basis.Find(a.Key) == null));
-            return new CrossingEquipment(result, basis.Complete);
+            return new CrossingEquipment(result, basis.Complete) { Owner = basis.Owner };
         }
         internal static bool Same(CrossingEquipment a, CrossingEquipment b) {
             if (a == null || b == null) return a == b;
@@ -271,6 +285,9 @@ namespace RailroaderScenePatcher.Core {
         // A bell definition the content library holds, with its definition name when it has one.
         public static SourceCandidate Bell(string identifier, string name, string problem) =>
             new SourceCandidate(EquipmentSource.ForDefinition(identifier), identifier, problem, null, null, String.IsNullOrWhiteSpace(name) ? null : name, null, null, null);
+        // The one rejected row that stands for bell definitions this build cannot offer, with why. It is not an addition and has
+        // no recorded source, so it is named Bell.
+        public static SourceCandidate UnavailableBells(string problem) => Bell("bell definitions", "Bell", problem);
         // The pattern an addition from this source is built with.
         public string Pattern { get; }
         // The source's map placement, or null when it is unknown.
@@ -348,6 +365,9 @@ namespace RailroaderScenePatcher.Core {
         // Releases the addition from the controller, its culling and the scene.
         void Destroy(object addition);
         bool Present(object addition);
+        // Whether a present addition still holds the copy or player it was built with. One without it counts as not built and
+        // is rebuilt from its source, as a missing addition is built.
+        bool Built(object addition);
         Placement Placement(object addition);
         void SetPlacement(object addition, Placement placement);
         // Why a present addition is not addressed, culled and built as the pattern requires, or null.
@@ -363,41 +383,58 @@ namespace RailroaderScenePatcher.Core {
     public interface ICrossingEquipmentScene {
         IReadOnlyList<SourceCandidate> EquipmentCandidates(object target);
         string EquipmentStatus(object target, string scope, string id);
+        // Whether the desired state would remove a wrapper without its copy that the read state does not show, so a
+        // Recheck that finds both states equal still applies it.
+        bool EquipmentLeftover(object target, ObjectState desired);
     }
     // The equipment part of a crossing: converges the additions a controller owns on a complete set.
     internal sealed class CrossingEquipmentPart {
         readonly ICrossingEquipmentWorld world;
         internal CrossingEquipmentPart(ICrossingEquipmentWorld world) { this.world = world; }
-        internal CrossingEquipment Observed(object controller, List<object> owned) {
-            var present = owned.Where(world.Present).ToList();
-            return new CrossingEquipment(present.Select(a => world.Describe(a).At(world.Placement(a))), true);
-        }
+        // A wrapper whose copy or player is gone. It counts as not built, as an addition that was never built does.
+        bool Stale(object addition) => world.Present(addition) && !world.Built(addition);
+        bool StaleAt(List<object> owned, EquipmentAddition addition) => owned.Any(a => Stale(a) && EquipmentAddition.SameBuild(world.Describe(a), addition));
+        // The built additions; a wrapper without its copy is left out.
+        internal CrossingEquipment Observed(object controller, List<object> owned) =>
+            new CrossingEquipment(owned.Where(a => world.Present(a) && world.Built(a)).Select(a => world.Describe(a).At(world.Placement(a))), true);
         internal void Adopt(object controller, List<object> owned) {
             foreach (var addition in world.Owned(controller) ?? Array.Empty<object>()) if (!owned.Any(o => ReferenceEquals(o, addition))) owned.Add(addition);
         }
-        // Rechecks each addition's source: unique, loaded and conforming to its pattern for this controller.
-        internal object Source(object controller, EquipmentAddition addition) {
-            if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidOperationException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported");
+        // Rechecks each addition's source: unique, loaded and conforming to its pattern for this controller. A refusal names the
+        // source as the addition's row does and ends with what the modder can do. stale says that the addition's wrapper stands
+        // without its copy. A refusal is a problem of the mod author's scene patch file (InvalidPatchDefinitionException), so the
+        // world load's warning names the mod author; only crossing bells this game build cannot provide stay a patcher problem.
+        internal object Source(object controller, EquipmentAddition addition, bool stale = false) {
+            var name = addition.Source.StoredName();
+            if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported. Use pattern " + String.Join(" or ", EquipmentAddition.Patterns) + ". Otherwise remove the addition");
             var kind = EquipmentAddition.SourceKindProblem(addition.Pattern, addition.Source);
-            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind);
+            if (kind != null) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": " + kind + ". Change its source in your scene patch file or remove the addition");
             var matches = world.ResolveSource(addition.Source) ?? Array.Empty<object>();
-            if (matches.Count == 0) throw new InvalidOperationException(addition.Source.IsDefinition
-                ? "Equipment " + addition.Id + ": source " + addition.Source + " is not available in the content library. The patcher will not substitute another sound or load a scene to find it"
-                : "Equipment " + addition.Id + ": source " + addition.Source + " is not loaded in this map. The patcher will not substitute another source or load another scene");
-            if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + addition.Source + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " definitions share that identifier" : " loaded objects share that path"));
+            if (matches.Count == 0) {
+                var what = "Equipment " + addition.Id + ": " + (stale ? "the added equipment is missing, and " : "");
+                var rebuilt = stale ? ", so the equipment cannot be rebuilt" : "";
+                throw new InvalidPatchDefinitionException(addition.Source.IsDefinition
+                    ? what + "bell definition " + name + " is unavailable in the content library" + rebuilt + ". The patcher only uses bell definitions already available and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition"
+                    : what + "light or gate " + name + " is not in the map" + rebuilt + ". The patcher only copies lights and gates already in the map and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition");
+            }
+            if (matches.Count > 1) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " bell definitions share its identifier. Edit this addition on the crossing's Connections tab to select another bell definition" : " objects in the map share its scene and path. Edit this addition on the crossing's Connections tab to select another light or gate") + ", or remove the addition");
             var problem = world.SourceProblem(matches[0], controller, addition.Pattern);
-            if (problem != null) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + addition.Source + " does not conform to " + addition.Pattern + ": " + problem);
+            if (problem != null) {
+                var message = "Equipment " + addition.Id + ": source " + name + " does not conform to " + addition.Pattern + ": " + problem + ". Select an eligible source or remove the addition";
+                if (problem.StartsWith(EquipmentAddition.BellsUnavailable, StringComparison.Ordinal)) throw new InvalidOperationException(message);
+                throw new InvalidPatchDefinitionException(message);
+            }
             return matches[0];
         }
-        internal void Check(object controller, CrossingEquipment equipment) {
+        internal void Check(object controller, CrossingEquipment equipment, List<object> owned) {
             foreach (var addition in equipment.Additions) {
-                if (addition.Placement?.Position == null || addition.Placement.Rotation == null) throw new InvalidOperationException("Equipment " + addition.Id + " needs a fixed placement");
-                Source(controller, addition);
+                if (addition.Placement?.Position == null || addition.Placement.Rotation == null) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + " needs a fixed placement. Give it a position and rotation or remove the addition");
+                Source(controller, addition, StaleAt(owned, addition));
             }
         }
-        // Null when every present addition is built, addressed and culled as its pattern requires. With a desired set, an
-        // addition that the change removes or rebuilds is not judged, so a faulty addition, such as a bell whose audio
-        // failed to load, can still be removed or replaced.
+        // Null when every built addition is addressed and culled as its pattern requires; an addition that is not built is
+        // listed as such and not judged here. With a desired set, an addition that the change removes or rebuilds is not judged
+        // either, so a faulty addition, such as a bell whose audio failed to load, can still be removed or replaced.
         internal string Coherence(List<object> owned, CrossingEquipment desired = null) => Faulty(owned, desired, out _);
         // Why an equipment change is refused before any change, with what the modder can do, or null. A faulty bell, such as
         // one whose audio failed to load, can be removed or replaced; another fault needs a reload.
@@ -409,7 +446,7 @@ namespace RailroaderScenePatcher.Core {
         }
         string Faulty(List<object> owned, CrossingEquipment desired, out string pattern) {
             pattern = null;
-            foreach (var addition in owned.Where(world.Present)) {
+            foreach (var addition in owned.Where(a => world.Present(a) && world.Built(a))) {
                 var record = world.Describe(addition);
                 if (desired != null) { var want = desired.Find(record.Key); if (want == null || !EquipmentAddition.SameBuild(record, want)) continue; }
                 var problem = world.Problem(addition);
@@ -417,19 +454,32 @@ namespace RailroaderScenePatcher.Core {
             }
             return null;
         }
+        // Whether the set retires a wrapper without its copy: one it names is built fresh, and its own mod's complete set
+        // removes one it leaves out. Another mod's set, a restoration's included, leaves it as it is.
+        bool Clears(object addition, CrossingEquipment desired) {
+            var record = world.Describe(addition);
+            return desired.Find(record.Key) != null || (desired.Complete && desired.Owner == record.Scope);
+        }
+        internal bool Clears(List<object> owned, CrossingEquipment desired) => owned.Any(a => Stale(a) && Clears(a, desired));
         // Converges the controller's additions on the complete set: a matching addition is kept and moved when needed; one
-        // whose source or pattern changed is rebuilt; one absent from the set is removed; a missing one is built.
+        // whose source or pattern changed is rebuilt; one absent from the set is removed; a missing one is built. A wrapper
+        // without its copy counts as not built: when the set clears it, it is retired and, if named, built fresh.
         internal void Write(object controller, List<object> owned, CrossingEquipment desired) {
             var kept = new HashSet<string>(StringComparer.Ordinal);
+            var stale = new HashSet<string>(StringComparer.Ordinal);
             foreach (var addition in owned.Where(world.Present).ToList()) {
                 var record = world.Describe(addition);
+                if (!world.Built(addition)) {
+                    if (Clears(addition, desired)) { stale.Add(record.Key); Retire(owned, addition); }
+                    continue;
+                }
                 var want = desired.Find(record.Key);
                 if (want == null || kept.Contains(record.Key) || !EquipmentAddition.SameBuild(record, want)) { Retire(owned, addition); continue; }
                 if (!EquipmentAddition.SamePlacement(world.Placement(addition), want.Placement)) world.SetPlacement(addition, want.Placement);
                 kept.Add(record.Key);
             }
             foreach (var want in desired.Additions.Where(a => !kept.Contains(a.Key))) {
-                var source = Source(controller, want);
+                var source = Source(controller, want, stale.Contains(want.Key));
                 var built = world.Construct(controller, source, want) ?? throw new InvalidOperationException("Equipment " + want.Id + " was not constructed");
                 owned.Add(built);
                 var problem = world.Problem(built);
@@ -450,36 +500,42 @@ namespace RailroaderScenePatcher.Core {
             if (!world.Present(addition)) owned.Remove(addition);
         }
         internal string Verify(object controller, List<object> owned, CrossingEquipment desired) {
+            // A stale wrapper the set cleared and that still stands is owned state the change did not remove.
+            var left = owned.FirstOrDefault(a => Stale(a) && Clears(a, desired));
             var observed = Observed(controller, owned);
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);
-                if (now == null) { Diagnose(controller, want, null, "missing"); return "equipment " + want.Id + " is missing"; }
-                if (!EquipmentAddition.Same(now, want)) { Diagnose(controller, want, now, "mismatch"); return "equipment " + want.Id + " differs from the mod's source or placement"; }
+                if (now == null) { Diagnose(controller, want, null, "Requested equipment is missing"); return "equipment " + want.Id + " is missing"; }
+                if (!EquipmentAddition.Same(now, want)) { Diagnose(controller, want, now, "Equipment differs from the requested equipment"); return "equipment " + want.Id + " differs from the mod's source or placement"; }
             }
             var extra = observed.Additions.FirstOrDefault(a => desired.Find(a.Key) == null);
-            if (extra != null) { Diagnose(controller, null, extra, "extra"); return "equipment " + extra.Id + " remains although it was removed"; }
+            if (extra != null) { Diagnose(controller, null, extra, "Equipment remains although it was removed"); return "equipment " + extra.Id + " remains although it was removed"; }
             var problem = Coherence(owned);
-            if (problem != null) Diagnose(controller, null, null, "coherence: " + problem);
-            return problem;
+            if (problem != null) { Diagnose(controller, null, null, "Equipment problem: " + problem); return problem; }
+            // Report a lone empty wrapper only after the remaining additions have passed their checks.
+            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "An empty equipment object remains"); throw new EmptyEquipmentObjectException(); }
+            return null;
         }
         static string Quoted(string value) => value == null ? "null" : "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n") + "\"";
         static string Values(IReadOnlyList<double> values) => values == null ? "null" : "[" + String.Join(",", values.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "]";
-        static string Detail(EquipmentAddition a) => a == null ? "null" : "{scope=" + Quoted(a.Scope) + ",id=" + Quoted(a.Id) + ",pattern=" + Quoted(a.Pattern)
-            + ",sourceScene=" + Quoted(a.Source.Scene) + ",sourcePath=" + Quoted(a.Source.Path) + ",position=" + Values(a.Placement?.Position) + ",rotation=" + Values(a.Placement?.Rotation) + "}";
+        static string Detail(EquipmentAddition a) => a == null ? "none" : "{mod=" + Quoted(a.Scope) + ", ID=" + Quoted(a.Id) + ", pattern=" + Quoted(a.Pattern)
+            + ", source scene=" + Quoted(a.Source.Scene) + ", source path=" + Quoted(a.Source.Path) + ", position=" + Values(a.Placement?.Position) + ", rotation=" + Values(a.Placement?.Rotation) + "}";
         void Diagnose(object controller, EquipmentAddition want, EquipmentAddition now, string reason) {
             if (!(world is ICrossingEquipmentVerificationDiagnostics sink)) return;
             try {
                 var comparable = want != null && now != null;
-                var comparison = comparable ? " identity=" + EquipmentAddition.SameBuild(now, want).ToString().ToLowerInvariant()
-                    + " source=" + EquipmentSource.Same(now.Source, want.Source).ToString().ToLowerInvariant()
-                    + " position=" + EquipmentAddition.SamePosition(now.Placement?.Position, want.Placement?.Position).ToString().ToLowerInvariant()
-                    + " rotation=" + PatchEditingSession.SameRotation(now.Placement?.Rotation, want.Placement?.Rotation).ToString().ToLowerInvariant() : "";
-                sink.VerificationFailed(controller, "reason=" + Quoted(reason) + comparison + " positionTolerance=0.0005-per-axis-or-equal-float32 rotationTolerance=normalized-absolute-dot>=0.99999999 desired=" + Detail(want) + " observed=" + Detail(now));
+                var comparison = comparable ? " Mod, equipment ID, pattern, and source match: " + EquipmentAddition.SameBuild(now, want).ToString().ToLowerInvariant()
+                    + "; source matches: " + EquipmentSource.Same(now.Source, want.Source).ToString().ToLowerInvariant()
+                    + "; position matches: " + EquipmentAddition.SamePosition(now.Placement?.Position, want.Placement?.Position).ToString().ToLowerInvariant()
+                    + "; rotation matches: " + PatchEditingSession.SameRotation(now.Placement?.Rotation, want.Placement?.Rotation).ToString().ToLowerInvariant() + "." : "";
+                sink.VerificationFailed(controller, reason + "." + comparison + " Positions match when each coordinate has a finite 32-bit floating-point value and either differs by at most 0.0005 or has the same stored 32-bit value. Rotations match when the absolute dot product of the normalized rotations is at least 0.99999999. Requested: " + Detail(want) + ". Found: " + Detail(now) + ".");
             } catch { /* Diagnostics must not change verification or restoration. */ }
         }
         internal IReadOnlyList<SourceCandidate> Candidates(object controller) => world.Candidates(controller) ?? Array.Empty<SourceCandidate>();
         internal string Status(List<object> owned, string scope, string id) {
-            var addition = owned.Where(world.Present).FirstOrDefault(a => { var r = world.Describe(a); return r.Scope == scope && r.Id == id; });
+            // The built addition of the ID, before a stale wrapper of the same ID that a failed cleanup left.
+            var addition = owned.Where(world.Present).Where(a => { var r = world.Describe(a); return r.Scope == scope && r.Id == id; })
+                .OrderBy(a => world.Built(a) ? 0 : 1).FirstOrDefault();
             return addition == null ? null : world.Status(addition);
         }
     }

@@ -63,14 +63,14 @@ static class MultipleModTests {
         new PatchRuntime(new PatchEngine(editorStart), editorMessages, "0.6.0", "game").ApplyLoaded(mods, null);
         Check(SceneTargetMapCheck.EditorDefaultMap == "rr/editor-default-map" && editorMessages.Rows.Count == 0, "The editor default map's load gives no map-applicability warning: " + String.Join(" | ", editorMessages.Rows.Select(r => r.Message)));
         // One log line per scene patch file per load attempt names the mod, the scene patch file's map and the outcome.
-        var start = "Scene Patcher 0.6.0: load attempt 2, map " + maps[0] + " (layers " + String.Join(", ", maps.Skip(1)) + "): ";
-        var lines = scenePatchFiles.ToDictionary(d => d.Mod.Source.Identifier, d => d.LogLine("0.6.0", 2, maps));
+        var start = "load attempt 2, map " + maps[0] + " (layers " + String.Join(", ", maps.Skip(1)) + "): ";
+        var lines = scenePatchFiles.ToDictionary(d => d.Mod.Source.Identifier, d => d.DebugLine(2, maps));
         Check(lines["a/declared"] == start + "Declared [a/declared] scene patch file for " + maps[0] + ": 1 of 1 modifications applied, 0 failed, 0 unchanged", "An applied scene patch file is logged with its counts: " + lines["a/declared"]);
         Check(lines["d/layer"] == start + "Layer [d/layer] scene patch file for layer: 1 of 1 modifications applied, 0 failed, 0 unchanged", "A scene patch file for a map layer is logged as applied: " + lines["d/layer"]);
         Check(lines["c/other-map"] == start + "Other map [c/other-map] scene patch file for elsewhere skipped: not the loaded map or one of its layers", "A scene patch file for another map is logged as skipped: " + lines["c/other-map"]);
         Check(lines["b/undeclared"] == start + "Undeclared [b/undeclared] scene patch file for " + maps[0] + " skipped: The mod does not declare a dependency on crankyant/scene-patcher", "A mod without the dependency is logged as skipped with its reason: " + lines["b/undeclared"]);
-        var again = runtime.ApplyLoaded(mods.Take(1), null).Single().LogLine("0.6.0", 3, new[] { maps[0] });
-        Check(again.StartsWith("Scene Patcher 0.6.0: load attempt 3, map " + maps[0] + " (layers none): Declared [a/declared] scene patch file for " + maps[0] + ": ", StringComparison.Ordinal), "A later attempt is logged with its number, and a map without layers says so: " + again);
+        var again = runtime.ApplyLoaded(mods.Take(1), null).Single().DebugLine(3, new[] { maps[0] });
+        Check(again.StartsWith("load attempt 3, map " + maps[0] + " (layers none): Declared [a/declared] scene patch file for " + maps[0] + ": ", StringComparison.Ordinal), "A later attempt is logged with its number, and a map without layers says so: " + again);
         var editTarget = LoadedMod.Read("e/edited", Info("Edited"), Doc(Move("m", "undeclared", 7)), editTarget: true);
         runtime.ApplyLoaded(new[] { editTarget }, null);
         Check(undeclared.X == 7, "The native map editor's active scene patch file applies before Save has declared the dependency");

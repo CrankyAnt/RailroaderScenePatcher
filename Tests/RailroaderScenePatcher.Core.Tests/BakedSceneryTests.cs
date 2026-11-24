@@ -100,7 +100,7 @@ class FakeGroup {
     // A construction controller switches the root itself, or the game switch Switch names does.
     public bool Constructed;
     public GameSwitch Switch = GameSwitch.Construction;
-    // A rail bridge construction: it and its parts take no track-following placement, and its separate track-owned
+    // A rail bridge and its parts take no track-following placement, and its separate track-owned
     // scenery is described by Scenery.
     public bool RailBridge;
     public string Scenery;
@@ -189,7 +189,7 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
     public Dictionary<string, GroupRootVerdict> GroupVerdicts;
     GroupRootVerdict GroupVerdict(string path) => GroupVerdicts != null && path != null && GroupVerdicts.TryGetValue(path, out var verdict) ? verdict : null;
     string PathOf(object handle) => Objects.FirstOrDefault(pair => pair.Value.Contains(handle)).Key;
-    // The listed crossbucks at a hierarchy path, each with the marker id of its crossing's pad, as GroupWorld.CrossbucksAt
+    // The listed crossbucks at a hierarchy path, each with the marker ID of its crossing's pad, as GroupWorld.CrossbucksAt
     // reads them.
     public Dictionary<string, List<KeyValuePair<object, string>>> CrossbuckIds = new Dictionary<string, List<KeyValuePair<object, string>>>();
     public IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path) =>
@@ -198,7 +198,7 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
         if (GroupVerdicts != null && !BakedSceneryRules.ResolvesGroup(GroupVerdict(path), path)) return new List<object>();
         return Objects.TryGetValue(path, out var found) ? found : new List<object>();
     }
-    public string Refusal(object group) => (GroupVerdicts == null ? null : BakedSceneryRules.GroupRefusal(GroupVerdict(PathOf(group)), PathOf(group))) ?? Refused;
+    public string Refusal(object group) => (GroupVerdicts == null || GroupVerdict(PathOf(group)) != null ? null : BakedSceneryRules.GroupRefusal(PathOf(group))) ?? Refused;
     static double[] Add(double[] a, double[] b) => a.Zip(b, (x, y) => x + y).ToArray();
     static double[] Sub(double[] a, double[] b) => a.Zip(b, (x, y) => x - y).ToArray();
     double[] Map(double[] scene) => new[] { scene[0] + Origin, scene[1], scene[2] };
@@ -291,12 +291,6 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
     // The part rule's verdicts by path, when set: a path resolves and is refused as GroupWorld resolves and refuses it
     // (BakedSceneryRules.Resolves, BakedSceneryRules.PartRefusal).
     public Dictionary<string, PartVerdict> Verdicts;
-    // The group verdict a part modification at the path is judged by, as GroupWorld.HolderOf reads it from the objects above.
-    GroupRootVerdict Holder(string path) {
-        var above = new List<GroupRootVerdict>();
-        for (var cut = path?.LastIndexOf('/') ?? -1; cut > 0; cut = path.LastIndexOf('/', cut - 1)) above.Add(GroupVerdict(path.Substring(0, cut)));
-        return BakedSceneryRules.GroupOf(GroupVerdict(path), above);
-    }
     public IReadOnlyList<object> FindParts(string scene, string path) {
         if (GroupVerdicts != null && BakedSceneryRules.Resolves(null, GroupVerdict(path)) && Objects.TryGetValue(path, out var root)) return root;
         if (Verdicts != null && Verdicts.TryGetValue(path, out var verdict) && !BakedSceneryRules.Resolves(verdict)) return new List<object>();
@@ -304,10 +298,6 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
     }
     public string PartRefusal(object part) {
         if (part is FakeGroup) return BakedSceneryRules.PartRefusal(null, GroupVerdict(PathOf(part))) ?? "This object is not listed as a baked scenery part";
-        if (GroupVerdicts != null) {
-            var held = BakedSceneryRules.PartRefusal(null, Holder(PartsAt.FirstOrDefault(pair => pair.Value.Contains(part)).Key));
-            if (held != null) return held;
-        }
         if (Verdicts != null) {
             var path = PartsAt.FirstOrDefault(pair => pair.Value.Contains(part)).Key;
             if (path != null && Verdicts.TryGetValue(path, out var verdict) && BakedSceneryRules.PartRefusal(verdict) != null) return BakedSceneryRules.PartRefusal(verdict);
@@ -384,7 +374,9 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
         sealed class HookToken { internal Action Before, Installed; }
         public bool Available => !Unloading;
         FakeGroup GroupOf(FakeCuller culler) => world.Objects.Values.SelectMany(list => list).OfType<FakeGroup>().FirstOrDefault(g => g.Cullers.Contains(culler));
-        public bool Alive(object target) =>
+        // Throws for the objects it names, as a game function that fails during an update.
+        public Func<object, Exception> FailAlive;
+        public bool Alive(object target) => FailAlive?.Invoke(target) is Exception failure ? throw failure :
             target is FakeCuller culler ? GroupOf(culler) != null && (culler.On == null || world.Alive(culler.On)) : target is FakeRenderer renderer ? world.Alive(renderer.On) : world.Alive(target);
         public bool Started(object culler) => ((FakeCuller)culler).Started;
         public bool Visible(object simpleCuller) => ((FakeCuller)simpleCuller).Visible;
@@ -452,7 +444,7 @@ static class BakedSceneryTests {
         ListsSimpleGroupRoots();
         LeavesOutGroupsThatLaterTicketsCover();
         CoverageRulesKeepObjectsOut();
-        CrossingFoldersHoldTheirChildren();
+        CrossingContainersHoldTheirChildren();
         GroupMoveMovesTheWholeGroup();
         EnabledChangesOnlyTheRoot();
         UnmatchedAndAmbiguousPathsFailBeforeMutation();
@@ -648,9 +640,9 @@ static class BakedSceneryTests {
     static Node Whistle(string side) => new Node("Whistle Sign " + side).With("Track.TrackMarker", "Track.TrackRelativePosition").Solid().Family();
     static Node Crossbuck(string name) => new Node(name, new Node("LOD0").Solid(), new Node("LOD1").Solid()).With("Helpers.Culling.RendererCuller");
     static Node Unprotected(string name) => new Node(name, Pad(), Whistle("E"), Whistle("W"), Crossbuck("Sign-Crossing0 (1)"), Crossbuck("Sign-Crossing0 (2)"));
-    // A scene object whose children are crossings, or a crossing and a road bridge, is a folder; an unprotected crossing
-    // is a folder too, and its children keep their families.
-    static void CrossingFoldersHoldTheirChildren() {
+    // A scene object whose children are crossings, or a crossing and a road bridge, is a container object; an unprotected crossing
+    // is a container object too, and its children keep their families.
+    static void CrossingContainersHoldTheirChildren() {
         var setup = new Node("Grade Crossing Setup", new Node("Mast").Solid()).With("Track.Crossings.GradeCrossingController").Family();
         var world = new Node("World",
             new Node("Roads Bryson",
@@ -659,16 +651,16 @@ static class BakedSceneryTests {
                 Unprotected("Crossing Unprotected (1)")),
             new Node("Large Scenery", new Node("Bryson", new Node("Station Yard", Pad(), new Node("Shed").Solid()))));
         var verdicts = BakedSceneryRules.Classify(world);
-        Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island") == null, "A crossing and a road bridge make a folder, not a group");
-        Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island/Grade Crossing Setup")?.Disposition == GroupDisposition.ExistingFamily, "The crossing in the folder keeps its family");
-        Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m") is GroupRootVerdict island && island.Disposition == GroupDisposition.Group && island.Subcategory == BakedSceneryCategories.RoadBridges, "The road bridge in the folder is a group root under Road bridges");
+        Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island") == null, "A crossing and a road bridge make a container object, not a group");
+        Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island/Grade Crossing Setup")?.Disposition == GroupDisposition.ExistingFamily, "The crossing in the container object keeps its family");
+        Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m") is GroupRootVerdict island && island.Disposition == GroupDisposition.Group && island.Subcategory == BakedSceneryCategories.RoadBridges, "The road bridge in the container object is a group root under Road bridges");
         var crossbucks = verdicts.Where(v => v.Path.StartsWith("World/Roads Bryson/Old River Rd/", StringComparison.Ordinal) && v.Path.EndsWith(")", StringComparison.Ordinal)).ToArray();
         Assert(At(verdicts, "World/Roads Bryson/Old River Rd") == null && crossbucks.Length == 6 && crossbucks.All(v => v.Disposition == GroupDisposition.Group && v.Crossbuck && v.Category == BakedSceneryCategories.GradeCrossing),
-            "Old River Rd is a folder of three unprotected crossings, whose six crossbucks are groups under Grade crossing");
+            "Old River Rd is a container object of three unprotected crossings, whose six crossbucks are groups under Grade crossing");
         var single = verdicts.Where(v => v.Path.StartsWith("World/Roads Bryson/Crossing Unprotected (1)/", StringComparison.Ordinal)).ToArray();
         Assert(single.Count(v => v.Disposition == GroupDisposition.ExistingFamily) == 3 && single.Count(v => v.Crossbuck && v.Disposition == GroupDisposition.Group) == 2 && At(verdicts, "World/Roads Bryson/Crossing Unprotected (1)") == null,
             "The pad and whistle signs of an unprotected crossing keep their families and its crossbucks are groups of their own");
-        Assert(At(verdicts, "World/Large Scenery/Bryson/Station Yard")?.Disposition == GroupDisposition.InspectionOnly, "A group that holds a pad among other parts is no crossing folder");
+        Assert(At(verdicts, "World/Large Scenery/Bryson/Station Yard")?.Disposition == GroupDisposition.InspectionOnly, "A group that holds a pad among other parts is no crossing container object");
     }
     // Every candidate that is no group comes back with the coverage rule that keeps it out, so evidence can explain it.
     static void CoverageRulesKeepObjectsOut() {
@@ -690,7 +682,7 @@ static class BakedSceneryTests {
         Expect("World/Roads Bryson/Spawned Car", GroupDisposition.NotListed, BakedSceneryRules.RuntimeObject);
         Expect("World/Roads Bryson/br-depot", GroupDisposition.NotListed, BakedSceneryRules.NativeMapData);
         Expect("World/Map Labels/Bryson", GroupDisposition.NotListed, BakedSceneryRules.MapLabel);
-        // The Station Icons folder is no group: its station map icon keeps its family.
+        // The Station Icons container object is no group: its station map icon keeps its family.
         Assert(At(verdicts, "World/Map Labels/Station Icons") == null && At(verdicts, "World/Map Labels/Station Icons/Icon")?.Disposition == GroupDisposition.ExistingFamily, "The station icon keeps its family");
         Expect("World/Builder Photo Setup/Backdrop", GroupDisposition.NotListed, BakedSceneryRules.BuilderPhotoRig);
         Expect("World/Track/Segment Mesh", GroupDisposition.NotListed, BakedSceneryRules.RuntimeObject);
@@ -730,22 +722,22 @@ static class BakedSceneryTests {
             new Node("Roads Sylva", new Node("Sylva Road Bridge 20m", new Node("Deck").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask", "Helpers.Culling.RendererCuller")),
             new Node("POIs", new Node("Alarka").With("Character.SpawnPoint"), new Node("Bryson").With("Character.SpawnPoint")),
             new Node("Map Labels", new Node("Station Icons", new Node("Bryson").With("UI.Map.MapIcon", "UnityEngine.UI.Image", "UnityEngine.BoxCollider").Solid().Family()))));
-        // The rail bridge constructions outside Ela are groups of the family: the Almond Bridge folder, which carries
+        // The rail bridges outside Ela are groups of the family: the Almond Bridge group root, which carries
         // the construction's controller and culler, each plate girder bridge and Bryson Bridge 1.
         foreach (var path in new[] { "World/Large Scenery/Almond Bridge", "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge",
             "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge (1)", "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge End", "World/Large Scenery/Bryson/Bridge 1" }) {
             var verdict = At(verdicts, path);
-            Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges, path + " is a rail bridge construction outside Ela: " + verdict?.Disposition + " " + verdict?.Reason);
+            Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges, path + " is a rail bridge outside Ela: " + verdict?.Disposition + " " + verdict?.Reason);
         }
         foreach (var path in new[] { "World/Large Scenery/Almond/Almond Road Bridge", "World/Roads Sylva/Sylva Road Bridge 20m" })
             Assert(At(verdicts, path)?.Disposition == GroupDisposition.Group && At(verdicts, path).Subcategory == BakedSceneryCategories.RoadBridges, path + " is a road bridge: " + At(verdicts, path)?.Disposition);
         // Physical presence comes first: a spawn point root has no renderer, collider or light.
         foreach (var path in new[] { "World/POIs/Alarka", "World/POIs/Bryson" })
             Assert(At(verdicts, path)?.Disposition == GroupDisposition.NotListed && At(verdicts, path).Reason == BakedSceneryRules.NoPhysicalPresence, path + " has no physical presence and is not listed");
-        // The station icons stand in a folder, not a group: each keeps the Station map icon family.
+        // The station icons stand in a container object, not a group: each keeps the Station map icon family.
         Assert(At(verdicts, "World/Map Labels/Station Icons") == null && At(verdicts, "World/Map Labels/Station Icons/Bryson")?.Disposition == GroupDisposition.ExistingFamily, "The station icons keep their family");
     }
-    // A group root is one level below a World category folder, and below World/Large Scenery one level below a town.
+    // A group root is one level below a World category container object, and below World/Large Scenery one level below a town.
     static void ListsSimpleGroupRoots() {
         var world = new Node("World",
             new Node("Large Scenery", new Node("Bryson", new Node("Bryson House Track", new Node("Platform").Solid()))),
@@ -755,6 +747,6 @@ static class BakedSceneryTests {
         Assert(house != null && house.Disposition == GroupDisposition.Group, "A town child with a renderer below it is a group root");
         Assert(At(verdicts, "World/Roads Barkers/1932 Chevy Truck LP")?.Disposition == GroupDisposition.Group, "A child of another category is a group root");
         Assert(At(verdicts, "World/Large Scenery/Bryson") == null && At(verdicts, "World/Large Scenery/Bryson/Bryson House Track/Platform") == null && At(verdicts, "World/Large Scenery") == null,
-            "Folders above group roots and parts below them are no group roots");
+            "Container objects above group roots and parts below them are no group roots");
     }
 }

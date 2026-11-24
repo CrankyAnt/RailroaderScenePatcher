@@ -178,6 +178,21 @@ static class PatchEditingTests {
         DependencyRefusalsComeBeforeTheClickWrites();
         SaveWritesTheScenePatchFileOnlyWhenItsContentChanged();
         PatchOnlyEditsAnnounceTheirOutstandingWork();
+        SeveralModificationsBlockEveryEditOfAnyObject();
+    }
+    // Any object, not only a crossing controller, that several modifications of the scene patch file target gets the same
+    // reason ahead of time, which the panel shows on its edit controls and Remove modification. Each edit still refuses with
+    // it and changes nothing; an object with one modification is not blocked.
+    static void SeveralModificationsBlockEveryEditOfAnyObject() {
+        var w = new World(Doc(Mod("move-p", "p", Fixed(112)) + "," + Mod("move-p-again", "p", Fixed(120)) + "," + Mod("move-q", "q", Fixed(5))));
+        Assert(PatchEditingSession.SeveralModifications == "This scene patch file has more than one modification for this object. Combine them into one modification in the file",
+            "The shared refusal names the modifications and the file to correct");
+        Assert(w.Session.SeveralModificationsBlock(P) == PatchEditingSession.SeveralModifications, "The object with two modifications is blocked: " + w.Session.SeveralModificationsBlock(P));
+        Assert(w.Session.SeveralModificationsBlock(Q) == null, "The object with one modification is not blocked");
+        var text = w.Store.Patch;
+        foreach (var (control, outcome) in new[] { ("Remove modification", w.Session.Remove(P)), ("Placement", w.Session.Edit(P, PlacementAt(130), null)) })
+            Assert(!outcome.Applied && outcome.Error.Contains(PatchEditingSession.SeveralModifications), control + " still refuses with the same reason: " + outcome.Error);
+        Assert(w.Store.Patch == text, "The refusals leave the scene patch file as it was");
     }
     // The native title star and the Save button's unsaved tint are rebuilt from IsDirty on this notification. It follows a
     // patch-only edit once the edit is accounted, so the rebuilt chrome reads it as unsaved; Undo and Redo do not raise it

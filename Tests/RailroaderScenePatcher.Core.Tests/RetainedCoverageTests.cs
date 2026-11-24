@@ -21,7 +21,7 @@ static partial class CoverageTests {
     static readonly string[] NativeSpanIds = { "Pcyi", "Pipr", "Pws9", "Pdlh", "P6id", "P1db", "Qa", "Qi", "Qb" };
     static bool NativeSpansRegistered(Fixture f) => NativeSpanIds.All(id => f.World.Graph.TryGetValue(id, out var s) && !s.Owned && !s.Destroyed);
     static bool NoSuffixedIds(Fixture f) => f.World.Graph.Keys.All(id => !id.EndsWith(".2", StringComparison.Ordinal));
-    // The crossing as the game rebuilds it from map data: a new controller whose circuits refer to the native spans.
+    // The crossing as the game rebuilds it from map data: a new controller whose circuits refer to the map's own detection spans.
     static FakeCrossing Rebuild(Fixture f) {
         var crossing = new FakeCrossing();
         crossing.Circuits.Add(new FakeCircuit { Spans = f.OldSpans });
@@ -40,7 +40,7 @@ static partial class CoverageTests {
         var again = peer.Engine.Apply(RetainedScenePatchFile, "pack");
         Assert(again.Outcomes.Values.All(o => o.Applied), "The retained world reconciles both modifications again: " + String.Join("; ", again.Outcomes.Values.Select(o => o.Error)));
         Assert(f.World.Created == 6 && OwnedAnywhere(f) == 6 && NoSuffixedIds(f) && f.Crossing.Circuits.SequenceEqual(circuits), "Reconciliation reuses the owned spans and circuits instead of adding others");
-        Assert(f.NewRouteDetectsBothWays && !f.OldRouteDetects && f.RetainedDetectsBothWays && DetectsBothWays(f, f.Crossing, "Sspur") && NativeSpansRegistered(f), "Detection stays on the selected and added tracks, and the native spans stay registered");
+        Assert(f.NewRouteDetectsBothWays && !f.OldRouteDetects && f.RetainedDetectsBothWays && DetectsBothWays(f, f.Crossing, "Sspur") && NativeSpansRegistered(f), "Detection stays on the selected and added tracks, and the map's own detection spans stay registered");
     }
     static void ReconstructedCrossingReleasesOnlyItsOwnedSpans() {
         var f = new Fixture();
@@ -53,7 +53,7 @@ static partial class CoverageTests {
         peer.Unload();
         Assert(peer.Enter("map", "graph") == WorldEntry.Reentered && peer.LastReentry.Released == 1 && peer.LastReentry.Failures.Count == 0, "Re-entry releases the reconstructed crossing");
         Assert(owned.All(s => s.Destroyed && !f.World.Registered(s)) && OwnedAnywhere(f) == 0, "The owned spans of the reconstructed crossing are removed");
-        Assert(NativeSpansRegistered(f) && f.Other.Circuits.SequenceEqual(otherCircuits) && rebuilt.Circuits.Count == 2, "Native spans, the rebuilt crossing and the unrelated crossing stay as they are");
+        Assert(NativeSpansRegistered(f) && f.Other.Circuits.SequenceEqual(otherCircuits) && rebuilt.Circuits.Count == 2, "The map's own detection spans, the rebuilt crossing and the unrelated crossing stay as they are");
         var applied = peer.Engine.Apply(RetainedScenePatchFile, "pack");
         Assert(applied.Outcomes.Values.All(o => o.Applied) && OwnedAnywhere(f) == 6 && NoSuffixedIds(f) && rebuilt.Circuits.Count == 3, "The rebuilt crossing gets one owned set under the original span IDs: " + String.Join("; ", applied.Outcomes.Values.Select(o => o.Error)));
         Assert(DetectsBothWays(f, rebuilt, "Snew") && DetectsBothWays(f, rebuilt, "Sspur") && !new[] { 500.0, 300, 100 }.Any(d => f.World.Detects(rebuilt, "Sold", d)), "The rebuilt crossing detects on the selected and added tracks only");

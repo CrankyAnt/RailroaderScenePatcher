@@ -274,7 +274,7 @@ namespace RailroaderScenePatcher.Core {
                 if (scenePatchFile == null) return minimum;
                 foreach (var item in scenePatchFile.Items) {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
-                    // A crossbuck that its crossing's pad marker id names needs the crossbuck identity.
+                    // A crossbuck that its crossing's pad marker ID names needs the crossbuck identity.
                     if ((item["target"] as JObject)?[TargetIdentity.PadMarkerMember] != null) minimum = Max(minimum, BakedSceneryGroups.RequiredVersion);
                     // Activity of a track-marker object may be the explicit disable of a group follower, which needs the group capability.
                     if (item["active"] != null && (item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) minimum = Max(minimum, TrackFollowingVersion);
@@ -700,6 +700,13 @@ namespace RailroaderScenePatcher.Core {
         public string UnderlyingMarkerId(TargetIdentity target) {
             try { return engine.Underlying(engine.ResolveUnique(target))?.MarkerId; } catch (Exception) { return null; }
         }
+        // The duplicate marker ID that this object's replacement ID repaired, or null: its underlying ID, when the scene
+        // marker now holds another ID and another scene marker or registration still uses the underlying one.
+        public string RepairedMarkerId(TargetIdentity target) {
+            var underlying = UnderlyingMarkerId(target);
+            var current = MarkerIdOf(target);
+            return underlying != null && current != null && underlying != current && MarkerIdUsers(target, underlying).Count != 0 ? underlying : null;
+        }
         // The scene markers and registrations other than the object that use the id, by name; empty for an object that
         // takes no replacement ID.
         public IReadOnlyList<string> MarkerIdUsers(TargetIdentity target, string id) {
@@ -803,7 +810,7 @@ namespace RailroaderScenePatcher.Core {
                 if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
-                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
+                if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
                 var existing = own.FirstOrDefault();
                 var value = CoverageValue(target, existing, circuit, coverage, addition);
                 if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey).State);
@@ -825,7 +832,7 @@ namespace RailroaderScenePatcher.Core {
         // names a native circuit by its island span, or a detection addition by its ID.
         JObject CoverageValue(TargetIdentity target, JObject existing, string circuit, CircuitCoverage coverage, bool addition) {
             if (String.IsNullOrWhiteSpace(circuit)) throw new InvalidOperationException(addition ? "Give the addition an ID" : "Choose a circuit of the crossing");
-            if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the coverage set by this mod for the circuit to return it to its native spans");
+            if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the coverage set by this mod for the circuit to return it to the map's own detection spans.");
             if (coverage != null && (coverage.Kind == CircuitKind.Added) != addition) throw new InvalidOperationException(addition ? "An addition needs its own selected tracks" : "Add detection for extra tracks as an addition; a native circuit takes selected tracks or a detach");
             if (existing != null) PatchEngine.Parse(existing);
             if (addition && coverage != null && scenePatchFile.Items.Any(m => !ReferenceEquals(m, existing) && PatchEngine.AdditionIds(m).Contains(circuit, StringComparer.Ordinal)))
@@ -899,16 +906,23 @@ namespace RailroaderScenePatcher.Core {
         // An equipment ID from the stem that no modification of the scene patch file uses yet, with a numeric suffix when it is
         // taken, as a new modification key gets one. An invalid stem falls back to "equipment".
         // This mod's additions of the crossing as the scene patch file holds them, each with its built state in the scene or why it
-        // was not built. The scene patch file's own order is the ordinal order of the IDs.
+        // was not built. The scene patch file may hold them in several modifications of the crossing, beside its coverage; all
+        // are listed, in the ordinal order of their IDs.
         public IReadOnlyList<EquipmentEntry> EquipmentEntries(TargetIdentity target) {
             var resolved = engine.ResolveUnique(target);
-            var existing = Own(resolved).FirstOrDefault();
-            if (existing == null) return Array.Empty<EquipmentEntry>();
+            var own = Own(resolved);
+            if (own.Count == 0) return Array.Empty<EquipmentEntry>();
+            CrossingEquipment observed = null;
+            try { observed = scene.Read(resolved).Equipment; } catch (InvalidOperationException) { }
+            var entries = new List<EquipmentEntry>();
+            foreach (var existing in own) entries.AddRange(EquipmentEntries(resolved, existing, observed));
+            return entries.OrderBy(e => e.Addition.Id, StringComparer.Ordinal).ToList();
+        }
+        // The additions of one modification of the crossing, each with its built state or why it was not built.
+        IEnumerable<EquipmentEntry> EquipmentEntries(object resolved, JObject existing, CrossingEquipment observed) {
             CrossingEquipment modEquipment;
             try { modEquipment = PatchEngine.Parse(existing, scenePatchFileKey).State.Equipment; } catch (InvalidOperationException) { return Array.Empty<EquipmentEntry>(); }
             if (modEquipment == null) return Array.Empty<EquipmentEntry>();
-            CrossingEquipment observed = null;
-            try { observed = scene.Read(resolved).Equipment; } catch (InvalidOperationException) { }
             // Why each addition on its own is refused, or null. The additions of one modification are one coherent operation:
             // a refused addition stops the others, so a valid addition that is not built names the refused ones rather than
             // offering a Recheck that refuses the same way.
@@ -968,7 +982,7 @@ namespace RailroaderScenePatcher.Core {
                 if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again.");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
-                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
+                if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
                 var existing = own.FirstOrDefault();
                 var value = EquipmentValue(target, existing, addition, id);
                 var key = existing == null ? NewId(target, "equip-") : ScenePatchFile.Key(existing);
@@ -1132,7 +1146,7 @@ namespace RailroaderScenePatcher.Core {
                 if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
-                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
+                if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
                 var existing = own.FirstOrDefault();
                 var ineffective = existing == null ? null : engine.IneffectiveReason(scenePatchFile.Modifications, ScenePatchFile.Key(existing), scenePatchFileKey);
                 JObject value;
@@ -1242,7 +1256,7 @@ namespace RailroaderScenePatcher.Core {
             outcome.Error = e.Message;
             var attempt = e as AttemptFailure;
             outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
-            if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; }
+            if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; outcome.EquipmentCleanup = attempt.EquipmentCleanup; }
         }
         // Whether an earlier failure left the object's cleanup unverified, and the remaining or uncertain state it named.
         // Read from the identities the engine resolved, without searching or mutating the scene, so the panel can ask
@@ -1463,17 +1477,19 @@ namespace RailroaderScenePatcher.Core {
                 if (!mutating && !contentChecked) contentRefusal = e.Message;
                 // A rejection before the mutation started changed nothing in the scene and needs no restoration.
                 if (!mutating) throw;
-                var restored = false; string restoreError = null;
+                var restored = false; Exception restoreError = null;
                 try {
 #if SCENE_PATCHER_FAULTS
                     FaultInjection.TripRestoration();
 #endif
                     scene.Apply(target, prior); restored = Same(scene.Read(target), prior);
-                } catch (Exception r) { restoreError = r.Message; }
+                } catch (Exception r) { restoreError = r; }
                 if (!restored) {
-                    var left = Core.RemainingState.Describe(prior, () => scene.Read(target), restoreError);
+                    var left = Core.RemainingState.Describe(prior, () => scene.Read(target), out var settingsMatch, restoreError?.Message);
                     engine.SetUnsafe(target, true, left);
-                    throw new AttemptFailure(FailureKind.IncompleteCleanup, "The edit failed. Cleanup could not be verified. Reason: " + e.Message, left);
+                    var cleanup = e is EmptyEquipmentObjectException && restoreError is EmptyEquipmentObjectException && settingsMatch
+                        ? EquipmentCleanupContext.EditUndone : EquipmentCleanupContext.None;
+                    throw new AttemptFailure(FailureKind.IncompleteCleanup, "The edit failed. Cleanup could not be verified. Reason: " + e.Message, left, equipmentCleanup: cleanup);
                 }
                 if (engine.AwaitOutput(target)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The edit failed and the object is back as it was. The game is still regenerating its dependent output. Editing can resume once that output is verified. Reason: " + e.Message);
                 throw new AttemptFailure(FailureKind.Restored, "The edit failed. The object is back as it was. Reason: " + e.Message);
@@ -1502,16 +1518,18 @@ namespace RailroaderScenePatcher.Core {
                 // misses a dependency or is not executed, are left out here too.
                 foreach (var own in engine.EffectiveFor(scenePatchFile.Modifications, resolved, scenePatchFileKey))
                     engine.CheckRelationships(resolved, engine.Evaluate(own.State.LeavingActivity()));
-                if (!Same(scene.Read(resolved), desired)) {
+                // A wrapper without its copy is not read, so the desired state can equal the read one while it still removes it.
+                if (!Same(scene.Read(resolved), desired) || (scene is ICrossingEquipmentScene equipment && equipment.EquipmentLeftover(resolved, desired))) {
                     engine.GuardMutation(target, resolved, mapContext, inspected);
                     try {
                         scene.Apply(resolved, desired);
                         if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("Applied state did not verify");
                     } catch (Exception e) {
                         // The scene patch file is the reference here: what still differs from it remains.
-                        var left = Core.RemainingState.Describe(desired, () => scene.Read(resolved), e.Message);
+                        var left = Core.RemainingState.Describe(desired, () => scene.Read(resolved), out var settingsMatch, e.Message);
                         engine.SetUnsafe(resolved, true, left);
-                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The object still does not match the scene patch file. Reason: " + e.Message, left);
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The object still does not match the scene patch file. Reason: " + e.Message, left,
+                            equipmentCleanup: e is EmptyEquipmentObjectException && settingsMatch ? EquipmentCleanupContext.Recheck : EquipmentCleanupContext.None);
                     }
                 }
                 engine.SetUnsafe(resolved, false);
@@ -1529,6 +1547,11 @@ namespace RailroaderScenePatcher.Core {
                 .Where(p => p.Name != key && (p.Value as JObject)?["dependsOn"] is JArray dependencies && dependencies.Any(d => d.Type == JTokenType.String && (string)d == key))
                 .Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
         }
+        // Why scene patch editing refuses every edit of an object before any change: several modifications of the scene patch
+        // file target it. The panel shows the controls of such an object inactive with this reason; the edit still refuses.
+        public const string SeveralModifications = "This scene patch file has more than one modification for this object. Combine them into one modification in the file";
+        // SeveralModifications when more than one modification of the scene patch file targets the object, or null.
+        public string SeveralModificationsBlock(TargetIdentity target) => Own(engine.ResolveUnique(target)).Count > 1 ? SeveralModifications : null;
         List<JObject> Own(object target) {
             var own = new List<JObject>();
             foreach (var item in scenePatchFile.Items) {
