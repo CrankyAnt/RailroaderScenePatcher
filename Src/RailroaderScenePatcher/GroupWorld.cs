@@ -286,8 +286,8 @@ namespace RailroaderScenePatcher {
                     (p.Value.Disposition == PartDisposition.Part ? "Listed as a scenery part" : p.Value.Disposition == PartDisposition.ExistingFamily ? ExistingFamilyReport(p.Key, true) : "Not listed as a scenery part") +
                     Reason(p.Value.Reason))));
         static string ExistingFamilyReport(GameObject go, bool inGroup = false) =>
-            (inGroup ? "Moves with its scenery group. Listed for inspection and supported edits through its own object family instead of as a scenery part. Gets its own outliner row, except for native track spans, which have no row. Object family: " :
-                "Listed for inspection and supported edits through its existing object family instead of as a scenery group. Gets its own outliner row, except for native track spans, which have no row. Object family: ") + String.Join(", ",
+            (inGroup ? "The outliner gives each object its own row, excluding any native track spans in this count. Group placement moves these objects, while their own family controls which individual placement, activity or connection edits are available. They have no scenery part entry because they already belong to another object family: " :
+                "The outliner gives each object its own row, excluding any native track spans in this count. Their own family controls which placement, activity or connection edits are available. They have no scenery group entry because they already belong to another object family: ") + String.Join(", ",
             go.GetComponents<Component>().Where(c => c != null).Select(NativeInventory.FamilyOf).Where(f => f != null).Distinct().OrderBy(f => f, StringComparer.Ordinal));
         // A reason that is a sentence keeps one full stop before the clause that follows it.
         static string Reason(string reason) => reason == null ? "" : ". Reason: " + reason.TrimEnd('.');
