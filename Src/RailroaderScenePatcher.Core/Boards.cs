@@ -44,6 +44,8 @@ namespace RailroaderScenePatcher.Core {
         // Circle map masks on the board root.
         public int Masks { get; }
         public bool MaskEnabled { get; }
+        // The mask also sets the terrain height under it. Such a board moves with its mask like any other: the game
+        // rebuilds the terrain at the old and the new place from the tiles' base heights and the registered masks.
         public bool FlattensHeight { get; }
         // A component in the board hierarchy whose dependent state this capability does not refresh, or null.
         public string UnexpectedDependency { get; }
@@ -112,7 +114,6 @@ namespace RailroaderScenePatcher.Core {
             if (!facts.HasCuller || !facts.CullerEnabled) return "The board's renderer culler must be present and enabled";
             if (facts.Masks != 1 || !facts.MaskEnabled) return "The board must carry exactly one enabled circle map mask";
             if (!facts.ParentsActive) return "The board's parents must be active";
-            if (facts.FlattensHeight) return "The board changes the terrain height, which prevents editing it here";
             if (facts.UnexpectedDependency != null) return "Editing this board would leave one of its attached objects out of date: " + facts.UnexpectedDependency;
             return null;
         }

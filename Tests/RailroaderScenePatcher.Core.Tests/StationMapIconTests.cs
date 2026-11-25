@@ -20,6 +20,7 @@ static class StationMapIconTests {
         new Node("Large Scenery", new Node("Bryson", new Node("Bryson House Track", new Node("Platform").Solid()))));
 
     public static void Run() {
+        GroundMaskTests.HeldMaskFollowsItsHolder("Station map icon", masks => { var icons = new Icons(); return (icons.BrysonIcon, new StationMapIconScene(icons.World, Capability.Unchecked, masks)); }, Doc(Mod("move-icon", Bryson, BrysonTarget)));
         InventoryListsEveryStationMapIconOnce();
         OnlyStationIconsAreListed();
         ContainerChildrenWithoutMapIconsStayOut();

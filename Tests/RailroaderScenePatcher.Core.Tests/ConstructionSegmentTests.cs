@@ -387,7 +387,7 @@ static class ConstructionSegmentTests {
             BakedSceneryGroups.Structure, BakedSceneryParts.Structure, StationMapIconRules.Structure, SpawnPoints.Structure, ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure })
             Assert(CommandBand.EditableStructure(structure), "Still editable: " + structure);
         Assert(!CommandBand.EditableStructure(null) && !CommandBand.EditableStructure(StarterPlacementScene.Structure), "No structure, or a starter placement marker with its own workflow, is not editable here");
-        Assert(CommandBand.PlacementBlock(null, null, CommandBand.ControllerNoPlacement, null) == CommandBand.ControllerNoPlacement
+        Assert(CommandBand.PlacementBlock(null, null, CommandBand.ControllerNoPlacement) == CommandBand.ControllerNoPlacement
             && CommandBand.ModeBlock(CommandBand.NumericMode, false, true, CommandBand.ConstructionSceneryOperations, controller: true) == null,
             "Numeric stays open for the Ela controller and its fields give the placement reason");
         var ela = new TargetIdentity(SceneName, Ela, ConstructionSceneryScene.ComponentType, ConstructionSceneryScene.Structure);

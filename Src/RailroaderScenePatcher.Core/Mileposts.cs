@@ -52,15 +52,19 @@ namespace RailroaderScenePatcher.Core {
     // as for a Generic track marker. Physical placement and binding stay separate settings. The post keeps its model,
     // mile value and display, and the origin cache keeps its entry: every write is checked against the state before it,
     // and a difference fails the write, which the engine then restores.
-    public sealed class MilepostScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene {
+    public sealed class MilepostScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IDependentOutputScene {
         public const string Structure = "milepost-v1", RequiredVersion = VersionRequirement.Delivery, Component = "Helpers.MilePost";
         readonly MarkerRelationship relationship;
         readonly IMilepostWorld world;
-        public MilepostScene(IMilepostWorld world, Capability capability) {
+        // The scene ground masks at and below the post: they move with it, a mask that flattens the terrain height included.
+        readonly MaskFollowing masks;
+        public MilepostScene(IMilepostWorld world, Capability capability, GroundMasks masks = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world));
             relationship = new MarkerRelationship(world, Structure, new Preserved(world));
-            Capability = capability;
+            Capability = capability; this.masks = new MaskFollowing(masks);
         }
+        public DependentOutput Output(object target) => masks.Output(target);
+        public void RetryOutput(object target) => masks.RetryOutput(target);
         public IEnumerable<string> MapIds => relationship.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => identity.Component == Component ? relationship.Resolve(identity) : Array.Empty<object>();
@@ -73,10 +77,10 @@ namespace RailroaderScenePatcher.Core {
         public ObjectState Read(object target) => relationship.Read(target);
         public void Apply(object target, ObjectState state) => Checked(target, () => relationship.Apply(target, state));
         public void ApplyFollowUpdate(object target, ObjectState state) => Checked(target, () => relationship.Apply(target, state, true));
-        public bool Restore(object target, object snapshot) => relationship.Restore(target, snapshot);
+        public bool Restore(object target, object snapshot) => masks.Restore(target, () => relationship.Restore(target, snapshot));
         void Checked(object target, Action write) {
             var before = world.Milepost(target);
-            write();
+            masks.Write(target, write);
             var difference = world.Milepost(target).Difference(before);
             if (difference != null) throw new InvalidOperationException("The milepost edit changed a value that must stay unchanged: " + difference);
         }

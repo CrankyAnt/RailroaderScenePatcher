@@ -76,6 +76,7 @@ static class MilepostTests {
     }
     static string Kept(FakeMilepostWorld world, FakeMarker m) { var p = world.Posts[m]; return p.Prefix + "|" + p.Origin + "|" + p.Mileage + "|" + p.Text + "|" + p.Model; }
     public static void Run() {
+        GroundMaskTests.HeldMaskFollowsItsHolder("Milepost", masks => { var (world, t46, _, _) = Setup(); return (t46, new MilepostScene(world, Capability.Unchecked, masks)); }, Doc(Item("move-post", Place(90))));
         PlacementAndBindingAreSeparateSettings();
         TargetsResolveExactlyOnce();
         ReplacementTracksResolveExactlyOnce();

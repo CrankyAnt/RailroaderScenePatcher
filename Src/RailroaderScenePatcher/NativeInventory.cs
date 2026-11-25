@@ -273,6 +273,10 @@ namespace RailroaderScenePatcher {
             if (type == StationMapIconRules.Component && StationMapIconRules.Listed(BoardScene.PathOf(c.transform))) return StationMapIconRules.Family;
             return null;
         }
+        // The families other than the baked scenery group family whose capability moves the scene ground masks at and
+        // below its object.
+        static bool MovesGroundMasks(string family) => family == "Track marker" || family == "Bridge" || family == "Milepost" || family == "Crossing pad marker"
+            || family == StationMapIconRules.Family || family == SpawnPoints.Family;
         // The discovery in one piece: the stepped walk without its pauses, so both read the scene in the same order.
         public IEnumerable<SceneObservation> Discover() => Steps(boardRefusal, true).Where(observation => observation != null);
         public IEnumerable<SceneObservation> DiscoverInSteps() => Steps(boardRefusal, false);
@@ -577,8 +581,9 @@ namespace RailroaderScenePatcher {
                 constructionIds = ids;
             });
             // A scene ground mask shapes the terrain where its object stands: the part that holds it says so, and the
-            // group root, a part above it and a marker object above it name that part.
-            if (groupRoot || part || family == "Track marker") Read(() => {
+            // group root, a part above it and a marker object above it name that part. A bridge, milepost, crossing pad,
+            // station map icon or spawn point moves its masks too.
+            if (groupRoot || part || MovesGroundMasks(family)) Read(() => {
                 var holders = GroundMaskWorld.Holders(go, out var flattens);
                 if (holders.Count != 0) dependencies.Add(CommandBand.GroundMaskDependency(holders.Count == 1 && holders[0] == go, holders.Select(holder => holder.name), flattens, groupRoot || part, groupRoot));
             });
@@ -761,9 +766,6 @@ namespace RailroaderScenePatcher {
                     information.AddRange(findings.Information);
                 }
             });
-            // A ground mask that flattens the terrain height blocks every move of the object: Supported edits then names
-            // only what still applies, and the Placement tab gives the reason.
-            if (structure != null && CommandBand.GroundMaskMoveBlock(dependencies) != null) operations = CommandBand.OperationsWithoutMove(operations);
             var notes = problems.Where(BindingRules.IsNote).ToArray();
             var defects = BindingRules.Problems(enabled, problems.Where(line => !BindingRules.IsNote(line)), anyway.Where(line => !BindingRules.IsNote(line)));
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure, padMarkerId), family,

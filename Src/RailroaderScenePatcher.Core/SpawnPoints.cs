@@ -128,9 +128,17 @@ namespace RailroaderScenePatcher.Core {
     }
     // Places and enables or disables a scene spawn point. The game reads its transform each time it starts, rescues or
     // teleports a player, so nothing else needs to follow; it has no renderer, collider or culling of its own.
-    public sealed class SpawnPointScene : IScene, IVersionedScene, IRelationshipScene {
+    public sealed class SpawnPointScene : IScene, IVersionedScene, IRelationshipScene, IDependentOutputScene {
         readonly ISpawnPointWorld world;
-        public SpawnPointScene(ISpawnPointWorld world, Capability capability) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; }
+        // The scene ground masks at and below the spawn point: they move with it, a mask that flattens the terrain height
+        // included.
+        readonly MaskFollowing masks;
+        public SpawnPointScene(ISpawnPointWorld world, Capability capability, GroundMasks masks = null) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.masks = new MaskFollowing(masks); }
+        // Gives a capability built before the world's ground masks existed, as for a new game's start, those masks. A
+        // capability that already has masks keeps them.
+        public void UseMasks(GroundMasks value) => masks.Use(value);
+        public DependentOutput Output(object target) => masks.Output(target);
+        public void RetryOutput(object target) => masks.RetryOutput(target);
         public IEnumerable<string> MapIds => world.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
@@ -150,7 +158,8 @@ namespace RailroaderScenePatcher.Core {
         }
         public object Capture(object target) => world.Observe(target);
         public ObjectState Read(object target) => world.Observe(target);
-        public void Apply(object target, ObjectState state) {
+        public void Apply(object target, ObjectState state) => masks.Write(target, () => Change(target, state));
+        void Change(object target, ObjectState state) {
             var before = world.Observe(target);
             if (state.Placement != null) GroupChecks.CheckPlacement(state.Placement);
             var active = state.Active ?? before.Active ?? true;
@@ -163,7 +172,8 @@ namespace RailroaderScenePatcher.Core {
             if (placement != null) world.SetPlacement(target, placement);
             if (!active && was != false) world.SetActive(target, false);
         }
-        public bool Restore(object target, object snapshot) {
+        public bool Restore(object target, object snapshot) => masks.Restore(target, () => Restored(target, snapshot));
+        bool Restored(object target, object snapshot) {
             var captured = (ObjectState)snapshot;
             try {
                 Write(target, captured.Placement, captured.Active != false, world.Observe(target).Active);

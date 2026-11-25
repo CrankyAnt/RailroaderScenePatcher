@@ -398,19 +398,18 @@ namespace RailroaderScenePatcher.Core {
         public const string Structure = "track-marker-v1", RequiredVersion = "0.5.0";
         readonly MarkerRelationship relationship;
         // The scene ground masks at and below a marker object, such as the Hemingway station, whose track marker stands
-        // on the root of its building: a move of the marker rebuilds them, and a mask that flattens the terrain height
-        // refuses the move. Null in a world without them.
-        GroundMasks masks;
-        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability, GroundMasks masks = null) { relationship = new MarkerRelationship(world, Structure, null, true); Capability = capability; this.masks = masks; }
+        // on the root of its building: a move of the marker rebuilds them, a mask that flattens the terrain height
+        // included.
+        readonly MaskFollowing masks;
+        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability, GroundMasks masks = null) { relationship = new MarkerRelationship(world, Structure, null, true); Capability = capability; this.masks = new MaskFollowing(masks); }
         // Gives a capability built before the world's ground masks existed, as for a new game's start, those masks. A
         // capability that already has masks keeps them.
-        public void UseMasks(GroundMasks value) { if (masks == null) masks = value; }
+        public void UseMasks(GroundMasks value) => masks.Use(value);
         public IReadOnlyList<string> MarkerIdUsers(object target, string id) => relationship.IdUsers(target, id);
         public bool RewritesRegistration(object target, ObjectState state) => relationship.RewritesRegistration(target, state);
         public string MarkerIdRefusal(object target, string id) => relationship.MarkerIdRefusal(target, id);
-        public DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;
-        public void RetryOutput(object target) => masks?.RetryOutput(target);
-        void Masked(object target, Action change) { var before = masks?.Observe(target); change(); masks?.Follow(target, target, before); }
+        public DependentOutput Output(object target) => masks.Output(target);
+        public void RetryOutput(object target) => masks.RetryOutput(target);
         public IEnumerable<string> MapIds => relationship.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => relationship.Resolve(identity);
@@ -420,17 +419,12 @@ namespace RailroaderScenePatcher.Core {
         public void Preflight(object target) => relationship.Preflight(target);
         public void CheckRelationships(object target, ObjectState state) {
             relationship.CheckRelationships(target, state);
-            if (state?.Placement != null && masks?.PlacementRefusal(target) is string refusal) throw new InvalidOperationException(refusal);
         }
         public object Capture(object target) => relationship.Capture(target);
         public ObjectState Read(object target) => relationship.Read(target);
-        public void Apply(object target, ObjectState state) => Masked(target, () => relationship.Apply(target, state));
-        public void ApplyFollowUpdate(object target, ObjectState state) => Masked(target, () => relationship.Apply(target, state, true));
-        public bool Restore(object target, object snapshot) {
-            var before = masks?.Observe(target);
-            if (!relationship.Restore(target, snapshot)) return false;
-            try { masks?.Follow(target, target, before); return true; } catch { return false; }
-        }
+        public void Apply(object target, ObjectState state) => masks.Write(target, () => relationship.Apply(target, state));
+        public void ApplyFollowUpdate(object target, ObjectState state) => masks.Write(target, () => relationship.Apply(target, state, true));
+        public bool Restore(object target, object snapshot) => masks.Restore(target, () => relationship.Restore(target, snapshot));
     }
     // State that a marker's consumer derives from the marker's location and the object's placement, such as generated geometry.
     internal interface IMarkerConsumer {

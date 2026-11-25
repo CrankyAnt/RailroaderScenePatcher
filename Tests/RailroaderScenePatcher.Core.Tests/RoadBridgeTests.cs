@@ -45,7 +45,7 @@ static class RoadBridgeTests {
         MoveCarriesMaskCullingAndColliders();
         PartMoveLeavesTheMaskOfTheRoot();
         DisabledMaskStaysUnregistered();
-        FlatteningMaskRefusesTheMove();
+        FlatteningMaskMovesWithTheBridge();
         ActivityReleasesAndRegistersTheMask();
         FailuresRestorePlacementMaskAndCulling();
         TerrainWriteFailureIsIdentifiableAndRetryable();
@@ -119,23 +119,22 @@ static class RoadBridgeTests {
 
     // The Object tab of a road bridge: its root holds the ground mask, so the dependency line names the group, not a
     // part; Use in the game says the bridge is decorative, that its road is native map data, and what the mask does.
-    // A bridge whose mask flattens the terrain height names disabling alone and blocks the placement modes.
+    // A bridge whose mask flattens the terrain height names that, and moving it stays offered.
     static void ObjectTabNamesTheMaskAndTheNativeRoad() {
         var line = CommandBand.GroundMaskDependency(true, new[] { "Concrete Road Bridge - 60m" }, false, group: true);
-        Assert(line == "Ground mask: the root of this group holds the scene ground mask. Moving the group moves the terrain shaping. The patcher asks the game to regenerate terrain and vegetation at the old and new positions.",
+        Assert(line == "Ground mask: the root of this group holds the scene ground mask. Moving the group moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of a group whose root holds the mask: " + line);
         var flat = CommandBand.GroundMaskDependency(true, new[] { "Old Home Town Road Bridge" }, true, group: true);
-        Assert(flat == "Ground mask: the root of this group holds the scene ground mask, which also flattens the terrain height. The group can't be moved because the game might not restore the terrain height after a move.",
+        Assert(flat == "Ground mask: the root of this group holds the scene ground mask. The mask also flattens the ground. Moving the group moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of a group whose root holds a flattening mask: " + flat);
-        Assert(CommandBand.HoldsGroundMask(new[] { line }) && CommandBand.GroundMaskMoveBlock(new[] { line }) == null && CommandBand.GroundMaskMoveBlock(new[] { flat }) == CommandBand.FlatteningMoveBlock,
-            "Both lines carry terrain output, and only the flattening one blocks a move");
+        Assert(CommandBand.HoldsGroundMask(new[] { line }) && CommandBand.HoldsGroundMask(new[] { flat }), "Both lines carry terrain output");
         Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false).StartsWith("Ground mask: this part holds the scene ground mask.", StringComparison.Ordinal), "A part that holds the mask keeps its line");
         var use = CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { "Culling", line }, roadBridge: true);
         Assert(use == "The bridge is decorative. Its road is native map data that the Map Editor edits. The bridge's ground mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
             "The use of a road bridge: " + use);
         var held = CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { flat }, roadBridge: true);
-        Assert(held == "The bridge is decorative. Its road is native map data that the Map Editor edits. The bridge's ground mask shapes the ground and the vegetation where it stands, so disabling this group changes the terrain there.",
-            "The use of a road bridge with a flattening mask names no move: " + held);
+        Assert(held == "The bridge is decorative. Its road is native map data that the Map Editor edits. The bridge's ground mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
+            "The use of a road bridge with a flattening mask names the move: " + held);
         var bare = CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { "Culling" }, roadBridge: true);
         Assert(bare == "The bridge is decorative. Its road is native map data that the Map Editor edits. Moving or disabling this group changes no game function.", "The use of a road bridge without a mask: " + bare);
         Assert(CommandBand.GroundMaskUse(CommandBand.PartDecorative, true, new[] { "Culling" }, roadBridge: true) == CommandBand.PartDecorative, "A part of a road bridge keeps the part's text");
@@ -280,22 +279,19 @@ static class RoadBridgeTests {
             "An enable applies, and the disabled mask still holds no registration and starts no terrain output: " + shown.Error + " " + f.Where());
     }
 
-    // The mask of the Old Home Town Road Bridge also flattens the terrain height: its move is refused before any
-    // mutation with the reason, in a scene patch file and in scene patch editing, where the file, the dirty state and
-    // the history stay unchanged. Enabling and disabling stay possible.
-    static void FlatteningMaskRefusesTheMove() {
+    // The mask of the Old Home Town Road Bridge also flattens the terrain height: it moves with the bridge, the terrain
+    // output at the old and the new place is tracked, and in scene patch editing Undo returns the bridge and its mask.
+    // Enabling and disabling stay possible.
+    static void FlatteningMaskMovesWithTheBridge() {
         var f = new Span(OldHomeTown, flattens: true);
         var outcome = f.Engine.Apply(Doc(GroupMod("move-bridge", Far, path: OldHomeTown))).Outcomes["move-bridge"];
-        Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && outcome.Error.Contains("The ground mask on Old Home Town Road Bridge flattens the terrain height") && f.World.Mutations == 0 && f.Terrain.Rebuilds == 0 && f.RegisteredOnceAt(Authored, 90),
-            "The move is refused before mutation: " + outcome.Failure + " " + outcome.Error + " " + f.Where());
-        Assert(f.Masks.Output(f.Group).Settled && f.Masks.Output(f.Group).Completed.Count == 0, "A refusal starts no terrain output");
+        Assert(outcome.Applied && f.RegisteredOnceAt(Far, 90) && f.Masks.Output(f.Group).Outstanding.Count == 2,
+            "The move carries the flattening mask and tracks both places: " + outcome.Error + " " + f.Where());
         var s = new Span(OldHomeTown, flattens: true); var store = new Store(); var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(s.Engine, mapEditor, store); mapEditor.Session = session;
         var id = new TargetIdentity(SceneName, OldHomeTown, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
-        var before = session.ScenePatchFileText;
-        var edit = session.Edit(id, new Placement(Far, Upright), null);
-        Assert(!edit.Applied && edit.Error.Contains("flattens the terrain height") && s.World.Mutations == 0 && session.ScenePatchFileText == before && store.Patch == null && !mapEditor.IsDirty && !mapEditor.CanUndo,
-            "In scene patch editing the refusal leaves the scene, the scene patch file and the history unchanged: " + edit.Error);
+        Assert(session.Edit(id, new Placement(Far, Upright), null).Applied && s.RegisteredOnceAt(Far, 90) && mapEditor.IsDirty && mapEditor.CanUndo, "In scene patch editing the move applies: " + s.Where());
+        mapEditor.Undo(); Assert(s.RegisteredOnceAt(Authored, 90) && !mapEditor.IsDirty, "Undo returns the bridge and its mask: " + s.Where());
         Assert(session.Edit(id, null, false).Applied && !s.Group.Active && s.Mask.Keys.Count == 0, "A disable of the flattening bridge applies and releases its mask");
         mapEditor.Undo(); Assert(s.Group.Active && s.RegisteredOnceAt(Authored, 90), "Undo enables it with its mask registered once: " + s.Where());
     }

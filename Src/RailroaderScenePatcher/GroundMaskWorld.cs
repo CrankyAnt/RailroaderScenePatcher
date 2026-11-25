@@ -20,7 +20,6 @@ namespace RailroaderScenePatcher {
         // The fields of one mask target (MaskTarget), the element of MapMaskBase.maskTargets.
         static readonly Type targetType = targets != null && targets.FieldType.IsGenericType ? targets.FieldType.GetGenericArguments()[0] : null;
         static readonly FieldInfo targetKind = targetType?.GetField("kind"), targetBiome = targetType?.GetField("biomeCode"), targetName = targetType?.GetField("maskName");
-        static readonly Type marker = Native.Type(BakedSceneryRules.Marker);
         static readonly MethodInfo rebuild = maskBase?.GetMethod("Rebuild", Native.Flags, null, Type.EmptyTypes, null);
         readonly BoardScene terrain;
         // Whether a world reads and rebuilds the masks in this load: without one, a group that holds a mask is refused.
@@ -40,33 +39,21 @@ namespace RailroaderScenePatcher {
         internal static void Release(GroundMaskWorld world) => availability.Release(world);
         // Whether a scene ground mask stands at or below the object, by the scene's own objects.
         internal static bool Holds(GameObject go) => go != null && maskBase != null && Components(go).Length != 0;
-        // The scene objects at and below the object that hold a mask the inspector names, and whether one of the masks
-        // flattens the height. A mask whose component the scene disabled, as on the Whittier Road Bridge, registers
-        // nothing wherever its object stands, so it gives no dependency line and no terrain output; one that flattens
-        // the height still counts, because its move is refused.
+        // The scene objects at and below the object that hold a mask the inspector names, and whether one of those
+        // masks flattens the height. A mask whose component the scene disabled, as on the Whittier Road Bridge, registers
+        // nothing wherever its object stands, so it gives no dependency line and no terrain output.
         internal static IReadOnlyList<GameObject> Holders(GameObject go, out bool flattens) {
-            var found = go == null || maskBase == null ? new Component[0] : Components(go);
-            flattens = found.Any(Flattens) && !FlatteningAllowed;
-            return found.Where(c => Flattens(c) || !(c is Behaviour behaviour) || behaviour.enabled).Select(c => c.gameObject).Distinct().ToArray();
+            var found = go == null || maskBase == null ? new Component[0] : Components(go).Where(c => !(c is Behaviour behaviour) || behaviour.enabled).ToArray();
+            flattens = found.Any(Flattens);
+            return found.Select(c => c.gameObject).Distinct().ToArray();
         }
         static bool Flattens(Component mask) => flatten != null && shaped.IsInstanceOfType(mask) && (bool)flatten.GetValue(mask);
-        // Test only: the fault build can lift the flattening refusal, and the inspector then offers the move.
-        static bool FlatteningAllowed {
-            get {
-#if SCENE_PATCHER_FAULTS
-                return FaultInjection.FlatteningMovesAllowed;
-#else
-                return false;
-#endif
-            }
-        }
-        // What the game builds while it runs does not count, as for the parts of a group. Below a marker object, only
-        // the station building that the rule names has its masks handled (BakedSceneryRules.MaskedMarker): the mask of
-        // any other marker object, such as a sign's, stays as the Track marker family leaves it.
-        static Component[] Components(GameObject go) {
-            if (marker != null && go.GetComponent(marker) != null && !BakedSceneryRules.MaskedMarker(BoardScene.PathOf(go.transform))) return new Component[0];
-            return go.GetComponentsInChildren(maskBase, true).Where(c => c != null && !Transient(c.transform, go.transform)).ToArray();
-        }
+        // What the game builds while it runs does not count, as for the parts of a group. A mask follows its holder
+        // whichever edit moves it, a board's mask below the edited object included; only the edited object's own board
+        // mask stays with the board family (GroundMasks.MovedByEdit), so each mask is handled once.
+        static Component[] Components(GameObject go) =>
+            go.GetComponentsInChildren(maskBase, true).Where(c => c != null && !Transient(c.transform, go.transform)
+                && GroundMasks.MovedByEdit(c.gameObject == go, c.gameObject.GetComponents<Component>().Where(k => k != null).Select(k => k.GetType().FullName))).ToArray();
         static bool Transient(Transform child, Transform root) {
             for (var t = child; t != null && t != root; t = t.parent) if ((t.gameObject.hideFlags & HideFlags.DontSave) != 0) return true;
             return false;

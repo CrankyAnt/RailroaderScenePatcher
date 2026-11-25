@@ -72,6 +72,7 @@ static class BridgeTests {
     }
     static double[] Offsets(FakeBridge bridge) => bridge.Colliders.SelectMany(c => c.Offset).ToArray();
     public static void Run() {
+        GroundMaskTests.HeldMaskFollowsItsHolder("Bridge", masks => { var (world, bridge, _) = Setup(); return (bridge, new BridgeScene(world, Capability.Unchecked, masks)); }, Doc(Bridge("move-bridge", 1300)));
         FixedPlacement();
         MapMismatchRejectsBeforeResolution();
         TargetResolutionIsExact();

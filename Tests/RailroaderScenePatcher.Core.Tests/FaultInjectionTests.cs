@@ -14,7 +14,6 @@ static class FaultInjectionTests {
         AfterMutationIsRestoredOnce();
         DuringRestorationLeavesAnIncompleteCleanup();
         CoverageTests.RunInjectedInterruption();
-        GroundMaskTests.RunFlatteningSwitch();
         RoadBridgeTests.RunFailureAfterRebuild();
         UnreadableGroupIsSkippedOnce();
         UnreadablePartsAreSkippedOnce();

@@ -68,10 +68,6 @@ public sealed class FaultSwitch : MonoBehaviour {
             GUILayout.Label("Armed: " + (Get(type, "Armed") ?? "none"));
             GUILayout.Label("Last: " + (armFailure ?? Get(type, "LastTrip") ?? "nothing tripped yet"));
             foreach (var point in Points) if (GUILayout.Button("Arm " + point)) { Call(type, "Arm", point); Debug.Log("[SceneFaultSwitch] Armed " + point); }
-            // Lifts the refusal of a move of a ground mask that flattens the terrain height, for the height evidence.
-            var flattening = Equals(Get(type, "FlatteningMovesAllowed"), true);
-            GUILayout.Label("Flattening mask moves: " + (flattening ? "allowed" : "refused"));
-            if (GUILayout.Button(flattening ? "Refuse flattening mask moves" : "Allow flattening mask moves")) { Call(type, "AllowFlatteningMoves", !flattening); Debug.Log("[SceneFaultSwitch] Flattening mask moves " + (!flattening ? "allowed" : "refused")); }
             GUILayout.Label("Unreadable group: " + (Get(type, "UnreadableGroup") ?? "none"));
             GUILayout.Label("Unreadable parts: " + (Get(type, "UnreadableParts") ?? "none"));
             groupRoot = GUILayout.TextField(groupRoot ?? "");

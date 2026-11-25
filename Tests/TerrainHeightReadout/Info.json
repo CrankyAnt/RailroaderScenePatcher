@@ -1,0 +1,8 @@
+{
+  "identifier": "crankyant/terrain-height-readout",
+  "name": "Terrain Height Readout",
+  "author": "CrankyAnt",
+  "version": "0.1.0",
+  "assemblies": ["TerrainHeightReadout.dll"],
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}

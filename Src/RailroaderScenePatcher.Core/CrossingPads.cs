@@ -66,17 +66,22 @@ namespace RailroaderScenePatcher.Core {
     // geometry and culling from the mod's location. A pad without a track location has no geometry, so a
     // relationship must name a location; disabling the pad is the way to hide it. Placement and activity stay
     // separate settings; the generated geometry follows the track, not the pad object.
-    public sealed class CrossingPadScene : IScene, IRelationshipScene, IVersionedScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene {
+    public sealed class CrossingPadScene : IScene, IRelationshipScene, IVersionedScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IDependentOutputScene {
         public const string Structure = "crossing-pad-v1", RequiredVersion = "0.5.0";
         readonly MarkerRelationship relationship;
         readonly ICrossingPadWorld world;
         // The changed source curves a reconciliation saw last for a pad, until they hold still for one more check.
         readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, string> unsettled = new System.Runtime.CompilerServices.ConditionalWeakTable<object, string>();
-        public CrossingPadScene(ICrossingPadWorld world, Capability capability) {
+        // The scene ground masks at and below the pad object: they move with it, a mask that flattens the terrain height
+        // included.
+        readonly MaskFollowing masks;
+        public CrossingPadScene(ICrossingPadWorld world, Capability capability, GroundMasks masks = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world));
             relationship = new MarkerRelationship(world, Structure, new GeneratedGeometry(world));
-            Capability = capability;
+            Capability = capability; this.masks = new MaskFollowing(masks);
         }
+        public DependentOutput Output(object target) => masks.Output(target);
+        public void RetryOutput(object target) => masks.RetryOutput(target);
         public IEnumerable<string> MapIds => relationship.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => relationship.Resolve(identity);
@@ -91,12 +96,12 @@ namespace RailroaderScenePatcher.Core {
         }
         public object Capture(object target) => relationship.Capture(target);
         public ObjectState Read(object target) => relationship.Read(target);
-        public void Apply(object target, ObjectState state) => relationship.Apply(target, state);
+        public void Apply(object target, ObjectState state) => masks.Write(target, () => relationship.Apply(target, state));
         public bool StillIdentifies(object target, TargetIdentity identity) => relationship.StillIdentifies(target, identity);
         public void PreflightPlacement(object target) => relationship.PreflightPlacement(target);
         // During a native track drag the curves change on every check. A curve-only change is reported once the changed
         // curves have held still between two checks, so one move regenerates the pad once. Any other difference is reported at once.
-        public void ApplyFollowUpdate(object target, ObjectState state) => relationship.Apply(target, state, true);
+        public void ApplyFollowUpdate(object target, ObjectState state) => masks.Write(target, () => relationship.Apply(target, state, true));
         public string DerivedProblem(object target, ObjectState desired) {
             var problem = relationship.DerivedProblem(target, desired);
             if (problem != GeneratedGeometry.CurvesChanged) { unsettled.Remove(target); return problem; }
@@ -106,7 +111,7 @@ namespace RailroaderScenePatcher.Core {
             unsettled.Add(target, curves);
             return null;
         }
-        public bool Restore(object target, object snapshot) => relationship.Restore(target, snapshot);
+        public bool Restore(object target, object snapshot) => masks.Restore(target, () => relationship.Restore(target, snapshot));
         // The pad geometry follows the marker location and the pad position it was generated from.
         sealed class GeneratedGeometry : IMarkerConsumer {
             internal const string CurvesChanged = "the track curves the pad follows have changed since its geometry was generated";

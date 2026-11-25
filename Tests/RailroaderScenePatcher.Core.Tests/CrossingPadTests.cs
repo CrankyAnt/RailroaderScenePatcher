@@ -113,6 +113,7 @@ static class CrossingPadTests {
     }
     static string Mesh(FakePadWorld world, FakeMarker pad) => world.Geometry(pad).Signature ?? "none";
     public static void Run() {
+        GroundMaskTests.HeldMaskFollowsItsHolder("Crossing pad", masks => { var (world, pad, _, _) = Setup(); return (pad, new CrossingPadScene(world, Capability.Unchecked, masks)); }, Doc(Placed("move-pad")));
         RebindRegeneratesGeometry();
         RepetitionAndReplacementConverge();
         ASavedMeshUnderThePadContainerIsOutput();

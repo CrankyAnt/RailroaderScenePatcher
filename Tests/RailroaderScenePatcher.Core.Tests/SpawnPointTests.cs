@@ -54,6 +54,7 @@ static class SpawnPointTests {
     static bool Unedited(FakeSpawn spawn) => spawn.Position.SequenceEqual(new[] { 4194.8, 645.5, -3139.2 }) && spawn.Rotation.SequenceEqual(new[] { 0.0, 0, 0, 1 }) && spawn.Active;
     static bool Moved(FakeSpawn spawn) => Math.Abs(spawn.Position[0] - 4210) < 1e-9 && spawn.Position[1] == 650 && spawn.Position[2] == -3100 && spawn.Rotation[1] == 0.707107;
     public static void Run() {
+        GroundMaskTests.HeldMaskFollowsItsHolder("Spawn point", masks => { var (world, spawn, _) = Setup(); return (spawn, new SpawnPointScene(world, Capability.Unchecked, masks)); }, Doc(Spawn("move-spawn", 5400)));
         FixedPlacementThroughTheOrigin();
         TargetResolutionIsExact();
         ActivityAndRepeatedApplication();

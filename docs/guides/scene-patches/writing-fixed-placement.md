@@ -61,7 +61,7 @@ When a player's game loads the world again, the patcher uses the stored map posi
 
 ## Check the support boundary
 
-The board's parents, culler, and circle map mask must be active. The board itself may be disabled through `active`. The patcher refuses a height-flattening mask, `Track.*` components, and other culling or mask components in the hierarchy. It also checks that the required game functions for map-coordinate conversion, culling, masks, and terrain are available.
+The board's parents, culler, and circle map mask must be active. The board itself may be disabled through `active`. The patcher refuses `Track.*` components, and other culling or mask components in the hierarchy. It also checks that the required game functions for map-coordinate conversion, culling, masks, and terrain are available.
 
 For the supported bridge, see [move or disable a bridge with its collision](placing-bridges.md). The [Current native targets](scene-patch-file-v1.md#current-native-targets) section lists every implemented object family. The runtime reports `Capability.Unchecked` even when the prerequisites are available. The isolated fixture observations described above cover only the tested board and build. They don't change that capability classification or establish the complete culling range.
 

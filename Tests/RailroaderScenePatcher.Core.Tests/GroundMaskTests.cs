@@ -103,6 +103,49 @@ class FakeMaskWorld : IGroundMaskWorld {
     }
 }
 
+// One flattening scene ground mask held by an object that a capability moves as a single object, such as a bridge, a
+// milepost, a crossing pad, a station map icon or a spawn point. The mask reads its holder through the capability's own
+// Read, registers where the holder stands while it is active, keeps its registration when only the holder moves, and
+// registers again at the holder on a rebuild. Each terrain tile is one metre wide, so the old and the new place of a
+// move are separate writes that stay outstanding until BuildTiles.
+sealed class HeldMaskTerrain : IGroundMaskWorld {
+    // Set once the capability that reads the holder exists.
+    internal object Holder;
+    internal Func<ObjectState> Read;
+    // The name of the object that holds the mask, and where it stands from the edited object, as a board below a track
+    // marker does.
+    internal string HolderName = "Mask";
+    internal double[] Offset = { 0, 0, 0 };
+    internal double[] Registered;
+    internal int Rebuilds;
+    internal bool FailRebuild, Built;
+    public event Action<double[], double[]> TileBuilt;
+    ObjectState Now => Read();
+    double[] Place => Now.Placement.Position.Select((v, i) => v + Offset[i]).ToArray();
+    bool Active => Now.Active != false;
+    void Sync() { if (!Active) Registered = null; else if (Registered == null) Registered = Place; }
+    static double[] Axis(Placement at) { var f = Turn.Rotate(at.Rotation, new[] { 0.0, 0, 1 }); var l = Math.Sqrt(f[0] * f[0] + f[2] * f[2]); return new[] { f[0] / l, 0, f[2] / l }; }
+    double[] registeredAxis;
+    public IReadOnlyList<GroundMaskState> Masks(object target) {
+        if (!ReferenceEquals(target, Holder)) return new GroundMaskState[0];
+        Sync();
+        var at = Now.Placement;
+        if (Registered != null && registeredAxis == null) registeredAxis = Axis(at);
+        if (Registered == null) registeredAxis = null;
+        var registrations = Registered == null ? new GroundMaskRegistration[0] : new[] { new GroundMaskRegistration(Registered, registeredAxis) };
+        return new[] { new GroundMaskState("mask", HolderName, Active, true, Place, Axis(at), 1, registrations, 0) };
+    }
+    public void Rebuild(object target, string id) {
+        if (FailRebuild) throw new InvalidOperationException("mask injected");
+        Rebuilds++; Registered = Place; registeredAxis = Axis(Now.Placement); Built = false;
+    }
+    public bool TileLoaded(double[] position) => true;
+    public void InvalidateTile(double[] position) { Built = false; }
+    public bool TerrainIdle => Built;
+    double ITerrainWorld.Now => 0;
+    internal void BuildTiles(IEnumerable<double[]> places) { Built = true; foreach (var p in places) TileBuilt?.Invoke(new[] { Math.Floor(p[0]), 0, Math.Floor(p[2]) }, new[] { Math.Floor(p[0]) + 1, 0, Math.Floor(p[2]) + 1 }); }
+}
+
 // Baked buildings with their own scene ground masks: the flag-stop stations and depots of the base-game map join the
 // Baked scenery group family, and a move of the object that holds a mask, or of its group, takes the mask's
 // registration along, with the terrain output at the old and the new place tracked to completion.
@@ -154,8 +197,8 @@ static class GroundMaskTests {
 
     // A map context change in one session, such as the editor's default map and then a mod's map: the earlier host is
     // released, the next host checks the game's ground mask members, and only then does Unity destroy the earlier host,
-    // whose OnDestroy releases it again. The members stay available for the next world, so Disable stays offered on a
-    // group with a flattening mask and only its move is refused.
+    // whose OnDestroy releases it again. The members stay available for the next world, so a group with a flattening
+    // mask stays editable.
     static void TheNextWorldKeepsTheMaskMembersWhenTheEarlierHostIsDestroyed() {
         var availability = new WorldOwnedFlag();
         object earlier = new object(), next = new object();
@@ -178,18 +221,21 @@ static class GroundMaskTests {
         MaskTheEditLeavesAloneIsNotJudged();
         SmallMovesDoNotLeaveTheMaskBehind();
         FailedSecondRebuildRestoresAndWaitsForTerrain();
-        PlacementModesAreUnavailableForAFlatteningMask();
-        FlatteningMaskRefusesAMove();
+        FlatteningMaskMovesWithItsHolder();
         RefusedLoadMoveShowsAsRefused();
-        BlockedMoveControlsShowTheirReason();
         ActivityReleasesAndRegistersTheMask();
-        FailureAfterMutationRestoresTheMask();
+        FailureAfterMutationRestoresTheMask(false);
+        FailureAfterMutationRestoresTheMask(true);
         TerrainWriteFailureIsIdentifiableAndRetryable();
-        EditingHistorySaveAndReload();
+        EditingHistorySaveAndReload(false);
+        EditingHistorySaveAndReload(true);
         InventoryListsTheStationsAndDepotsWithTheirParts();
         ObjectTabNamesTheMaskHolder();
         MarkerRootGainsTheMaskHandling();
         MarkerSceneBuiltBeforeTheMasksGainsThem();
+        GenericMarkerMovesItsMask();
+        BoardMaskStaysWithTheBoardFamily();
+        BoardBelowMovedMarkerMovesItsMask();
         Console.WriteLine("PASS: ground masks");
     }
 
@@ -276,39 +322,19 @@ static class GroundMaskTests {
         Assert(f.Engine.Apply(Doc(GroupMod("later", Near))).Outcomes["later"].Applied && Close(f.At(f.Group), Near) && f.Terrain.Store.Count == 2, "Completed terrain output lifts the guard: " + f.Where());
     }
 
-    // Every move of an object with a flattening mask at or below it is refused, so Gizmo, Snap and Follow are
-    // unavailable with the reason and Numeric keeps showing the placement with its fields unavailable.
-    static void PlacementModesAreUnavailableForAFlatteningMask() {
-        var flat = new[] { "Culling", CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) }; var free = new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) };
-        var reason = CommandBand.GroundMaskMoveBlock(flat);
-        Assert(reason == "This object has a ground mask that flattens the terrain height. The game might not restore that height after a move.", "The reason: " + reason);
-        Assert(CommandBand.GroundMaskMoveBlock(free) == null && CommandBand.GroundMaskMoveBlock(new[] { "Culling" }) == null && CommandBand.GroundMaskMoveBlock(null) == null, "Only a flattening mask blocks a move");
-        foreach (var mode in new[] { CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
-            Assert(CommandBand.ModeBlock(mode, false, true, CommandBand.GroupOperations, moveBlock: reason) == reason && CommandBand.Tooltip("Drag", CommandBand.ModeBlock(mode, false, true, CommandBand.GroupOperations, moveBlock: reason)).StartsWith("Unavailable: This object has a ground mask", StringComparison.Ordinal),
-                "Mode " + mode + " is unavailable with the reason");
-        Assert(CommandBand.ModeBlock(CommandBand.NumericMode, false, true, CommandBand.GroupOperations, moveBlock: reason) == null, "Numeric stays open and shows the placement");
-        Assert(CommandBand.ModeBlock(CommandBand.GizmoMode, false, true, CommandBand.GroupOperations) == null, "An object without the block keeps its modes");
-        // A mode that was open before the object was selected closes: the tab shows Numeric, as for a pad.
-        Assert(CommandBand.ForcesNumeric(false, true, false, reason) && CommandBand.ForcesNumeric(true, true, false, null) && CommandBand.ForcesNumeric(false, false, false, null) && CommandBand.ForcesNumeric(false, true, true, null)
-            && !CommandBand.ForcesNumeric(false, true, false, null), "A blocked move forces Numeric, as a pad, an object that cannot be edited and a controller do");
-        // The tab's actions, Read and Apply included, take the same reason.
-        Assert(CommandBand.PlacementBlock(null, null, null, reason) == reason && CommandBand.PlacementBlock("edit", "pad", "controller", reason) == "edit" && CommandBand.PlacementBlock(null, "pad", null, reason) == "pad"
-            && CommandBand.PlacementBlock(null, null, "controller", reason) == "controller" && CommandBand.PlacementBlock(null, null, null, null) == null, "The move block is the reason of the placement actions when no earlier block holds");
-    }
-
-    // A move that the world load refused, such as a hand-written fixed move of a station whose ground mask flattens the
-    // terrain height, shows as refused in scene patch editing: not as a change, with the reason on the Changes tab, in
+    // A move that the world load refused, such as a hand-written fixed move of a station that the group world refuses
+    // to place, shows as refused in scene patch editing: not as a change, with the reason on the Changes tab, in
     // the outliner marker, the state badge and the row tooltip. The Problems filter stays for repairable defects of the
     // object. An edit that replaces the refused modification ends the mark.
     static void RefusedLoadMoveShowsAsRefused() {
-        var f = new Stop(flattens: true);
+        var f = new Stop(); f.World.PlacementRefused[f.Group] = "The station can't be placed in this test.";
         var text = Doc(GroupMod("move-station", Far));
         var load = f.Engine.Apply(text, "author/pack").Outcomes["move-station"];
         Assert(!load.Applied && load.Failure == FailureKind.Refused, "The world load refuses the move: " + load.Error);
         var store = new Store { Patch = text }; var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(f.Engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
         var refusal = session.Refusal(StationId);
-        Assert(refusal != null && refusal.Contains("flattens the terrain height") && session.IsChanged(StationId), "The session knows the refused modification and its reason: " + refusal);
+        Assert(refusal != null && refusal.Contains("can't be placed in this test") && session.IsChanged(StationId), "The session knows the refused modification and its reason: " + refusal);
         Assert(session.Changes(StationId).SequenceEqual(new[] { "Refused. " + refusal.TrimEnd('.') + "." }), "The Changes tab marks it as refused: " + String.Join(" | ", session.Changes(StationId)));
         // What the outliner, state line and tooltip show: only an object this mod changes can show a failure.
         Assert(CommandBand.ShownFailure(true, FailureKind.Refused) == FailureKind.Refused && CommandBand.ShownFailure(false, FailureKind.Refused) == null && CommandBand.ShownFailure(true, null) == null, "Only a changed object shows a failure");
@@ -331,24 +357,6 @@ static class GroundMaskTests {
         Assert(session.IncompleteOperation == null && session.Refusal(StationId) != null && Close(f.At(f.Group), Authored), "Undo brings the refused move back as refused: " + session.IncompleteOperation);
     }
 
-    // An object whose move a flattening ground mask blocks shows Read and Apply inactive with the reason, the Numeric mode
-    // and the position fields with "Unavailable: <reason>", and Supported edits names only what still applies.
-    static void BlockedMoveControlsShowTheirReason() {
-        var reason = CommandBand.FlatteningMoveBlock;
-        var acts = CommandBand.NumericActionReasons(reason, null);
-        Assert(acts.Apply == reason && acts.Read == reason, "Read and Apply are inactive with the reason");
-        var open = CommandBand.NumericActionReasons(null, "Enter a number");
-        Assert(open.Apply == "Enter a number" && open.Read == null, "Without a block Apply follows the fields and Read is available");
-        Assert(CommandBand.ModeTip(CommandBand.NumericMode, "Enter a position.", null, reason) == "Unavailable: " + reason.TrimEnd('.') + ".", "The Numeric mode gives the reason of its fields: " + CommandBand.ModeTip(CommandBand.NumericMode, "Enter a position.", null, reason));
-        Assert(CommandBand.ModeTip(CommandBand.NumericMode, "Enter a position.", null, null) == "Enter a position." && CommandBand.ModeTip(CommandBand.GizmoMode, "Drag.", reason, reason).StartsWith("Unavailable: ", StringComparison.Ordinal),
-            "An open Numeric mode keeps its description; another mode gives its own block");
-        Assert(CommandBand.BlockedValueTip(reason) == "Unavailable: " + reason.TrimEnd('.') + ".", "A blocked value row's tooltip starts with Unavailable: " + CommandBand.BlockedValueTip(reason));
-        Assert(CommandBand.OperationsWithoutMove(CommandBand.GroupOperations) == "Enable or disable the whole group.", "A blocked group: " + CommandBand.OperationsWithoutMove(CommandBand.GroupOperations));
-        Assert(CommandBand.OperationsWithoutMove(CommandBand.PartOperations) == "Enable or disable this part. The group and its other parts stay unchanged.", "A blocked part: " + CommandBand.OperationsWithoutMove(CommandBand.PartOperations));
-        Assert(CommandBand.OperationsWithoutMove(CommandBand.MarkerOperations) == "Set, replace, or detach the marker's track binding. Edit activity separately.", "A blocked marker: " + CommandBand.OperationsWithoutMove(CommandBand.MarkerOperations));
-        Assert(CommandBand.OperationsWithoutMove("Something else.") == "Something else." && CommandBand.OperationsWithoutMove(null) == null, "Other texts stay");
-    }
-
     // A part with a fixed placement keeps it when its group moves, and so does the mask it holds: nothing is rebuilt.
     static void HeldMaskPartStaysWhenItsGroupMoves() {
         var f = new Stop(onPart: true);
@@ -358,48 +366,25 @@ static class GroundMaskTests {
         Assert(Close(f.At(f.Group), Near) && Close(f.At(f.Slab), held) && f.RegisteredOnceAt(held, 30), "The held part keeps its mask where it is: " + f.Where());
     }
 
-    // A mask that flattens the terrain height: a move of its holder, of a part above it or of its group is refused
-    // before any mutation, with the reason. Enabling and disabling stay possible.
-    static void FlatteningMaskRefusesAMove() {
-        var reason = GroundMasks.FlatteningRefusal("Mask");
-        Assert(reason == "The ground mask on Mask flattens the terrain height. The game might not restore that height after a move, so this object can't be moved.", "The refusal names the holder and why: " + reason);
-        var f = new Stop(flattens: true); var rebuilds = f.Terrain.Rebuilds;
-        var outcome = f.Engine.Apply(Doc(GroupMod("move-station", Far))).Outcomes["move-station"];
-        Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && outcome.Error.Contains("flattens the terrain height") && f.World.Mutations == 0 && f.Terrain.Rebuilds == rebuilds && f.RegisteredOnceAt(Authored, 30),
-            "A group move is refused before mutation: " + outcome.Failure + " " + outcome.Error + " " + f.Where());
-        Assert(f.Masks.Output(f.Group).Settled && f.Masks.Output(f.Group).Completed.Count == 0, "A refusal starts no terrain output");
-        var part = new Stop(onPart: true, flattens: true);
-        outcome = part.Engine.Apply(Doc(PartMod("move-foundation", Foundation, Far))).Outcomes["move-foundation"];
-        Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && part.World.Mutations == 0 && part.RegisteredOnceAt(new[] { 1100.0, 10, 24 }, 30), "A move of the part that holds the mask is refused before mutation: " + outcome.Error);
-        Assert(part.Engine.Apply(Doc(PartMod("move-bench", Bench, new[] { 1120.0, 10, 30 }))).Outcomes["move-bench"].Applied, "A part without the mask still moves");
-        var hide = f.Engine.Apply(Doc(GroupMod("hide-station", active: false))).Outcomes["hide-station"];
-        Assert(hide.Applied && !f.Group.Active && f.Terrain.Store.Count == 0, "Disabling the station still applies and releases the mask: " + hide.Error);
-        var s = new Stop(flattens: true); var store = new Store(); var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(s.Engine, mapEditor, store); mapEditor.Session = session;
-        var before = session.ScenePatchFileText;
-        var edit = session.Edit(StationId, new Placement(Far, Upright), null);
-        Assert(!edit.Applied && edit.Error.Contains("flattens the terrain height") && s.World.Mutations == 0 && session.ScenePatchFileText == before && !mapEditor.IsDirty && !mapEditor.CanUndo,
-            "In scene patch editing the refusal leaves the scene, the scene patch file and the history unchanged: " + edit.Error);
-        Assert(session.Edit(StationId, null, false).Applied && s.Terrain.Store.Count == 0, "A disable of the flattening station applies in scene patch editing");
-        mapEditor.Undo(); Assert(s.Group.Active && s.RegisteredOnceAt(Authored, 30), "Undo enables it with its mask registered once: " + s.Where());
-        mapEditor.Redo();
-        var removed = session.Remove(StationId);
-        Assert(removed.Applied && s.Group.Active && s.RegisteredOnceAt(Authored, 30), "Remove modification returns the enabled station and its mask: " + removed.Error + " " + s.Where());
-    }
-
-#if SCENE_PATCHER_FAULTS
-    // The fault build can lift the refusal, so that a Railroader journey can compare the terrain height before, after
-    // and restoration; Disarm ends it.
-    internal static void RunFlatteningSwitch() {
+    // A mask that flattens the terrain height moves with its holder like any other mask: a move of the group, of the
+    // part that holds it or of a part above it applies, the mask's centre and rotation follow, and the terrain output
+    // at the old and the new place is tracked under the edited object. Enabling and disabling stay as they were.
+    static void FlatteningMaskMovesWithItsHolder() {
         var f = new Stop(flattens: true);
-        FaultInjection.AllowFlatteningMoves(true);
-        try {
-            var outcome = f.Engine.Apply(Doc(GroupMod("move-station", Far))).Outcomes["move-station"];
-            Assert(outcome.Applied && f.RegisteredOnceAt(Far, 30), "With the switch on, a flattening mask moves with its station: " + outcome.Error + " " + f.Where());
-        } finally { FaultInjection.Disarm(); }
-        Assert(!FaultInjection.FlatteningMovesAllowed && !f.Engine.Apply(Doc(GroupMod("again", Near))).Outcomes["again"].Applied, "Disarm restores the refusal");
+        var outcome = f.Engine.Apply(Doc(GroupMod("move-station", Far, yaw: 40))).Outcomes["move-station"];
+        Assert(outcome.Applied && Close(f.At(f.Group), Far) && f.RegisteredOnceAt(Far, 70), "A group move carries the flattening mask, centre and rotation: " + outcome.Error + " " + f.Where());
+        var output = f.Masks.Output(f.Group);
+        Assert(output.Outstanding.Count == 2 && output.Outstanding.Any(l => l.Contains("x=1100.0")) && output.Outstanding.Any(l => l.Contains("x=1700.0")),
+            "The terrain at the old and the new place is tracked: " + String.Join("; ", output.Outstanding));
+        f.Terrain.BuildTiles(); f.Masks.Poll();
+        Assert(f.Masks.Output(f.Group).Settled && f.Masks.Output(f.Group).Completed.Count == 2, "Both terrain writes complete");
+        var part = new Stop(onPart: true, flattens: true);
+        outcome = part.Engine.Apply(Doc(PartMod("move-foundation", Foundation, new[] { 1150.0, 10, 60 }, yaw: 90))).Outcomes["move-foundation"];
+        Assert(outcome.Applied && part.RegisteredOnceAt(new[] { 1150.0, 10, 60 }, 120) && part.Masks.Output(part.Slab).Outstanding.Count == 2,
+            "A move of the part that holds the flattening mask carries it: " + outcome.Error + " " + part.Where());
+        var hide = new Stop(flattens: true);
+        Assert(hide.Engine.Apply(Doc(GroupMod("hide-station", active: false))).Outcomes["hide-station"].Applied && hide.Terrain.Store.Count == 0, "Disabling the station releases the flattening mask");
     }
-#endif
 
     // Disabling the group releases the mask through the component's own lifecycle; enabling registers it once again.
     // The terrain at the mask's place is tracked both times.
@@ -420,15 +405,16 @@ static class GroundMaskTests {
     // A failure after the group moved restores the placement and the mask's one registration at its old place. A
     // rebuild that failed changed no registration, so no terrain output is outstanding and the next edit applies. A
     // restoration that cannot rebuild the mask is an incomplete cleanup, which blocks the retry.
-    static void FailureAfterMutationRestoresTheMask() {
-        var f = new Stop();
+    // flattens: the mask also flattens the terrain height, which takes the same route.
+    static void FailureAfterMutationRestoresTheMask(bool flattens) {
+        var f = new Stop(flattens: flattens);
         f.Terrain.FailRebuildCount = 1;
         var outcome = f.Engine.Apply(Doc(GroupMod("move-station", Far, yaw: 40))).Outcomes["move-station"];
         Assert(!outcome.Applied && outcome.Error.Contains("back as it was") && Close(f.At(f.Group), Authored) && f.RegisteredOnceAt(Authored, 30), "The placement and the registration are restored: " + outcome.Error + " " + f.Where());
         Assert(f.Masks.Output(f.Group).Settled && f.Terrain.Store.Count == 1, "The failed rebuild left no terrain output outstanding and no second registration");
         Assert(f.Engine.Apply(Doc(GroupMod("later", Far))).Outcomes["later"].Applied && f.RegisteredOnceAt(Far, 30), "The next edit applies: " + f.Where());
         // Two masks: the first follows the move, the second cannot be rebuilt, and neither can the first on the way back.
-        var stuck = new Stop();
+        var stuck = new Stop(flattens: flattens);
         stuck.Terrain.Add(new FakeMask { Id = "second", Holder = "Foundation", Group = stuck.Group, On = stuck.Slab });
         stuck.Terrain.FailAfterRebuilds = stuck.Terrain.Rebuilds + 1;
         outcome = stuck.Engine.Apply(Doc(GroupMod("move-station", Far))).Outcomes["move-station"];
@@ -436,7 +422,7 @@ static class GroundMaskTests {
         stuck.Terrain.FailAfterRebuilds = -1; var mutations = stuck.World.Mutations;
         var retry = stuck.Engine.Apply(Doc(GroupMod("again", Near))).Outcomes["again"];
         Assert(!retry.Applied && retry.Error.Contains("Cleanup") && stuck.World.Mutations == mutations, "The retry is blocked until cleanup is verified: " + retry.Error);
-        var part = new Stop(onPart: true); part.Terrain.FailRebuildCount = 1;
+        var part = new Stop(onPart: true, flattens: flattens); part.Terrain.FailRebuildCount = 1;
         outcome = part.Engine.Apply(Doc(PartMod("move-foundation", Foundation, Far))).Outcomes["move-foundation"];
         Assert(!outcome.Applied && outcome.Error.Contains("back as it was") && part.RegisteredOnceAt(new[] { 1100.0, 10, 24 }, 30), "A failed part move restores the part and its mask: " + outcome.Error + " " + part.Where());
     }
@@ -464,8 +450,9 @@ static class GroundMaskTests {
     // In scene patch editing: Undo and Redo of a station move with its mask and matching dirty state, Remove
     // modification, Save at format version 1 with the patcher dependency, and a reload that reproduces the move with
     // one registration.
-    static void EditingHistorySaveAndReload() {
-        var f = new Stop(); var store = new Store(); var mapEditor = new NativeMapEditor();
+    // flattens: the mask also flattens the terrain height, which takes the same route.
+    static void EditingHistorySaveAndReload(bool flattens) {
+        var f = new Stop(flattens: flattens); var store = new Store(); var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(f.Engine, mapEditor, store); mapEditor.Session = session;
         var all = new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata };
         void Persistence(bool dirty, string[] outstanding, string step) {
@@ -486,12 +473,12 @@ static class GroundMaskTests {
         mapEditor.Undo(); Assert(f.RegisteredOnceAt(Far, 70), "Undo of the removal moves the station and its mask again: " + f.Where());
         Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0") && (int)JObject.Parse(store.Patch)["formatVersion"] == 1, "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
         Persistence(false, new string[0], "After Save");
-        var fresh = new Stop();
+        var fresh = new Stop(flattens: flattens);
         var reload = fresh.Engine.Apply(store.Patch);
         Assert(reload.Outcomes.Count == 1 && reload.Outcomes.Values.All(o => o.Applied) && fresh.RegisteredOnceAt(Far, 70), "A reloaded world reproduces the move with one registration: " + fresh.Where());
         Assert(fresh.Engine.Apply(store.Patch).Outcomes.Values.All(o => o.Applied) && fresh.RegisteredOnceAt(Far, 70), "Applying the saved file again adds no registration: " + fresh.Where());
         var strict = new Store { Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.9.0\"]}}" };
-        var other = new Stop(); var strictEditor = new NativeMapEditor(); var kept = new PatchEditingSession(other.Engine, strictEditor, strict); strictEditor.Session = kept;
+        var other = new Stop(flattens: flattens); var strictEditor = new NativeMapEditor(); var kept = new PatchEditingSession(other.Engine, strictEditor, strict); strictEditor.Session = kept;
         Assert(kept.Edit(StationId, new Placement(Far, Upright), null).Applied && strictEditor.Save() == null && strict.Info.Contains(">=0.9.0") && !strict.Info.Contains(">=0.5.0"), "A stricter existing constraint is retained: " + strict.Info);
     }
 
@@ -537,13 +524,13 @@ static class GroundMaskTests {
     // The Object tab names the part that holds the ground mask and says that moving it moves the terrain shaping; the
     // group root and a part above the mask name the part that holds it. The Changes tab shows terrain output for them.
     static void ObjectTabNamesTheMaskHolder() {
-        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false) == "Ground mask: this part holds the scene ground mask. Moving it moves the terrain shaping. The patcher asks the game to regenerate terrain and vegetation at the old and new positions.",
+        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false) == "Ground mask: this part holds the scene ground mask. Moving this part moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The holder's line: " + CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false));
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) == "Ground mask: the part Mask holds the scene ground mask. Moving this object moves that part and the terrain shaping with it. The patcher asks the game to regenerate terrain and vegetation at the old and new positions.",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) == "Ground mask: the part Mask holds the scene ground mask. Moving this part moves that part, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of an object above the holder: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false));
-        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true) == "Ground mask: this part holds the scene ground mask, which also flattens the terrain height. It can't be moved because the game might not restore the terrain height after a move.",
+        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true) == "Ground mask: this part holds the scene ground mask. The mask also flattens the ground. Moving this part moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The holder of a flattening mask: " + CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true));
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) == "Ground mask: the part Mask holds the scene ground mask, which also flattens the terrain height. This object can't be moved because the game might not restore the terrain height after a move.",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) == "Ground mask: the part Mask holds the scene ground mask. The mask also flattens the ground. Moving this part moves that part, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "An object above a flattening mask: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true));
         Assert(CommandBand.HoldsGroundMask(new[] { "Culling", CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) }) && !CommandBand.HoldsGroundMask(new[] { "Culling" }) && !CommandBand.HoldsGroundMask(null),
             "Whether an object has terrain output travels as its dependency line");
@@ -559,26 +546,61 @@ static class GroundMaskTests {
             "The holder names its group's result: " + CommandBand.GroupTerrain("Wilmot Station", CommandBand.Terrain(null, null, true, "16525.9, 2300.8", "", true), false));
         Assert(CommandBand.GroupTerrain("Wilmot Station", CommandBand.Terrain(null, null, false, "none", "16525.9, 2300.8", false), true).EndsWith("Retry is on the group's Changes tab.", StringComparison.Ordinal),
             "A pending or stopped write says where Retry is");
-        // A flattening mask cannot be moved, so its use names only what an edit can do: disabling.
-        Assert(CommandBand.GroundMaskUse(CommandBand.PartDecorative, true, new[] { CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true) }) == "Ground mask: it shapes the ground and the vegetation where this part stands. Disabling this part changes the terrain there.",
-            "The use of a flattening holder names no move");
-        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) }) == "The building is decorative. The ground mask of its part Mask shapes the ground and the vegetation where it stands, so disabling this group changes the terrain there.",
-            "The use of a group above a flattening mask names its holder and no move, as Wilmot Station's");
+        // A flattening mask moves like any other, so its use names moving and disabling.
+        Assert(CommandBand.GroundMaskUse(CommandBand.PartDecorative, true, new[] { CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true) }) == "Ground mask: it shapes the ground and the vegetation where this part stands. Moving or disabling this part changes the terrain there.",
+            "The use of a flattening holder names the move");
+        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) }) == "The building is decorative. The ground mask of its part Mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
+            "The use of a group above a flattening mask names its holder and the move, as Wilmot Station's");
         // Several holders are named together; the group root's own mask stays "Its ground mask".
         Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask", "Pad" }, false) }) == "The building is decorative. The ground masks of its parts Mask and Pad shape the ground and the vegetation where they stand, so moving or disabling this group changes the terrain there.",
             "Several holders: " + CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask", "Pad" }, false) }));
         Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(true, new[] { "Root" }, false, group: true) }).StartsWith("The building is decorative. Its ground mask shapes", StringComparison.Ordinal),
             "A mask on the group root is the group's own");
         // Below a marker object the holder is no part of a family: the line calls it an object.
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false) == "Ground mask: the object Mask holds the scene ground mask, which also flattens the terrain height. This object can't be moved because the game might not restore the terrain height after a move.",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false) == "Ground mask: the object Mask holds the scene ground mask. The mask also flattens the ground. Moving this object moves that object, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of a marker object above the holder: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false));
-        // Only the marker object of a station building gains the mask handling in the Track marker family.
-        Assert(BakedSceneryRules.MaskedMarker("World/Large Scenery/Hemingway/Hemingway flagstopstation") && !BakedSceneryRules.MaskedMarker("World/Signs/Loc: Sylva Int") && !BakedSceneryRules.MaskedMarker(null),
-            "Hemingway is the marker object whose mask the Track marker family handles");
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, group: true) == "Ground mask: the part Mask holds the scene ground mask. The mask also flattens the ground. Moving this group moves that part, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+            "A group above a mask holder calls the inspected object a group");
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask", "Pad" }, true, group: true) == "Ground mask: the parts Mask and Pad hold scene ground masks. At least one mask also flattens the ground. Moving this group moves those parts, their masks, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+            "A group above several mask holders names the group and all the masks");
+        // An object of another family, such as a milepost or a spawn point, that holds the mask itself is no part.
+        Assert(CommandBand.GroundMaskDependency(true, new[] { "Spawn" }, true, parts: false) == "Ground mask: this object holds the scene ground mask. The mask also flattens the ground. Moving this object moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+            "The line of an object of another family that holds the mask: " + CommandBand.GroundMaskDependency(true, new[] { "Spawn" }, true, parts: false));
+    }
+
+    // A flattening ground mask under an object of another family follows its holder when the patcher moves it: the
+    // move applies, the registration stands at the holder's new place, the capability reports the terrain output at the
+    // old and the new place, and a failed rebuild restores the holder and the registration. setup makes a fresh world
+    // and returns the holder with the family's capability built with the masks; move is a whole scene patch file that
+    // moves the holder.
+    // holderName and offset: the mask stands on an object below the edited one, such as a board below a track marker.
+    internal static void HeldMaskFollowsItsHolder(string family, Func<GroundMasks, (object Holder, IScene Scene)> setup, string move, string holderName = "Mask", double[] offset = null) {
+        (object Holder, IScene Scene, HeldMaskTerrain Terrain, GroundMasks Masks) Fresh() {
+            var terrain = new HeldMaskTerrain { HolderName = holderName, Offset = offset ?? new double[3] }; var masks = new GroundMasks(terrain);
+            var (holder, scene) = setup(masks);
+            terrain.Holder = holder; terrain.Read = () => scene.Read(holder);
+            terrain.Masks(holder);
+            return (holder, scene, terrain, masks);
+        }
+        var f = Fresh();
+        var authored = f.Terrain.Registered.ToArray();
+        var outcome = new PatchEngine(f.Scene).Apply(move).Outcomes.Values.Single();
+        var now = f.Scene.Read(f.Holder).Placement.Position.Select((v, i) => v + (offset?[i] ?? 0)).ToArray();
+        Assert(outcome.Applied && f.Terrain.Rebuilds == 1 && Close(f.Terrain.Registered, now) && !Close(now, authored), family + ": the move carries the flattening mask to the holder's new place: " + outcome.Error);
+        var output = ((IDependentOutputScene)f.Scene).Output(f.Holder);
+        Assert(output.Outstanding.Count == 2 && output.Error == null, family + ": the terrain output at the old and the new place is reported: " + String.Join("; ", output.Outstanding));
+        f.Terrain.BuildTiles(new[] { authored, now }); f.Masks.Poll();
+        Assert(((IDependentOutputScene)f.Scene).Output(f.Holder).Settled, family + ": the terrain output completes");
+        var g = Fresh();
+        var place = g.Scene.Read(g.Holder).Placement.Position.ToArray(); var registered = g.Terrain.Registered.ToArray();
+        g.Terrain.FailRebuild = true;
+        var failed = new PatchEngine(g.Scene).Apply(move).Outcomes.Values.Single();
+        Assert(!failed.Applied && failed.Error.Contains("back as it was") && Close(g.Scene.Read(g.Holder).Placement.Position, place) && Close(g.Terrain.Registered, registered),
+            family + ": a failed rebuild restores the holder and the registration: " + failed.Error);
     }
 
     // Hemingway: the track marker stands on the station's root, so the object stays in the Track marker family, and
-    // that family handles the mask below it: a move rebuilds the mask, and a flattening mask refuses the move.
+    // that family handles the mask below it: a move rebuilds the mask, a flattening one included.
     static void MarkerRootGainsTheMaskHandling() {
         const string path = "World/Large Scenery/Hemingway/Hemingway flagstopstation";
         var world = new FakeMarkerWorld(); var marker = new FakeMarker { Id = "Mo0j", Segment = "S9sc", End = "a", Distance = 46.52 };
@@ -590,8 +612,45 @@ static class GroundMaskTests {
         Assert(moved.Applied && terrain.Registered.Count == 1 && Close(terrain.Registered[0], new[] { 1160.0, 1, 2 }) && terrain.Rebuilds == 1, "A marker move rebuilds the mask below it once: " + moved.Error + " " + String.Join(";", terrain.Registered.Select(N)));
         Assert(masks.Output(marker).Completed.Count + masks.Output(marker).Outstanding.Count == 2, "The terrain at both places is tracked under the marker");
         terrain.Flattens = true;
-        var refused = engine.Apply(Doc(Move("again", 1220))).Outcomes["again"];
-        Assert(!refused.Applied && refused.Error.Contains("flattens the terrain height") && Close(world.Position(marker), new[] { 1160.0, 1, 2 }) && terrain.Rebuilds == 1, "A flattening mask refuses the marker's move before mutation: " + refused.Error);
+        var again = engine.Apply(Doc(Move("again", 1220))).Outcomes["again"];
+        Assert(again.Applied && terrain.Registered.Count == 1 && Close(terrain.Registered[0], new[] { 1220.0, 1, 2 }) && terrain.Rebuilds == 2, "A flattening mask follows the marker's move: " + again.Error);
+    }
+    // Any generic track marker object that holds a ground mask, not only Hemingway's, moves it with the marker.
+    static void GenericMarkerMovesItsMask() {
+        const string path = "World/Signs/Sign-Whistle Masked";
+        HeldMaskFollowsItsHolder("Track marker", masks => {
+            var world = new FakeMarkerWorld(); var marker = new FakeMarker { Id = "Mw1x", Segment = "S9sc", End = "a", Distance = 46.52 };
+            world.Objects[path] = new List<object> { marker }; world.Load(marker); world.Relative(marker);
+            return (marker, new TrackMarkerScene(world, Capability.Unchecked, masks));
+        }, Doc("\"move\":{\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + path + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"placement\":{\"mode\":\"fixed\",\"position\":[1160,1,2],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}"));
+    }
+    // A board below a moved track marker, such as a Loc: location sign, moves along with the marker, and the marker's
+    // family moves its mask once: one rebuild, one registration at the board's new place, terrain output at both places,
+    // and a failed rebuild restored. The board family rebuilds a board's mask only when the board itself is the edited
+    // target, so an edit handles each mask once.
+    static void BoardBelowMovedMarkerMovesItsMask() {
+        const string path = "World/Signs/Sign-Whistle Masked";
+        HeldMaskFollowsItsHolder("Board below a track marker", masks => {
+            var world = new FakeMarkerWorld(); var marker = new FakeMarker { Id = "Mw1x", Segment = "S9sc", End = "a", Distance = 46.52 };
+            world.Objects[path] = new List<object> { marker }; world.Load(marker); world.Relative(marker);
+            return (marker, new TrackMarkerScene(world, Capability.Unchecked, masks));
+        }, Doc("\"move\":{\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + path + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"placement\":{\"mode\":\"fixed\",\"position\":[1160,1,2],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}"),
+            "Loc: Sylva Int", new[] { 3.0, 0, 0 });
+        var board = new[] { "UnityEngine.Transform", "Helpers.Culling.RendererCuller", "Map.Runtime.MaskComponents.CircleMapMask", "Helpers.TextSynchronizer" };
+        Assert(GroundMasks.MovedByEdit(false, board), "The mask of a board below the edited object moves with that edit");
+        Assert(!GroundMasks.MovedByEdit(true, board), "A board that is the edited object itself keeps its mask with the board family");
+        Assert(GroundMasks.MovedByEdit(true, new[] { "UnityEngine.Transform", "Track.TrackMarker", "Map.Runtime.MaskComponents.RectangleMapMask" }) && GroundMasks.MovedByEdit(false, new[] { "Map.Runtime.MaskComponents.RectangleMapMask" }),
+            "Any other mask moves with the edit of its holder or of an object above it");
+    }
+    // A mask whose holder is an independent board, a renderer culler with a circle mask such as a Loc: location sign:
+    // the board family moves it when the board is the edited target.
+    static void BoardMaskStaysWithTheBoardFamily() {
+        Assert(GroundMasks.HeldByBoard(new[] { "UnityEngine.Transform", "Helpers.Culling.RendererCuller", "Map.Runtime.MaskComponents.CircleMapMask", "Helpers.TextSynchronizer" }),
+            "A Loc: location sign holds a board's mask");
+        Assert(!GroundMasks.HeldByBoard(new[] { "UnityEngine.Transform", "Track.TrackMarker", "Map.Runtime.MaskComponents.CircleMapMask" }) && !GroundMasks.HeldByBoard(new[] { "Map.Runtime.MaskComponents.RectangleMapMask" })
+            && !GroundMasks.HeldByBoard(new[] { "Helpers.Culling.RendererCuller", "Map.Runtime.MaskComponents.RectangleMapMask" }) && !GroundMasks.HeldByBoard(null)
+            && !GroundMasks.HeldByBoard(new[] { "Track.TrackMarker", "Helpers.Culling.RendererCuller", "Map.Runtime.MaskComponents.CircleMapMask" }),
+            "A marker object, a plain mask holder, a culler with another mask, or an object the board family refuses holds no board's mask");
     }
     // A new game prepares the runtime before the world load builds the ground masks; the marker capability built then
     // gains them once they exist, and handles the mask below Hemingway as one built with them.
@@ -602,10 +661,11 @@ static class GroundMaskTests {
         var terrain = new MarkerTerrain(world, marker) { Flattens = true }; var masks = new GroundMasks(terrain);
         var scene = new TrackMarkerScene(world, Capability.Unchecked);
         scene.UseMasks(masks);
-        scene.UseMasks(new GroundMasks(new MarkerTerrain(world, marker)));
+        var second = new MarkerTerrain(world, marker);
+        scene.UseMasks(new GroundMasks(second));
         string Move(string id, double x) => "\"" + id + "\":{\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + path + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"placement\":{\"mode\":\"fixed\",\"position\":[" + x.ToString(CultureInfo.InvariantCulture) + ",1,2],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
-        var refused = new PatchEngine(scene).Apply(Doc(Move("move", 1160))).Outcomes["move"];
-        Assert(!refused.Applied && refused.Error.Contains("flattens the terrain height") && terrain.Rebuilds == 0, "The masks given later refuse the move under a flattening mask; a second set does not replace them: " + refused.Error);
+        var moved = new PatchEngine(scene).Apply(Doc(Move("move", 1160))).Outcomes["move"];
+        Assert(moved.Applied && terrain.Rebuilds == 1 && second.Rebuilds == 0, "The masks given later rebuild the flattening mask on a move; a second set does not replace them: " + moved.Error);
     }
     // The one mask below a controlled marker: registered where the marker stood at the last rebuild.
     sealed class MarkerTerrain : IGroundMaskWorld {

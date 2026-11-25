@@ -31,12 +31,7 @@ namespace RailroaderScenePatcher.Core {
             if (point != AfterMutation && point != DuringRestoration && point != BetweenAdditionSteps) throw new ArgumentException("Unknown fault point: " + point);
             lock (gate) { armed = point; failRestoration = false; }
         }
-        public static void Disarm() { lock (gate) { armed = null; failRestoration = false; unreadableGroup = null; unreadableParts = null; flatteningMoves = false; } }
-        // Lifts the refusal of a move of a ground mask that flattens the terrain height, until Disarm or a call with
-        // false: the Railroader evidence that compares the height before, after and restoration needs such a move.
-        static bool flatteningMoves;
-        public static bool FlatteningMovesAllowed { get { lock (gate) return flatteningMoves; } }
-        public static void AllowFlatteningMoves(bool allow) { lock (gate) flatteningMoves = allow; }
+        public static void Disarm() { lock (gate) { armed = null; failRestoration = false; unreadableGroup = null; unreadableParts = null; } }
         // The group root that world marking reads as unreadable, as the Group skipped line names it
         // (scene name/path), or null.
         static string unreadableGroup;

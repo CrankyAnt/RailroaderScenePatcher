@@ -16,8 +16,9 @@ In the native map editor, open **Scene Patcher**, click **Refresh** in the comma
 
 - its culler or mask is disabled, or it carries more than one circle mask,
 - a parent object is inactive (the board itself may be disabled),
-- its mask flattens terrain height,
 - its hierarchy contains a `Track.*` component, another culler, another mask component, or another culling handler.
+
+A mask that flattens the ground moves with its board like any other mask. The game rebuilds the terrain at both positions. At the old position, it restores the ground height without the mask. At the new position, the mask flattens the ground. **Undo**, **Remove modification**, and restoration after a failed edit make the game rebuild the terrain at both positions again.
 
 A board placement holds a position and a rotation only. It never names a track, segment, or marker, and the patcher does not attach the board to one.
 

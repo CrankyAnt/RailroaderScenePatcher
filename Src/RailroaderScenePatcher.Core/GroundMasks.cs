@@ -45,27 +45,29 @@ namespace RailroaderScenePatcher.Core {
     }
     // Scene ground masks of baked scenery groups. A mask registers its shape in the game's terrain system where its
     // holder stood when it was enabled; after a move of the holder, the mask is rebuilt so that its registration follows,
-    // and the game regenerates terrain and vegetation at the old and the new place. That output is tracked by the
+    // and the game regenerates terrain and vegetation at the old and the new place. A mask that flattens the terrain
+    // height follows the same way: the game rebuilds a tile from its base heights and the masks registered there
+    // (Railroader 0.6.3, MapMaskBase.ApplyModifiers, MaskComponentBase.OnDisable, TerrainBuilder.TerraformCore). That output is tracked by the
     // edited object. The group and part capabilities of one scene share one instance.
     public sealed class GroundMasks : IDisposable {
         const double CentreTolerance = 0.1, AxisToleranceDegrees = 0.1;
         readonly IGroundMaskWorld world;
         readonly TerrainOutput output;
-        public GroundMasks(IGroundMaskWorld world) { this.world = world ?? throw new ArgumentNullException(nameof(world)); output = new TerrainOutput(world); }
-        // Why the move of an object whose ground mask flattens the terrain height is refused.
-        public static string FlatteningRefusal(string holder) =>
-            "The ground mask on " + holder + " flattens the terrain height. The game might not restore that height after a move, so this object can't be moved.";
-        internal IReadOnlyList<GroundMaskState> Observe(object scope) => world.Masks(scope) ?? Array.Empty<GroundMaskState>();
-        // Why the placement of the group root or part cannot be set, or null: a ground mask at or below it flattens the
-        // terrain height. Activity stays editable.
-        internal string PlacementRefusal(object target) {
-#if SCENE_PATCHER_FAULTS
-            // Test only: the fault build can lift the refusal to gather the evidence that would end it.
-            if (FaultInjection.FlatteningMovesAllowed) return null;
-#endif
-            var flattening = Observe(target).FirstOrDefault(mask => mask.Flattens);
-            return flattening == null ? null : FlatteningRefusal(flattening.Holder);
+        // Whether a holder with these component types is an independent board: a renderer culler and a circle mask on one
+        // object without a track component, such as a Loc: location sign. The board family rebuilds that mask itself
+        // when the board is the edited target.
+        public static bool HeldByBoard(IEnumerable<string> components) {
+            var types = components?.Where(type => type != null).ToArray();
+            return types != null && types.Contains(IndependentBoards.CullerType) && types.Contains(CircleMask) && !types.Any(type => type.StartsWith("Track.", StringComparison.Ordinal));
         }
+        const string CircleMask = "Map.Runtime.MaskComponents.CircleMapMask";
+        // Whether an edit of a family that moves its holders' masks moves this mask. heldByTarget: the edited object holds
+        // the mask itself. A mask follows its holder whichever edit moves it, so a board carried along below a moved
+        // object moves its mask with that edit; only a board that is the edited target leaves its mask to the board
+        // family, so each mask is handled once.
+        public static bool MovedByEdit(bool heldByTarget, IEnumerable<string> holderComponents) => !(heldByTarget && HeldByBoard(holderComponents));
+        public GroundMasks(IGroundMaskWorld world) { this.world = world ?? throw new ArgumentNullException(nameof(world)); output = new TerrainOutput(world); }
+        internal IReadOnlyList<GroundMaskState> Observe(object scope) => world.Masks(scope) ?? Array.Empty<GroundMaskState>();
         // After an edit of target changed placement or activity inside the group at scope: every enabled mask whose
         // registration no longer stands at its holder is rebuilt there, and the terrain at each place a registration
         // left or reached is tracked under target. before holds the masks as they were when the edit started. A mask
@@ -126,5 +128,25 @@ namespace RailroaderScenePatcher.Core {
         // The edited objects whose terrain output stopped without completing, with their reports.
         public IEnumerable<KeyValuePair<object, DependentOutput>> Failures => output.Failures;
         public void Dispose() => output.Dispose();
+    }
+    // The scene ground masks at and below the objects of one capability whose holder the patcher moves as a single
+    // object, such as a bridge, a milepost, a crossing pad, a station map icon, a spawn point or a marker object: every
+    // write is followed by the masks' rebuild where the object stands now, and the terrain output is tracked under the
+    // object. Without masks, as in a world without them, writes go through unchanged.
+    internal sealed class MaskFollowing {
+        GroundMasks masks;
+        internal MaskFollowing(GroundMasks masks) { this.masks = masks; }
+        // Gives a capability built before the world's ground masks existed, as for a new game's start, those masks. A
+        // capability that already has masks keeps them.
+        internal void Use(GroundMasks value) { if (masks == null) masks = value; }
+        internal void Write(object target, Action change) { var before = masks?.Observe(target); change(); masks?.Follow(target, target, before); }
+        // A restoration that verified its own state verifies the masks too: each stands at its holder again.
+        internal bool Restore(object target, Func<bool> restore) {
+            var before = masks?.Observe(target);
+            if (!restore()) return false;
+            try { masks?.Follow(target, target, before); return true; } catch { return false; }
+        }
+        internal DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;
+        internal void RetryOutput(object target) => masks?.RetryOutput(target);
     }
 }

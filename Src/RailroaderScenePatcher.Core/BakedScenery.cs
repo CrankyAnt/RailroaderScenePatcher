@@ -472,11 +472,6 @@ namespace RailroaderScenePatcher.Core {
         // that holds one is a group of the family, and the object that holds it is a part.
         public const string GroundMasks = "Map.Runtime.MaskComponents.";
         public static bool HoldsGroundMask(IEnumerable<string> components) => components != null && components.Any(type => type != null && type.StartsWith(GroundMasks, StringComparison.Ordinal));
-        // The marker objects whose scene ground mask the Track marker family handles: a station building whose track
-        // marker stands on its root, which keeps that family. Railroader 0.6.3 has one, the Hemingway flag-stop station.
-        // The masks of other marker objects, such as a sign's, stay as that family leaves them.
-        public static readonly IReadOnlyList<string> MaskedMarkers = Array.AsReadOnly(new[] { "World/Large Scenery/Hemingway/Hemingway flagstopstation" });
-        public static bool MaskedMarker(string path) => path != null && MaskedMarkers.Contains(path);
         // The first exclusion, in the order of the list, that a component at or below the node matches.
         static Exclusion FirstExclusion(IHierarchyNode node, string allowed = null) {
             var types = new HashSet<string>(StringComparer.Ordinal);
@@ -849,7 +844,7 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship.");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Placement?.Following != null && world.FollowingRefusal(target) is string following) throw new InvalidOperationException(following);
-            var refusal = (state?.Placement == null ? null : world.PlacementRefusal(target) ?? masks?.PlacementRefusal(target))
+            var refusal = (state?.Placement == null ? null : world.PlacementRefusal(target))
                 ?? (state?.Active == false ? world.DisableRefusal(target) : null);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
@@ -957,7 +952,7 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Equipment != null) throw new InvalidOperationException("Baked scenery parts do not support crossing-equipment relationships");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Placement?.Following != null && world.FollowingRefusal(target) is string following) throw new InvalidOperationException(following);
-            var refusal = (state?.Active == null ? null : world.ActivityRefusal(target)) ?? (state?.Placement == null ? null : world.PlacementRefusal(target) ?? masks?.PlacementRefusal(target))
+            var refusal = (state?.Active == null ? null : world.ActivityRefusal(target)) ?? (state?.Placement == null ? null : world.PlacementRefusal(target))
                 ?? (state?.Active == false ? world.DisableRefusal(target) : null);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }

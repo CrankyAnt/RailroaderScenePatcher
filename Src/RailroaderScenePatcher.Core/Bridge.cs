@@ -50,13 +50,17 @@ namespace RailroaderScenePatcher.Core {
     }
     // Places and enables or disables a bridge root together with its colliders. Separate track-owned
     // scenery, such as generated trestles, is never part of the moved hierarchy and must stay unchanged.
-    public sealed class BridgeScene : IScene {
+    public sealed class BridgeScene : IScene, IDependentOutputScene {
         public const string Structure = "bridge-colliders-v1";
         const double PositionTolerance = 0.01, AngleToleranceDegrees = 0.01;
         readonly IBridgeWorld world;
         // The collider layout first observed for each bridge in this load: the invariant every application keeps.
         readonly Dictionary<object, BridgeObservation> reference = new Dictionary<object, BridgeObservation>();
-        public BridgeScene(IBridgeWorld world, Capability capability) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; }
+        // The scene ground masks at and below the bridge: they move with it, a mask that flattens the terrain height included.
+        readonly MaskFollowing masks;
+        public BridgeScene(IBridgeWorld world, Capability capability, GroundMasks masks = null) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.masks = new MaskFollowing(masks); }
+        public DependentOutput Output(object target) => masks.Output(target);
+        public void RetryOutput(object target) => masks.RetryOutput(target);
         public IEnumerable<string> MapIds => world.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
@@ -76,7 +80,8 @@ namespace RailroaderScenePatcher.Core {
         }
         public object Capture(object target) { Reference(target); return world.Observe(target); }
         public ObjectState Read(object target) => world.Observe(target).Root;
-        public void Apply(object target, ObjectState state) {
+        public void Apply(object target, ObjectState state) => masks.Write(target, () => Change(target, state));
+        void Change(object target, ObjectState state) {
             var expected = Reference(target);
             var before = world.Observe(target);
             var active = state.Active ?? before.Root.Active ?? true;
@@ -89,7 +94,8 @@ namespace RailroaderScenePatcher.Core {
             var difference = Layout(expected, after) ?? Activity(before, after) ?? (after.SeparateScenery == before.SeparateScenery ? null : "separate track-owned scenery changed");
             if (difference != null) throw new InvalidOperationException("Bridge collider state did not verify: " + difference);
         }
-        public bool Restore(object target, object snapshot) {
+        public bool Restore(object target, object snapshot) => masks.Restore(target, () => Restored(target, snapshot));
+        bool Restored(object target, object snapshot) {
             var captured = (BridgeObservation)snapshot;
             try {
                 var expected = Reference(target);

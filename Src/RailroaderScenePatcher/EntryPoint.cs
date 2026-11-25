@@ -155,6 +155,7 @@ namespace RailroaderScenePatcher {
         NativeRows Rows => rows ?? (rows = new NativeRows(new NativeRowOutput(() => loadId)));
         TrackMarkerWorld markerWorld;
         TrackMarkerScene markerScene;
+        SpawnPointScene spawnScene;
         internal bool Initialized { get; private set; }
         SceneInventory inventory;
         InspectionInputBlocker inputBlocker;
@@ -275,8 +276,10 @@ namespace RailroaderScenePatcher {
                     PatcherLog.Debug("The patcher couldn't prepare to change ground masks: " + e.GetBaseException().Message);
                 }
                 PrepareRuntime(value);
-                // A runtime prepared before the world load, for a new game's start or a marker check, built the marker capability without them.
+                // A runtime prepared before the world load, for a new game's start or a marker check, built the marker and
+                // spawn point capabilities without them.
                 markerScene?.UseMasks(groundMasks);
+                spawnScene?.UseMasks(groundMasks);
                 if (inMapEditor) {
                     inventory = new SceneInventory(native);
                     selection = new SpatialSelection(native, () => inventory?.Entries);
@@ -299,7 +302,7 @@ namespace RailroaderScenePatcher {
                     live.scene.name == identity.Scene && BoardScene.PathOf(live.transform) == identity.Path;
                 if (scene != null) capabilities.Add(scene);
                 else capabilities.AddUnavailable(IndependentBoards.Structure, status);
-                try { capabilities.Add(new BridgeScene(new BridgeWorld(), Capability.Unchecked)); }
+                try { capabilities.Add(new BridgeScene(new BridgeWorld(), Capability.Unchecked, groundMasks)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to change bridges: " + e.GetBaseException().Message);
@@ -319,17 +322,17 @@ namespace RailroaderScenePatcher {
                 catch (Exception e) {
                     capabilities.AddUnavailable(ConstructionSceneryScene.Structure, e.GetBaseException().Message);
                 }
-                try { capabilities.Add(new CrossingPadScene(new CrossingPadWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
+                try { capabilities.Add(new CrossingPadScene(new CrossingPadWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked, groundMasks)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingPadScene.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to change crossing pads: " + e.GetBaseException().Message);
                 }
-                try { capabilities.Add(new MilepostScene(new MilepostWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
+                try { capabilities.Add(new MilepostScene(new MilepostWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked, groundMasks)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(MilepostScene.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to change mileposts: " + e.GetBaseException().Message);
                 }
-                try { capabilities.Add(new StationMapIconScene(new MapIconWorld())); }
+                try { capabilities.Add(new StationMapIconScene(new MapIconWorld(), Capability.Unchecked, groundMasks)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(StationMapIconRules.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to change station map icons: " + e.GetBaseException().Message);
@@ -377,7 +380,7 @@ namespace RailroaderScenePatcher {
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             // A new game reads its start spawn point before the world load, so the spawn point capability is ready with the runtime.
-            try { capabilities.Add(new SpawnPointScene(new SpawnPointWorld(), Capability.Unchecked)); }
+            try { capabilities.Add(spawnScene = new SpawnPointScene(new SpawnPointWorld(), Capability.Unchecked, groundMasks)); }
             catch (Exception e) {
                 capabilities.AddUnavailable(SpawnPoints.Structure, e.GetBaseException().Message);
                 PatcherLog.Debug("The patcher couldn't prepare to change spawn points: " + e.GetBaseException().Message);
@@ -1053,7 +1056,7 @@ namespace RailroaderScenePatcher {
             // Ending the capabilities returns patched crossings to their native coverage when the scene stays.
             capabilities?.Dispose();
             groundMasks?.Dispose(); groundMasks = null; GroundMaskWorld.Release(groundMaskWorld); groundMaskWorld = null; scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; crossingCoverageScene = null; engine = null; inventory = null; native = null; selected = null;
-            runtime = null; markerWorld = null; markerScene = null; nativeDiagnostics = null; rows?.Abandon(); rows = null; overlapNotices = null;
+            runtime = null; markerWorld = null; markerScene = null; spawnScene = null; nativeDiagnostics = null; rows?.Abandon(); rows = null; overlapNotices = null;
         }
         static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);
         void OnDestroy() { Release(); }

@@ -509,7 +509,7 @@ static class ExistingEquipmentTests {
                 Assert(CommandBand.ModeBlock(mode, false, false, operations, equipment: equipment) == shown, "Placement mode " + mode + " is disabled with the reason: " + CommandBand.ModeBlock(mode, false, false, operations, equipment: equipment));
             Assert(CommandBand.Tooltip("Enter a position in map coordinates and a rotation in degrees.", shown) == "Unavailable: " + shown, "Numeric's tooltip gives the reason: " + CommandBand.Tooltip("Enter a position in map coordinates and a rotation in degrees.", shown));
             // The rotation fields and Enabled take the inspector's edit block, which for an object that cannot be edited is this reason.
-            Assert(CommandBand.ForcesNumeric(false, false, false, null) && CommandBand.InspectorEditBlock(false, operations) == shown, "Rotation and Enabled are disabled with the same reason: " + CommandBand.InspectorEditBlock(false, operations));
+            Assert(CommandBand.ForcesNumeric(false, false, false) && CommandBand.InspectorEditBlock(false, operations) == shown, "Rotation and Enabled are disabled with the same reason: " + CommandBand.InspectorEditBlock(false, operations));
         }
         Assert(!CommandBand.RefusedEquipment(conforming.Family, conforming.Operations) && CommandBand.ModeBlock(CommandBand.NumericMode, false, true, conforming.Operations, equipment: true) == null && CommandBand.InspectorEditBlock(true, conforming.Operations) == null,
             "A conforming mast keeps Numeric, rotation and Enabled");

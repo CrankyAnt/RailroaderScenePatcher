@@ -111,8 +111,10 @@ static class BoardTests {
         if (!board.Active) return board.Sphere == null && board.Keys.Count == 0;
         return Near(board.Sphere, board.Position) && board.Keys.Count == board.Masks && board.Keys.All(k => world.MaskStore.ContainsKey(k) && Near(world.MaskStore[k], board.Position));
     }
+    // Whether Setup's board holds a mask that also flattens the terrain height.
+    static bool flattening;
     static (FakeBoardWorld, FakeBoard, IndependentBoards, PatchEngine) Setup() {
-        var world = new FakeBoardWorld(); var board = world.Add(); world.BuildTiles();
+        var world = new FakeBoardWorld(); var board = world.Add(new FakeBoard { Flattens = flattening }); world.BuildTiles();
         var boards = new IndependentBoards(world); return (world, board, boards, new PatchEngine(boards));
     }
     internal static void Run() {
@@ -134,6 +136,24 @@ static class BoardTests {
         InspectedOutputResolvesOncePerInspection();
         ChangedObjectsAreReadFromTheScenePatchFile();
         FileVersionReportsInvalidBoardRotation();
+        FlatteningBoardMovesWithItsMask();
+    }
+    // A board whose circle mask also flattens the terrain height moves with its mask like any other board: the
+    // placement applies with the mask rebuilt at the board, the terrain at the old and the new place is tracked, a
+    // failed rebuild restores the board or reports an incomplete cleanup that guards the retry, and Undo, Redo,
+    // removal, Save and the dependency minimum behave as for any board.
+    static void FlatteningBoardMovesWithItsMask() {
+        flattening = true;
+        try {
+            var (world, board, boards, engine) = Setup();
+            Assert(world.Facts(board).FlattensHeight && boards.Refusal(board) == null, "A flattening board is not refused: " + boards.Refusal(board));
+            PlacementMovesBoardAndItsRegistrations();
+            FailedMutationRestoresBoardAndRegistrations();
+            UnverifiedRestorationGuardsRetry();
+            TerrainOutputFollowsTheEdit();
+            ModdedBoardFollowsHistoryAndRemoval();
+            SaveRaisesMinimumForPatternBoards();
+        } finally { flattening = false; }
     }
     static void FileVersionReportsInvalidBoardRotation() {
         var initial = Doc(Mod("move", Place(Moved)));
@@ -222,7 +242,6 @@ static class BoardTests {
     static void PreflightRefusalLeavesBoardUnchanged() {
         foreach (var (name, change, reason) in new (string, Action<FakeBoard>, string)[] {
             ("track dependency", b => b.Unexpected = "Track.TrackMarker", "Track.TrackMarker"),
-            ("height-flattening mask", b => b.Flattens = true, "changes the terrain height"),
             ("disabled culler", b => b.CullerEnabled = false, "renderer culler"),
             ("two masks", b => b.Masks = 2, "exactly one"),
             ("inactive parent", b => b.ParentsActive = false, "parents"),

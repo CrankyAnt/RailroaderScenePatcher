@@ -46,12 +46,17 @@ namespace RailroaderScenePatcher.Core {
     // Station map icons: places and enables or disables one map icon below World/Map Labels/Station Icons. The map draws
     // the icon where its object stands; the icon registers with the map when it is enabled and leaves it when it is
     // disabled. Native map data, such as the station's track span, house and station agent, is not touched.
-    public sealed class StationMapIconScene : IScene, IVersionedScene, IRelationshipScene {
+    public sealed class StationMapIconScene : IScene, IVersionedScene, IRelationshipScene, IDependentOutputScene {
         const double PositionTolerance = 0.01, AngleToleranceDegrees = 0.01;
         readonly IMapIconWorld world;
-        public StationMapIconScene(IMapIconWorld world, Capability capability = Capability.Unchecked) {
-            this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability;
+        // The scene ground masks at and below the icon object: they move with it, a mask that flattens the terrain height
+        // included.
+        readonly MaskFollowing masks;
+        public StationMapIconScene(IMapIconWorld world, Capability capability = Capability.Unchecked, GroundMasks masks = null) {
+            this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.masks = new MaskFollowing(masks);
         }
+        public DependentOutput Output(object target) => masks.Output(target);
+        public void RetryOutput(object target) => masks.RetryOutput(target);
         public IEnumerable<string> MapIds => world.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
@@ -73,7 +78,8 @@ namespace RailroaderScenePatcher.Core {
         }
         public object Capture(object target) => world.Observe(target);
         public ObjectState Read(object target) => world.Observe(target).Root;
-        public void Apply(object target, ObjectState state) {
+        public void Apply(object target, ObjectState state) => masks.Write(target, () => Change(target, state));
+        void Change(object target, ObjectState state) {
             var before = world.Observe(target);
             if (state.Placement != null) CheckPlacement(state.Placement);
             var active = state.Active ?? before.Root.Active ?? true;
@@ -97,7 +103,8 @@ namespace RailroaderScenePatcher.Core {
             if (after.ActiveInHierarchy && after.Registered == false) return "the map does not have the enabled icon registered";
             return null;
         }
-        public bool Restore(object target, object snapshot) {
+        public bool Restore(object target, object snapshot) => masks.Restore(target, () => Restored(target, snapshot));
+        bool Restored(object target, object snapshot) {
             var captured = (MapIconObservation)snapshot;
             try {
                 var current = world.Observe(target);
