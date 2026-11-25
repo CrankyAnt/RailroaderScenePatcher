@@ -151,7 +151,7 @@ namespace RailroaderScenePatcher {
         void CompactConnectionsContext(UIPanelBuilder builder) {
             if (IsStarter) CompactStarterLines(builder);
             else if (HoldsConstructionSegments) CompactSegmentsContext(builder);
-            else if (selected.Identity.Structure == CrossingCoverageScene.Structure) CompactCoverageContext(builder);
+            else if (CommandBand.EditsCoverage(selected.Identity)) CompactCoverageContext(builder);
             else CompactBindingContext(builder);
         }
 
@@ -327,7 +327,7 @@ namespace RailroaderScenePatcher {
         // open coverage form has its three role choices instead; a crossing's coverage and equipment rows stay in the
         // full window.
         Act[] CompactConnectionsActs() {
-            var coverage = selected.Identity.Structure == CrossingCoverageScene.Structure;
+            var coverage = CommandBand.EditsCoverage(selected.Identity);
             if (coverage && coverageCircuit != null)
                 return Enumerable.Range(0, CircuitCoverage.Roles.Length).Select(role => CoverageRoleAct(role, CircuitCoverage.RoleCaption(CircuitCoverage.Roles[role]), CoveragePickBlock)).ToArray();
             if (coverage && attachment != null) return ReplacementActs();

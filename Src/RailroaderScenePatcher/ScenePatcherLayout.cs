@@ -1156,7 +1156,7 @@ namespace RailroaderScenePatcher {
         void DrawConnections(UIPanelBuilder builder) {
             if (IsStarter) { DrawStarterLocation(builder); return; }
             if (HoldsConstructionSegments) { DrawConstructionSegments(builder); return; }
-            var coverage = selected.Identity.Structure == CrossingCoverageScene.Structure;
+            var coverage = CommandBand.EditsCoverage(selected.Identity);
             // A crossing pad has the binding of its marker: setting it regenerates the pad along the track there.
             var pad = selected.Identity.Structure == CrossingPadScene.Structure;
             var marker = pad || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure;
@@ -1194,7 +1194,7 @@ namespace RailroaderScenePatcher {
                 var busy = EditBlock() ?? (selection == null ? "World selection is unavailable." : ChoiceBlock);
                 return new[] { Slot("Segment", "Choose a track segment in the world and confirm its identity. Click Picked to add it to the construction segments.", busy, () => BeginSelection(SelectionKind.TrackSegment, selected), "Replacement segment") };
             }
-            var coverage = selected.Identity.Structure == CrossingCoverageScene.Structure;
+            var coverage = CommandBand.EditsCoverage(selected.Identity);
             var marker = selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure;
             // A starter placement marker gives its own reason: its track location belongs to the starter placement workflow.
             var reason = selected.Family == StarterPlacements.Family ? CommandBand.EditReason(selected.Operations)

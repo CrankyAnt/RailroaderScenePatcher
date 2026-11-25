@@ -739,6 +739,11 @@ namespace RailroaderScenePatcher {
             BakedSceneryGroups.Structure, BakedSceneryParts.Structure, StationMapIconRules.Structure, SpawnPoints.Structure,
             ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure, ConstructionSceneryScene.Structure };
         internal static bool EditableStructure(string structure) => structure != null && EditableStructures.Contains(structure);
+        // Whether the Connections tab offers crossing coverage for an object: its Crossing coverage section with Edit
+        // circuit and Edit detection addition, and the coverage choices of the compact rail. Only a crossing controller
+        // the inventory gives the crossing coverage structure has it; a controller that fails the crossing pattern check
+        // has none.
+        internal static bool EditsCoverage(TargetIdentity identity) => identity?.Structure == CrossingCoverageScene.Structure;
         internal static string PlacementBlock(string edit, string pad, string controller, string moveBlock) => edit ?? pad ?? controller ?? moveBlock;
         // Why every move of the object is refused, or null: its dependency line names a mask that flattens the terrain
         // height. The placement modes and fields are then unavailable with this reason.

@@ -190,6 +190,8 @@ static partial class CoverageTests {
         SaveAndReloadReproduceCoverageOnce();
         DependedCoverageKeepsItsLastEntry();
         UnresolvedDetectionSpanIsAControllerProblem();
+        NonEditableControllerHasNoCoverageAndListsDetectionAsInformation();
+        InspectionChangesNoObjectPatchDataOrHistory();
         RunForm();
         Console.WriteLine("PASS: crossing coverage omission, explicit selection, detachment, retention, refusal, restoration and scene patch editing");
     }
