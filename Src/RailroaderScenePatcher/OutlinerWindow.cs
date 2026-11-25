@@ -47,6 +47,33 @@ namespace RailroaderScenePatcher {
             return !ShowsAtOnce() || now - since >= Wait ? new TooltipInfo(title, String.Empty) : TooltipInfo.Empty;
         }
     }
+    // Fits the added names of the outliner's rows to the width their cells have. The list makes and reuses its row cells
+    // as it scrolls and the divider resizes it without a rebuild, so each cell is checked again: a cell that shows a
+    // row's full text, or whose width changed, gets the name that fits (InventoryPresentationState.FittedRow).
+    internal sealed class OutlineNameFit : UnityEngine.MonoBehaviour {
+        struct Shown { internal InventoryPresentationState.FittedRow Row; internal float Width; internal string Text; }
+        IReadOnlyDictionary<string, InventoryPresentationState.FittedRow> rows = new Dictionary<string, InventoryPresentationState.FittedRow>();
+        readonly Dictionary<TMPro.TMP_Text, Shown> shown = new Dictionary<TMPro.TMP_Text, Shown>();
+        float nextScan;
+        internal void Use(IReadOnlyDictionary<string, InventoryPresentationState.FittedRow> fitted) { rows = fitted; shown.Clear(); nextScan = 0; }
+        void LateUpdate() {
+            if (UnityEngine.Time.unscaledTime < nextScan) return;
+            nextScan = UnityEngine.Time.unscaledTime + 0.1f;
+            foreach (var text in GetComponentsInChildren<TMPro.TMP_Text>(true)) {
+                if (text == null) continue;
+                var current = text.text;
+                if (!shown.TryGetValue(text, out var state) || current != state.Text) {
+                    if (current == null || !rows.TryGetValue(current, out var row)) { shown.Remove(text); continue; }
+                    state = new Shown { Row = row, Width = -1, Text = current };
+                }
+                var width = text.rectTransform.rect.width - text.margin.x - text.margin.z - 1;
+                if (width <= 0 || width == state.Width) { shown[text] = state; continue; }
+                var fit = state.Row.Fit(width, value => text.GetPreferredValues(value).x);
+                if (fit != current) text.text = fit;
+                shown[text] = new Shown { Row = state.Row, Width = width, Text = fit };
+            }
+        }
+    }
     public sealed partial class PatcherBehaviour {
         // The map x/z where a starter placement marker or track span acts, from the same track points Focus uses. The
         // outliner asks only for those families (OutlinerGrouping.UsesTrackPoint).

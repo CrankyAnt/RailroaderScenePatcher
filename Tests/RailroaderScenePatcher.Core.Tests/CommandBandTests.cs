@@ -27,12 +27,12 @@ static class CommandBandTests {
         APendingWorldChoiceKeepsItsClickFromTheGamesClickTargets();
         ThePatcherWindowIsBuiltOnceItsInputIsAvailableAgain();
         SessionDetailsSayTheyShowTheLastFullRead();
-        AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing();
-        AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates();
+        AddedEquipmentIsNamedBySourceAndEquipmentId();
         AddedEquipmentIsNamedFromItsStoredSource();
-        EquipmentCopyNumbersSurviveNarrowLabels();
+        EquipmentIdsSurviveNarrowLabels();
+        OutlinerRowsShortenAddedNamesOnlyWhenNarrow();
         EquipmentDisplayHidesInternalIdentities();
-        WorldChoicesKeepAddedOrdinals();
+        WorldChoicesKeepAddedEquipmentIds();
         AClickOnTheInspectedRowClearsTheInspection();
         ClearActivityNeedsAnActivityValue();
         AClosedPanelCancelsTheWaitingRequest();
@@ -99,62 +99,48 @@ static class CommandBandTests {
         Check(CommandBand.ClearsConnectionsPreviewOnQueue("Placement"), "Queuing a placement edit invalidates a prepared Connections preview");
     }
     // The name comes from the source the addition was built from, stored with it, so it reads the same whether or not its copy
-    // object still exists; the inventory passes every live addition of the crossing, with or without its copy, as a sibling.
-    static void AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing() {
-        var first = (Scope: "alpha", Id: "signal-1", Name: "Signal 1", IsBell: false);
-        var second = (Scope: "alpha", Id: "signal-2", Name: "Signal 1", IsBell: false);
-        var third = (Scope: "beta", Id: "signal-1", Name: "Signal 1", IsBell: false);
-        var gate = (Scope: "alpha", Id: "gate", Name: "Gate 1", IsBell: false);
-        var crossing = new[] { third, gate, second, first };
-        foreach (var reopened in new[] { crossing, crossing.Reverse().ToArray() }) {
-            Check(InventoryPresentationState.AddedEquipmentName(first, reopened) == "Signal 1 (added, 1 of 3)", "The first copy keeps its ordinal when the list reopens");
-            Check(InventoryPresentationState.AddedEquipmentName(second, reopened) == "Signal 1 (added, 2 of 3)", "Two copies from the same mod are distinguishable by their names");
-            Check(InventoryPresentationState.AddedEquipmentName(third, reopened) == "Signal 1 (added, 3 of 3)", "A copy from another mod at the same crossing is also numbered");
-            Check(InventoryPresentationState.AddedEquipmentName(gate, reopened) == "Gate 1 (added)", "A unique device name has no ordinal");
-        }
-        Check(InventoryPresentationState.AddedEquipmentName(first, new[] { first }) == "Signal 1 (added)", "The same device name at a different crossing has its own count");
-        Check(InventoryPresentationState.AddedEquipmentName(second, new[] { second, first }) == "Signal 1 (added, 2 of 2)", "Removing a copy updates the remaining ordinals");
+    // object still exists, and from the Equipment ID the modder chose.
+    static void AddedEquipmentIsNamedBySourceAndEquipmentId() {
+        Check(InventoryPresentationState.AddedEquipmentName("Signal 1", "north-signal") == "Signal 1 (added: north-signal)", "A light or gate is named by its source and Equipment ID");
+        Check(InventoryPresentationState.AddedEquipmentName("US&S Teardrop Crossing Bell", "north-bell") == "US&S Teardrop Crossing Bell (added: north-bell)", "A bell is named by its source and Equipment ID");
+        var first = InventoryPresentationState.AddedEquipmentName("Signal 1", "north-signal"); var second = InventoryPresentationState.AddedEquipmentName("Signal 1", "south-signal");
+        Check(first != second && !first.Contains(" of ") && !second.Contains(" of "), "Two additions from one source are told apart by their Equipment IDs, without a number");
     }
-    static void AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates() {
-        var firstBell = (Scope: "alpha", Id: "bell", Name: "Signal 1", IsBell: true);
-        var secondBell = (Scope: "beta", Id: "bell", Name: "Signal 1", IsBell: true);
-        var light = (Scope: "alpha", Id: "light", Name: "Signal 1", IsBell: false);
-        var gate = (Scope: "beta", Id: "gate", Name: "Signal 1", IsBell: false);
-        var crossing = new[] { gate, secondBell, light, firstBell };
-        Check(InventoryPresentationState.AddedEquipmentName(firstBell, crossing) == "Signal 1 (added, 1 of 2)", "The first bell counts only the matching bells");
-        Check(InventoryPresentationState.AddedEquipmentName(secondBell, crossing) == "Signal 1 (added, 2 of 2)", "The second bell keeps its ordinal among matching bells");
-        Check(InventoryPresentationState.AddedEquipmentName(light, crossing) == "Signal 1 (added, 1 of 2)", "The light counts the matching gate");
-        Check(InventoryPresentationState.AddedEquipmentName(gate, crossing) == "Signal 1 (added, 2 of 2)", "The gate counts the matching light");
-        Check(InventoryPresentationState.AddedEquipmentName(firstBell, new[] { light, gate, firstBell }) == "Signal 1 (added)", "A single bell with this name has no ordinal");
-    }
-    // A light or gate is named after the source device, a bell after its definition's name; the stored kind, not the shape
-    // of the source, separates a bell from a light or gate.
+    // A light or gate is named after the source device, a bell after its definition's name, or its identifier without one.
     static void AddedEquipmentIsNamedFromItsStoredSource() {
-        var light = (Scope: "alpha", Id: "west", Name: new EquipmentSource("scene", "World/Crossings/Signal 1").StoredName(), IsBell: false);
-        var bell = (Scope: "alpha", Id: "ring", Name: EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName("US&S Teardrop Crossing Bell"), IsBell: true);
-        var unnamedBell = (Scope: "alpha", Id: "ring-2", Name: EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName(" "), IsBell: true);
-        var crossing = new[] { light, bell, unnamedBell };
-        Check(InventoryPresentationState.AddedEquipmentName(light, crossing) == "Signal 1 (added)", "A light or gate is named after its source device");
-        Check(InventoryPresentationState.AddedEquipmentName(bell, crossing) == "US&S Teardrop Crossing Bell (added)", "A bell is named after its definition's name");
-        Check(InventoryPresentationState.AddedEquipmentName(unnamedBell, crossing) == "bell-uss-teardrop (added)", "A bell definition without a name is named after its identifier, as its player is");
-        var asLight = (Scope: "alpha", Id: "x", Name: "Signal 1", IsBell: false);
-        var asBell = (Scope: "alpha", Id: "y", Name: "Signal 1", IsBell: true);
-        Check(InventoryPresentationState.AddedEquipmentName(asLight, new[] { asLight, asBell }) == "Signal 1 (added)", "The stored kind keeps a bell out of a light or gate's count");
+        Check(InventoryPresentationState.AddedEquipmentName(new EquipmentSource("scene", "World/Crossings/Signal 1").StoredName(), "west") == "Signal 1 (added: west)", "A light or gate is named after its source device");
+        Check(InventoryPresentationState.AddedEquipmentName(EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName("US&S Teardrop Crossing Bell"), "ring") == "US&S Teardrop Crossing Bell (added: ring)", "A bell is named after its definition's name");
+        Check(InventoryPresentationState.AddedEquipmentName(EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName(" "), "ring-2") == "bell-uss-teardrop (added: ring-2)", "A bell definition without a name is named after its identifier, as its player is");
     }
-    static void EquipmentCopyNumbersSurviveNarrowLabels() {
-        const string name = "US&S Teardrop Crossing Bell (added, 2 of 2)";
+    static void EquipmentIdsSurviveNarrowLabels() {
+        const string name = "US&S Teardrop Crossing Bell (added: north-bell)";
         float Width(string value) => value.Sum(character => character == '&' ? 3 : 1);
         foreach (var family in new[] { CommandBand.AddedBellFamily, CommandBand.AddedEquipmentFamily }) {
-            Check(InventoryPresentationState.NarrowName(family, name, 32, Width) == "US&S Teardrop… (added, 2 of 2)",
-                "The ordinal follows the shortened name for both added families");
+            Check(InventoryPresentationState.NarrowName(family, name, 36, Width) == "US&S Teardrop… (added: north-bell)",
+                "The Equipment ID follows the shortened name for both added families: " + InventoryPresentationState.NarrowName(family, name, 36, Width));
             Check(InventoryPresentationState.NarrowName(family, name, 100, Width) == name,
-                "A wide label fits the full added name and ordinal");
+                "A wide label fits the full added name and Equipment ID");
         }
-        Check(InventoryPresentationState.NarrowName(CommandBand.AddedBellFamily, "US&S Teardrop Crossing Bell (added)", 24, Width) == "US&S Teardrop… (added)",
-            "The added suffix also stays visible for a unique bell");
-        Check(InventoryPresentationState.NarrowName(CommandBand.AddedBellFamily, "U\u0308S&S Teardrop Crossing Bell (added)", 10, Width) == "… (added)",
+        Check(InventoryPresentationState.NarrowName(CommandBand.AddedBellFamily, "ÜS&S Teardrop Crossing Bell (added: ring)", 16, Width) == "… (added: ring)",
             "Shortening cannot split a letter from its combining mark");
         Check(InventoryPresentationState.NarrowName("Other family", name, 32, Width) == name, "The narrow format only applies to added equipment");
+    }
+    // An outliner row is fitted to the width its cell has, with the row's markers and markup measured. The full name shows
+    // where it fits; a narrow row shortens the source name and keeps "(added: <Equipment ID>)".
+    static void OutlinerRowsShortenAddedNamesOnlyWhenNarrow() {
+        const string name = "Signal 1 (added: north-signal)";
+        string Markup(string value) => "<b>+</b> " + value + "  <alpha=#99>Sylva<alpha=#FF>";
+        float Width(string value) => System.Text.RegularExpressions.Regex.Replace(value, "<[^>]*>", "").Length;
+        var row = new InventoryPresentationState.FittedRow(CommandBand.AddedEquipmentFamily, name, Markup);
+        Check(row.Full == Markup(name), "A row starts with its full name");
+        Check(row.Fit(Width(Markup(name)), Width) == Markup(name), "A row wide enough for the full name shows it unshortened: " + row.Fit(Width(Markup(name)), Width));
+        Check(row.Fit(300, Width) == Markup(name), "A widened row shows the full name");
+        Check(row.Fit(Width(Markup(name)) - 1, Width) == Markup("Signal… (added: north-signal)"),
+            "A row slightly too narrow shortens only the source name: " + row.Fit(Width(Markup(name)) - 1, Width));
+        Check(row.Fit(Width(Markup("… (added: north-signal)")), Width) == Markup("… (added: north-signal)"),
+            "A narrow row keeps the Equipment ID readable before the source name: " + row.Fit(Width(Markup("… (added: north-signal)")), Width));
+        var other = new InventoryPresentationState.FittedRow("Other family", "Grade Crossing - Allen", Markup);
+        Check(other.Fit(5, Width) == other.Full, "Other rows keep the outliner's own shortening at the end of the row");
     }
     static void EquipmentDisplayHidesInternalIdentities() {
         var addition = new EquipmentAddition("signal-1-added", EquipmentAddition.LightGatePattern, new EquipmentSource("scene", "World/Crossings/Signal 1"), null);
@@ -184,7 +170,7 @@ static class CommandBandTests {
             "The rejected row that stands for unavailable bell definitions is not an addition and keeps the name Bell");
         var identity = new TargetIdentity("scene", "World/Crossings/CrankyAnt Scene Patcher equipment author:pack signal-1-added", "OwnedEquipment");
         var added = new SceneObservation(new object(), identity, CommandBand.AddedEquipmentFamily, true, Array.Empty<double>(), Array.Empty<double>(),
-            Array.Empty<string>(), Array.Empty<string>(), new[] { "Missing object at " + identity.Path }, null, displayName: "Signal 1 (added, 1 of 2)");
+            Array.Empty<string>(), Array.Empty<string>(), new[] { "Missing object at " + identity.Path }, null, displayName: "Signal 1 (added: north-signal)");
         var copied = JObject.Parse(PatchEditingSession.CopyId(new[] { "rr/test-map" }, added));
         var target = copied["target"];
         Check((string)target["scene"] == "scene" && (string)target["path"] == identity.Path && (string)target["component"] == "OwnedEquipment",
@@ -193,13 +179,13 @@ static class CommandBandTests {
         Check(candidate.Identity.ToString() == "scene/" + identity.Path + " [OwnedEquipment]",
             "World choice Details shows the full target identity alongside the visible candidate name");
     }
-    static void WorldChoicesKeepAddedOrdinals() {
+    static void WorldChoicesKeepAddedEquipmentIds() {
         var identity = new TargetIdentity("scene", "World/Crossings/Owned equipment bell-2", "OwnedEquipment");
         var added = new SceneObservation(new object(), identity, CommandBand.AddedBellFamily, true, Array.Empty<double>(), Array.Empty<double>(),
-            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), null, displayName: "US&S Teardrop Crossing Bell (added, 2 of 2)");
+            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), null, displayName: "US&S Teardrop Crossing Bell (added: north-bell)");
         var label = added.Family + ": " + identity.Path;
-        Check(CommandBand.ChoiceLabel(label, new[] { label }, 30, added) == "US&S Teardrop… (added, 2 of 2)",
-            "A long world choice retains the added ordinal after the shortened name");
+        Check(CommandBand.ChoiceLabel(label, new[] { label }, 34, added) == "US&S Teardrop… (added: north-bell)",
+            "A long world choice retains the Equipment ID after the shortened name: " + CommandBand.ChoiceLabel(label, new[] { label }, 34, added));
     }
     static void NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit() {
         var current = new[] { "8", "2", "3", "0", "90", "0" };

@@ -442,12 +442,14 @@ namespace RailroaderScenePatcher {
         string OutlinerSummary(OutlinerGrouping.Result tree) =>
             inventory == null ? "Inspection is unavailable" : tree == null ? "The object list couldn't be built. The log has the cause." : OutlinerGrouping.Summary(tree, inventory.Entries);
         // The outliner's rows, in a section that rebuilds by itself. countLine shows the object count, as countMarkup
-        // words it, and its font measures the row names. The full window and the compact rail share it.
+        // words it. The full window and the compact rail share it.
         UIPanel DrawOutlinerRows(UIPanelBuilder builder, TMP_Text countLine, Func<string, string> countMarkup) {
             return builder.AddRebuildableSection(items => {
                 items.ConfigureLayout(4f);
                 var rows = new List<UIOutlineItem>();
                 var byKey = new Dictionary<string, SceneObservation>();
+                // The added rows by their full text, for OutlineNameFit.
+                var fittedRows = new Dictionary<string, InventoryPresentationState.FittedRow>(StringComparer.Ordinal);
                 // The crossing nodes, by the key of their outline row.
                 var crossingKeys = new Dictionary<string, string>();
                 string selectedKey = null;
@@ -483,12 +485,15 @@ namespace RailroaderScenePatcher {
                     var mark = InventoryPresentationState.RowMark(item);
                     var context = mark == null ? "" : "  <alpha=#99>" + mark + "<alpha=#FF>";
                     var prefix = markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>").Replace("×", "<color=" + Red + "><b>×</b></color>") + (markers.Length == 0 ? "" : " ");
-                    string NameMarkup(string value) => item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
-                    // The divider can shrink the list without rebuilding its rows. Use the minimum column's width.
-                    var name = InventoryPresentationState.NarrowName(item.Family, label, OutlinerMinimumWidth - RowDecoration, value => countLine.GetPreferredValues(prefix + NameMarkup(value)).x);
-                    var text = NameMarkup(name);
-                    if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
-                    return new UIOutlineItem(key, prefix + text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) { Tooltip = OutlinerGrouping.Tooltip(tree, item, changed, failure) };
+                    string RowMarkup(string value) {
+                        var text = item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
+                        if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
+                        return prefix + text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>");
+                    }
+                    // The row shows its full name. Its cell fits an added name to the width it has (OutlineNameFit).
+                    var fitted = new InventoryPresentationState.FittedRow(item.Family, label, RowMarkup);
+                    if (CommandBand.IsAddedFamily(item.Family)) fittedRows[fitted.Full] = fitted;
+                    return new UIOutlineItem(key, fitted.Full, item) { Tooltip = OutlinerGrouping.Tooltip(tree, item, changed, failure) };
                 }
                 // A folder shows its count first, so a narrow column cuts the name and never the count. A crossing
                 // without a controller is a folder that can be selected.
@@ -538,6 +543,7 @@ namespace RailroaderScenePatcher {
                 });
                 // A row's tooltip waits as long as a button's, also while the pointer moves from row to row.
                 if (outline.GetComponent<OutlineTooltipDelay>() == null) outline.gameObject.AddComponent<OutlineTooltipDelay>();
+                (outline.GetComponent<OutlineNameFit>() ?? outline.gameObject.AddComponent<OutlineNameFit>()).Use(fittedRows);
                 var listLayout = outline.GetComponent<LayoutElement>();
                 listLayout.minHeight = CommandBand.OutlinerLeastHeight; listLayout.flexibleHeight = 10000;
                 // The compact rail trims this view to whole rows.

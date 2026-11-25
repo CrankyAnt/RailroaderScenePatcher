@@ -19,9 +19,7 @@ namespace RailroaderScenePatcher {
         internal GameObject Controller, Copy;
         internal bool Retired;
         internal EquipmentSource Source => SourceDefinition != null ? EquipmentSource.ForDefinition(SourceDefinition) : new EquipmentSource(SourceScene, SourcePath);
-        (string Scope, string Id, string Name, bool IsBell) NameParts => (Scope, Id, SourceName, IsBell);
-        internal string DisplayName => InventoryPresentationState.AddedEquipmentName(NameParts,
-            Controller == null ? new[] { NameParts } : At(Controller).Select(item => item.NameParts));
+        internal string DisplayName => InventoryPresentationState.AddedEquipmentName(SourceName, Id);
         // Records the addition and the source it is built from on a new wrapper beneath its controller.
         internal static OwnedEquipment Mark(GameObject wrapper, GameObject controller, EquipmentAddition addition, string sourceName) {
             var owned = wrapper.AddComponent<OwnedEquipment>();

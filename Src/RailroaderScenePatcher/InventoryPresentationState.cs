@@ -100,7 +100,8 @@ namespace RailroaderScenePatcher {
         // Baked scenery parts include their group; other objects use their observed visible name.
         internal static string Name(SceneObservation entry) => entry.GroupPath != null ? BakedSceneryRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
 
-        static readonly Regex AddedSuffix = new Regex(@" \(added(?:, [0-9]+ of [0-9]+)?\)\z");
+        // The suffix of an added name (AddedEquipmentName); an Equipment ID holds no parenthesis.
+        static readonly Regex AddedSuffix = new Regex(@" \(added(?:: [^()]+)?\)\z");
         internal static string NarrowName(string family, string name, float width, Func<string, float> measure) {
             if (!CommandBand.IsAddedFamily(family) || measure(name) <= width) return name;
             var suffix = AddedSuffix.Match(name);
@@ -121,6 +122,17 @@ namespace RailroaderScenePatcher {
             return shortened;
         }
 
+        // An outliner row fitted to the width its cell has. The cell first gets the full row; when an added name doesn't
+        // fit, its source name is shortened and "(added: <Equipment ID>)" stays (NarrowName). Other rows keep the full
+        // text, which the outliner cuts at the end. Markup adds the row's markers and marks around the name.
+        internal sealed class FittedRow {
+            readonly string family, name;
+            readonly Func<string, string> markup;
+            internal FittedRow(string family, string name, Func<string, string> markup) { this.family = family; this.name = name; this.markup = markup; }
+            internal string Full => markup(name);
+            internal string Fit(float width, Func<string, float> measure) => markup(NarrowName(family, name, width, value => measure(markup(value))));
+        }
+
         internal static string EquipmentKind(EquipmentSource source) => source.IsDefinition ? "Bell" : "Light or gate";
 
         // A source by its visible name, or by the stored-name rule from its recorded source when it has none.
@@ -138,17 +150,9 @@ namespace RailroaderScenePatcher {
         internal static string UnbuiltEquipmentName(EquipmentAddition item, IEnumerable<SourceCandidate> candidates) =>
             item.Id + ": " + EquipmentSourceName(item.Source, candidates);
 
-        // An added light, gate or bell by the source name stored with it, numbered among the additions of its crossing with the
-        // same name and kind. The supplying scope and addition ID keep the order independent of the scene and outliner order.
-        internal static string AddedEquipmentName((string Scope, string Id, string Name, bool IsBell) equipment,
-            IEnumerable<(string Scope, string Id, string Name, bool IsBell)> crossingEquipment) {
-            var matches = crossingEquipment.Where(item => item.IsBell == equipment.IsBell && item.Name == equipment.Name)
-                .OrderBy(item => item.Scope, StringComparer.Ordinal).ThenBy(item => item.Id, StringComparer.Ordinal).ToArray();
-            var ordinal = Array.IndexOf(matches, equipment) + 1;
-            return matches.Length > 1 && ordinal > 0
-                ? FormattableString.Invariant($"{equipment.Name} (added, {ordinal} of {matches.Length})")
-                : equipment.Name + " (added)";
-        }
+        // An added light, gate or bell by the source name stored with it and the Equipment ID the modder chose, such as
+        // "Signal 1 (added: north-signal)". The ID tells additions from one source apart, so no number is needed.
+        internal static string AddedEquipmentName(string sourceName, string id) => sourceName + " (added: " + id + ")";
 
         // One node of the outliner: a folder (a category, kind, place or crossing), an object, or what stands beneath an
         // object (a part of a group, a detection span of a crossing controller, a member of a crossing). Row is the
