@@ -54,6 +54,8 @@ Below the command band, the outliner on the left has a search field, a **?** for
 - **Disabled** shows objects that are switched off, regardless of their parents' state.
 - **Problems** shows objects with a detected problem.
 
+When all the scene objects the patcher checks for editing are created by the game while the map is running, the outliner shows **This map has no objects the patcher can edit.** and explains why.
+
 Click **Fit** at the right end of the outliner's top row, beside the divider, to fit most names. You can also drag the divider between the outliner and inspector. **Fit** limits the column to 40 percent of the window. If the names need more room, a message with the source **Fit** reports their width. Three notes at the bottom explain that Undo, Redo, and Save are the Map Editor's own, when to refresh after native edits, and that reloading clears the Undo history.
 
 An object opens in **Follow** placement mode if it follows a track, or **Numeric** otherwise. The **Inspector** and **Guided** segments at the right end of the state line switch between inspection and guided tasks. See [complete a guided task](completing-guided-tasks.md).

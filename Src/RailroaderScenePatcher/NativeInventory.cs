@@ -11,7 +11,13 @@ using UnityEngine;
 
 namespace RailroaderScenePatcher {
     // Reads serialized bindings and direct references, never binding/cache getters or TryApply.
-    internal sealed class NativeInventory : ISteppedInspectionScene, IRelatedInspectionScene, IOwnedObjectScene {
+    internal sealed class NativeInventory : ISteppedInspectionScene, IRelatedInspectionScene, IOwnedObjectScene, ICheckedObjectsScene {
+        // The baked scenery rule's checks, for the window's reason on a map where it lists nothing. A failed read reports
+        // no checks, so the window keeps its list.
+        public IEnumerable<string> CheckedObjects() {
+            try { return GroupWorld.Checks(); }
+            catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Debug("The patcher couldn't read the baked scenery checks for the object list: " + e.GetBaseException().Message); return Array.Empty<string>(); }
+        }
         // Observes one component with what the last discovery learned about the rest of the scene: who references what,
         // the graph's segments and the setup holders. A discovery sets it when that knowledge is complete.
         static Func<Component, string, SceneObservation> observer;

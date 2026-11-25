@@ -285,6 +285,11 @@ namespace RailroaderScenePatcher {
                 .Concat(partVerdicts.Where(p => p.Key != null).Select(p => new KeyValuePair<string, string>(p.Key.scene.name + "/" + p.Value.Path,
                     (p.Value.Disposition == PartDisposition.Part ? "Listed as a scenery part" : p.Value.Disposition == PartDisposition.ExistingFamily ? ExistingFamilyReport(p.Key, true) : "Not listed as a scenery part") +
                     Reason(p.Value.Reason))));
+        // The same candidates and parts for the inventory (ICheckedObjectsScene): null for an object that is listed, as a
+        // group, for inspection only, as a part or through its own object family, otherwise the rule's reason.
+        internal static IEnumerable<string> Checks() =>
+            Verdicts().Values.Select(v => v.Disposition == GroupDisposition.Group || v.Disposition == GroupDisposition.InspectionOnly || v.Disposition == GroupDisposition.ExistingFamily ? null : v.Reason ?? v.Disposition.ToString())
+                .Concat(partVerdicts.Where(p => p.Key != null).Select(p => p.Value.Disposition == PartDisposition.NotListed ? p.Value.Reason ?? p.Value.Disposition.ToString() : null)).ToArray();
         static string ExistingFamilyReport(GameObject go, bool inGroup = false) =>
             (inGroup ? "Moves with its scenery group. Listed for inspection and supported edits through its own object family instead of as a scenery part. Gets its own outliner row, except for native track spans, which have no row. Object family: " :
                 "Listed for inspection and supported edits through its existing object family instead of as a scenery group. Gets its own outliner row, except for native track spans, which have no row. Object family: ") + String.Join(", ",

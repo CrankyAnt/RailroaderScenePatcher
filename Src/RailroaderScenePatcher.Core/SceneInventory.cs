@@ -28,6 +28,12 @@ namespace RailroaderScenePatcher.Core {
     public interface IOwnedObjectScene {
         bool IsOwned(object handle);
     }
+    // A scene that checks scene objects for the inventory with a rule that can leave them out, as the baked scenery rule
+    // checks the objects below World. It gives one value per checked object: null for an object it lists, otherwise the
+    // reason it leaves the object out.
+    public interface ICheckedObjectsScene {
+        IEnumerable<string> CheckedObjects();
+    }
     public interface IRelatedInspectionScene : ITargetedInspectionScene {
         // Every current observation that belongs with the object, the object's own included; null when it is gone.
         IEnumerable<SceneObservation> ObserveRelated(object handle, TargetIdentity identity);
@@ -243,6 +249,10 @@ namespace RailroaderScenePatcher.Core {
         // Why the snapshot is stale: the first difference a check found, or its failure. Null while it is not stale.
         public string StaleReason { get; private set; } = "not yet scanned";
         public SceneInventory(IInspectionScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
+        // How many scene objects the scene checked at the last refresh, and the reason for each one it left out, so the
+        // window can tell why a list is empty. Zero and none for a scene that does not report its checks.
+        public int CheckedCount { get; private set; }
+        public IReadOnlyList<string> UnlistedReasons { get; private set; } = Array.Empty<string>();
         // A stepped comparison of the scene with the snapshot, and how many scanned observations match each entry.
         IEnumerator<SceneObservation> check;
         int[] checkMatches;
@@ -281,6 +291,8 @@ namespace RailroaderScenePatcher.Core {
             CancelFreshnessCheck();
             var observations = Inventoried(scene.Discover()).ToArray();
             maps = scene.MapIds.ToArray(); Entries = Array.AsReadOnly(observations); IsStale = false; StaleReason = null;
+            var checks = (scene as ICheckedObjectsScene)?.CheckedObjects()?.ToArray() ?? Array.Empty<string>();
+            CheckedCount = checks.Length; UnlistedReasons = Array.AsReadOnly(checks.Where(reason => reason != null).ToArray());
         }
         public IEnumerable<SceneObservation> Search(string text) => Entries.Where(e => e.SearchText.IndexOf(text ?? "", StringComparison.OrdinalIgnoreCase) >= 0);
         public IReadOnlyList<DefinitionInspection> InspectScenePatchFile(string json) {

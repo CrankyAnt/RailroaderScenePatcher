@@ -42,6 +42,17 @@ namespace RailroaderScenePatcher {
         // category, kind, place and crossing (OutlinerGrouping.Rows).
         internal static IReadOnlyList<SceneObservation> Rows(SceneInventory inventory, string search, OutlinerFilter filter, Func<SceneObservation, bool> changed) =>
             inventory == null ? Array.Empty<SceneObservation>() : inventory.Search(search).Where(entry => Passes(entry, filter, changed)).ToArray();
+        // What the outliner area states instead of an empty list on a map where the patcher lists no scene object because
+        // the game creates every scene object it checked while it runs.
+        internal const string NoEditableObjects = "This map has no objects the patcher can edit. While the map is running, the game creates all the scene objects the patcher checks for editing.";
+        // The reason the outliner area states instead of its list, or null: the inventory lists no object, it checked at
+        // least one scene object, and it left out every one because the game creates it while it runs. A search or a
+        // filter that matches nothing on a map with listed objects states no reason; its count line stays.
+        internal static string EmptyListReason(SceneInventory inventory) {
+            if (inventory == null || inventory.CheckedCount == 0 || inventory.UnlistedReasons.Count != inventory.CheckedCount) return null;
+            if (inventory.Entries.Count - OutlinerGrouping.HiddenCount(inventory.Entries) > 0) return null;
+            return inventory.UnlistedReasons.All(reason => reason == BakedSceneryRules.RuntimeObject) ? NoEditableObjects : null;
+        }
         // The scene root of the detection spans the patcher adds for a crossing.
         internal const string CoverageRoot = "CrankyAnt Scene Patcher crossing coverage";
 

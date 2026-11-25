@@ -509,6 +509,17 @@ namespace RailroaderScenePatcher {
                     var below = above.Concat(new[] { key }).ToArray();
                     foreach (var child in node.Children) Nest(made, child, below);
                 }
+                // On a map where the patcher lists nothing because the game creates every checked scene object while it
+                // runs, the area states that reason instead of an empty list.
+                var emptyReason = InventoryPresentationState.EmptyListReason(inventory);
+                if (emptyReason != null) {
+                    var reasonLine = items.AddLabel(Literal(emptyReason)).TextWrap(TextOverflowModes.Overflow, TextWrappingModes.Normal);
+                    var reasonLayout = reasonLine.GetComponent<LayoutElement>() ?? reasonLine.gameObject.AddComponent<LayoutElement>();
+                    reasonLayout.minHeight = CommandBand.OutlinerLeastHeight; reasonLayout.flexibleHeight = 10000;
+                    foreach (var text in reasonLine.GetComponentsInChildren<TMP_Text>(true)) text.verticalAlignment = VerticalAlignmentOptions.Top;
+                    presentation.OutlinerView = null;
+                    return;
+                }
                 if (tree != null) foreach (var top in tree.Tops) Nest(null, top, new string[0]);
                 var outline = items.AddOutlineView(rows, state, new UIState<string>(selectedKey), key => {
                     if (!byKey.TryGetValue(key, out var observation)) {
@@ -1909,6 +1920,7 @@ namespace RailroaderScenePatcher {
                     new[] { StarterPlacements.Family, "An active new-game setup reads these markers' track locations to place its starting cars. The marker's own position has no effect. Click Focus to move the camera to where the cars stand." },
                     new[] { StationMapIconRules.Family, "The icons that show stations on the map. After moving a station in the Map Editor, move its icon to the station's new location." },
                     new[] { "Inspection only", "Marks an object of a kind the patcher has no edit for yet and the Map Editor does not edit. It stands under its category like any other object, has no problem marker and no edit. The Object tab gives the reason." },
+                    new[] { "No objects to list", "The outliner shows this when all the scene objects the patcher checks for editing are created by the game while the map is running. The patcher has no objects it can edit on this map." },
                     new[] { "Dimmed rows", "A dimmed group row holds matching parts but does not match the search itself." },
                     new[] { "Focus", "Moves the camera to the inspected object, the starting point of a car placement, or the selected crossing." },
                     new[] { "Fit names", "Sizes the column to most names. Drag the divider for another width." } },

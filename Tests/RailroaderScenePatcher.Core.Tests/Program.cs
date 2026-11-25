@@ -323,6 +323,7 @@ class Program {
         SceneClassificationTests.Run();
         OutlineTreeTests.Run();
         OutlinerGroupingTests.Run();
+        EmptyListReasonTests.Run();
         BakedPartTests.Run();
         CrossbuckTests.Run();
         IndustryObjectTests.Run();
