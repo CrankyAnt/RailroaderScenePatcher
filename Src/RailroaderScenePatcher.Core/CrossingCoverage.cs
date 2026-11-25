@@ -333,14 +333,14 @@ namespace RailroaderScenePatcher.Core {
                 // A retained world still holds the additions an earlier load built; they stay owned and are reconciled, not taken for native circuits.
                 var addition = world.AdditionKey(set);
                 if (addition != null) {
-                    if (!DetectionAddition.TryRead(addition, out _, out _) || baseline.Added.Any(c => c.Key == addition)) throw new InvalidOperationException("The crossing holds an added circuit this patcher cannot identify. Reload before editing it");
+                    if (!DetectionAddition.TryRead(addition, out _, out _) || baseline.Added.Any(c => c.Key == addition)) throw new InvalidOperationException("The crossing holds an added circuit this patcher cannot identify. " + WindowGuidance.ReloadBeforeEditing);
                     baseline.Added.Add(new Circuit { Key = addition, Set = set });
                     baseline.Owned.AddRange(spans.Where(s => !baseline.Owned.Any(o => ReferenceEquals(o, s))));
                     continue;
                 }
-                if (spans.Any(s => !world.Registered(s))) throw new InvalidOperationException("A span of this crossing is not registered in the track graph under its ID. Reload before editing it");
+                if (spans.Any(s => !world.Registered(s))) throw new InvalidOperationException("A span of this crossing is not registered in the track graph under its ID. " + WindowGuidance.ReloadBeforeEditing);
                 // Spans under the patcher's prefix are never native: an earlier patcher state left this circuit patched.
-                if (spans.Any(s => (world.SpanId(s) ?? "").StartsWith(OwnedPrefix, StringComparison.Ordinal))) throw new InvalidOperationException("A circuit of this crossing holds spans an earlier patcher state created, so its native coverage is unknown. Reload before editing it");
+                if (spans.Any(s => (world.SpanId(s) ?? "").StartsWith(OwnedPrefix, StringComparison.Ordinal))) throw new InvalidOperationException("A circuit of this crossing holds spans an earlier patcher state created, so its native coverage is unknown. " + WindowGuidance.ReloadBeforeEditing);
                 var key = world.SpanId(spans[1]);
                 if (String.IsNullOrWhiteSpace(key)) throw new InvalidOperationException("The island span of a circuit has no ID; the circuit cannot be identified");
                 if (baseline.Circuits.Any(c => c.Key == key || ReferenceEquals(c.Set, set))) throw new InvalidOperationException("Two circuits of this crossing share island span " + key + "; they cannot be told apart");
@@ -389,7 +389,7 @@ namespace RailroaderScenePatcher.Core {
             if (problem != null) throw new InvalidOperationException(problem);
             var baseline = BaselineOf(target);
             var difference = Coherence(target, baseline, false);
-            if (difference != null) throw new InvalidOperationException("The crossing's circuits differ from their native or patched coverage: " + difference + ". Reload before editing it");
+            if (difference != null) throw new InvalidOperationException("The crossing's circuits differ from their native or patched coverage: " + difference + ". " + WindowGuidance.ReloadBeforeEditing);
         }
         // The equipment an application converges on, or null when it leaves the additions as they are. An operation that leaves
         // them alone neither checks nor touches them, so a faulty addition does not block coverage edits of the same crossing.
@@ -435,7 +435,7 @@ namespace RailroaderScenePatcher.Core {
                 }
             }
             var effective = Effective(target, baseline, coverage);
-            if (effective.Circuits.All(c => c.Value.Kind == CircuitKind.Detached)) throw new InvalidOperationException("Detaching every circuit would leave the crossing without detection; keep or select coverage for at least one circuit");
+            if (effective.Circuits.All(c => c.Value.Kind == CircuitKind.Detached)) throw new InvalidOperationException("Detaching every circuit would leave the crossing without detection. " + WindowGuidance.KeepOneCircuit);
         }
         // The coverage an application converges on: a complete coverage as it stands, any other laid over the observed one.
         CrossingCoverage Effective(object target, Baseline baseline, CrossingCoverage coverage) => coverage.Complete ? coverage : CrossingCoverage.Overlay(Observed(target, baseline), coverage);

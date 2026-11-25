@@ -272,7 +272,7 @@ static class EquipmentTests {
         f.World.Device("World/Other/Gate Only", d => { d.Model = "Unexamined Gate"; d.Facts.Lamps.Clear(); });
         f.World.Device("World/Other/Gate Lamp", d => { d.Model = "Unexamined Gate Lamp"; d.Facts.Gates.Clear(); d.Facts.Lamps[0] = new LampFacts { Name = "Arm Lamp", Key = "gates", Targets = 1, Materials = 3, RendererUsesMaterial = true }; });
         var rejected = new Dictionary<string, KeyValuePair<Action<FakeDevice>, string>> {
-            ["bell"] = R(d => d.Facts.Bells = 1, "it contains a bell player; add bells from a bell definition using the bell pattern"),
+            ["bell"] = R(d => d.Facts.Bells = 1, "it contains a bell player and is not a light or gate source"),
             ["owner"] = R(d => d.Facts.KeyValueObjects = 1, "it holds its own key-value object, which would intercept the crossing controller's keys"),
             ["controller"] = R(d => d.Facts.Controllers = 1, "it holds a crossing controller; a copy would be a second crossing"),
             ["span"] = R(d => d.Facts.Spans = 1, "it holds a detection span"),
@@ -407,7 +407,7 @@ static class EquipmentTests {
         var (f, session, mapEditor, store) = Session();
         Assert(session.EquipmentSources(Crossing).Count(c => c.Eligible) == 2, "Scene patch editing offers the loaded conforming sources");
         var preview = session.PreviewEquipment(Crossing, West(), null);
-        Assert(preview.Error == null && preview.Lines.Single().StartsWith("Add author/pack west", StringComparison.Ordinal), "The preview names the addition: " + preview.Error + String.Join("|", preview.Lines));
+        Assert(preview.Error == null && preview.Lines.Single().StartsWith("Would add author/pack west", StringComparison.Ordinal), "The preview names the addition: " + preview.Error + String.Join("|", preview.Lines));
         Assert(f.World.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && session.ScenePatchFileText.Contains("\"modifications\": {}"), "A preview changes nothing");
         var added = session.AddEquipment(Crossing, West());
         Assert(added.Applied && f.Live.Single().Position[0] == 10, "A scene patch editing addition builds the equipment directly: " + added.Error);
@@ -419,7 +419,7 @@ static class EquipmentTests {
         Assert(session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east")).Applied && f.Live.Count == 2, "A second addition joins the same modification");
         Assert(session.AddEquipment(Crossing, West(12)).Applied && f.Live.Count == 2 && f.World.Constructed == 2 && f.Live.Single(a => a.Record.Id == "west").Position[0] == 12, "Re-adding an ID moves its addition");
         var removePreview = session.PreviewEquipment(Crossing, null, "east");
-        Assert(removePreview.Error == null && removePreview.Lines.Any(l => l.StartsWith("Remove author/pack east", StringComparison.Ordinal)), "Removal is previewed: " + String.Join("|", removePreview.Lines));
+        Assert(removePreview.Error == null && removePreview.Lines.Any(l => l.StartsWith("Would remove author/pack east", StringComparison.Ordinal)), "Removal is previewed: " + String.Join("|", removePreview.Lines));
         Assert(session.RemoveEquipment(Crossing, "east").Applied && f.Live.Single().Record.Id == "west", "Removing one addition releases only it");
         Assert(!session.RemoveEquipment(Crossing, "east").Applied, "Removing an absent addition is refused");
         mapEditor.Undo(); Assert(f.Live.Count == 2 && f.Live.Single(a => a.Record.Id == "east").Position[0] == 20, "Undo of removal rebuilds the addition");
@@ -447,11 +447,11 @@ static class EquipmentTests {
         // Each line names the addition by its equipment ID, with the display name beside it: additions that share a
         // source read apart.
         CheckLines(Preview(West(path: replacementPath, id: "east")),
-            "Add east (Signal 2); the crossing controller drives it.", "Keep west (Signal 1 (added)).");
+            "Would add east (Signal 2). The crossing controller drives it.", "Would keep west (Signal 1 (added)).");
         CheckLines(Preview(West(path: replacementPath)),
-            "Rebuild west (Signal 2); the copy of Signal 1 (added) is removed.");
-        CheckLines(Preview(West(12)), "Move west (Signal 1 (added)).");
-        CheckLines(Preview(null, "west"), "Remove west (Signal 1 (added)).");
+            "Would rebuild west (Signal 2); the copy of Signal 1 (added) is removed.");
+        CheckLines(Preview(West(12)), "Would move west (Signal 1 (added)).");
+        CheckLines(Preview(null, "west"), "Would remove west (Signal 1 (added)).");
     }
     static void EditingRefusalAndFailureRestore() {
         var (f, session, mapEditor, store) = Session();
@@ -551,7 +551,7 @@ static class EquipmentTests {
         var (f, session, mapEditor, store) = Session();
         var first = session.AddEquipment(Crossing, West(id: "first"));
         var later = session.PreviewEquipment(Crossing, West(30, id: "second"), null);
-        Assert(first.Applied && later.Lines.Count == 2 && later.Lines[0].StartsWith("Add author/pack second", StringComparison.Ordinal) && later.Lines[1].StartsWith("Keep author/pack first", StringComparison.Ordinal),
+        Assert(first.Applied && later.Lines.Count == 2 && later.Lines[0].StartsWith("Would add author/pack second", StringComparison.Ordinal) && later.Lines[1].StartsWith("Would keep author/pack first", StringComparison.Ordinal),
             "A preview lists what changes before what is kept: " + String.Join(" | ", later.Lines));
         Assert(session.NewEquipmentId("signal-1-added") == "signal-1-added", "An unused ID is proposed as it is");
         session.AddEquipment(Crossing, West(id: "signal-1-added"));
@@ -675,7 +675,7 @@ static class EquipmentTests {
         f.World.Devices.RemoveAll(d => d.Path == SignalPath);
         var mutations = f.World.Mutations;
         var recheck = session.Recheck(Crossing);
-        const string Refusal = "Equipment west: the added equipment is missing, and light or gate Signal 1 is not in the map, so the equipment cannot be rebuilt. The patcher only copies lights and gates already in the map and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition";
+        const string Refusal = "Equipment west: the added equipment is missing, and light or gate Signal 1 is not in the map, so the equipment cannot be rebuilt. The patcher only copies lights and gates already in the map and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition.";
         Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains(Refusal),
             "Recheck refuses the rebuild and names the source by its name, with the standard tail: " + recheck.Failure + " " + recheck.Error);
         Assert(f.World.Mutations == mutations && !lost.Destroyed && !session.CleanupUnverified(Crossing), "The refusal changes nothing");
@@ -691,7 +691,7 @@ static class EquipmentTests {
         b.Live.Single().CopyLost = true;
         b.World.Bells.Clear();
         var bellRecheck = bellSession.Recheck(Crossing);
-        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell is unavailable in the content library, so the equipment cannot be rebuilt. The patcher only uses bell definitions already available and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition"),
+        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell is unavailable in the content library, so the equipment cannot be rebuilt"),
             "A lost bell whose definition is unavailable is refused with its recorded name and a next step: " + bellRecheck.Error);
     }
     static void AnAdditionWithoutItsCopyCanBeRemoved() {
@@ -813,7 +813,7 @@ static class EquipmentTests {
         Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("An added light, gate, or bell left an empty object at this crossing"),
             "A stale wrapper that stays after its rebuild is reported: " + failed.Failure + " " + failed.Error);
         var recovery = RecoveryGuidance.For(failed, "Connections", "Recheck", null).Line("Recheck");
-        Assert(recovery == "An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map. Your edits are kept. Click Recheck to try removing it, or reload the native map editor.",
+        Assert(recovery == "An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map. Your edits are kept. Click Recheck to try removing it, or reload the Map Editor.",
             "The cleanup reason composes with the recovery action: " + recovery);
         Assert(f.Live.Count(a => !a.CopyLost) == 1 && f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west") == "lamp and gate observers registered",
             "Status reads the rebuilt addition: " + f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west"));
@@ -845,7 +845,7 @@ static class EquipmentTests {
         Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.ScenePatchFileText == before,
             "The failed edit restores the scene patch file: " + failed.Error);
         var line = RecoveryGuidance.For(failed, "Connections", "Equipment", null).Line("Equipment");
-        Assert(line == "The change was undone. An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map. Click Recheck to try removing it, or reload the native map editor.",
+        Assert(line == "The change was undone. An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map. Click Recheck to try removing it, or reload the Map Editor.",
             "An edit reports the rollback and leftover once: " + line);
     }
     sealed class EquipmentWarnings : IPatchDiagnostics {
@@ -963,12 +963,12 @@ static class EquipmentTests {
         }
         var device = new EquipmentSource("BushnellWhittier", SignalPath);
         var cases = new[] {
-            (Refusal(new EquipmentAddition("x", "crossing-custom-v1", device, at, "author/pack")), "Equipment x: pattern crossing-custom-v1 is not supported. Use pattern crossing-light-gate-v1 or crossing-bell-v1. Otherwise remove the addition"),
-            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack")), "Equipment x: a light or gate needs a light or gate in the map as its source, not a bell definition. Change its source in your scene patch file or remove the addition"),
-            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Twin"), at, "author/pack")), "Equipment x: source Twin is ambiguous; 2 objects in the map share its scene and path. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition"),
-            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Bell"), at, "author/pack")), ". Select an eligible source or remove the addition"),
-            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack")), "Equipment x needs a fixed placement. Give it a position and rotation or remove the addition"),
-            (Refusal(new EquipmentAddition("x", EquipmentAddition.BellPattern, device, at, "author/pack")), "Equipment x: a bell needs a bell definition as its source, not a light or gate in the map. Change its source in your scene patch file or remove the addition"),
+            (Refusal(new EquipmentAddition("x", "crossing-custom-v1", device, at, "author/pack")), "Equipment x: pattern crossing-custom-v1 is not supported; supported patterns: crossing-light-gate-v1 or crossing-bell-v1. Use a supported pattern or remove the addition."),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack")), "Equipment x: a light or gate needs a light or gate in the map as its source, not a bell definition. Change its source in your scene patch file or remove the addition."),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Twin"), at, "author/pack")), "Equipment x: source Twin is ambiguous; 2 objects in the map share its scene and path. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition."),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Bell"), at, "author/pack")), "it contains a bell player and is not a light or gate source. Add bells from a bell definition using the bell pattern. Select an eligible source or remove the addition."),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack")), "Equipment x has no fixed position and rotation. Give it a position and rotation or remove the addition."),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.BellPattern, device, at, "author/pack")), "Equipment x: a bell needs a bell definition as its source, not a light or gate in the map. Change its source in your scene patch file or remove the addition."),
         };
         foreach (var (error, tail) in cases) Assert(error != null && error.EndsWith(tail, StringComparison.Ordinal), "The refusal gives its reason and any next step: " + error);
         Assert(cases[3].Item1.StartsWith("Equipment x: source Bell does not conform to " + EquipmentAddition.LightGatePattern, StringComparison.Ordinal), "A non-conforming source is named: " + cases[3].Item1);
@@ -1114,7 +1114,7 @@ static class EquipmentTests {
             "The removal preview names the removed addition and the one that keeps the modification refused: " + preview.Error + String.Join("|", preview.Lines));
         // Both refused additions copy one source: the removal preview names the removed one by its equipment ID.
         var named = session.PreviewEquipment(Crossing, null, "bell-as-light-a", null, addition => "Crossing Bell at Rejected");
-        Assert(named.Error == null && named.Lines.Single().StartsWith("Remove bell-as-light-a (Crossing Bell at Rejected) from the scene patch file.", StringComparison.Ordinal),
+        Assert(named.Error == null && named.Lines.Single().StartsWith("Would remove bell-as-light-a (Crossing Bell at Rejected) from the scene patch file.", StringComparison.Ordinal),
             "The removal preview names the addition by its equipment ID beside its display name: " + named.Error + String.Join("|", named.Lines));
         var first = session.RemoveEquipment(Crossing, "bell-as-light-a");
         Assert(first.Applied && f.World.Mutations == 0 && f.Live.Count == 0 && !session.ScenePatchFileText.Contains("bell-as-light-a") && session.ScenePatchFileText.Contains("bell-as-light-b"),
@@ -1159,7 +1159,7 @@ static class EquipmentTests {
         Assert(preview.Error == null && preview.Lines.Count == 1 && preview.Lines[0].Contains("bell-as-light-a") && preview.Lines[0].Contains("bell-as-light-b"),
             "The preview of the first correction names the addition and the one that keeps the modification refused: " + preview.Error + String.Join("|", preview.Lines));
         var named = session.PreviewEquipment(Crossing, West(5, SignalPath, "bell-as-light-a"), null, null, addition => "Signal 1");
-        Assert(named.Error == null && named.Lines.Single().StartsWith("Save bell-as-light-a (Signal 1) in the scene patch file.", StringComparison.Ordinal),
+        Assert(named.Error == null && named.Lines.Single().StartsWith("Would save bell-as-light-a (Signal 1) in the scene patch file.", StringComparison.Ordinal),
             "The correction preview names the addition by its equipment ID beside its display name: " + named.Error + String.Join("|", named.Lines));
         var first = session.AddEquipment(Crossing, West(5, SignalPath, "bell-as-light-a"));
         Assert(first.Applied && f.World.Mutations == 0 && f.Live.Count == 0 && session.Refusal(Crossing) != null && session.Refusal(Crossing).Contains("bell-as-light-b"),

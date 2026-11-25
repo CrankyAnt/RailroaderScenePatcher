@@ -148,13 +148,13 @@ namespace RailroaderScenePatcher {
             var session = attachment.Session;
             editingStatus = "Editing ready for " + CommandBand.ShownPath(attachment.PatchPath, GameFolder);
             if (session.FreshStartPending) {
-                freshStartMessage = "Start fresh completed. The original is backed up at " + session.LastBackup + ". Save replaces it with an empty scene patch file.";
+                freshStartMessage = "Start fresh completed. The original is backed up at " + session.LastBackup + ". " + WindowGuidance.SaveReplacesWithEmpty;
                 feedback.Report(RecoveryPlace, freshStartMessage);
             } else {
                 var outcomes = session.LastReread?.Outcomes?.Values.ToArray() ?? new Outcome[0];
                 var failed = session.LastReread?.Outcomes?.Where(o => !o.Value.Applied).Select(o => o.Key).ToArray() ?? new string[0];
                 feedback.Report(RecoveryPlace, "Read again completed. " + (session.LastReread?.Error != null ? "The modifications were not applied. " + CommandBand.Sentence(session.LastReread.Error)
-                    : (outcomes.Length - failed.Length) + " of " + outcomes.Length + " modifications applied" + (failed.Length == 0 ? "." : ". Not applied: " + String.Join(", ", failed) + ". See the diagnostics for the reasons.")));
+                    : (outcomes.Length - failed.Length) + " of " + outcomes.Length + " modifications applied" + (failed.Length == 0 ? "." : ". Not applied: " + String.Join(", ", failed) + ". " + WindowGuidance.SeeDiagnostics)));
                 // The scene and the definitions changed: the scene patch file's diagnostics are replaced, and the inventory and
                 // the supplied definitions are read again.
                 ReplaceScenePatchFileDiagnostics(session.LastReread);

@@ -36,6 +36,10 @@ static class LogModeTests {
         UndeliveredRows();
         DebugOptionSetting();
         EditResults();
+        WindowGuidanceStaysInTheWindow();
+        GuidanceLeavesTheLogLine();
+        AttemptIdentifiers();
+        LinesOfOneLoad();
         EditingFaults();
         CullingUpdateFailure();
         Console.WriteLine("PASS: log modes");
@@ -82,14 +86,14 @@ static class LogModeTests {
         string Line(string id) => off.SingleOrDefault(l => l.Contains("[" + id + "]"));
         Assert(off.Length == 5, "Five files get one player warning each: " + String.Join(" | ", off));
         Assert(Line("a/applied") == null && Line("c/other-map") == null && Line("d/missing-target") == null, "An applied file, a skip for another map and a failure with a Log window row get no player line");
-        Assert(Line("b/undeclared") == "Warning Undeclared [b/undeclared]: the scene patch file wasn't applied because the mod's Info.json doesn't list crankyant/scene-patcher under dependencies.required.", "A missing patcher dependency is a warning that says what to add: " + Line("b/undeclared"));
-        Assert(Line("e/unreadable").StartsWith("Warning Unreadable [e/unreadable]: the scene patch file wasn't applied: Unreadable", StringComparison.Ordinal), "An unreadable file is a warning: " + Line("e/unreadable"));
-        Assert(Line("f/format").StartsWith("Warning Format [f/format]: the scene patch file wasn't applied: ", StringComparison.Ordinal) && Line("f/format").Contains("format version 2"), "An unsupported format version is a warning: " + Line("f/format"));
-        Assert(Line("g/metadata") == "Warning g/metadata [g/metadata]: the scene patch file wasn't applied: Cannot read scene patch file or supplying metadata: JsonReaderException.", "Unreadable metadata is a warning: " + Line("g/metadata"));
-        Assert(Line("h/unsupported").StartsWith("Warning Unsupported [h/unsupported]: modification m wasn't applied because the game can't apply it in play: m: Unsupported", StringComparison.Ordinal), "A modification unsupported in play is a warning that names it: " + Line("h/unsupported"));
+        Assert(Line("b/undeclared") == "Warning Undeclared [b/undeclared]: Data/scene-patches.json wasn't applied because Info.json doesn't list crankyant/scene-patcher under dependencies.required. Report this to the mod author.", "A missing patcher dependency is a warning that names the missing dependency: " + Line("b/undeclared"));
+        Assert(Line("e/unreadable").StartsWith("Warning Unreadable [e/unreadable]: Data/scene-patches.json wasn't applied: Unreadable", StringComparison.Ordinal), "An unreadable file is a warning: " + Line("e/unreadable"));
+        Assert(Line("f/format").StartsWith("Warning Format [f/format]: Data/scene-patches.json wasn't applied: ", StringComparison.Ordinal) && Line("f/format").Contains("format version 2"), "An unsupported format version is a warning: " + Line("f/format"));
+        Assert(Line("g/metadata") == "Warning g/metadata [g/metadata]: Data/scene-patches.json wasn't applied: Cannot read scene patch file or supplying metadata: JsonReaderException. Report this to the mod author.", "Unreadable metadata is a warning: " + Line("g/metadata"));
+        Assert(Line("h/unsupported").StartsWith("Warning Unsupported [h/unsupported]: Data/scene-patches.json modification m wasn't applied because the game can't apply it in play: m: Unsupported", StringComparison.Ordinal), "A modification unsupported in play is a warning that names it: " + Line("h/unsupported"));
         // The Log window row of a target that is not in the loaded map says what is missing and what the modder can do.
         var missing = lastRows.Failures.Single(f => f.ModIdentifier == "d/missing-target").Message;
-        Assert(missing.Contains("This target doesn't match any object in the loaded map. Inspect the intended object in the Scene Patcher. On the Object tab, compare its Identity fields with the target's scene, path, and component in the scene patch file. Correct the target or remove this modification from the file.") && !missing.Contains("resolve uniquely"),
+        Assert(missing.Contains("This target doesn't match any object in the loaded map. ") && !missing.Contains("resolve uniquely"),
             "A missing target reads in plain words: " + missing);
         var on = Player(true, out var onLog);
         Assert(on.SequenceEqual(off), "Debug on keeps the same player lines");
@@ -221,24 +225,29 @@ static class LogModeTests {
             [EditingFailure.ReloadPending] = "A working-location return is still pending.",
             [EditingFailure.ReloadStopped] = "Save failed.",
             [EditingFailure.ReloadCancelled] = "Reload cancelled: x",
-            [EditingFailure.ReturnTimedOut] = "The return to your working location did not complete within five minutes. Check the Player log for loading errors before trying again.",
+            [EditingFailure.ReturnTimedOut] = "The return to your working location timed out after five minutes. Check the Player log for loading errors before trying again.",
             [EditingFailure.LocationNotRestored] = "The Map Editor reloaded, but your working location could not be restored: x",
             [EditingFailure.OutstandingUnknown] = "The patcher couldn't check for unsaved changes. It treats the Map Editor as unsaved: x",
             [EditingFailure.HistoryError] = "A Map Editor Undo or Redo step failed, so scene patch editing may not match the scene: x",
             [EditingFailure.ExitCancelled] = "The Map Editor stayed open because the patcher couldn't check for unsaved changes. x",
             [EditingFailure.FileCheck] = "Could not check the scene patch file: x",
-            [EditingFailure.GizmoCleanup] = "The patcher couldn't confirm that it removed the temporary changes made while using the gizmo. Reload the Map Editor. x",
+            [EditingFailure.GizmoCleanup] = "The patcher couldn't confirm removal of the gizmo's temporary changes. Reload the Map Editor. x",
             [EditingFailure.HookUnavailable] = "Map Editor reload hook unavailable",
             [EditingFailure.HistoryTracking] = "The patcher couldn't track an Undo or Redo history change in the Map Editor: x",
             [EditingFailure.ChromeRefresh] = "The Map Editor title and Save button couldn't be updated: x",
             [EditingFailure.HistoryCheck] = "The Map Editor Undo or Redo step couldn't be checked: x",
+        };
+        // The window shows the repair step; the log line leaves it out.
+        var logged = new Dictionary<EditingFailure, string> {
+            [EditingFailure.ReturnTimedOut] = "The return to your working location timed out after five minutes.",
+            [EditingFailure.GizmoCleanup] = "The patcher couldn't confirm removal of the gizmo's temporary changes. x",
         };
         string Detail(EditingFailure site) => site == EditingFailure.ReloadPending ? "A working-location return is still pending." : site == EditingFailure.ReloadStopped ? "Save failed." : site == EditingFailure.HookUnavailable ? "Map Editor reload hook unavailable" : "x";
         Assert(Enum.GetValues(typeof(EditingFailure)).Length == expected.Count, "Every editing failure site has its expected text");
         foreach (var site in expected.Keys) {
             var fault = new EditingFault();
             var log = RecordingLog.Capture(false, () => { fault.Fail(site, Detail(site)); fault.Fail(site, Detail(site)); });
-            Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Error && log.Lines[0].Value == expected[site], site + " is written once as a player error: " + String.Join(" | ", log.Lines.Select(l => l.Value)));
+            Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Error && log.Lines[0].Value == (logged.TryGetValue(site, out var line) ? line : expected[site]) + " Report this to the patcher maintainer.", site + " is written once as a player error: " + String.Join(" | ", log.Lines.Select(l => l.Value)));
             Assert(fault.Text == (site == EditingFailure.HistoryError ? null : expected[site]), site + (site == EditingFailure.HistoryError ? " reaches only the log" : " stands in the window"));
         }
         var refused = new EditingFault();
@@ -261,8 +270,8 @@ static class LogModeTests {
             once.Warning("j", BakedSceneryRules.CullingUpdateFailure(null), failure);
         });
         Assert(log.At(LogLevel.Warning).SequenceEqual(new[] {
-            "Moved parts of BushnellWhittier-MapManager/World/Mill may appear or disappear at the wrong distance because the patcher couldn't update when they are shown: game function gone",
-            "Moved baked scenery parts may appear or disappear at the wrong distance because the patcher couldn't update when they are shown: game function gone" }), "One text names the group or the parts: " + String.Join(" | ", log.At(LogLevel.Warning)));
+            "The patcher couldn't update visibility for moved parts of BushnellWhittier-MapManager/World/Mill. Report this to the patcher maintainer: game function gone",
+            "The patcher couldn't update visibility for moved baked scenery parts. Report this to the patcher maintainer: game function gone" }), "One text names the group or the parts: " + String.Join(" | ", log.At(LogLevel.Warning)));
         Assert(log.At(LogLevel.Debug).Count() == 2 && log.At(LogLevel.Debug).All(l => l.Contains("System.InvalidOperationException")), "Each written warning adds its full exception as a debug line");
     }
 
@@ -294,7 +303,7 @@ static class LogModeTests {
                 rows.Abandon();
                 window.Ready = true; rows.Flush();
             });
-            Assert(log.PlayerLines.SequenceEqual(new[] { "Warning The game's Log window didn't show this message: mod/b: Held problem.", "Warning The game's Log window didn't show this message: World/Depot: Held notice." }) && window.Rows.Count == 0,
+            Assert(log.PlayerLines.SequenceEqual(new[] { "Warning Log window message delivery failed or the Log window wasn't ready: mod/b: Held problem. Report delivery failures to the patcher maintainer.", "Warning Log window message delivery failed or the Log window wasn't ready: World/Depot: Held notice. Report delivery failures to the patcher maintainer." }) && window.Rows.Count == 0,
                 ending + ": each undelivered row is written once in player mode: " + String.Join(" | ", log.PlayerLines));
         }
 
@@ -305,10 +314,69 @@ static class LogModeTests {
             rows.Warning("w2", "mod/c", "Two.");
             rows.Abandon();
         });
-        Assert(failed.PlayerLines.SequenceEqual(new[] { "Warning The game's Log window didn't show this message: mod/c: One.", "Warning The game's Log window didn't show this message: mod/c: Two." }),
+        Assert(failed.PlayerLines.SequenceEqual(new[] { "Warning Log window message delivery failed or the Log window wasn't ready: mod/c: One. Report delivery failures to the patcher maintainer.", "Warning Log window message delivery failed or the Log window wasn't ready: mod/c: Two. Report delivery failures to the patcher maintainer." }),
             "A failing Log window writes each row once in player mode: " + String.Join(" | ", failed.PlayerLines));
         var failedDebug = RecordingLog.Capture(true, () => { var again = new NativeRows(window); again.Warning("w", "mod/c", "Three."); });
         Assert(failedDebug.At(LogLevel.Debug).Any(l => l.Contains("collector gone")), "Debug on adds why the Log window failed");
+        Assert(failedDebug.At(LogLevel.Debug).Any(l => l.StartsWith("Log window message delivery failed for row w from mod/c: ", StringComparison.Ordinal)),
+            "The delivery failure names the row key and originator that the row's other lines carry: " + String.Join(" | ", failedDebug.At(LogLevel.Debug)));
+
+        RowsKeepTheirRepairStep();
+    }
+    // In play mode the Scene Patcher window is not open, so a Log window row for a patcher failure names its repair step.
+    // A row that can't be delivered is written once to the Player log without it, with the attempt number of the load
+    // the row was raised in, even when the next load has begun.
+    static void RowsKeepTheirRepairStep() {
+        var window = new Window();
+        var rows = new NativeRows(window);
+        RecordingLog.Capture(true, () => rows.Warning("g", "mod/d", "The bridge differs. " + WindowGuidance.ReloadBeforeEditing));
+        Assert(window.Rows.Single() == "Warning mod/d: The bridge differs. Reload before editing it.", "A Log window row names its repair step: " + window.Rows.Single());
+
+        LoadAttempt.Reset();
+        try {
+            window = new Window { Ready = false }; rows = new NativeRows(window);
+            LoadAttempt.Begin("rr/bushnell-whittier");
+            rows.Warning("h", "mod/e", "The bridge differs. " + WindowGuidance.ReloadBeforeEditing);
+            LoadAttempt.Begin("rr/bushnell-whittier");
+            var held = RecordingLog.Capture(false, () => rows.Abandon());
+            Assert(held.PlayerLines.Single() == "Warning load attempt 1, map rr/bushnell-whittier: Log window message delivery failed or the Log window wasn't ready: mod/e: The bridge differs. Report delivery failures to the patcher maintainer.",
+                "The undelivered row is written without its repair step, with the attempt number of its own load: " + String.Join(" | ", held.PlayerLines));
+        } finally { LoadAttempt.Reset(); }
+    }
+    // While a load is in progress every line starts with its identifiers, also from parts that know nothing of the load;
+    // a line that already names them, an attempt trace and a line outside a load stay as they are.
+    static void LinesOfOneLoad() {
+        LoadAttempt.Reset();
+        try {
+            var log = RecordingLog.Capture(true, () => {
+                PatcherLog.Debug("Before any load.");
+                LoadAttempt.Begin("map");
+                PatcherLog.Warning("A warning.");
+                PatcherLog.Debug(LoadedScenePatchFile.AttemptLabel(1, new[] { "map" }) + ": a labelled line.");
+                PatcherLog.Debug(PatchEngine.AttemptTrace + "{}");
+                LoadAttempt.End();
+                PatcherLog.Debug("After the load.");
+                LoadAttempt.Resume();
+                PatcherLog.Debug("Another callback.");
+                LoadAttempt.End();
+            });
+            Assert(log.Lines.Select(l => l.Value).SequenceEqual(new[] { "Before any load.", "load attempt 1, map map: A warning.", "load attempt 1, map map: a labelled line.", PatchEngine.AttemptTrace + "{}", "After the load.", "load attempt 1, map map: Another callback." }),
+                "Lines of one load carry its attempt number: " + String.Join(" | ", log.Lines.Select(l => l.Value)));
+
+            var opened = 0;
+            var binding = new LocalWorldBinding<object>(() => new object(), _ => { }, _ => PatcherLog.Debug("Reconciled."), () => { opened++; LoadAttempt.Begin("map"); });
+            var reentry = RecordingLog.Capture(true, () => {
+                binding.Enter("world", 1); binding.Enter("world", 1);
+                binding.EndAttempt(); binding.Enter("world", 2);
+            });
+            Assert(opened == 2 && LoadAttempt.Number == 3 && reentry.Lines.Single().Value == "load attempt 3, map map: Reconciled.",
+                "Each opened load attempt begins a load before the retained state is reconciled: " + opened + " / " + String.Join(" | ", reentry.Lines.Select(l => l.Value)));
+        } finally { LoadAttempt.Reset(); }
+    }
+    // Every debug line of one load attempt starts with the same identifiers: the attempt number and the loaded map.
+    static void AttemptIdentifiers() {
+        Assert(LoadedScenePatchFile.AttemptLabel(3, new[] { "rr/bushnell-whittier", "layer" }) == "load attempt 3, map rr/bushnell-whittier", "The label names the attempt and the loaded map");
+        Assert(LoadedScenePatchFile.AttemptLabel(1, null) == "load attempt 1, map unknown" && LoadedScenePatchFile.AttemptLabel(1, new string[0]) == "load attempt 1, map unknown", "A map that can't be read is unknown");
     }
 
     // The settings file in the patcher's mod folder, as the debug option reads and writes it.
@@ -364,5 +432,59 @@ static class LogModeTests {
         Assert(off.Lines.Count == 0 && described == 0 && offFeedback.Messages.Count != 0, "Debug off logs no edit result and builds no log line; the message area still has the result");
         var on = RecordingLog.Capture(true, () => Edit(Feedback()));
         Assert(on.Lines.All(l => l.Key == LogLevel.Debug) && on.Lines.Count == 3 && on.Lines[0].Value == "[x] Placement completed.", "Debug on logs each edit result as a debug line: " + String.Join(" | ", on.Lines.Select(l => l.Value)));
+        // A result of an action on the scene patch file, such as Save, names the file; a result of an edit names the inspected object.
+        var subject = new RailroaderScenePatcher.EditFeedback();
+        subject.FilePlaces.Add("Save");
+        subject.Describe = text => subject.LogLine(text, "World/Roads Sylva/Grade Crossing - Allen", "[crankyant/maptest] scene patch file");
+        var named = RecordingLog.Capture(true, () => {
+            subject.Refuse("Save", "Save", "An import is open in Scene Patcher.");
+            subject.Report("Placement", "Placement completed.");
+        });
+        Assert(named.Lines.Select(l => l.Value).SequenceEqual(new[] {
+            "[Save] [crankyant/maptest] scene patch file: Save refused. An import is open in Scene Patcher.",
+            "[Placement] World/Roads Sylva/Grade Crossing - Allen: Placement completed." }),
+            "A Save line names the scene patch file and an edit line names its object: " + String.Join(" | ", named.Lines.Select(l => l.Value)));
+    }
+    // A refusal in the Scene Patcher window keeps the repair step its reason carries; the debug line of the same result
+    // records the refusal without it.
+    static void WindowGuidanceStaysInTheWindow() {
+        var scene = new Scene(); var box = new Box { X = 7 };
+        scene.Objects["p"] = new List<object> { box };
+        scene.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        var feedback = new RailroaderScenePatcher.EditFeedback();
+        box.X = 8;
+        var stale = RecordingLog.Capture(true, () => feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), _ => null));
+        Assert(feedback.Result == "Placement refused. The object list is stale (p changed (position)). Refresh and inspect again.",
+            "The window shows the stale refusal with its repair step: " + feedback.Result);
+        Assert(stale.Lines.Count == 1 && stale.Lines[0].Key == LogLevel.Debug && stale.Lines[0].Value == "Placement refused. The object list is stale (p changed (position)).",
+            "The debug line records the refusal without the repair step: " + String.Join(" | ", stale.Lines.Select(l => l.Value)));
+
+        var nothing = RecordingLog.Capture(true, () => feedback.Run("placement", "Placement", null, null, null, _ => null));
+        Assert(feedback.Result == "Placement refused. No object is inspected. Refresh the inventory and inspect the object first.",
+            "The window says how to inspect an object: " + feedback.Result);
+        Assert(nothing.Lines.Single().Value == "Placement refused. No object is inspected.",
+            "The debug line names only the refusal: " + nothing.Lines.Single().Value);
+
+        var fault = new EditingFault();
+        var timedOut = RecordingLog.Capture(false, () => fault.Fail(EditingFailure.ReturnTimedOut, "x"));
+        Assert(fault.Text.EndsWith(" " + WindowGuidance.CheckPlayerLog, StringComparison.Ordinal) && timedOut.Lines.Single().Value == "The return to your working location timed out after five minutes. Report this to the patcher maintainer.",
+            "An editing error keeps its repair step in the window, and its player line names the report recipient instead: " + fault.Text + " / " + timedOut.Lines.Single().Value);
+    }
+    // PatcherLog leaves every window guidance text out of a line, wherever the reason put it, and keeps the rest of the
+    // line; an attempt trace keeps its payload as the engine recorded it.
+    static void GuidanceLeavesTheLogLine() {
+        foreach (var guidance in WindowGuidance.All) {
+            Assert(guidance.EndsWith(".", StringComparison.Ordinal) && guidance.IndexOf('"') < 0 && guidance.IndexOf('\\') < 0, "A guidance text is whole sentences without quotes: " + guidance);
+            Assert(WindowGuidance.Without("The reason. " + guidance) == "The reason.", "A guidance text at the end leaves the line: " + guidance);
+            Assert(WindowGuidance.Without("The reason: x. " + guidance.TrimEnd('.')) == "The reason: x.", "A guidance text without its full stop leaves the line: " + guidance);
+            Assert(WindowGuidance.Without("The reason. " + guidance + " What remains: y.") == "The reason. What remains: y.", "A guidance text in the middle leaves the line: " + guidance);
+        }
+        Assert(WindowGuidance.Without(WindowGuidance.SelectAgain + " Snap target changed.") == "Snap target changed.", "A guidance text that starts the line leaves it with its space");
+        Assert(WindowGuidance.Without("Reload before editing it later.") == "Reload before editing it later.", "A sentence that only starts like a guidance text stays");
+        Assert(WindowGuidance.Without("Snap target changed (" + WindowGuidance.SelectAgain + ")") == "Snap target changed (" + WindowGuidance.SelectAgain + ")", "A guidance text inside parentheses stays");
+        var trace = PatchEngine.AttemptTrace + "{\"error\":\"x. " + WindowGuidance.ReloadBeforeEditing + "\"}";
+        var log = RecordingLog.Capture(true, () => { PatcherLog.Debug(trace); PatcherLog.Warning("The bridge differs. " + WindowGuidance.ReloadBeforeEditing); });
+        Assert(log.Lines[0].Value == trace && log.Lines[1].Value == "The bridge differs.", "The trace keeps its payload; a warning loses its guidance: " + String.Join(" | ", log.Lines.Select(l => l.Value)));
     }
 }

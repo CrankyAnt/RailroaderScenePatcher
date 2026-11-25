@@ -27,7 +27,7 @@ The editor lists every device beneath a loaded crossing controller, including th
 
 | Reason | Meaning |
 | --- | --- |
-| it contains a bell player; add bells from a bell definition using the bell pattern | Bells use the controller-bound bell pattern; see [add a bell to an existing crossing](adding-crossing-bells.md). |
+| it contains a bell player and is not a light or gate source. Add bells from a bell definition using the bell pattern. | Bells use the controller-bound bell pattern; see [add a bell to an existing crossing](adding-crossing-bells.md). |
 | it holds its own key-value object, which would intercept the crossing controller's keys | The copy's lamps and gates would observe that object instead of the crossing controller. |
 | it holds a crossing controller; a copy would be a second crossing | A copy would duplicate a crossing. |
 | it holds a detection span | A copy would duplicate detection. |
@@ -40,7 +40,7 @@ The editor lists every device beneath a loaded crossing controller, including th
 | it is in a different Unity scene from the destination crossing and could unload while the copy still uses its assets | The other scene could unload the shared assets while the copy still uses them. |
 | the destination crossing controller has ... key-value objects, so it cannot address the copy | The controller has no key-value object or more than one, so the copy could not be addressed unambiguously. |
 | the destination crossing controller has several cullers, so it is unclear which one should control the copy's visibility | The copy could not be culled unambiguously. |
-| the patcher added this equipment; choose a device already present in the map | Copy the map's own device instead. |
+| the patcher added this equipment; it isn't an eligible native source. Choose a device already present in the map. | Copy the map's own device instead. |
 | a script in its hierarchy is missing | The device cannot be checked or copied safely. |
 
 ## What an addition does
@@ -48,7 +48,7 @@ The editor lists every device beneath a loaded crossing controller, including th
 - The patcher places the copy beneath the crossing controller. Its lamps and gates find the controller's key-value object. They follow the same lights and gates state as the native equipment, driven by the same circuits.
 - The copy joins the controller's culler and takes its current culling state. It is shown and hidden with the crossing's own equipment. A culled copy initializes when it becomes visible.
 - The copy shares the source's model, materials, and animation. These assets belong to the scene that contains both the source and crossing, so they stay loaded while the copy exists. The copy keeps working when the source object is culled or removed from view. Removing the copy destroys only the objects the patcher created, leaving the shared assets and the working source intact.
-- Each addition is an added object. The outliner lists it once under its category, marked with `+`, and its state line shows **+ ADDED**. When two or more added lights or gates at the same crossing share a name, their display names end in `(added, N of M)`, such as `Signal 1 (added, 2 of 3)`. The copy's parts have no separate entries. Culling, initialization, and Undo/Redo steps for the copy do not mark the inventory stale. Edit the addition on its crossing's **Connections** tab.
+- Each addition is an added object. The outliner lists it once under its category, marked with `+`, and its state line shows **+ ADDED**. Its name is the source device's name followed by `(added: <Equipment ID>)`, such as `Signal 1 (added: north-signal)`, in the outliner, in the **Lights, gates, and bells** list, and in the inspector heading. Two additions from one source differ by their Equipment IDs. The copy's parts have no separate entries. Culling, initialization, and Undo/Redo steps for the copy do not mark the inventory stale. Edit the addition on its crossing's **Connections** tab.
 - An addition that fails its check blocks only equipment edits of that crossing until the world reloads. An addition whose copy is gone doesn't block them; your next equipment change builds it again. Coverage and detection edits of the same crossing stay available.
 - The crossing object, its coverage, and its native equipment do not change.
 - Each addition needs an ID that is unique in your scene patch file. Only one modification may use it. If two modifications share an ID, both fail. The editor refuses an ID that another modification already uses. IDs are scoped to your mod, so another supplying mod can use the same ID without a conflict. Your scene patch file never moves or removes another mod's additions.

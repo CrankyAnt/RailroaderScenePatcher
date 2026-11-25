@@ -19,9 +19,7 @@ namespace RailroaderScenePatcher {
         internal GameObject Controller, Copy;
         internal bool Retired;
         internal EquipmentSource Source => SourceDefinition != null ? EquipmentSource.ForDefinition(SourceDefinition) : new EquipmentSource(SourceScene, SourcePath);
-        (string Scope, string Id, string Name, bool IsBell) NameParts => (Scope, Id, SourceName, IsBell);
-        internal string DisplayName => InventoryPresentationState.AddedEquipmentName(NameParts,
-            Controller == null ? new[] { NameParts } : At(Controller).Select(item => item.NameParts));
+        internal string DisplayName => InventoryPresentationState.AddedEquipmentName(SourceName, Id);
         // Records the addition and the source it is built from on a new wrapper beneath its controller.
         internal static OwnedEquipment Mark(GameObject wrapper, GameObject controller, EquipmentAddition addition, string sourceName) {
             var owned = wrapper.AddComponent<OwnedEquipment>();
@@ -80,7 +78,7 @@ namespace RailroaderScenePatcher {
                 if (transformer.GetMethods(Native.Flags).Count(m => m.Name == method && m.GetParameters().Length == 1) != 1) throw new MissingMethodException(TransformerType, method);
             try { bells = new CrossingBells(controller); } catch (Exception e) {
                 bellsUnavailable = EquipmentAddition.BellsUnavailable;
-                PatcherLog.Debug(() => "Crossing bells are unavailable: " + e);
+                PatcherLog.Debug(() => "Crossing bell capability check failed: " + e);
             }
         }
         // Why bells are unavailable on this build, or null.
@@ -186,7 +184,7 @@ namespace RailroaderScenePatcher {
                     foreach (var bell in bells.All()) found.Add(SourceCandidate.Bell(bell.Identifier, bell.Name, SourceProblem(bell, destination, EquipmentAddition.BellPattern)));
                     result.AddRange(found);
                 } catch (Exception e) {
-                    PatcherLog.Warning("The patcher couldn't list the available bells because it couldn't read the bell definitions in the game's content library", e);
+                    PatcherLog.Warning("The patcher couldn't list bell definitions from the game's content library. Report this to the patcher maintainer.", e);
                     result.Add(SourceCandidate.UnavailableBells(EquipmentAddition.BellDefinitionsUnreadable));
                 }
             }

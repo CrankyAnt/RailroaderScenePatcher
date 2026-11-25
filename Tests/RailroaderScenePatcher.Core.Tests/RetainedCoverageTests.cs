@@ -131,7 +131,7 @@ static partial class CoverageTests {
         var mutations = f.World.Mutations;
         var fresh = new CrossingCoverageScene(f.World, Capability.Unchecked);
         var refused = new PatchEngine(fresh).Apply(Doc(Cover("reroute", Tracks("Pipr"))));
-        Assert(!refused.Outcomes["reroute"].Applied && refused.Outcomes["reroute"].Error.Contains("Reload before editing it") && f.World.Mutations == mutations, "The fresh state refuses the patched circuit: " + refused.Outcomes["reroute"].Error);
+        Assert(!refused.Outcomes["reroute"].Applied && refused.Outcomes["reroute"].Error.Contains("spans an earlier patcher state created") && f.World.Mutations == mutations, "The fresh state refuses the patched circuit: " + refused.Outcomes["reroute"].Error);
         Assert(f.NewRouteDetectsBothWays && f.OwnedRegistered == 3, "The patched coverage stays as it was");
     }
 }

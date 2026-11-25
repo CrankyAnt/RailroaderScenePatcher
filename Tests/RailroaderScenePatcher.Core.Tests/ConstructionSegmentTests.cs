@@ -400,10 +400,10 @@ static class ConstructionSegmentTests {
             Assert(reason != null && reason.StartsWith("The construction controller ", StringComparison.Ordinal) && reason.EndsWith(".", StringComparison.Ordinal)
                 && CommandBand.Tooltip("Start this task for the inspected object.", reason).Contains("Unavailable: " + reason), "The guided task " + task + " of the Ela controller is unavailable with its reason: " + reason);
         }
-        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela).Contains("Connections tab"), "The binding tasks point to where the controller's segments are set");
+        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela).Contains("no marker track location"), "The binding tasks state why a marker-location edit does not apply to the controller");
         // The controller is bound to track by its construction segments, which the Connections tab shows: the reason
         // says it holds no marker's track location, not that it has no track binding at all.
-        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela) == "The construction controller uses construction segments rather than a marker's track location. Set its construction segments on the Connections tab."
+        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela) == "The construction controller has no marker track location. Set its construction segments on the Connections tab."
             && GuidedTaskState.TargetBlock(GuidedTaskKind.DetachBinding, ela) == GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela),
             "The binding tasks do not deny the construction segments: " + GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela));
         Assert(GuidedTaskState.Tasks.Count == 8, "The task list keeps every task visible");

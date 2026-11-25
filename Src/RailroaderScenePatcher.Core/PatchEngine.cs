@@ -27,7 +27,7 @@ namespace RailroaderScenePatcher.Core {
         public string PadMarkerId { get; internal set; }
         public const string PadMarkerMember = "padMarkerId";
         // Why a scene refuses a target with a pad marker ID, when it names no crossbuck at a shared path.
-        public const string PadMarkerNotAccepted = "padMarkerId only identifies a crossbuck at an unprotected crossing when other crossbucks share its path. Remove padMarkerId from this target.";
+        public const string PadMarkerNotAccepted = "The target doesn't accept padMarkerId because it isn't a crossbuck at an unprotected crossing with a shared path. " + WindowGuidance.RemovePadMarkerId;
         // Whether a target object of a scene patch file names this identity's object: the same scene, path, component
         // and pad marker ID. The structure is compared by the caller.
         internal static bool SameObject(JObject target, TargetIdentity identity) =>
@@ -141,8 +141,8 @@ namespace RailroaderScenePatcher.Core {
             var maps = scene.MapIds.ToArray();
             if (!maps.Contains(mapId, StringComparer.Ordinal)) return Mismatch;
             if (scene is IMapPatchContext context && (context.MapPatchIds ?? Enumerable.Empty<string>()).Contains(mapId, StringComparer.Ordinal))
-                return mapId + " is a map patch. The game skips scene patch files that name a map patch. Use the bottom map layer, "
-                    + PatchEditingSession.SceneTargetMapFor(maps) + ".";
+                return mapId + " is a map patch. The scene patch file wasn't applied; bottom map layer: "
+                    + PatchEditingSession.SceneTargetMapFor(maps) + ". " + WindowGuidance.UseBottomLayer;
             return null;
         }
     }
@@ -529,9 +529,9 @@ namespace RailroaderScenePatcher.Core {
         }
         // The refusals of a target that does not match exactly one object of the loaded scene.
         public const string TargetMissing = "This target doesn't match any object in the loaded map.";
-        public const string TargetMissingAction = "Inspect the intended object in the Scene Patcher. On the Object tab, compare its Identity fields with the target's scene, path, and component in the scene patch file. Correct the target or remove this modification from the file.";
+        public const string TargetMissingAction = WindowGuidance.CompareTargetIdentity;
         public const string TargetAmbiguous = "This target matches more than one object in the loaded map.";
-        public const string TargetAmbiguousAction = "Use a more specific path or component so the target matches only one object.";
+        public const string TargetAmbiguousAction = WindowGuidance.UseSpecificTarget;
         static string UnresolvedTarget(IReadOnlyList<object> matches) =>
             matches == null || matches.Count == 0 || (matches.Count == 1 && matches[0] == null) ? TargetMissing : matches.Count != 1 ? TargetAmbiguous : null;
         internal object ResolveFresh(TargetIdentity identity) {
@@ -547,7 +547,7 @@ namespace RailroaderScenePatcher.Core {
             scene.Preflight(resolved);
             var current = Matches(identity);
             if (current == null || current.Count != 1 || !ReferenceEquals(current[0], resolved))
-                throw new InvalidOperationException("Target changed before mutation; refresh and inspect again");
+                throw new InvalidOperationException("Target changed before mutation. " + WindowGuidance.RefreshAndInspect);
             if (!mapContext.SequenceEqual(scene.MapIds))
                 throw new InvalidOperationException("Map context changed before mutation");
             expected?.Validate(scene, identity, resolved);
@@ -755,7 +755,7 @@ namespace RailroaderScenePatcher.Core {
         // Why the modification holds content this patcher version does not execute, or null. A modification is named by
         // its key, so an id member inside it is content of an older shape.
         static string UnsupportedContent(string id, JObject item) {
-            if (item["id"] != null) return "Unsupported modification content: modification " + id + " carries an id member. The ID of a modification is its key, " + id + "; remove the id member";
+            if (item["id"] != null) return "Unsupported modification content: modification " + id + " carries an id member. " + WindowGuidance.RemoveIdMember;
             return Only(item, Known) ? null : "Unsupported modification content";
         }
         // The owner is the key of the scene patch file the modification belongs to; it scopes the identities of its additions.
@@ -898,7 +898,7 @@ namespace RailroaderScenePatcher.Core {
                     var key = addition ? DetectionAddition.Key("", property.Name) : property.Name;
                     if (!addition && DetectionAddition.Id(key) != null) throw new InvalidOperationException("Invalid relationship: " + key + " is not the ID of an island span");
                     if (circuit["detach"] != null) {
-                        if (addition) throw new InvalidOperationException("Invalid relationship: an addition cannot be detached; omit it to delete it");
+                        if (addition) throw new InvalidOperationException("Invalid relationship: an addition cannot be detached. " + WindowGuidance.OmitDetachedAddition);
                         if (!Only(circuit, "detach") || circuit["detach"].Type != JTokenType.Boolean || !(bool)circuit["detach"]) throw new InvalidOperationException("Invalid relationship: detach must be true and stand alone");
                         parsed.Add(new KeyValuePair<string, CircuitCoverage>(key, CircuitCoverage.Detached));
                         continue;
@@ -946,10 +946,10 @@ namespace RailroaderScenePatcher.Core {
                 EquipmentSource from;
                 // A bell loads the audio of a bell definition; a light or gate copies a loaded device.
                 if (pattern == EquipmentAddition.BellPattern) {
-                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a bell definition as its source. In your mod's scene patch file (Data/scene-patches.json), set the source's definition to the bell definition's identifier and remove any other members from the source");
+                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a bell definition as its source in Data/scene-patches.json; the source must contain only definition with the bell definition's identifier");
                     from = EquipmentSource.ForDefinition((string)source["definition"]);
                 } else {
-                    if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a light or gate in the map as its source. In your mod's scene patch file (Data/scene-patches.json), give this addition's source only a scene and a path that identify the light or gate to copy");
+                    if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a light or gate in the map as its source in Data/scene-patches.json; the source must contain only the scene and path of the light or gate");
                     from = new EquipmentSource((string)source["scene"], (string)source["path"]);
                 }
                 var placement = addition["placement"] as JObject;

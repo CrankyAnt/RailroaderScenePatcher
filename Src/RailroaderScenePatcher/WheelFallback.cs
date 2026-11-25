@@ -40,8 +40,8 @@ namespace RailroaderScenePatcher {
                     if (!reported) {
                         reported = true;
                         var handler = hit == null ? null : ExecuteEvents.GetEventHandler<IScrollHandler>(hit);
-                        PatcherLog.Debug(() => "A scroll view took the wheel itself: the event went to " + (handler == null ? "no handler" : Path(handler)) +
-                            " under the pointer at " + (hit == null ? "nothing" : Path(hit)) + ".");
+                        PatcherLog.Debug(() => "Scroll fallback applied; event handler: " + (handler == null ? "no handler" : Path(handler)) +
+                            "; pointer target: " + (hit == null ? "nothing" : Path(hit)) + ".");
                     }
                 }
             }

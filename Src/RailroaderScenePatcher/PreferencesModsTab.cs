@@ -48,7 +48,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) {
                 try { patcher.UnpatchAll(Id); } catch { }
                 section = null;
-                PatcherLog.Warning("Debug logging is unavailable because the patcher can't add its section to the Mods tab in Preferences", e);
+                PatcherLog.Warning("The patcher couldn't add the Scene Patcher section to Preferences > Mods. Report this to the patcher maintainer.", e);
             }
             return option = new DebugOption(new SettingsFile(settings), available);
         }
@@ -76,7 +76,7 @@ namespace RailroaderScenePatcher {
                 if (list == null || section == null) return;
                 lock (list) if (list.Count == 0 || !ReferenceEquals(list[0], section)) return;
                 builder.AddTab("Mods", TabId, DrawTab);
-            } catch (Exception e) { PatcherLog.Warning("The patcher couldn't add the Mods tab to Preferences", e); }
+            } catch (Exception e) { PatcherLog.Warning("The patcher couldn't add the Mods tab to Preferences. Report this to the patcher maintainer.", e); }
         }
         static void DrawTab(UIPanelBuilder builder) {
             builder.VScrollView(scroll => {
@@ -88,7 +88,7 @@ namespace RailroaderScenePatcher {
                 lock (list) sections = list.ToArray();
                 foreach (var draw in sections) {
                     try { draw(scroll); }
-                    catch (Exception e) { PatcherLog.Warning("A mod's section in the Mods tab of Preferences couldn't be drawn", e); }
+                    catch (Exception e) { PatcherLog.Warning("A mod's section in Preferences > Mods couldn't be drawn. Report this to the patcher maintainer.", e); }
                 }
             });
         }
@@ -100,7 +100,7 @@ namespace RailroaderScenePatcher {
                     row.Spacer(12f);
                     row.AddToggle(() => current.On, on => {
                         try { current.Set(on); }
-                        catch (Exception e) { PatcherLog.Error("Debug logging couldn't be changed", e); }
+                        catch (Exception e) { PatcherLog.Error("The patcher couldn't change Debug logging in settings.json. Report this to the patcher maintainer.", e); }
                     });
                     row.Spacer(8f);
                     row.AddLabel(DebugLabel, text => { text.fontStyle |= FontStyles.Bold; text.alignment = TextAlignmentOptions.Left; }).FlexibleWidth();

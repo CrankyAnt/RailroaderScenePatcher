@@ -22,7 +22,7 @@ namespace RailroaderScenePatcher {
         static string ControllerTaskBlock(GuidedTaskKind kind) {
             switch (kind) {
                 case GuidedTaskKind.Binding:
-                case GuidedTaskKind.DetachBinding: return "The construction controller uses construction segments rather than a marker's track location. Set its construction segments on the Connections tab.";
+                case GuidedTaskKind.DetachBinding: return "The construction controller has no marker track location. " + WindowGuidance.SetSegmentsOnConnections;
                 case GuidedTaskKind.StarterPlacement:
                 case GuidedTaskKind.Wreck: return "The construction controller isn't a starter placement marker.";
                 case GuidedTaskKind.MarkerId: return "The construction controller isn't a track marker, so you can't give it a Replacement ID.";
@@ -41,7 +41,7 @@ namespace RailroaderScenePatcher {
         internal void SetValues(string[] values) { if (Step == GuidedTaskStep.Values) draft = (string[])values.Clone(); }
         internal bool Select(SceneObservation target) {
             if ((Step == GuidedTaskStep.Values || Step == GuidedTaskStep.Review) && !(Target != null && target != null && ReferenceEquals(Target.Handle, target.Handle) && Target.Identity.Scene == target.Identity.Scene && Target.Identity.Path == target.Identity.Path && Target.Identity.Component == target.Identity.Component && Target.Identity.Structure == target.Identity.Structure)) {
-                Message = "Finish this task or return to Inspector before clearing the selection or selecting another object."; return false;
+                Message = "The selection can't change while a guided task is at Values or Review. " + WindowGuidance.FinishGuidedTask; return false;
             }
             if (Step == GuidedTaskStep.Target) Target = target;
             Message = null; return true;

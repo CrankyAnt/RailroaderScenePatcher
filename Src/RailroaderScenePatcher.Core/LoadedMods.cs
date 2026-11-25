@@ -71,26 +71,29 @@ namespace RailroaderScenePatcher.Core {
             var maps = mapIds ?? Array.Empty<string>();
             var name = (Mod.Source.Name ?? Mod.Source.Identifier) + " [" + Mod.Source.Identifier + "]";
             if (Result == null) {
-                if (Mod.Error != null) return name + ": the scene patch file wasn't applied: " + Sentence(Mod.Error);
-                if (!Mod.Applicable) return name + ": the scene patch file wasn't applied because the mod's Info.json doesn't list " + LoadedMod.PatcherId + " under dependencies.required.";
+                if (Mod.Error != null) return name + ": Data/scene-patches.json wasn't applied: " + Sentence(Mod.Error) + " Report this to the mod author.";
+                if (!Mod.Applicable) return name + ": Data/scene-patches.json wasn't applied because Info.json doesn't list " + LoadedMod.PatcherId + " under dependencies.required. Report this to the mod author.";
                 return null;
             }
             if (Result.Error != null) {
                 if (!Result.MapEditorOnly || Result.NotApplicable != null || ForOtherMap(maps)) return null;
-                return name + ": the scene patch file wasn't applied: " + Sentence(Result.Error);
+                return name + ": Data/scene-patches.json wasn't applied: " + Sentence(Result.Error) + " Report this to the mod author.";
             }
             var unsupported = (Result.Outcomes ?? new Dictionary<string, Outcome>()).Where(o => !o.Value.Applied && o.Value.MapEditorOnly).ToArray();
             if (unsupported.Length == 0) return null;
-            return name + ": " + (unsupported.Length == 1 ? "modification " + unsupported[0].Key + " wasn't applied" : "modifications " + String.Join(", ", unsupported.Select(o => o.Key)) + " weren't applied") +
-                " because the game can't apply " + (unsupported.Length == 1 ? "it" : "them") + " in play: " + Sentence(String.Join("; ", unsupported.Select(o => o.Key + ": " + (o.Value.Error ?? "").TrimEnd('.'))));
+            return name + ": Data/scene-patches.json " + (unsupported.Length == 1 ? "modification " + unsupported[0].Key + " wasn't applied" : "modifications " + String.Join(", ", unsupported.Select(o => o.Key)) + " weren't applied") +
+                " because the game can't apply " + (unsupported.Length == 1 ? "it" : "them") + " in play: " + Sentence(String.Join("; ", unsupported.Select(o => o.Key + ": " + (o.Value.Error ?? "").TrimEnd('.')))) + " Report this to the patcher maintainer.";
         }
         static string Sentence(string text) { text = (text ?? "").Trim(); return text.EndsWith(".", StringComparison.Ordinal) ? text : text + "."; }
         // What happened to this scene patch file in one load attempt, as one debug line: the load attempt, the mod, the map
         // the scene patch file is for, and the outcome. mapIds is the loaded map followed by its layers.
+        // The identifiers that start every debug line of one load attempt: its number and the loaded map.
+        public static string AttemptLabel(int attempt, IReadOnlyList<string> mapIds) =>
+            "load attempt " + attempt + ", map " + (mapIds == null || mapIds.Count == 0 ? "unknown" : mapIds[0]);
         public string DebugLine(int attempt, IReadOnlyList<string> mapIds) {
             var maps = mapIds ?? Array.Empty<string>();
             var source = Mod.Source;
-            var start = "load attempt " + attempt + ", map " + (maps.Count == 0 ? "unknown" : maps[0]) +
+            var start = AttemptLabel(attempt, maps) +
                 " (layers " + (maps.Count < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "): " + (source.Name ?? source.Identifier) + " [" + source.Identifier + "] scene patch file";
             var map = MapId;
             var named = start + (map == null ? "" : " for " + map);
@@ -117,7 +120,7 @@ namespace RailroaderScenePatcher.Core {
             Dependencies = dependencies;
             Message = "Supplying mods " + String.Join(", ", Mods.Select(Name)) + " each modify the existing target " + target.Label + ". " +
                 "This indicates a possible incompatibility, not a confirmed conflict. " + (dependencies.Count == 0 ? "" : String.Join("; ", dependencies) + "; a dependency does not establish that the changes are compatible. ") +
-                "Application continued in load order; no change was undone and no winner was chosen. Check the mods' descriptions if the result looks wrong.";
+                "Application continued in load order; no change was undone.";
         }
         static string Name(PatchSource source) => (source.Name ?? source.Identifier) + " [" + source.Identifier + "]";
         public string Source => "Railroader Scene Patcher";

@@ -13,7 +13,9 @@ namespace RailroaderScenePatcher.Core {
 
     // The one logging entry point of the patcher. Every log line passes through here, so the debug option decides in one
     // place what a session writes, and no line carries an absolute path, which would name the player's user folder in a
-    // log that players post publicly. The game's Log window rows are not written here: the game writes those itself.
+    // log that players post publicly, and no line carries the window guidance of a reason (WindowGuidance). A line written
+    // during a load starts with that load's identifiers (LoadAttempt). The game's Log
+    // window rows are not written here: the game writes those itself.
     public static class PatcherLog {
         static readonly object gate = new object();
         static readonly List<KeyValuePair<string, string>> roots = new List<KeyValuePair<string, string>>();
@@ -53,8 +55,12 @@ namespace RailroaderScenePatcher.Core {
         static void Write(LogLevel level, string text) {
             var output = Output;
             if (output == null || text == null) return;
-            try { output.Write(level, WithoutAbsolutePaths(text)); } catch { /* Logging cannot stop the work it reports. */ }
+            try { output.Write(level, WithoutAbsolutePaths(LoadAttempt.Prefixed(WithoutGuidance(text)))); } catch { /* Logging cannot stop the work it reports. */ }
         }
+        // A log line records what happened; the repair steps and fallbacks the window shows with a reason stay out of it.
+        // An attempt trace keeps its JSON payload as the engine recorded it.
+        static string WithoutGuidance(string text) =>
+            text.StartsWith(PatchEngine.AttemptTrace, StringComparison.Ordinal) ? text : WindowGuidance.Without(text);
         // One folder name: any characters a file system allows, with an apostrophe only inside a name, as in O'Neil, so
         // the quote that closes a quoted path is no part of a folder name.
         const string Folder = @"(?:[^\\/\r\n""'<>|:*?]|'(?=[^\s\\/'""]))*";

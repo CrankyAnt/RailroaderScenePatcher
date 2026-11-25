@@ -76,7 +76,7 @@ namespace RailroaderScenePatcher.Core {
             var current = world.Observe(target);
             if (current.Colliders.Count == 0) throw new InvalidOperationException("The bridge has no colliders; this is not the supported bridge pattern");
             var difference = Layout(Reference(target), current);
-            if (difference != null) throw new InvalidOperationException("The bridge's collider state differs from its first observation in this load: " + difference + ". Reload before editing it");
+            if (difference != null) throw new InvalidOperationException("The bridge's collider state differs from its first observation in this load: " + difference + ". " + WindowGuidance.ReloadBeforeEditing);
         }
         public object Capture(object target) { Reference(target); return world.Observe(target); }
         public ObjectState Read(object target) => world.Observe(target).Root;

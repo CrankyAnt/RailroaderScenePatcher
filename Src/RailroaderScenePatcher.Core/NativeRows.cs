@@ -14,10 +14,13 @@ namespace RailroaderScenePatcher.Core {
     }
 
     // The patcher's Log window rows of one load attempt, each delivered once. The game writes a delivered row to the player
-    // log, so the patcher writes no line beside it. A row that can't be delivered is written once in player mode instead:
+    // log, so the patcher writes no line beside it. A row for a patcher failure keeps the repair step of its reason, since
+    // the Scene Patcher window is not open in play mode. A row keeps the identifiers of the load it was raised in. A row that can't be delivered is written once in player mode instead:
     // when the Log window fails, and when the load attempt or the world ends before the Log window is ready.
     public sealed class NativeRows {
-        sealed class Row { internal string Key, Originator, Message; internal bool Notice; }
+        sealed class Row { internal string Key, Originator, Message, Load; internal bool Notice; }
+        // The row's load identifiers in front of a line about the row, or nothing for a row raised outside a load.
+        static string In(Row row) => row.Load == null ? "" : row.Load + ": ";
         readonly INativeRowOutput output;
         readonly List<Row> pending = new List<Row>();
         readonly HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
@@ -32,7 +35,7 @@ namespace RailroaderScenePatcher.Core {
         }
         void Add(string key, string originator, string message, bool notice, bool replace = false) {
             if (!replace && !seen.Add("w/" + key)) return;
-            pending.Add(new Row { Key = key, Originator = originator, Message = message, Notice = notice });
+            pending.Add(new Row { Key = key, Originator = originator, Message = message, Notice = notice, Load = LoadAttempt.Current });
             Flush();
         }
         public bool HasPending => pending.Count != 0;
@@ -46,7 +49,7 @@ namespace RailroaderScenePatcher.Core {
                     if (row.Notice) output.Notice(row.Originator, row.Message, row.Key);
                     else output.Warning(row.Originator, row.Message, row.Key);
                 } catch (Exception e) {
-                    PatcherLog.Debug(() => "The patcher couldn't deliver a message to the game's Log window. Undelivered messages will be written as warnings in the Player log: " + e);
+                    PatcherLog.Debug(() => In(row) + "Log window message delivery failed for row " + row.Key + " from " + row.Originator + ": " + e);
                     Abandon();
                     return;
                 }
@@ -57,7 +60,7 @@ namespace RailroaderScenePatcher.Core {
         public void Abandon() {
             var rows = pending.ToArray();
             pending.Clear();
-            foreach (var row in rows) PatcherLog.Warning("The game's Log window didn't show this message: " + row.Originator + ": " + row.Message);
+            foreach (var row in rows) PatcherLog.Warning(In(row) + "Log window message delivery failed or the Log window wasn't ready: " + row.Originator + ": " + row.Message + " Report delivery failures to the patcher maintainer.");
         }
     }
 }

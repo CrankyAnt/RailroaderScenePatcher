@@ -224,11 +224,11 @@ namespace RailroaderScenePatcher {
         void Failed(OwnedBell bell, string reason) {
             bell.LoadProblem = reason;
             var message = "Crossing bell " + bell.Id + " from mod " + bell.Scope + " at " + bell.ControllerPath + " stays silent because its audio failed to load. Reason: " + reason
-                + ". Remove or replace the bell, or correct its bell definition.";
+                + ". Report this to the maintainer of mod " + bell.Scope + ".";
             try {
                 if (Warn != null) Warn("bell-audio/" + bell.Scope + "/" + bell.Id + "/" + bell.ControllerPath, message, bell.Scope + ":Data/scene-patches.json");
                 else PatcherLog.Warning(message);
-            } catch (Exception e) { PatcherLog.Warning(message); PatcherLog.Debug(() => "The warning about the bell didn't reach the Log window: " + e); }
+            } catch (Exception e) { PatcherLog.Warning(message); PatcherLog.Debug(() => "Crossing bell warning delivery failed: " + e); }
         }
         // Configures a controller's own bell player again with the clip the controller loaded, its definition's indexes
         // and volume: what GradeCrossingController.LoadBellAudio does once. A player that was disabled destroyed the

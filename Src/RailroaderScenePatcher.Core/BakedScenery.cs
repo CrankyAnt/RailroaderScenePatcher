@@ -211,9 +211,9 @@ namespace RailroaderScenePatcher.Core {
         public const string StationAgentReason = "This group contains a station click spot. It's native map data, which you edit in the Map Editor.";
         // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
         // their own family. No ticket is needed.
-        public const string TrackMarkerReason = "You can't move this group as a whole. Edit its track markers individually in the Track marker family.";
+        public const string TrackMarkerReason = "This group can't be moved as a whole because it contains track markers. " + WindowGuidance.EditTrackMarkersIndividually;
         // Why a group with a spawn point is left out: its spawn points are edited one by one in their own family.
-        public const string SpawnPointReason = "You can't move this group as a whole. Edit its spawn points individually in the Spawn point family.";
+        public const string SpawnPointReason = "This group can't be moved as a whole because it contains spawn points. " + WindowGuidance.EditSpawnPointsIndividually;
         // A road bridge, wherever it stands: a root whose name contains Road Bridge. Its road is native
         // map data; the bridge carries a renderer culler and its own scene ground mask.
         public static bool RoadBridge(string name) => name != null && name.IndexOf("Road Bridge", StringComparison.Ordinal) >= 0;
@@ -274,7 +274,7 @@ namespace RailroaderScenePatcher.Core {
         // Why a target with a pad marker ID cannot name a crossbuck, from the crossbucks listed at its path, or null. The
         // id identifies a crossbuck only where several crossbucks share the path: a crossbuck with a path of its own is
         // named by its path alone, so the identity holds one identifier, never two.
-        public const string PadMarkerUnshared = "This crossbuck's path identifies it uniquely, so its target doesn't accept padMarkerId. Remove padMarkerId from this target.";
+        public const string PadMarkerUnshared = "This crossbuck's path identifies it uniquely, so its target doesn't accept padMarkerId. " + WindowGuidance.RemovePadMarkerId;
         public static string PadMarkerRefusal(int crossbucksAtPath) =>
             crossbucksAtPath == 0 ? TargetIdentity.PadMarkerNotAccepted : crossbucksAtPath == 1 ? PadMarkerUnshared : null;
         static bool Protected(IHierarchyNode node) => node.Components.Contains(CrossingController);
@@ -385,21 +385,21 @@ namespace RailroaderScenePatcher.Core {
         public static bool CullingContainer(IHierarchyNode node) =>
             node != null && !Present(node) && node.Children.Count != 0 && node.Components.Contains(SimpleCuller);
         // Why a modification cannot edit the object at a path the part rule did not list, or null for a listed part.
-        public const string CullingContainerRefusal = "This path names a culling container. It holds parts for the game's culling. Edit those parts directly.";
+        public const string CullingContainerRefusal = "This path names a culling container, which isn't an editable scenery part. " + WindowGuidance.EditCulledParts;
         // Whether a path resolves to the object the part rule decided this for: a listed part, and a culling container,
         // so that its modification fails with the container's reason instead of finding nothing.
         public static bool Resolves(PartVerdict verdict) => verdict?.Disposition == PartDisposition.Part || PartRefusal(verdict) != null;
         public static string PartRefusal(PartVerdict verdict) => verdict?.Reason == CullingContainers ? CullingContainerRefusal : null;
         // Why a modification cannot edit, as a group, the object the group rule did not list, or null: the object is
         // a container object, such as Bryson Yard.
-        public const string ContainerRefusal = "This path names a container object. A container object isn't a group. Edit the groups it holds.";
+        public const string ContainerRefusal = "This path names a container object, which isn't a scenery group. " + WindowGuidance.EditHeldGroups;
         public static string GroupRefusal(GroupRootVerdict verdict) => verdict?.Disposition == GroupDisposition.ContainerObject ? ContainerRefusal : null;
         // Whether an object resolves as a group target: a listed group root and a container object, so that a
         // container object's modification fails with its reason instead of finding nothing.
         public static bool ResolvesGroup(GroupRootVerdict verdict) => verdict?.Disposition == GroupDisposition.Group || GroupRefusal(verdict) != null;
         // Why a modification cannot edit, as a part, the object at a path: a listed group root, such as a yard lamp
         // post of Bryson Yard, is edited as a group; otherwise the part rule's own reason, or null for a listed part.
-        public const string GroupRootRefusal = "This path names a group root, not a part. Edit it as a baked scenery group";
+        public const string GroupRootRefusal = "This path names a group root, not a part. " + WindowGuidance.EditAsGroup;
         public static string PartRefusal(PartVerdict verdict, GroupRootVerdict group) =>
             group?.Disposition == GroupDisposition.Group ? GroupRootRefusal : PartRefusal(verdict);
         public static bool Resolves(PartVerdict verdict, GroupRootVerdict group) => verdict?.Disposition == PartDisposition.Part || PartRefusal(verdict, group) != null;
@@ -465,8 +465,8 @@ namespace RailroaderScenePatcher.Core {
         // patcher's handler stays in the chain and only passes the game's events on. Information, not a warning.
         // A failed update of own culling, for the group it names, or for moved parts in general when no group is known.
         public static string CullingUpdateFailure(string group) =>
-            (String.IsNullOrEmpty(group) ? "Moved baked scenery parts" : "Moved parts of " + group) + " may appear or disappear at the wrong distance because the patcher couldn't update when they are shown";
-        public static string LeftoverWrapper(string culler) => "Another component changed the show and hide handler for game culler " + culler + ", which controls scenery visibility. The patcher left that handler in place and stopped applying its own visibility rules for this culler. If the patcher's handler is still called, it only passes requests to the previous handler";
+            "The patcher couldn't update visibility for " + (String.IsNullOrEmpty(group) ? "moved baked scenery parts" : "moved parts of " + group) + ". Report this to the patcher maintainer";
+        public static string LeftoverWrapper(string culler) => "Released visibility rules for game culler " + culler + "; another component replaced its handler; replacement handler retained";
         // A scene ground mask is a component in this namespace (Map.Runtime.MaskComponents): it registers a shape in
         // the game's terrain system where its object stands, which shapes the ground and the vegetation there. A group
         // that holds one is a group of the family, and the object that holds it is a part.

@@ -117,7 +117,7 @@ namespace RailroaderScenePatcher {
         // applies it. A removal or correction that builds nothing says so here too, wherever the form stands in the tab.
         internal static string PreviewReport(string kind, IEnumerable<string> lines) {
             var shown = (lines ?? Enumerable.Empty<string>()).Where(line => !String.IsNullOrWhiteSpace(line)).Select(Sentence).ToArray();
-            return kind + " preview completed. " + (shown.Length == 0 ? "" : String.Join(" ", shown) + " ") + "Click Apply to apply it.";
+            return kind + " preview completed." + (shown.Length == 0 ? "" : " " + String.Join(" ", shown)) + " " + WindowGuidance.ApplyPreview;
         }
         // The addition a Use corrects: the refused addition whose Edit form is open (editedId) takes the device as its
         // source and keeps its ID and placement. Null when Use starts a new addition: no form, a new addition's form, or

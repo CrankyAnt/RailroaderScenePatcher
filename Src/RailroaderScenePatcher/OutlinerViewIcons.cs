@@ -44,7 +44,7 @@ namespace RailroaderScenePatcher {
                     }
                 });
             } catch (Exception e) {
-                PatcherLog.Warning("The patcher couldn't show the outliner view icons. Use the By category or By place button beside the object count to switch views. Report this to the patcher maintainer and include the Player log.", e);
+                PatcherLog.Warning("The patcher couldn't show the outliner view icons. Report this to the patcher maintainer.", e);
                 Button(row, OutlinerGrouping.ByPlace ? "By category" : "By place", () => SwitchOutlinerView(!OutlinerGrouping.ByPlace));
             }
         }

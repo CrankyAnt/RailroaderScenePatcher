@@ -47,7 +47,7 @@ namespace RailroaderScenePatcher.Core {
         internal string Text { get; }
         public bool Ready => Conflicts.All(c => c.UseFile.HasValue);
         // Why Import cannot apply yet, or null.
-        public string ApplyRefusal => Ready ? null : "Choose the editor version or the file version for each conflict first.";
+        public string ApplyRefusal => Ready ? null : "The import has unresolved file/editor version conflicts. " + WindowGuidance.ChooseVersionPerConflict;
     }
     // What the last completed Import applied.
     public sealed class ImportResult {
@@ -64,7 +64,7 @@ namespace RailroaderScenePatcher.Core {
     // start state. A change to an entry without scene patch editing steps in this session applies as unsaved work; an entry
     // with such steps is a conflict for the modder to decide. Import is outside native Undo and Redo and writes nothing.
     public sealed partial class PatchEditingSession {
-        public const string ImportSaveRefusal = "An import is open in Scene Patcher. Click Import or Cancel first.";
+        public const string ImportSaveRefusal = "An import is open in Scene Patcher. " + WindowGuidance.ImportOrCancel;
         // The scene patch file's content when the session started, or after Use file version replaced it; kept apart from the
         // text last read or written.
         JToken startContent;
@@ -92,10 +92,10 @@ namespace RailroaderScenePatcher.Core {
                 if (scenePatchFile == null) throw new InvalidOperationException("The scene patch file is unavailable");
                 var shown = observedVersion;
                 CheckFileVersion();
-                if (shown != observedVersion) throw new InvalidOperationException("The file changed again. Review the updated choice before continuing");
+                if (shown != observedVersion) throw new InvalidOperationException("The file changed after the version choice was shown. " + WindowGuidance.ReviewUpdatedChoice);
                 if (VersionState != FileVersionState.Changed) throw new InvalidOperationException("There is no readable file version to import");
                 var text = storage.ReadScenePatchFile();
-                if ((storage is IVersionBackupStorage versionStorage ? versionStorage.VersionFingerprint() : text) != shown) throw new InvalidOperationException("The file changed again. Review the updated choice before continuing");
+                if ((storage is IVersionBackupStorage versionStorage ? versionStorage.VersionFingerprint() : text) != shown) throw new InvalidOperationException("The file changed after the version choice was shown. " + WindowGuidance.ReviewUpdatedChoice);
                 if (text == null) throw new InvalidOperationException("The file no longer exists");
                 // The declared format version decides how the rest is read, so it is checked before any other content.
                 var format = ScenePatchFile.FormatProblem(text);
@@ -273,7 +273,7 @@ namespace RailroaderScenePatcher.Core {
                 var text = storage.ReadScenePatchFile();
                 if ((storage is IVersionBackupStorage versionStorage ? versionStorage.VersionFingerprint() : text) != overview.Fingerprint) {
                     Import = null;
-                    throw new InvalidOperationException("The file changed again. Review the updated choice before continuing");
+                    throw new InvalidOperationException("The file changed after the version choice was shown. " + WindowGuidance.ReviewUpdatedChoice);
                 }
                 var merged = ScenePatchFile.Load(text);
                 var refusal = Refusal(merged, text);
@@ -322,7 +322,7 @@ namespace RailroaderScenePatcher.Core {
                             continue;
                         }
                         if (targets.Any(t => ReferenceEquals(t.Item2, resolved))) continue;
-                        if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for the object of modification " + key + " could not be verified. Click Recheck or reload the Map Editor before importing");
+                        if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for the object of modification " + key + " could not be verified. " + WindowGuidance.RecheckBeforeImporting);
                         scene.Preflight(resolved);
                         targets.Add(Tuple.Create(identity, resolved));
                     }

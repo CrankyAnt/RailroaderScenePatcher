@@ -436,18 +436,20 @@ namespace RailroaderScenePatcher {
             try {
                 shown = OutlinerGrouping.Rows(inventory, filter, outlinerFilter, IsChanged, OutlinerTrackPoint);
                 return OutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, OutlinerTrackPoint);
-            } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The patcher couldn't build the outliner. Try Refresh. If the object list still doesn't appear, report this to the patcher maintainer and include the Player log.", e); return null; }
+            } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The patcher couldn't build the scene object outliner. Report this to the patcher maintainer.", e); return null; }
         }
         // The object count line's text. The count is that of the tree: container objects and native track spans have no row.
         string OutlinerSummary(OutlinerGrouping.Result tree) =>
             inventory == null ? "Inspection is unavailable" : tree == null ? "The object list couldn't be built. The log has the cause." : OutlinerGrouping.Summary(tree, inventory.Entries);
         // The outliner's rows, in a section that rebuilds by itself. countLine shows the object count, as countMarkup
-        // words it, and its font measures the row names. The full window and the compact rail share it.
+        // words it. The full window and the compact rail share it.
         UIPanel DrawOutlinerRows(UIPanelBuilder builder, TMP_Text countLine, Func<string, string> countMarkup) {
             return builder.AddRebuildableSection(items => {
                 items.ConfigureLayout(4f);
                 var rows = new List<UIOutlineItem>();
                 var byKey = new Dictionary<string, SceneObservation>();
+                // The added rows by their full text, for OutlineNameFit.
+                var fittedRows = new Dictionary<string, InventoryPresentationState.FittedRow>(StringComparer.Ordinal);
                 // The crossing nodes, by the key of their outline row.
                 var crossingKeys = new Dictionary<string, string>();
                 string selectedKey = null;
@@ -483,12 +485,15 @@ namespace RailroaderScenePatcher {
                     var mark = InventoryPresentationState.RowMark(item);
                     var context = mark == null ? "" : "  <alpha=#99>" + mark + "<alpha=#FF>";
                     var prefix = markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>").Replace("×", "<color=" + Red + "><b>×</b></color>") + (markers.Length == 0 ? "" : " ");
-                    string NameMarkup(string value) => item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
-                    // The divider can shrink the list without rebuilding its rows. Use the minimum column's width.
-                    var name = InventoryPresentationState.NarrowName(item.Family, label, OutlinerMinimumWidth - RowDecoration, value => countLine.GetPreferredValues(prefix + NameMarkup(value)).x);
-                    var text = NameMarkup(name);
-                    if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
-                    return new UIOutlineItem(key, prefix + text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) { Tooltip = OutlinerGrouping.Tooltip(tree, item, changed, failure) };
+                    string RowMarkup(string value) {
+                        var text = item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
+                        if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
+                        return prefix + text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>");
+                    }
+                    // The row shows its full name. Its cell fits an added name to the width it has (OutlineNameFit).
+                    var fitted = new InventoryPresentationState.FittedRow(item.Family, label, RowMarkup);
+                    if (CommandBand.IsAddedFamily(item.Family)) fittedRows[fitted.Full] = fitted;
+                    return new UIOutlineItem(key, fitted.Full, item) { Tooltip = OutlinerGrouping.Tooltip(tree, item, changed, failure) };
                 }
                 // A folder shows its count first, so a narrow column cuts the name and never the count. A crossing
                 // without a controller is a folder that can be selected.
@@ -538,6 +543,7 @@ namespace RailroaderScenePatcher {
                 });
                 // A row's tooltip waits as long as a button's, also while the pointer moves from row to row.
                 if (outline.GetComponent<OutlineTooltipDelay>() == null) outline.gameObject.AddComponent<OutlineTooltipDelay>();
+                (outline.GetComponent<OutlineNameFit>() ?? outline.gameObject.AddComponent<OutlineNameFit>()).Use(fittedRows);
                 var listLayout = outline.GetComponent<LayoutElement>();
                 listLayout.minHeight = CommandBand.OutlinerLeastHeight; listLayout.flexibleHeight = 10000;
                 // The compact rail trims this view to whole rows.
@@ -553,7 +559,7 @@ namespace RailroaderScenePatcher {
             StoreOutlinerWidth(outlinerWidth);
             // The same fit without a window limit tells whether the cap stopped it.
             var wanted = InventoryPresentationState.FitWidth(widths, RowDecoration, 100000, OutlinerMinimumWidth, InspectorMinimumWidth, divider);
-            if (wanted > outlinerWidth + 0.5f) feedback.Report("Fit", "Most names need " + Mathf.RoundToInt(wanted) + "; the column stops at " + Mathf.RoundToInt(outlinerWidth) + ", 40 percent of the window. Widen the window for more.");
+            if (wanted > outlinerWidth + 0.5f) feedback.Report("Fit", "Most names need " + Mathf.RoundToInt(wanted) + "; the column stops at " + Mathf.RoundToInt(outlinerWidth) + ", 40 percent of the window. " + WindowGuidance.WidenWindow);
         }
 
         void DrawInspector(UIPanelBuilder builder) {
@@ -1006,10 +1012,10 @@ namespace RailroaderScenePatcher {
                     }
                     Button(row, "Add detection", () => {
                         var id = (newAddition ?? "").Trim();
-                        if (id.Length == 0) { feedback.Refuse(CoveragePlace, "Detection addition", "give the addition an ID first"); return; }
+                        if (id.Length == 0) { feedback.Refuse(CoveragePlace, "Detection addition", "the addition has no ID. " + WindowGuidance.GiveAdditionId); return; }
                         var existing = circuits.Circuits.FirstOrDefault(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == id);
                         CloseEquipmentForm(); coverageAddition = id; coverageCircuit = existing.Key ?? DetectionAddition.Key("", id); preparedCoverage = null; ReadCoverage(existing.Value);
-                        OpenedForm("Detection addition " + id + " is open at the top of this tab: select its tracks, then Preview.");
+                        OpenedForm("Detection addition " + id + " is open. " + WindowGuidance.SelectTracksThenPreview);
                     }).Inactive(wait != null).Tooltip("Add detection with this ID", CommandBand.Tooltip("Make the crossing detect an extra track: give the addition an ID that is unique in this mod's scene patch file, then select its tracks.", wait));
                 });
             }
@@ -1082,7 +1088,7 @@ namespace RailroaderScenePatcher {
                         catch (Exception e) {
                             state = "The equipment status could not be checked";
                             var failure = e;
-                            equipmentStatusFailures.Debug(item.Id + "/" + e.GetBaseException().Message, () => "Could not check equipment status for " + item.Id + ": " + failure.GetBaseException());
+                            equipmentStatusFailures.Debug(item.Id + "/" + e.GetBaseException().Message, () => "Equipment status check failed for " + item.Id + ": " + failure.GetBaseException());
                         }
                     }
                     EquipmentNameField(builder, item, name, entry.Built != null);
@@ -1256,7 +1262,7 @@ namespace RailroaderScenePatcher {
         void ApplySegments() {
             var identity = selected.Identity;
             var ids = CommandBand.SegmentIds(segmentFields[0]);
-            if (ids.Count == 0) { feedback.Refuse(SegmentsPlace, "Construction segments", "enter at least one segment ID"); return; }
+            if (ids.Count == 0) { feedback.Refuse(SegmentsPlace, "Construction segments", "the segment ID list is empty. " + WindowGuidance.EnterSegmentId); return; }
             Edit(SegmentsPlace, "Construction segments", (current, inspection) => current.SetConstructionSegments(identity, ids, inspection), true);
         }
         bool HasBindingValue(TargetIdentity identity) {
@@ -1631,7 +1637,7 @@ namespace RailroaderScenePatcher {
                             Slot("Start", "Start following: keep the current placement relative to the picked track or endpoint.", unavailable ?? (picked == null ? "Choose a track or endpoint and confirm it first." : null), () => {
                                 var maps = picked.MapIds.ToArray();
                                 Edit(FollowPlace, "Track following", (current, inspection) => {
-                                    if (!maps.SequenceEqual(capabilities.MapIds)) throw new InvalidOperationException("Map context changed; select the track again");
+                                    if (!maps.SequenceEqual(capabilities.MapIds)) throw new InvalidOperationException("The map context changed after the track was selected. " + WindowGuidance.SelectTrackAgain);
                                     var anchor = picked.Identity.Kind == SelectionKind.TrackNode ? TrackAnchor.Endpoint(picked.Identity.Identifier)
                                         : TrackAnchor.At(trackPoses.Nearest(picked.Identity.Identifier, ((GameObject)selected.Handle).transform.position));
                                     return current.Follow(identity, anchor, inspection);
@@ -1799,7 +1805,7 @@ namespace RailroaderScenePatcher {
             var identity = selected.Identity;
             var location = EnteredEditValues.TrackLocation(binding);
             if (location == null) {
-                feedback.Refuse(BindingPlace, "Track location", "enter a segment ID, end a or b, and a distance with a decimal point");
+                feedback.Refuse(BindingPlace, "Track location", "the segment ID, end a or b, or numeric distance is missing or invalid. " + WindowGuidance.EnterTrackLocation);
                 return;
             }
             Edit(BindingPlace, CommandBand.StarterAction(location.Segment, location.End, location.Distance), (current, inspection) => current.PlaceStarter(identity, location, inspection), true);
@@ -1810,14 +1816,14 @@ namespace RailroaderScenePatcher {
         void ApplyPlacement() {
             var identity = selected.Identity;
             var placement = EnteredPlacement(placementFields, PlacementValues(), selected);
-            if (placement == null) { feedback.Refuse(PlacementPlace, "Placement", "enter six numbers with a decimal point"); return; }
+            if (placement == null) { feedback.Refuse(PlacementPlace, "Placement", "the six position and rotation values aren't valid numbers. " + WindowGuidance.EnterPlacement); return; }
             Edit(PlacementPlace, "Placement", (current, inspection) => current.Edit(identity, placement, null, inspection));
         }
         void ApplyBinding() {
             var identity = selected.Identity;
             var location = EnteredEditValues.TrackLocation(binding);
             if (location == null) {
-                feedback.Refuse(BindingPlace, "Track binding", "enter a segment ID, end a or b, and a distance with a decimal point");
+                feedback.Refuse(BindingPlace, "Track binding", "the segment ID, end a or b, or numeric distance is missing or invalid. " + WindowGuidance.EnterTrackLocation);
                 return;
             }
             var value = MarkerBinding.At(location);

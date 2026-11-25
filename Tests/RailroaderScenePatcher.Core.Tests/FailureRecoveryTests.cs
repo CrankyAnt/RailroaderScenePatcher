@@ -173,13 +173,13 @@ static class FailureRecoveryTests {
         Assert(RecoveryGuidance.For(w.Session.Edit(Q, At(40), null), "Placement", "Placement", null) == null, "An applied outcome needs no guidance");
         w.Scene.FailNextApplies = 1;
         var restored = RecoveryGuidance.For(w.Session.Edit(P, At(70), null), "Placement", "Placement", IndependentBoards.Structure);
-        Assert(restored.Kind == FailureKind.Restored && restored.Guide == "editing-placement-in-the-map-editor.md#set-a-numeric-placement" && restored.Line("Placement").Contains("was undone") && restored.Correction.Contains("Correct the cause and try again."), "A restored placement failure links the placement guide");
+        Assert(restored.Kind == FailureKind.Restored && restored.Guide == "editing-placement-in-the-map-editor.md#set-a-numeric-placement" && restored.Line("Placement").Contains("was undone") && restored.Correction == "The scene patch file is unchanged. Correct the cause and try again.", "A restored placement failure links the placement guide");
         var pin = w.Pin(P); w.P.X = 5;
         var stale = RecoveryGuidance.For(w.Session.Edit(P, At(71), null, pin), "Modification", "Removal", BridgeScene.Structure);
         w.Scene.FailNextApplies = 1; w.Scene.RefuseState = s => s.Placement?.Position[0] != 80;
         var incomplete = RecoveryGuidance.For(w.Session.Edit(P, At(80), null), "Track binding", "Set binding", CrossingPadScene.Structure);
         w.Scene.RefuseState = null;
-        Assert(incomplete.Kind == FailureKind.IncompleteCleanup && incomplete.Guide == "rebinding-crossing-pads.md" && incomplete.Correction.Contains("Recheck") && incomplete.Line("Track binding").Contains("What remains: Position: now 80, 2, 3, before 5, 2, 3."), "An incomplete cleanup names what remains and Recheck: " + incomplete.Line("Track binding"));
+        Assert(incomplete.Kind == FailureKind.IncompleteCleanup && incomplete.Guide == "rebinding-crossing-pads.md" && incomplete.Correction == "Cleanup remains unverified. Click Recheck or reload the Map Editor." && incomplete.Line("Track binding").Contains("What remains: Position: now 80, 2, 3, before 5, 2, 3."), "An incomplete cleanup names what remains and Recheck: " + incomplete.Line("Track binding"));
         Assert(stale.Kind == FailureKind.Refused && stale.Guide == "placing-bridges.md" && stale.Correction.StartsWith("Nothing changed. Refresh", StringComparison.Ordinal), "A stale target asks for a refresh and links the capability guide");
         foreach (var guidance in new[] { restored, incomplete, stale })
             Assert(!guidance.Correction.Contains("JSON") && !guidance.Correction.Contains("scene-patches.json"), "Scene patch editing guidance corrects through the editor, not the file: " + guidance.Correction);
@@ -218,7 +218,7 @@ static class FailureRecoveryTests {
         w.Scene.FailNextApplies = 1;
         Assert(!Run(inspection => w.Session.Edit(P, At(70), null, inspection)) && feedback.Result.StartsWith("Placement failed and was undone. ", StringComparison.Ordinal) && feedback.Result.Contains("The scene patch file is unchanged.") && !feedback.Result.Contains("back as it was"), "A restored failure says it was undone once: " + feedback.Result);
         w.Scene.FailNextApplies = 1; w.Scene.RefuseState = s => s.Placement?.Position[0] != 80;
-        Assert(!Run(inspection => w.Session.Edit(P, At(80), null, inspection)) && feedback.Result.StartsWith("Placement failed; cleanup is incomplete. ", StringComparison.Ordinal) && feedback.Result.Contains("What remains: Position: now 80") && feedback.Result.Contains("Recheck"), "An incomplete cleanup names what remains and Recheck: " + feedback.Result);
+        Assert(!Run(inspection => w.Session.Edit(P, At(80), null, inspection)) && feedback.Result.StartsWith("Placement failed; cleanup is incomplete. ", StringComparison.Ordinal) && feedback.Result.Contains("What remains: Position: now 80") && feedback.Result.Contains("Cleanup remains unverified. Click Recheck"), "An incomplete cleanup names what remains and Recheck: " + feedback.Result);
         w.Scene.RefuseState = null;
         Assert(feedback.Recovery.Guide == "editing-placement-in-the-map-editor.md#set-a-numeric-placement" && feedback.Recovery.GuideTitle == "Fixed placement", "The result keeps the operation's guide for the footer");
         Assert(!Run(inspection => w.Session.Edit(P, At(81), null, inspection)) && feedback.Result.StartsWith("Placement is blocked by incomplete cleanup. ", StringComparison.Ordinal), "A blocked retry says why: " + feedback.Result);
@@ -242,7 +242,7 @@ static class FailureRecoveryTests {
         var waiting = session.Edit(P, At(71), null);
         var guidance = RecoveryGuidance.For(waiting, "Placement", "Placement", IndependentBoards.Structure);
         Assert(waiting.Failure == FailureKind.AwaitingOutput && waiting.Remaining.Count == 0 && p.X == 4, "An edit while the restored output is pending is refused as waiting, not blocked: " + waiting.Failure + " " + waiting.Error);
-        Assert(guidance.Heading == "is waiting for terrain" && guidance.Correction.Contains("click Retry on the Changes tab")
+        Assert(guidance.Heading == "is waiting for terrain" && guidance.Correction == "Terrain output is still pending. Wait for the terrain to update before editing again, or click Retry on the Changes tab."
             && guidance.Line("Placement").Contains("The game is still regenerating terrain after an earlier edit.")
             && !guidance.Line("Placement").Contains("was undone"), "The second edit reports the pending terrain without claiming it was undone: " + guidance.Line("Placement"));
         Assert(!session.CleanupUnverified(P), "Pending output is not an unverified cleanup");
@@ -316,6 +316,6 @@ static class FailureRecoveryTests {
         var runtimeFailure = rows.Failures.Single(f => f.Operation == "move").Message;
         Assert(!runtimeFailure.Contains("correct") && !runtimeFailure.Contains("Correct"), "A runtime failure asks for a report and gives no repair instruction: " + runtimeFailure);
         var missingTarget = rows.Failures.Single(f => f.Operation == "missing").Message;
-        Assert(missingTarget.Contains(PatchEngine.TargetMissingAction) && missingTarget.Contains("Report to the mod author."), "An invalid target explains how to inspect and correct its identity and directs the report to the supplying mod: " + missingTarget);
+        Assert(missingTarget.Contains(PatchEngine.TargetMissingAction) && missingTarget.Contains("Report to the mod author."), "An invalid target's row explains how to inspect and correct its identity and directs the report to the supplying mod: " + missingTarget);
     }
 }

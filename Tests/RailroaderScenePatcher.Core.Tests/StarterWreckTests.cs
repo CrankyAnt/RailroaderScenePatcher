@@ -75,7 +75,7 @@ static class StarterWreckTests {
     static void InvalidWreckValuesAreRefused() {
         Refused(Starter("text", HopperPath, "\"wreck\":\"yes\""), "text", "wreck must be true or false", "A wreck that is no boolean is invalid");
         Refused(Starter("null", HopperPath, "\"wreck\":null"), "null", "wreck must be true or false", "A null wreck is invalid");
-        Refused(Starter("bare", HopperPath, ""), "bare", "set track, wreck or both in starterPlacement", "A starter placement that sets nothing is invalid");
+        Refused(Starter("bare", HopperPath, ""), "bare", "starterPlacement contains neither track nor wreck. Set track, wreck or both in starterPlacement.", "A starter placement that sets nothing is invalid");
     }
     // A wreck setting changes the one car placement that reads the marker: a marker that no active car placement or
     // several read is refused before mutation, with the reason, and so is a setup other than the reader's.

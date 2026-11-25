@@ -64,7 +64,7 @@ namespace RailroaderScenePatcher.Core {
             var description = EquipmentAddition.EmptyEquipmentObject + ". It won't be saved with the map.";
             if (context == EquipmentCleanupContext.Recheck) description += " Your edits are kept.";
             else description = "The change was undone. " + description;
-            return description + " Click Recheck to try removing it, or reload the native map editor.";
+            return description + " " + WindowGuidance.RecheckEmptyObject;
         }
     }
     // A failure after a mutation started, with what it left behind.
@@ -212,23 +212,23 @@ namespace RailroaderScenePatcher.Core {
         }
         static string Correction(FailureKind kind, string problem) {
             switch (kind) {
-                case FailureKind.Restored: return "The scene patch file is unchanged. Correct the cause and try again.";
-                case FailureKind.AwaitingOutput: return "Wait for the terrain to update before editing again, or click Retry on the Changes tab.";
+                case FailureKind.Restored: return "The scene patch file is unchanged. " + WindowGuidance.CorrectAndRetry;
+                case FailureKind.AwaitingOutput: return "Terrain output is still pending. " + WindowGuidance.WaitForTerrain;
                 case FailureKind.IncompleteCleanup:
-                case FailureKind.Blocked: return "Click Recheck or reload the Map Editor.";
-                case FailureKind.DependencyFailed: return "First correct the modification that this one depends on.";
+                case FailureKind.Blocked: return "Cleanup remains unverified. " + WindowGuidance.Recheck;
+                case FailureKind.DependencyFailed: return "The prerequisite modification failed. " + WindowGuidance.CorrectDependency;
             }
-            if (Mentions(problem, "Target changed", "inspected", "refresh", "Inspect")) return "Nothing changed. Refresh the object list, inspect the object again, and repeat the action.";
+            if (Mentions(problem, "Target changed", "inspected", "refresh", "Inspect")) return "Nothing changed. " + WindowGuidance.RefreshAndRepeat;
             // A target refusal (PatchEngine.TargetMissing or TargetAmbiguous) already says what is wrong; the correction says
             // only what to do.
-            if (Mentions(problem, PatchEngine.TargetAmbiguous)) return "Nothing changed. Use a more specific path or component so the target matches only one object.";
-            if (Mentions(problem, "resolve uniquely", PatchEngine.TargetMissing)) return "Nothing changed. Refresh the object list, then inspect the object again.";
+            if (Mentions(problem, PatchEngine.TargetAmbiguous)) return "Nothing changed. " + WindowGuidance.UseSpecificTarget;
+            if (Mentions(problem, "resolve uniquely", PatchEngine.TargetMissing)) return "Nothing changed. " + WindowGuidance.RefreshThenInspect;
             if (Mentions(problem, "protected from overwrite")) return "Nothing changed. This scene patch file cannot be overwritten.";
             if (Mentions(problem, "Reload before", "Reload the Map Editor before")) return "";
             // A replacement ID refusal (ReplacementMarkerIds) already says what to enter instead, so it needs no second
             // instruction. ReplacementMarkerIdTests pins every one of them.
             if (Mentions(problem, "Choose an ID", "Choose another ID", "Remove the space", "Enter an ID")) return "Nothing changed.";
-            return "Nothing changed. Correct the problem and try again.";
+            return "Nothing changed. " + WindowGuidance.CorrectProblem;
         }
         static bool Mentions(string text, params string[] words) => words.Any(w => text.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);
     }

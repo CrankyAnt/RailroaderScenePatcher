@@ -35,7 +35,7 @@ namespace RailroaderScenePatcher {
         internal static IOutlinerScene Scene { get; set; }
         static readonly LogOnce warnings = new LogOnce();
         // One warning per kind of failure, so a failure on each of 1,900 objects writes one line.
-        internal static void WarnOnce(string kind, string message) => warnings.Warning(kind, "The outliner is missing information. " + message + ". Try Refresh. If this continues, report it to the patcher maintainer and include the Player log.");
+        internal static void WarnOnce(string kind, string message) => warnings.Warning(kind, "The scene object outliner is missing information: " + message + ". Report this to the patcher maintainer.");
 
         // A scene object's identity in the hierarchy: its scene and path.
         readonly struct ScenePath : IEquatable<ScenePath> {
@@ -401,7 +401,7 @@ namespace RailroaderScenePatcher {
             PatcherLog.Debug("Places found for the outliner: " + placesLine);
             PatcherLog.Debug("Crossings grouped in the outliner: " + result.Crossings.Count + " {" + String.Join(" | ", result.Crossings) + "}");
             PatcherLog.Debug("Objects listed for inspection only in the outliner: " + result.InspectionOnlyRows.Count + " {" + String.Join(" | ", result.InspectionOnlyRows) + "}");
-            PatcherLog.Debug("Objects kept out of the outliner because they are containers or track spans managed by the game: " + result.Hidden.Count + " {" + String.Join(" | ", result.Hidden) + "}");
+            PatcherLog.Debug("Outliner exclusions, native containers and track spans: " + result.Hidden.Count + " {" + String.Join(" | ", result.Hidden) + "}");
         }
     }
 }

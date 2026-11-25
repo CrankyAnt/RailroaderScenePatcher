@@ -388,7 +388,7 @@ static partial class CoverageTests {
         f.Retained.Spans = new[] { f.Retained.Spans[0], f.World.Span("Pforeign", "Sother", 190, 200), f.Retained.Spans[2] };
         f.World.Mutations = 0;
         result = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr"))));
-        Assert(!result.Outcomes["reroute"].Applied && result.Outcomes["reroute"].Error.Contains("Reload") && f.World.Mutations == 0 && f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9", "A crossing changed outside the patcher is refused before mutation: " + result.Outcomes["reroute"].Error);
+        Assert(!result.Outcomes["reroute"].Applied && result.Outcomes["reroute"].Error.Contains("circuits differ") && f.World.Mutations == 0 && f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9", "A crossing changed outside the patcher is refused before mutation: " + result.Outcomes["reroute"].Error);
         f = new Fixture();
         f.World.Graph.Remove("Pws9");
         result = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr"))));

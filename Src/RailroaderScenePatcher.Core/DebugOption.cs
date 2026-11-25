@@ -22,7 +22,7 @@ namespace RailroaderScenePatcher.Core {
             Available = available;
             string text = null;
             try { text = store.Read(); }
-            catch (Exception e) { PatcherLog.Warning("Debug logging is off because the patcher's " + FileName + " can't be read", e); }
+            catch (Exception e) { PatcherLog.Warning("The patcher couldn't read " + FileName + "; debug logging is off. Report this to the patcher maintainer", e); }
             stored = text != null && Read(text, true);
             Apply();
         }
@@ -38,7 +38,7 @@ namespace RailroaderScenePatcher.Core {
             Apply();
             // The option takes effect for this session even when it can't be stored.
             try { store.Write(With(text, on)); }
-            catch (Exception e) { PatcherLog.Error("Debug logging is " + (on ? "on" : "off") + " for this session only, because the patcher's " + FileName + " can't be saved", e); }
+            catch (Exception e) { PatcherLog.Error("The patcher couldn't save " + FileName + "; debug logging is " + (on ? "on" : "off") + " for this session only. Report this to the patcher maintainer", e); }
         }
         void Apply() { PatcherLog.DebugEnabled = On; }
         public static bool Read(string text) => Read(text, false);
@@ -49,7 +49,7 @@ namespace RailroaderScenePatcher.Core {
                 if (value == null) return false;
                 if (value.Type == JTokenType.Boolean) return (bool)value;
             } catch (JsonException) { }
-            if (warn) PatcherLog.Warning("Debug logging is off because the patcher's " + FileName + " has no true or false value for " + Key + ".");
+            if (warn) PatcherLog.Warning("The patcher couldn't read " + Key + " in " + FileName + " because the file isn't valid JSON or the value isn't true or false; debug logging is off. Report this to the patcher maintainer.");
             return false;
         }
         // The settings file text with the debug option set, keeping its other values.

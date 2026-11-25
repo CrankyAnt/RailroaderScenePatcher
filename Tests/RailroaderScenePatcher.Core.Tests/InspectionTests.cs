@@ -308,7 +308,7 @@ static class InspectionTests {
 
         box.X = 8;
         Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 0 && box.X == 8, "A stale inventory refuses the edit before it runs");
-        Check(feedback.Place == "placement" && feedback.Result == "Placement refused. The object list is stale (p changed (position)); refresh and inspect again." && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
+        Check(feedback.Place == "placement" && feedback.Result == "Placement refused. The object list is stale (p changed (position)). Refresh and inspect again." && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
         inventory.Refresh(); log.Clear();
         Check(!feedback.Run("binding", "Track binding", "a world selection is pending; confirm or cancel it first", inventory, inventory.Entries.Single(), move) && calls == 0,
             "An edit during a pending interaction does not run");
@@ -1166,9 +1166,9 @@ static class InspectionTests {
         var sign = new object();
         SceneObservation Marker(double x, bool active, object handle = null) => new SceneObservation(handle ?? sign, new TargetIdentity("scene", "World/Sign", "Marker"), "Track marker", active,
             new double[] { x, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Track binding");
-        Check(InspectedTarget.Changed(Marker(1, true), Marker(5, true)) == "Inspected target changed (position); refresh and inspect again" && InspectedTarget.Changed(Marker(1, true), Marker(1, false)) == "Inspected target changed (activity); refresh and inspect again"
-            && InspectedTarget.Changed(Marker(1, true), null) == "Inspected target changed (missing); refresh and inspect again"
-            && InspectedTarget.Changed(Marker(1, true), Marker(1, true, new object())) == "Inspected target changed (another object); refresh and inspect again", "The refusal of a changed target names what differed");
+        Check(InspectedTarget.Changed(Marker(1, true), Marker(5, true)) == "Inspected target changed (position). Refresh and inspect again." && InspectedTarget.Changed(Marker(1, true), Marker(1, false)) == "Inspected target changed (activity). Refresh and inspect again."
+            && InspectedTarget.Changed(Marker(1, true), null) == "Inspected target changed (missing). Refresh and inspect again."
+            && InspectedTarget.Changed(Marker(1, true), Marker(1, true, new object())) == "Inspected target changed (another object). Refresh and inspect again.", "The refusal of a changed target names what differed");
     }
 
     // Auto-fit sizes the outliner column to most names, relative to the window, within a cap.

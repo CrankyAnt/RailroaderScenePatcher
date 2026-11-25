@@ -257,8 +257,8 @@ namespace RailroaderScenePatcher {
                 terrainLayer = LayerMask.NameToLayer("Terrain"); trackLayer = LayerMask.NameToLayer("Track");
                 // A layer the game does not have gives no mask bit: without the terrain nothing is cut, without the
                 // track the cut is at the terrain alone. Said once.
-                if (terrainLayer < 0) PatcherLog.Debug("This game build has no Terrain layer; object frames are not cut off at the ground.");
-                else if (trackLayer < 0) PatcherLog.Debug("This game build has no Track layer; object frames are cut off at the terrain and not at the ballast.");
+                if (terrainLayer < 0) PatcherLog.Debug("Object frame clipping: Terrain layer missing; no ground clipping.");
+                else if (trackLayer < 0) PatcherLog.Debug("Object frame clipping: Track layer missing; terrain clipping only.");
             }
             if (terrainLayer < 0) return null;
             long key = ((long)Math.Floor(x * 2) << 32) ^ ((long)Math.Floor(z * 2) & 0xFFFFFFFFL);
@@ -470,7 +470,7 @@ namespace RailroaderScenePatcher {
                     }
                     inventoryGroups = found.ToArray();
                 }
-            } catch (Exception e) { PatcherLog.Warning("The Scene Patcher window shows every object on its own, because the game-defined groups couldn't be read", e); }
+            } catch (Exception e) { PatcherLog.Warning("The patcher couldn't read game-defined groups for scene object selection. Report this to the patcher maintainer.", e); }
             return inventoryGroups;
         }
         // A group that world marking skips shows its objects on its own; one developer diagnostic line says so, once

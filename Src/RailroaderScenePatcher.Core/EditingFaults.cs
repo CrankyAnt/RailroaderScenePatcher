@@ -48,13 +48,13 @@ namespace RailroaderScenePatcher.Core {
                 case EditingFailure.ReloadStopped:
                 case EditingFailure.HookUnavailable: return detail;
                 case EditingFailure.ReloadCancelled: return "Reload cancelled: " + detail;
-                case EditingFailure.ReturnTimedOut: return "The return to your working location did not complete within five minutes. Check the Player log for loading errors before trying again.";
+                case EditingFailure.ReturnTimedOut: return "The return to your working location timed out after five minutes. " + WindowGuidance.CheckPlayerLog;
                 case EditingFailure.LocationNotRestored: return "The Map Editor reloaded, but your working location could not be restored: " + detail;
                 case EditingFailure.OutstandingUnknown: return "The patcher couldn't check for unsaved changes. It treats the Map Editor as unsaved: " + detail;
                 case EditingFailure.HistoryError: return "A Map Editor Undo or Redo step failed, so scene patch editing may not match the scene: " + detail;
                 case EditingFailure.ExitCancelled: return "The Map Editor stayed open because the patcher couldn't check for unsaved changes. " + detail;
                 case EditingFailure.FileCheck: return "Could not check the scene patch file: " + detail;
-                case EditingFailure.GizmoCleanup: return "The patcher couldn't confirm that it removed the temporary changes made while using the gizmo. Reload the Map Editor. " + detail;
+                case EditingFailure.GizmoCleanup: return "The patcher couldn't confirm removal of the gizmo's temporary changes. " + WindowGuidance.ReloadMapEditor + " " + detail;
                 case EditingFailure.HistoryTracking: return "The patcher couldn't track an Undo or Redo history change in the Map Editor: " + detail;
                 case EditingFailure.ChromeRefresh: return "The Map Editor title and Save button couldn't be updated: " + detail;
                 case EditingFailure.HistoryCheck: return "The Map Editor Undo or Redo step couldn't be checked: " + detail;
@@ -64,7 +64,7 @@ namespace RailroaderScenePatcher.Core {
         public void Fail(EditingFailure failure, string detail = null) {
             var text = Describe(failure, detail);
             if (failure != EditingFailure.HistoryError) Text = text;
-            written.Error(text, text);
+            written.Error(text, text + " Report this to the patcher maintainer.");
         }
         public void Refuse(string text) { Text = text; }
         public void Clear() { Text = null; }
