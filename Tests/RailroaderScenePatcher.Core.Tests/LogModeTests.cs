@@ -180,6 +180,25 @@ static class LogModeTests {
         Assert(off.Lines.Count == 1 && off.At(LogLevel.Error).Single() == "The scene patch file wasn't saved: disk full", "Debug off writes the base message without a stack trace");
         var on = RecordingLog.Capture(true, () => PatcherLog.Error("The scene patch file wasn't saved", failure));
         Assert(on.At(LogLevel.Error).Single() == "The scene patch file wasn't saved: disk full" && on.At(LogLevel.Debug).Single().Contains("System.InvalidOperationException"), "Debug on adds the full exception as a debug line");
+        // A sentence that ends with whom to report to takes the message after a colon, without a period before it.
+        var report = RecordingLog.Capture(true, () => PatcherLog.Warning("The patcher couldn't add the Mods tab to Preferences. Report this to the patcher maintainer.", failure));
+        Assert(report.At(LogLevel.Warning).Single() == "The patcher couldn't add the Mods tab to Preferences. Report this to the patcher maintainer: disk full",
+            "The exception message follows the report sentence after one colon: " + report.At(LogLevel.Warning).Single());
+        var detail = report.At(LogLevel.Debug).Single();
+        Assert(detail.StartsWith(PatcherLog.ExceptionDetail, StringComparison.Ordinal) && detail.IndexOf('\n') < 0 && detail.IndexOf('\r') < 0 && detail.Contains(" | "),
+            "The full exception is one marked debug line: " + detail);
+        // A text with line breaks is written as one physical line.
+        var joined = RecordingLog.Capture(true, () => { PatcherLog.Debug("first\r\nsecond\nthird"); PatcherLog.Warning("one\ntwo"); });
+        Assert(joined.Lines.Select(l => l.Value).SequenceEqual(new[] { "first | second | third", "one | two" }), "Every entry is one physical line: " + String.Join(" / ", joined.Lines.Select(l => l.Value)));
+        // A scene patch file line names whom to report to once: the patcher maintainer without the mod author, or the
+        // mod author by name; never a period after the reason's own period.
+        var source = new PatchSource("example/mod", "Example Mod", "2.1", "Example author", "https://example.com/mod");
+        Assert(ScenePatchFileReport.Line(source, "Spawn point placement failed before the new game start: denied.", "0.5.0", toMaintainer: true)
+            == "Example Mod [example/mod 2.1] Data/scene-patches.json: Spawn point placement failed before the new game start: denied. Patcher 0.5.0. Report this to the patcher maintainer.",
+            "A patcher failure names the maintainer once: " + ScenePatchFileReport.Line(source, "Spawn point placement failed before the new game start: denied.", "0.5.0", toMaintainer: true));
+        Assert(ScenePatchFileReport.Line(source, "The file isn't valid JSON", "0.5.0", toMaintainer: false)
+            == "Example Mod [example/mod 2.1] Data/scene-patches.json: The file isn't valid JSON. Patcher 0.5.0. Mod author: Example author; website: https://example.com/mod",
+            "A diagnostic of the mod's file names its author: " + ScenePatchFileReport.Line(source, "The file isn't valid JSON", "0.5.0", toMaintainer: false));
     }
 
     static void AbsolutePaths() {
@@ -247,9 +266,22 @@ static class LogModeTests {
         foreach (var site in expected.Keys) {
             var fault = new EditingFault();
             var log = RecordingLog.Capture(false, () => { fault.Fail(site, Detail(site)); fault.Fail(site, Detail(site)); });
-            Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Error && log.Lines[0].Value == (logged.TryGetValue(site, out var line) ? line : expected[site]) + " Report this to the patcher maintainer.", site + " is written once as a player error: " + String.Join(" | ", log.Lines.Select(l => l.Value)));
+            var sentence = logged.TryGetValue(site, out var line) ? line : expected[site];
+            if (!sentence.EndsWith(".", StringComparison.Ordinal)) sentence += ".";
+            Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Error && log.Lines[0].Value == sentence + " Report this to the patcher maintainer.", site + " is written once as a player error: " + String.Join(" | ", log.Lines.Select(l => l.Value)));
             Assert(fault.Text == (site == EditingFailure.HistoryError ? null : expected[site]), site + (site == EditingFailure.HistoryError ? " reaches only the log" : " stands in the window"));
         }
+        // A failure about the scene patch file or an object names it in the log line; the window keeps its text.
+        var named = new EditingFault();
+        var namedLog = RecordingLog.Capture(false, () => {
+            named.Fail(EditingFailure.FileCheck, "denied", "[crankyant/maptest] scene patch file");
+            named.Fail(EditingFailure.GizmoCleanup, "hook gone", "World/Large Scenery/Bryson/Bryson Coal Dealer");
+        });
+        Assert(namedLog.Lines.Select(l => l.Value).SequenceEqual(new[] {
+            "[crankyant/maptest] scene patch file: Could not check the scene patch file: denied. Report this to the patcher maintainer.",
+            "World/Large Scenery/Bryson/Bryson Coal Dealer: The patcher couldn't confirm removal of the gizmo's temporary changes. hook gone. Report this to the patcher maintainer." }),
+            "Each line names its file or object: " + String.Join(" | ", namedLog.Lines.Select(l => l.Value)));
+        Assert(named.Text == "The patcher couldn't confirm removal of the gizmo's temporary changes. Reload the Map Editor. hook gone", "The window keeps its own text: " + named.Text);
         var refused = new EditingFault();
         var refusal = RecordingLog.Capture(false, () => refused.Refuse("The file version can't be used: it is unreadable."));
         Assert(refusal.Lines.Count == 0 && refused.Text == "The file version can't be used: it is unreadable.", "A refusal stands in the window and writes no player line");

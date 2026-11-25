@@ -112,10 +112,12 @@ namespace RailroaderScenePatcher {
                         if (call.Instance == null || !(call.Instance is Behaviour behaviour) || !behaviour.isActiveAndEnabled) continue;
                         var action = (Action)Delegate.CreateDelegate(typeof(Action), call.Instance, call.Hook.Method);
                         notifier.RegisterForRestore((int)enablePriority.GetValue(call.Instance, null), call.Instance, action);
-                    } catch (Exception e) { PatcherLog.Warning(call.Instance + " couldn't resume its deferred restoration. Report this to the patcher maintainer.", e); }
+                    } catch (Exception e) { PatcherLog.Warning(Name(call.Instance) + " may not match its saved state because the patcher couldn't hand its restore step back to the game. Report this to the patcher maintainer.", e); }
                 }
-            } catch (Exception e) { skipped.Clear(); PatcherLog.Warning("Deferred scene objects couldn't resume restoration. Report this to the patcher maintainer.", e); }
+            } catch (Exception e) { skipped.Clear(); PatcherLog.Warning("Some scene objects may not match their saved state because the patcher couldn't hand their restore steps back to the game. Report this to the patcher maintainer.", e); }
         }
+        static string Name(object instance) =>
+            instance is Component component && component != null ? BoardScene.PathOf(component.transform) + " (" + component.GetType().Name + ")" : instance?.ToString() ?? "A scene object";
     }
     // Hands the skipped callbacks back once, in a frame after the skip and once the restore notifier is complete, so a restore
     // that no OnWorldLoad follows cannot hold a skipped call until unload. After OnWorldLoad has handed them back, it finds

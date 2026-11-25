@@ -743,6 +743,8 @@ static class PartCullingTests {
         g.World.Native.FailWrites = true;
         g.World.Show(sphere, false); g.World.Show(sphere, false);
         Assert(faults.Count == 1 && g.World.Culling.Waiting, "A failing callback does not throw and is reported once: " + faults.Count);
+        Assert(faults[0].StartsWith("Moved scenery parts may appear or disappear at the wrong distance because the patcher couldn't respond to a visibility change: ", StringComparison.Ordinal)
+            && faults[0].EndsWith(". Report this to the patcher maintainer.", StringComparison.Ordinal), "The failure says whom to report to: " + faults[0]);
         g.World.Native.FailWrites = false; g.World.Culling.Tick();
         Assert(!g.Post.Active && !g.World.Culling.Waiting, "The next update brings the group to its spheres");
     }

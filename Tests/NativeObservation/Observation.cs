@@ -177,7 +177,7 @@ public sealed class Observation : MonoBehaviour {
     // The culling readout serves any map in the isolated home: it needs the home and the observer's mod folder, not the
     // fixed-placement fixture. It writes Evidence/culling/readout.jsonl under the mod folder.
     string cullingPath = "World/Large Scenery/Whittier/Whittier Saw Mill", cullingPadMarkerId = "", cullingLabel = "", cullingStatus = "No readout yet"; long cullingSequence;
-    Rect cullingWindow = new Rect(740, 330, 380, 240); long colliderSequence;
+    Rect cullingWindow = new Rect(740, 330, 380, 270); long colliderSequence;
     bool HomeValid() {
         try {
             var args = Environment.GetCommandLineArgs(); var ix = Enumerable.Range(0, args.Length).Where(i => String.Equals(args[i], "-homedir", StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -269,6 +269,91 @@ public sealed class Observation : MonoBehaviour {
             cullingStatus = "Collider readout " + colliderSequence + " written: " + colliders.Length + " colliders";
         } catch (Exception e) { cullingStatus = "Collider readout failed: " + e.GetBaseException().Message; }
     }
+    // The detection spans of the one grade-crossing controller at or below the culling target, one row per span to
+    // Evidence/crossing/spans.jsonl. A span's Length getter builds its cached route when the cache is empty
+    // (TrackSpan.UpdateCachedPointsIfNeeded), so the readout never calls it. It reads the cache fields as they are, which
+    // is the route the running game uses, and measures the route the game would build now with the same call the span
+    // makes (RouteSearchPoints.FindPoints from the clamped ends, step 10, into lists of its own). The readout checks that
+    // the stored ends and the cached route are the same before and after it, and records that check.
+    long spanSequence;
+    void SpanReadout() {
+        try {
+            if (!HomeValid()) throw new InvalidOperationException("Unexpected home or observer mod");
+            var padMarkerId = cullingPadMarkerId.Trim();
+            var root = padMarkerId.Length == 0 ? One(cullingPath) : OneCrossbuck(cullingPath, padMarkerId);
+            var controllerType = TypeNamed("Track.Crossings.GradeCrossingController");
+            var controllers = root.GetComponentsInChildren(controllerType, true).Where(c => c != null).ToArray();
+            if (controllers.Length != 1) throw new InvalidOperationException("Crossing controller count=" + controllers.Length);
+            var controller = controllers[0];
+            var graph = Read(TypeNamed("Track.Graph"), "Shared") ?? throw new InvalidOperationException("No track graph");
+            var common = new JObject { ["evidenceKind"] = "crossing-span-readout", ["schemaVersion"] = 1, ["label"] = cullingLabel, ["sequence"] = ++spanSequence, ["utc"] = DateTime.UtcNow.ToString("O"), ["frame"] = Time.frameCount, ["gameVersion"] = Application.version, ["mapId"] = ActiveMap(), ["controller"] = PathOf(controller.transform), ["controllerInstanceId"] = controller.GetInstanceID() };
+            common["patcherAssemblySha256"] = HashFile(TypeNamed("RailroaderScenePatcher.PatcherBehaviour").Assembly.Location);
+            var lines = new List<string>(); var circuit = 0; var count = 0; var changed = 0;
+            foreach (var set in (IEnumerable)Read(controller, "circuitSets")) {
+                foreach (var role in new[] { "approachA", "island", "approachB" }) {
+                    var row = new JObject(common); row["event"] = "span"; row["circuit"] = circuit; row["role"] = role;
+                    var span = Field(set, role) as Component;
+                    if (span == null) { row["missing"] = true; lines.Add(row.ToString(Formatting.None)); continue; }
+                    try { Span(row, span, graph); } catch (Exception e) { row["error"] = e.GetBaseException().ToString(); }
+                    if ((bool?)row["unchanged"] == false) changed++;
+                    lines.Add(row.ToString(Formatting.None)); count++;
+                }
+                circuit++;
+            }
+            if (lines.Count == 0) { var row = new JObject(common); row["event"] = "no-circuits"; lines.Add(row.ToString(Formatting.None)); }
+            var path = Path.Combine(directory, "Evidence", "crossing", "spans.jsonl"); Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.AppendAllLines(path, lines);
+            cullingStatus = "Span readout " + spanSequence + " written: " + count + " spans in " + circuit + " circuits" + (changed == 0 ? "" : ", " + changed + " CHANGED");
+        } catch (Exception e) { cullingStatus = "Span readout failed: " + e.GetBaseException().Message; }
+    }
+    void Span(JObject row, Component span, object graph) {
+        var points = (IList)Field(span, "_cachedPoints"); var segments = (IList)Field(span, "_cachedSegments");
+        var storedLower = Field(span, "_lower"); var storedUpper = Field(span, "_upper");
+        var before = SpanState(span);
+        row["id"] = Convert.ToString(Field(span, "id")); row["path"] = PathOf(span.transform); row["instanceId"] = span.GetInstanceID();
+        row["isValid"] = JToken.FromObject(Read(span, "IsValid"));
+        var lower = Read(span, "lower"); var upper = Read(span, "upper");
+        row["lower"] = End(storedLower, lower); row["upper"] = End(storedUpper, upper);
+        // The cached route: what the game uses until a span end is set or the world loads again. An empty cache is
+        // reported as such; the game builds it at its next read.
+        row["cachedRoute"] = points.Count == 0 ? new JObject { ["present"] = false } : new JObject { ["present"] = true, ["length"] = JToken.FromObject(Field(span, "_length")), ["pointCount"] = points.Count, ["segments"] = Segments(segments.Cast<object>()) };
+        if (lower != null && upper != null && Field(lower, "segment") != null && Field(upper, "segment") != null) {
+            var output = new List<Vector3>(); var listType = typeof(List<>).MakeGenericType(TypeNamed("Track.TrackSegment")); var routeSegments = (IList)Activator.CreateInstance(listType);
+            var find = TypeNamed("Track.Search.RouteSearchPoints").GetMethods(F).Single(m => m.Name == "FindPoints" && m.GetParameters().Length == 7);
+            find.Invoke(null, new[] { graph, Call(lower, "Clamped"), Call(upper, "Clamped"), (object)10f, span.name, output, routeSegments });
+            var length = 0f; for (var i = 0; i < output.Count - 1; i++) length += Vector3.Distance(output[i], output[i + 1]);
+            row["currentRoute"] = new JObject { ["length"] = length, ["pointCount"] = output.Count, ["noRoute"] = output.Count == 0, ["segments"] = Segments(routeSegments.Cast<object>()) };
+        } else row["currentRoute"] = new JObject { ["unresolved"] = true };
+        var after = SpanState(span);
+        row["unchanged"] = before == after && Equals(storedLower, Field(span, "_lower")) && Equals(storedUpper, Field(span, "_upper"));
+    }
+    // The stored end as the span holds it, and the resolved end with its segment length and its position, stored and
+    // clamped onto the segment, in map coordinates and in scene coordinates.
+    JObject End(object stored, object resolved) {
+        var j = new JObject { ["segmentId"] = Convert.ToString(Field(stored, "segmentId")), ["end"] = Convert.ToString(Field(stored, "end")), ["distance"] = JToken.FromObject(Field(stored, "distance")), ["resolved"] = resolved != null };
+        var segment = resolved == null ? null : Field(resolved, "segment");
+        if (segment == null) return j;
+        j["segmentLength"] = JToken.FromObject(Call(segment, "GetLength"));
+        j["isValid"] = JToken.FromObject(Read(resolved, "IsValid"));
+        try { j["position"] = Position((Vector3)CallDefaults(resolved, "GetPosition")); } catch (Exception e) { j["positionError"] = e.GetBaseException().Message; }
+        var clamped = Call(resolved, "Clamped");
+        j["clampedDistance"] = JToken.FromObject(Field(clamped, "distance"));
+        try { j["clampedPosition"] = Position((Vector3)CallDefaults(clamped, "GetPosition")); } catch (Exception e) { j["clampedPositionError"] = e.GetBaseException().Message; }
+        return j;
+    }
+    JObject Position(Vector3 map) => new JObject { ["mapPosition"] = V(map), ["scenePosition"] = V(ConvertPosition("GameToWorld", map)) };
+    static JArray Segments(IEnumerable<object> segments) => new JArray(segments.Select(s => s == null ? (JToken)JValue.CreateNull() : new JObject { ["id"] = Convert.ToString(Field(s, "id")), ["length"] = JToken.FromObject(Call(s, "GetLength")) }));
+    // The cache identity and content of a span, compared before and after a readout.
+    static string SpanState(Component span) {
+        var points = (IList)Field(span, "_cachedPoints"); var segments = (IList)Field(span, "_cachedSegments");
+        return points.Count + "|" + String.Join(",", points.Cast<Vector3>().Select(p => p.x.ToString("R") + ";" + p.y.ToString("R") + ";" + p.z.ToString("R"))) + "|" + String.Join(",", segments.Cast<object>().Select(s => s == null ? "null" : Convert.ToString(Field(s, "id")))) + "|" + Convert.ToSingle(Field(span, "_length")).ToString("R");
+    }
+    // Calls the one method of that name whose parameters all have defaults, with those defaults.
+    static object CallDefaults(object o, string name) {
+        var methods = o.GetType().GetMethods(F).Where(m => m.Name == name && m.GetParameters().All(p => p.HasDefaultValue)).ToArray();
+        if (methods.Length != 1) throw new MissingMethodException(name);
+        return methods[0].Invoke(o, methods[0].GetParameters().Select(p => p.ParameterType.IsEnum ? Enum.ToObject(p.ParameterType, p.DefaultValue) : p.DefaultValue).ToArray());
+    }
     // Every UI object under the mouse pointer, top hit first, as the event system raycasts a click there: for each, its
     // selectables with their enabled and interactable state and the parent canvas groups that can block them. Bound to
     // F8 so the pointer can stay on the control. It writes Evidence/culling/pointer.jsonl under the mod folder.
@@ -304,6 +389,7 @@ public sealed class Observation : MonoBehaviour {
                 GUILayout.Label("Label"); cullingLabel = GUILayout.TextField(cullingLabel);
                 if (GUILayout.Button("Culling readout")) CullingReadout();
                 if (GUILayout.Button("Collider readout")) ColliderReadout();
+                if (GUILayout.Button("Crossing span readout")) SpanReadout();
                 GUI.DragWindow(new Rect(0, 0, 10000, 20));
             }, "Culling readout");
         if (!ready) return;

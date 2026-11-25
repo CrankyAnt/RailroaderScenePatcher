@@ -226,7 +226,7 @@ namespace RailroaderScenePatcher {
             var current = For(__instance);
             if (current == null) return;
             try { __result = current.Session.IsDirty(current.NativeDirty); }
-            catch (Exception e) { __result = true; current.Fault.Fail(EditingFailure.OutstandingUnknown, e.GetBaseException().Message); }
+            catch (Exception e) { __result = true; current.Fault.Fail(EditingFailure.OutstandingUnknown, e.GetBaseException().Message, current.FileLabel); }
         }
         static void BeforeHistory(object __instance) { ForManager(__instance)?.BeginHistoryExecution(); }
         static Exception HistoryFinalizer(object __instance, Exception __exception) {
@@ -235,7 +235,7 @@ namespace RailroaderScenePatcher {
                 current.EndHistoryExecution(__exception);
                 // Native Undo and Redo rebuild the chrome before the history identity is settled here.
                 current.RefreshChrome();
-                if (__exception != null) current.Fault.Fail(EditingFailure.HistoryError, __exception.GetBaseException().Message);
+                if (__exception != null) current.Fault.Fail(EditingFailure.HistoryError, __exception.GetBaseException().Message, current.FileLabel);
                 try { PatcherLog.Debug(() => "Map Editor Undo or Redo step for " + current.FileLabel + (__exception == null ? "" : " with error " + __exception.GetBaseException().Message) + "; still to save: " + current.Outstanding() + (current.Session.IncompleteOperation == null ? "" : "; incomplete: " + current.Session.IncompleteOperation)); }
                 catch (Exception e) { current.Fault.Fail(EditingFailure.HistoryCheck, e.GetBaseException().Message); }
             }

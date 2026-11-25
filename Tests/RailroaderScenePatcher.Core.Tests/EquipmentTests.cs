@@ -861,7 +861,7 @@ static class EquipmentTests {
         var message = warnings.Failures.Single().Message;
         Assert(message.Contains("The change was undone, but an empty object remains where a light, gate, or bell was added at this crossing. This leftover object won't be saved with the map.")
             && message.Split(new[] { "empty object" }, StringSplitOptions.None).Length == 2
-            && !message.Contains("Remaining state:") && !message.Contains("Recheck") && message.EndsWith("Report to the patcher maintainer.", StringComparison.Ordinal),
+            && !message.Contains("Remaining state:") && !message.Contains("Recheck") && message.EndsWith("Report this to the patcher maintainer.", StringComparison.Ordinal),
             "The world-load warning explains the leftover once and retains the player reporting route: " + message);
         var mixed = WithEmptyWrappers();
         mixed.World.StickyDestroy = true;

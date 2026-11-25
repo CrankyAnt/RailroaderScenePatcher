@@ -121,7 +121,7 @@ namespace RailroaderScenePatcher {
             if (disposed) return;
             disposed = true;
             try { own.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't restore visibility checks for moved baked scenery parts. Report this to the patcher maintainer.", e); }
-            try { ownSwitches.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't restore game control of scene object activity. Report this to the patcher maintainer.", e); }
+            try { ownSwitches.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't give objects back to progression, map features and track construction, so they may no longer turn on or off as the game progresses. Report this to the patcher maintainer.", e); }
             if (ReferenceEquals(switches, ownSwitches)) { switches = null; switchHost = null; }
             ownHost.Dispose();
             if (ReferenceEquals(culling, own)) { culling = null; host = null; }
@@ -524,7 +524,7 @@ namespace RailroaderScenePatcher {
                 var standIn = new GameObject("Scene Patcher switch stand-in") { hideFlags = HideFlags.HideAndDontSave };
                 try {
                     standIn.SetActive(choice);
-                    standIn.AddComponent<SwitchStandIn>().Changed = changed;
+                    var forward = standIn.AddComponent<SwitchStandIn>(); forward.Changed = changed; forward.Path = BoardScene.PathOf(go.transform);
                     // A failure part way puts the entries back (SwitchSlots.Divert); the diversion counts only once every
                     // entry names the stand-in.
                     var slots = SwitchSlots.Divert(SwitchLists(), go, standIn, out var kinds);
@@ -905,10 +905,15 @@ namespace RailroaderScenePatcher {
     // OnDisable when the switch sets its activity.
     internal sealed class SwitchStandIn : MonoBehaviour {
         internal Action<bool> Changed;
+        // The hierarchy path of the object the switch's lists named.
+        internal string Path;
         void OnEnable() { try { Changed?.Invoke(true); } catch (Exception e) { Failed(e); } }
         void OnDisable() { try { Changed?.Invoke(false); } catch (Exception e) { Failed(e); } }
         // A switch can turn many times in one frame: each failure is written once.
         static readonly LogOnce failures = new LogOnce();
-        static void Failed(Exception e) { var message = e.GetBaseException().Message; failures.Warning(message, "The patcher couldn't update a moved baked scenery part's activity after a game switch: " + message + ". Report this to the patcher maintainer."); }
+        void Failed(Exception e) {
+            var message = e.GetBaseException().Message.TrimEnd('.');
+            failures.Warning(Path + "|" + message, (Path ?? "A scene object") + " may not turn on or off when progression, a map feature or track construction switches it, because the patcher couldn't pass the change on: " + message + ". Report this to the patcher maintainer.");
+        }
     }
 }
