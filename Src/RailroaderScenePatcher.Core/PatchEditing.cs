@@ -812,7 +812,8 @@ namespace RailroaderScenePatcher.Core {
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
                 var existing = own.FirstOrDefault();
-                var value = CoverageValue(target, existing, circuit, coverage, addition);
+                // The preview follows the equal-value rule of the edit, so it shows what Apply would store.
+                var value = Normalised(existing, CoverageValue(target, existing, circuit, coverage, addition), engine.Underlying(resolved));
                 if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey).State);
                 var key = existing == null ? NewId(target, "cover-") : ScenePatchFile.Key(existing);
                 var candidate = (JObject)scenePatchFile.Modifications.DeepClone();
@@ -1300,6 +1301,16 @@ namespace RailroaderScenePatcher.Core {
             relationships = result["relationships"] as JObject;
             if (relationships != null && Changed(existing?["relationships"]?["constructionSegments"], relationships["constructionSegments"]) && state.Segments != null && under.Segments != null && ConstructionSegments.Same(state.Segments, under.Segments)) {
                 relationships.Remove("constructionSegments");
+                if (!relationships.HasValues) result.Remove("relationships");
+            }
+            // A native circuit whose selected tracks are the track its own spans cover keeps those spans: the entry leaves.
+            relationships = result["relationships"] as JObject;
+            var coverage = relationships?["crossingCoverage"] as JObject;
+            if (coverage?["circuits"] is JObject circuits && state.Coverage != null && under.Coverage != null) {
+                foreach (var circuit in circuits.Properties().ToList())
+                    if (Changed(existing?["relationships"]?["crossingCoverage"]?["circuits"]?[circuit.Name], circuit.Value) && CircuitCoverage.CoversNativeTrack(state.Coverage[circuit.Name], under.Coverage[circuit.Name])) circuit.Remove();
+                if (!circuits.HasValues) coverage.Remove("circuits");
+                if (!coverage.HasValues) relationships.Remove("crossingCoverage");
                 if (!relationships.HasValues) result.Remove("relationships");
             }
             if (PreservingJson.SameModification(result, value)) return value;

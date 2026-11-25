@@ -917,16 +917,20 @@ namespace RailroaderScenePatcher {
             var block = EditBlock();
             // A button in the tab waits for a pending world choice; the fields stay as they are.
             var wait = ChoiceBlock ?? block;
-            // The open form keeps all three role pickers above the list of circuits.
+            // The open form keeps the pickers of all three roles above the list of circuits: each role's From and To
+            // ends, each with its own segment, segment end, distance and world pick, since the two ends may lie on
+            // different segments.
             if (coverageCircuit != null) {
                 Section(builder, coverageAddition == null ? "Circuit " + coverageCircuit : "Detection addition " + coverageAddition);
                 var pickBlock = CoveragePickBlock;
-                var labels = new[] { "Segment", "End", "From", "To" };
                 for (var role = 0; role < 3; role++) {
-                    var roleIndex = role;
-                    var first = role * 4; var roleName = CircuitCoverage.RoleCaption(CircuitCoverage.Roles[role]);
-                    ValueRow(builder, roleName, "m", labels, coverageFields, first, block, "End is a or b. Distances are metres from the chosen end. From is the end next to the island for an approach.", column => column >= 2, row =>
-                        ActButton(row, CoverageRoleAct(roleIndex, "Segment", pickBlock)));
+                    var roleIndex = role; var roleName = CircuitCoverage.RoleCaption(CircuitCoverage.Roles[role]);
+                    foreach (var to in new[] { false, true }) {
+                        var end = to;
+                        ValueRow(builder, roleName + " " + CoverageFormFields.EndCaption(to), "m", CoverageFormFields.EndLabels, coverageFields, CoverageFormFields.First(role, to), block,
+                            "End is a or b. Distance is in meters from that segment end. " + (to ? "To is the end away from the island for an approach, and the island's upper end for the island." : "From is the end next to the island for an approach, and the island's lower end for the island.") + " The two ends can lie on different segments.",
+                            column => column == 2, row => ActButton(row, CoverageRoleAct(roleIndex, "Segment", pickBlock, end)));
+                    }
                 }
                 Section(builder, "Preview");
                 if (preparedCoverage == null || preparedCoverage.Circuit != coverageCircuit) Line(builder, "None", null, null);
@@ -1132,12 +1136,14 @@ namespace RailroaderScenePatcher {
         }
         // Why a role's Segment button cannot start a world choice now, or null.
         string CoveragePickBlock => ChoiceBlock ?? EditBlock() ?? (selection == null ? "World selection is unavailable." : null);
-        // The Segment button of one role of the open coverage form: a world choice that fills the role's segment.
-        Act CoverageRoleAct(int role, string label, string pickBlock) {
+        // The Segment button of one end of a role of the open coverage form: a world choice that fills that end's
+        // segment, segment end and distance from the click. Without to it fills the From end.
+        Act CoverageRoleAct(int role, string label, string pickBlock, bool to = false) {
             var roleName = CircuitCoverage.RoleCaption(CircuitCoverage.Roles[role]);
-            return Slot(label, "Click a track in the world and confirm it to fill this role's segment.", pickBlock, () => BeginSelection(SelectionKind.TrackSegment, selected, role), "Choose a segment for " + roleName);
+            var end = CoverageFormFields.EndCaption(to);
+            return Slot(label, "Click a track in the world and confirm it to fill the segment, segment end, and distance of this end.", pickBlock, () => BeginSelection(SelectionKind.TrackSegment, selected, role, coverageTo: to), "Choose a segment for the " + end + " end of " + roleName);
         }
-        void CloseCoverageForm() { OpenedForm(null); coverageCircuit = coverageAddition = null; preparedCoverage = null; newAddition = ""; for (var i = 0; i < coverageFields.Length; i++) coverageFields[i] = ""; }
+        void CloseCoverageForm() { OpenedForm(null); coverageCircuit = coverageAddition = null; preparedCoverage = null; newAddition = ""; coverageForm.Clear(); }
         // The message that says a form is open. It leaves when the form closes or another one opens.
         string openedForm;
         void OpenedForm(string message) {

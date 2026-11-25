@@ -12,9 +12,11 @@ namespace RailroaderScenePatcher.Core {
         public TrackLocation From { get; }
         public TrackLocation To { get; }
         internal static bool Same(SpanRange a, SpanRange b) => a == null ? b == null : b != null && TrackLocation.Same(a.From, b.From) && TrackLocation.Same(a.To, b.To);
+        // A range whose two ends lie on different segments, or are measured from different ends, names each end.
         public override string ToString() => From.Segment == To.Segment && From.End == To.End
             ? From.Segment + " end " + From.End + " " + Number(From.Distance) + " to " + Number(To.Distance) + " m"
-            : From + " to " + To;
+            : End(From) + " to " + End(To);
+        static string End(TrackLocation location) => location.Segment + " end " + location.End + " " + Number(location.Distance) + " m";
         static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
     }
     public enum CircuitKind { Native, Tracks, Detached, Added }
@@ -107,15 +109,26 @@ namespace RailroaderScenePatcher.Core {
         // A detection addition: a circuit the patcher adds to the crossing for explicitly selected tracks, in role order.
         public static CircuitCoverage Added(SpanRange approachA, SpanRange island, SpanRange approachB) =>
             new CircuitCoverage(CircuitKind.Added, new[] { approachA ?? throw new ArgumentNullException(nameof(approachA)), island ?? throw new ArgumentNullException(nameof(island)), approachB ?? throw new ArgumentNullException(nameof(approachB)) }, null);
-        // The circuit's own spans, by ID in role order, as the map defines them.
-        public static CircuitCoverage Native(IReadOnlyList<string> spanIds) {
+        // The circuit's own spans, by ID in role order, as the map defines them, with the track each covers when it was read.
+        public static CircuitCoverage Native(IReadOnlyList<string> spanIds, IReadOnlyList<SpanRange> spanRanges = null) {
             if (spanIds == null || spanIds.Count != 3) throw new ArgumentException("A circuit has three spans", nameof(spanIds));
-            return new CircuitCoverage(CircuitKind.Native, null, spanIds.ToArray());
+            if (spanRanges != null && (spanRanges.Count != 3 || spanRanges.Any(r => r == null))) throw new ArgumentException("A circuit has three spans", nameof(spanRanges));
+            return new CircuitCoverage(CircuitKind.Native, null, spanIds.ToArray()) { nativeRanges = spanRanges?.ToArray() };
         }
+        SpanRange[] nativeRanges;
         // Null unless Kind is Tracks or Added.
         public IReadOnlyList<SpanRange> Ranges => ranges;
         // Null unless Kind is Native.
         public IReadOnlyList<string> SpanIds => spans;
+        // The track the map's own spans cover in role order, each from its lower to its upper end; null unless Kind is
+        // Native and the spans were read from the scene. It is not part of the coverage's identity: the spans are.
+        public IReadOnlyList<SpanRange> SpanRanges => nativeRanges;
+        // The track each role covers now: the selected tracks, or the map's own spans as read. Null for a detached
+        // circuit and for native spans that were not read.
+        public IReadOnlyList<SpanRange> CurrentRanges => ranges ?? nativeRanges;
+        // Whether these selected tracks are the track the map's own spans of the native circuit cover.
+        internal static bool CoversNativeTrack(CircuitCoverage selected, CircuitCoverage native) =>
+            selected?.Kind == CircuitKind.Tracks && native?.Kind == CircuitKind.Native && native.nativeRanges != null && selected.ranges.Zip(native.nativeRanges, SpanRange.Same).All(x => x);
         internal static bool Same(CircuitCoverage a, CircuitCoverage b) {
             if (a == null || b == null) return a == b;
             if (a.Kind != b.Kind) return false;
@@ -294,15 +307,17 @@ namespace RailroaderScenePatcher.Core {
             return world.Circuits(target).SelectMany(world.Spans).Where(span => span != null)
                 .SelectMany(world.SegmentIds).Where(id => !String.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToArray();
         }
-        // The segment the selected role currently starts on, or null when the circuit or role has no span.
-        public SelectionIdentity RoleSegment(object target, string circuit, int role) {
+        // The segment the selected role's From end, or with to its To end, currently lies on, or null when the circuit or
+        // role has no span.
+        public SelectionIdentity RoleSegment(object target, string circuit, int role, bool to = false) {
             foreach (var set in world.Circuits(target)) {
                 var spans = world.Spans(set);
                 var island = spans.ElementAtOrDefault(1);
                 var key = CircuitSpanProblems.CircuitKey(island == null ? null : world.SpanId(island), world.AdditionKey(set));
                 if (key != circuit) continue;
                 var span = spans.ElementAtOrDefault(role);
-                var segment = span == null ? null : world.Range(span).From.Segment;
+                var range = span == null ? null : world.Range(span);
+                var segment = range == null ? null : to ? range.To.Segment : range.From.Segment;
                 return String.IsNullOrWhiteSpace(segment) ? null : SelectionIdentity.Graph(SelectionKind.TrackSegment, segment);
             }
             return null;
@@ -454,9 +469,13 @@ namespace RailroaderScenePatcher.Core {
             var spans = (world.Spans(circuit.Set) ?? Array.Empty<object>()).ToArray();
             var owned = spans.Length == 3 && spans.All(s => s != null && baseline.Owned.Any(o => ReferenceEquals(o, s)));
             if (circuit.Original == null) return owned ? CircuitCoverage.Added(world.Range(spans[0]), world.Range(spans[1]), world.Range(spans[2])) : throw new InvalidOperationException(DetectionAddition.Name(circuit.Key) + " holds spans this patcher does not own");
-            if (spans.Length == 3 && spans.Zip(circuit.Original, ReferenceEquals).All(x => x)) return CircuitCoverage.Native(circuit.Original.Select(world.SpanId).ToArray());
+            if (spans.Length == 3 && spans.Zip(circuit.Original, ReferenceEquals).All(x => x)) return CircuitCoverage.Native(circuit.Original.Select(world.SpanId).ToArray(), NativeRanges(circuit.Original));
             if (owned) return CircuitCoverage.Tracks(world.Range(spans[0]), world.Range(spans[1]), world.Range(spans[2]));
             throw new InvalidOperationException("Circuit " + circuit.Key + " holds spans other than the map's own detection spans for this circuit or spans this patcher owns");
+        }
+        // The track the map's own spans cover, or null when a span's ends cannot be read.
+        SpanRange[] NativeRanges(object[] spans) {
+            try { var read = spans.Select(world.Range).ToArray(); return read.Any(r => r == null) ? null : read; } catch (Exception) { return null; }
         }
         public void Apply(object target, ObjectState state) {
             if (state.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");

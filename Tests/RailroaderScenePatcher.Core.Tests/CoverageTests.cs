@@ -190,6 +190,7 @@ static partial class CoverageTests {
         SaveAndReloadReproduceCoverageOnce();
         DependedCoverageKeepsItsLastEntry();
         UnresolvedDetectionSpanIsAControllerProblem();
+        RunForm();
         Console.WriteLine("PASS: crossing coverage omission, explicit selection, detachment, retention, refusal, restoration and scene patch editing");
     }
     static void RolePickerOffersTheOtherRoles() {

@@ -226,11 +226,14 @@ namespace RailroaderScenePatcher {
         readonly string[] segmentFields = { "" };
         TrackLocation pickedTrackLocation;
         ConfirmedSelection pickedTrackSelection;
-        // Crossing coverage being edited: the circuit, four fields per role (segment, end, from, to) and the previewed change.
+        // Crossing coverage being edited: the circuit, the From and To ends of each role (CoverageFormFields) and the previewed change.
         // coverageAddition is the ID of the detection addition being added or edited, or null while a native circuit is edited.
+        // A pending world choice for the form names the role and whether it fills the role's To end.
         string coverageCircuit, coverageAddition, newAddition = "";
         int? choosingCoverageRole;
-        readonly string[] coverageFields = new string[12];
+        bool choosingCoverageTo;
+        readonly CoverageFormFields coverageForm = new CoverageFormFields();
+        string[] coverageFields => coverageForm.Values;
         sealed class PreparedCoverage { internal string Circuit, Addition; internal CircuitCoverage Value; internal CoveragePreview Preview; }
         PreparedCoverage preparedCoverage;
         // A light or gate being added or edited: the chosen source, seven fields (ID, position x/y/z, rotation x/y/z in
@@ -1064,7 +1067,8 @@ namespace RailroaderScenePatcher {
             catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
         }
         // bindingSlot says the choice fills the inspected marker's track binding, a crossing pad's included.
-        void BeginSelection(SelectionKind kind, SceneObservation origin, int? coverageRole = null, bool bindingSlot = false) {
+        // coverageTo says a coverage role's choice fills the role's To end; otherwise it fills the From end.
+        void BeginSelection(SelectionKind kind, SceneObservation origin, int? coverageRole = null, bool bindingSlot = false, bool coverageTo = false) {
             if (selection?.Pending != null) return;
             CancelGizmo();
             ClearSnap();
@@ -1073,14 +1077,14 @@ namespace RailroaderScenePatcher {
                 // A binding slot's current binding cannot be picked as a candidate: a coverage role does not offer its
                 // current segment, a marker's binding, a crossing pad's included, not its marker segment, and a
                 // construction not its current construction segments.
-                var role = coverageRole.HasValue ? crossingCoverageScene?.RoleSegment(origin.Handle, coverageCircuit, coverageRole.Value) : null;
+                var role = coverageRole.HasValue ? crossingCoverageScene?.RoleSegment(origin.Handle, coverageCircuit, coverageRole.Value, coverageTo) : null;
                 var own = kind == SelectionKind.TrackSegment && ReferenceEquals(origin, selected) && origin != null;
                 IReadOnlyList<SelectionIdentity> excluded = role != null ? new[] { role }
                     : own && HoldsConstructionSegments ? CurrentSegments().Select(id => SelectionIdentity.Graph(SelectionKind.TrackSegment, id)).ToArray()
                     : own && bindingSlot ? CommandBand.BindingSlotSegments(origin.Bindings).Select(id => SelectionIdentity.Graph(SelectionKind.TrackSegment, id)).ToArray() : null;
-                var purpose = coverageRole.HasValue ? "Select track segment for " + CircuitCoverage.RoleCaption(CircuitCoverage.Roles[coverageRole.Value]) : null;
+                var purpose = coverageRole.HasValue ? "Select track segment for the " + CoverageFormFields.EndCaption(coverageTo) + " end of " + CircuitCoverage.RoleCaption(CircuitCoverage.Roles[coverageRole.Value]) : null;
                 selection.Begin(kind, origin, origin == null && kind == SelectionKind.SceneObject, excluded, purpose);
-                choosingCoverageRole = coverageRole;
+                choosingCoverageRole = coverageRole; choosingCoverageTo = coverageTo;
                 selectionProblem = null;
                 if (selection.Pending?.InspectOnly == false) BeginWorldEditAction();
                 // The refusal of an earlier action, such as a Set, does not stand beside the new choice.
@@ -1249,11 +1253,12 @@ namespace RailroaderScenePatcher {
                     ReadPlacement();
                 }
                 // Marker, pad and starter placement fields all take the confirmed click's complete track location.
-                // A crossing's segment pick fills the role that started the choice.
+                // A crossing's segment pick fills the end of the role that started the choice: its segment, and the
+                // segment end and distance of the click.
                 var picked = selection.Confirmed;
                 if (choosingCoverageRole is int role) {
                     if (coverageCircuit != null && selected != null && picked?.Source?.Equals(SelectionIdentity.SceneObject(selected.Identity)) == true) {
-                        coverageFields[role * 4] = picked.Identity.Identifier;
+                        PickCoverageEnd(candidate, picked, role, choosingCoverageTo);
                         preparedCoverage = null;
                     }
                     choosingCoverageRole = null;
@@ -1271,6 +1276,24 @@ namespace RailroaderScenePatcher {
                 if (snapping && selection.Pending == null) EndWorldEditAction();
                 selection.Pending?.Offer(Array.Empty<SelectionCandidate>());
                 selectionProblem = "Identity could not be confirmed: " + e.GetBaseException().Message;
+            }
+        }
+        // Fills one end of a coverage role from the confirmed click. Without a distance from the click only the segment
+        // fills, and the refusal says to enter the end and distance by hand.
+        void PickCoverageEnd(SpatialCandidate candidate, ConfirmedSelection picked, int role, bool to) {
+            const string action = "Track location from the click";
+            var segment = picked.Identity.Identifier;
+            if (trackPoses == null) { coverageForm.PickSegment(role, to, segment); feedback.Refuse(CoveragePlace, action, "the track graph is unavailable in this game build, so the click cannot give a distance; enter end and distance by hand"); return; }
+            try {
+                var point = selection.ClickedPoint(candidate);
+                if (point == null) throw new InvalidOperationException("the click on the track could not be found on the segment's curve");
+                var offset = (Vector3)Native.Call(Native.Type("Helpers.WorldTransformer"), "GameToWorld", Vector3.zero);
+                var at = trackPoses.Nearest(segment, point.Value + offset);
+                if (at == null || at.Segment != segment) throw new InvalidOperationException("the click gave no distance on segment " + segment);
+                coverageForm.Pick(role, to, at);
+            } catch (Exception e) {
+                coverageForm.PickSegment(role, to, segment);
+                feedback.Refuse(CoveragePlace, action, e.GetBaseException().Message.TrimEnd('.') + "; enter end and distance by hand");
             }
         }
         // Fills a marker's complete track location from where the confirmed segment was clicked. The segment is
@@ -1573,30 +1596,9 @@ namespace RailroaderScenePatcher {
             else { var q = Quaternion.Euler((float)angles[0], (float)angles[1], (float)angles[2]); rotation = new double[] { q.x, q.y, q.z, q.w }; }
             return new EquipmentAddition(id, equipmentSource.IsDefinition ? EquipmentAddition.BellPattern : EquipmentAddition.LightGatePattern, equipmentSource, new Placement(position, rotation));
         }
-        // Fills the fields from the selected tracks of a circuit or addition; a circuit using the map's own detection spans or detached, and a new
-        // addition, start empty.
-        void ReadCoverage(CircuitCoverage value) {
-            for (var role = 0; role < 3; role++) {
-                var range = value?.Ranges?[role];
-                coverageFields[role * 4] = range?.From.Segment ?? "";
-                coverageFields[role * 4 + 1] = range?.From.End ?? "a";
-                coverageFields[role * 4 + 2] = range == null ? "" : CommandBand.Number(range.From.Distance);
-                coverageFields[role * 4 + 3] = range == null ? "" : CommandBand.Number(range.To.Distance);
-            }
-        }
-        CircuitCoverage ParseCoverage(out string problem, bool addition) {
-            problem = null;
-            var ranges = new SpanRange[3];
-            for (var role = 0; role < 3; role++) {
-                var segment = (coverageFields[role * 4] ?? "").Trim(); var end = (coverageFields[role * 4 + 1] ?? "").Trim().ToLowerInvariant();
-                if (segment.Length == 0 || (end != "a" && end != "b") || !Double.TryParse(coverageFields[role * 4 + 2], NumberStyles.Float, CultureInfo.InvariantCulture, out var from) || !Double.TryParse(coverageFields[role * 4 + 3], NumberStyles.Float, CultureInfo.InvariantCulture, out var to)) {
-                    problem = "enter a segment ID, end a or b, and from and to distances with a decimal point for " + CommandBand.RoleCaption(CircuitCoverage.Roles[role]);
-                    return null;
-                }
-                ranges[role] = new SpanRange(new TrackLocation(segment, end, from), new TrackLocation(segment, end, to));
-            }
-            return addition ? CircuitCoverage.Added(ranges[0], ranges[1], ranges[2]) : CircuitCoverage.Tracks(ranges[0], ranges[1], ranges[2]);
-        }
+        // Fills the fields from the track each role of the circuit or addition covers now; see CoverageFormFields.Read.
+        void ReadCoverage(CircuitCoverage value) => coverageForm.Read(value);
+        CircuitCoverage ParseCoverage(out string problem, bool addition) => coverageForm.Parse(addition, out problem);
         int queuedPasses;
         bool queuedCompared;
         // The frame in which the last gizmo ended.

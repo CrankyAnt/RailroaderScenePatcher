@@ -30,11 +30,11 @@ You must specify the tracks and area. The patcher doesn't choose them from nearb
 
 1. Open the Scene Patcher panel and inspect the crossing controller. Select it under **Grade crossing** in the outliner or click **Select in world** to select it in the world.
 2. On the **Connections** tab, under **Add detection**, enter an ID for the addition in **Detection addition ID** and click **Add detection** beside it.
-3. For each of **Approach A**, **Island**, and **Approach B**, enter a segment ID, the end (`a` or `b`) the distances are measured from, and the **From** and **To** distances in meters. To fill a role's segment from the world, click **Segment** next to the role, click the track, then click **Confirm**. When editing an existing addition, the role's current starting segment is excluded from its choice list. You can pick segments used by other roles. **From** is the end next to the island for each approach, and the island's lower end for the island.
+3. Each of **Approach A**, **Island**, and **Approach B** has two ends, **From** and **To**. For each end, enter a segment ID, the segment end (`a` or `b`) the distance is measured from, and the distance in meters. The two ends of a role can lie on different segments; the detection span covers the route between them. **From** is the end next to the island for each approach, and the island's lower end for the island. To fill an end from the world, click **Segment** next to that end, click the track, then click **Confirm**. The end takes the segment and the distance of the click from end `a`; the other end keeps its values. When editing an existing addition, the end's current segment is excluded from its choice list. You can pick segments used by other roles.
 4. Click **Preview** at the bottom of the tab. The **Preview** section lists every native circuit as retained and the addition as new with its tracks and area. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab. Apply uses the previewed tracks. Preview again after you change a field.
 
-To change an addition's tracks, click **Edit detection addition** with its ID, change the fields, preview, and apply. The patcher replaces the addition's spans and keeps its circuit.
+To change an addition's tracks, click **Edit detection addition** with its ID. The form opens with the addition's current From and To ends. Change the fields, preview, and apply. The patcher replaces the addition's spans and keeps its circuit.
 
 To delete an addition, click **Edit detection addition** with its ID, then **Delete** at the bottom of the tab and apply. The patcher removes the circuit from the crossing and unregisters and removes its spans. Other additions and the native circuits keep their coverage.
 
@@ -91,6 +91,5 @@ These statements are based on the patcher's automated tests and the code of Rail
 - A missing segment, a segment ID that matches more than one segment, a distance outside its segment, and a span without length are refused before anything changes.
 - The patcher does not check whether trains occupy the affected spans. Make edits in scene patch editing with those spans clear.
 - The patcher does not check that your spans meet at the island or that the track is connected. It checks that each span resolves, registers, and covers track.
-- The editor fields accept one segment per span. To define a span across segment boundaries, write it in the scene patch file with `from` and `to` on different segments.
 - A crossing whose circuits were changed by something other than this patcher is refused until the world reloads.
 - Research demonstrated added detection in both directions on one crossing and build. The patcher does not check warning time.

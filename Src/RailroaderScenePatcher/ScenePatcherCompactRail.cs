@@ -16,8 +16,8 @@ namespace RailroaderScenePatcher {
     // an action row in the footer's pattern, and an outliner that can be hidden, with its summary line. The message area,
     // the bands, the actions and the outliner rows are the full window's own.
     public sealed partial class PatcherBehaviour {
-        // The one field of construction segments, and the coverage form's fields per role, whose first is the segment.
-        const int CompactSegmentIdsField = 0, CompactCoverageFieldsPerRole = 4;
+        // The one field of construction segments.
+        const int CompactSegmentIdsField = 0;
 
         // What the rail shows for the active tab or guided task: its name, its context section and its idle actions.
         sealed class CompactView {
@@ -165,10 +165,12 @@ namespace RailroaderScenePatcher {
         void CompactCoverageContext(UIPanelBuilder builder) {
             if (coverageCircuit != null) {
                 var label = coverageAddition == null ? "Circuit " + coverageCircuit : "Detection addition " + coverageAddition;
-                Line(builder, "<b>" + Literal(label) + "</b>", "Crossing coverage", "Editing " + label + ". Choose each role's segment in the world, then switch to the full window to preview and apply.", LineHeight);
+                Line(builder, "<b>" + Literal(label) + "</b>", "Crossing coverage", "Editing " + label + ". Choose the From end of each role in the world, then switch to the full window to set the To ends, preview, and apply.", LineHeight);
+                // A role whose two ends lie on different segments names both.
                 var roles = Enumerable.Range(0, CircuitCoverage.Roles.Length).Select(role => {
-                    var segment = coverageFields[role * CompactCoverageFieldsPerRole];
-                    return CircuitCoverage.RoleCaption(CircuitCoverage.Roles[role]) + ": " + (String.IsNullOrWhiteSpace(segment) ? "none" : segment);
+                    var from = coverageFields[CoverageFormFields.First(role, false)]; var to = coverageFields[CoverageFormFields.First(role, true)];
+                    var segments = String.IsNullOrWhiteSpace(from) ? "none" : String.IsNullOrWhiteSpace(to) || to == from ? from : from + " to " + to;
+                    return CircuitCoverage.RoleCaption(CircuitCoverage.Roles[role]) + ": " + segments;
                 }).ToArray();
                 // One line per role: the three on one line cut off the last role.
                 foreach (var role in roles) Line(builder, Literal(role), "Role segments", String.Join("\n", roles), LineHeight);
