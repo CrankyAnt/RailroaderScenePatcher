@@ -224,7 +224,7 @@ namespace RailroaderScenePatcher {
         void Failed(OwnedBell bell, string reason) {
             bell.LoadProblem = reason;
             var message = "Crossing bell " + bell.Id + " from mod " + bell.Scope + " at " + bell.ControllerPath + " stays silent because its audio failed to load. Reason: " + reason
-                + ". Report this to the maintainer of mod " + bell.Scope + ".";
+                + ". Report this to the mod author.";
             try {
                 if (Warn != null) Warn("bell-audio/" + bell.Scope + "/" + bell.Id + "/" + bell.ControllerPath, message, bell.Scope + ":Data/scene-patches.json");
                 else PatcherLog.Warning(message);

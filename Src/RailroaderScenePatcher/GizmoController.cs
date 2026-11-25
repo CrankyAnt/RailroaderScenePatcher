@@ -207,7 +207,7 @@ namespace RailroaderScenePatcher {
                 if (cleanup.Count != 0) {
                     var detail = String.Join("; ", cleanup);
                     var message = EditingFault.Describe(EditingFailure.GizmoCleanup, detail);
-                    attachment.Fault.Fail(EditingFailure.GizmoCleanup, detail);
+                    attachment.Fault.Fail(EditingFailure.GizmoCleanup, detail, identity?.Path);
                     if (notify) finished?.Invoke(result, message);
                 } else if (notify) finished?.Invoke(result, result?.Error == null ? "Gizmo drag cancelled; the prior placement is restored." : "Gizmo cancellation failed: " + result.Error);
             } finally { if (gameObject != null) Destroy(gameObject); }

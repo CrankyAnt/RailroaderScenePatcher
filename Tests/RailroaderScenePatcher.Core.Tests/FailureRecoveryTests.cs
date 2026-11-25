@@ -312,10 +312,10 @@ static class FailureRecoveryTests {
         Assert(rows.Failures.Count == 2, "Each failure becomes one player row: " + rows.Failures.Count);
         Assert(rows.Failures.Single(f => f.Operation == "move").Message.Contains("Remaining state: Position: now 90, 2, 3, before 4, 2, 3"), "The player row of an incomplete cleanup names what remains: " + rows.Failures.Single(f => f.Operation == "move").Message);
         foreach (var row in rows.Failures)
-            Assert(row.Message.Contains("Report to the") && !row.Message.Contains("Recheck"), "Each player row asks for a report without an editor-only Recheck instruction: " + row.Message);
+            Assert(row.Message.Contains("Report this to the") && !row.Message.Contains("Recheck"), "Each player row asks for a report without an editor-only Recheck instruction: " + row.Message);
         var runtimeFailure = rows.Failures.Single(f => f.Operation == "move").Message;
         Assert(!runtimeFailure.Contains("correct") && !runtimeFailure.Contains("Correct"), "A runtime failure asks for a report and gives no repair instruction: " + runtimeFailure);
         var missingTarget = rows.Failures.Single(f => f.Operation == "missing").Message;
-        Assert(missingTarget.Contains(PatchEngine.TargetMissingAction) && missingTarget.Contains("Report to the mod author."), "An invalid target's row explains how to inspect and correct its identity and directs the report to the supplying mod: " + missingTarget);
+        Assert(missingTarget.Contains(PatchEngine.TargetMissingAction) && missingTarget.Contains("Report this to the mod author"), "An invalid target's row explains how to inspect and correct its identity and directs the report to the supplying mod: " + missingTarget);
     }
 }

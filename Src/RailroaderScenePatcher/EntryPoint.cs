@@ -48,7 +48,7 @@ namespace RailroaderScenePatcher {
             GroupWorld.WorldLoaded();
             object map, attempt;
             try { map = MapContext(); attempt = AttemptIdentity(); }
-            catch (Exception e) { Unbound("Local world context unavailable: " + e.GetBaseException().Message + ". Report to the patcher maintainer."); return; }
+            catch (Exception e) { Unbound("The patcher couldn't read which map is loaded, so it applied no scene patch files in this load: " + e.GetBaseException().Message.TrimEnd('.') + ". " + WindowGuidance.ReloadMap + " Report this to the patcher maintainer."); return; }
             // The same map context keeps this peer's retained state; a changed attempt key or an earlier world unload starts a
             // new load attempt that first reconciles that state with the actual objects. Another map context replaces it.
             var binding = Binding();
@@ -419,7 +419,7 @@ namespace RailroaderScenePatcher {
             foreach (var mod in ModScenePatchFiles.Discover()) {
                 if (mod == null || mod.Error != null || !mod.Applicable) continue;
                 try { applied += runtime.BeforeNewGameStart(mod.Json, mod.Source).Outcomes.Values.Count(o => o.Applied); }
-                catch (Exception e) { PatcherLog.Warning(Describe(mod, "Spawn point placement failed before the new game start: " + e.GetBaseException().Message + ". Report this to the patcher maintainer.")); }
+                catch (Exception e) { PatcherLog.Warning(Describe(mod, "Spawn point placement failed before the new game start: " + e.GetBaseException().Message, toMaintainer: true)); }
             }
             return applied;
         }
@@ -431,7 +431,7 @@ namespace RailroaderScenePatcher {
             }
             IReadOnlyList<LoadedScenePatchFile> scenePatchFiles;
             try { scenePatchFiles = runtime.ApplyLoaded(ModScenePatchFiles.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
-            catch (Exception e) { Report("discovery", "The patcher couldn't finish reading or applying the loaded mods' scene patch files. Report to the patcher maintainer. " + e.GetBaseException().Message); return; }
+            catch (Exception e) { Report("discovery", "The patcher couldn't finish reading or applying the loaded mods' scene patch files: " + e.GetBaseException().Message.TrimEnd('.') + ". " + WindowGuidance.ReloadMap + " Report this to the patcher maintainer."); return; }
             // Each scene patch file's outcome in this load attempt is a debug line; a file-level failure that gives no Log
             // window row, such as a mod without the patcher dependency, is one player warning.
             string[] maps = null;
@@ -441,7 +441,7 @@ namespace RailroaderScenePatcher {
                 try { scenePatchFile.WriteLog(LoadAttempt.Number, maps); } catch { }
                 // Follow-up work for one scene patch file cannot stop the others; their application has already happened in load order.
                 try {
-                    if (scenePatchFile.PresentationError != null) PatcherLog.Warning(Describe(mod, scenePatchFile.PresentationError + ". Report this to the patcher maintainer."));
+                    if (scenePatchFile.PresentationError != null) PatcherLog.Warning(Describe(mod, scenePatchFile.PresentationError, toMaintainer: true));
                     if (scenePatchFile.Result == null) {
                         if (mod.Error != null) EditedScenePatchFileDiagnostic(mod, Describe(mod, mod.Error));
                         continue;
@@ -458,7 +458,7 @@ namespace RailroaderScenePatcher {
                         }
                         else ReconcileMarkerWarning(mod, item.Key, item.Value);
                     }
-                } catch (Exception e) { PatcherLog.Warning(Describe(mod, "Scene patch checks failed after application: " + e.GetBaseException().Message + ". Report this to the patcher maintainer.")); }
+                } catch (Exception e) { PatcherLog.Warning(Describe(mod, "Scene patch checks failed after application: " + e.GetBaseException().Message, toMaintainer: true)); }
             }
             status = "Scene patch files processed. " + (scene?.Status ?? "");
         }
@@ -488,10 +488,7 @@ namespace RailroaderScenePatcher {
                 })) PatcherLog.Debug("Removed the verified track marker warning for " + outcome.Target?.Path + "; early repair unavailable: " + attribution.EarlyRouteUnavailable);
             }
         }
-        static string Describe(LoadedMod loaded, string message) {
-            var mod = loaded.Source;
-            return (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + " " + mod.Version + "] Data/scene-patches.json: " + message + ". Patcher " + Version + ". Mod author: " + (mod.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(mod.Website) ? "" : "; website: " + mod.Website);
-        }
+        static string Describe(LoadedMod loaded, string message, bool toMaintainer = false) => ScenePatchFileReport.Line(loaded.Source, message, Version, toMaintainer);
         internal void ReportWorld(string message) { Report("world", message); }
         void MapEditorDiagnostic(string message) { if (inMapEditor && !diagnostics.Contains(message)) diagnostics.Add(message); }
         // A diagnostic of the edited mod's scene patch file at world load. Recovery replaces that scene patch file in the session,
@@ -572,8 +569,8 @@ namespace RailroaderScenePatcher {
             }
             catch (Exception e) {
                 presentation = null; presentationFailed = true;
-                Report("inspection-presentation", "The Scene Patcher window couldn't open: " + e.GetBaseException().Message + ". Report this to the patcher maintainer.");
-                PatcherLog.Debug(() => "The Scene Patcher window couldn't open: " + e);
+                Report("inspection-presentation", "The Scene Patcher window couldn't open: " + e.GetBaseException().Message.TrimEnd('.') + ". " + WindowGuidance.ReloadMapEditor + " Report this to the patcher maintainer.");
+                PatcherLog.Debug(() => PatcherLog.ExceptionDetail + e);
             }
         }
         // Whether the game finished loading the world: the Map Editor appears, and the window is built, before that.
@@ -715,7 +712,7 @@ namespace RailroaderScenePatcher {
                 var changed = feedback.CheckFileVersion(session, RecoveryPlace);
                 if (session.ImportOutdated) { session.ImportOutdated = false; feedback.Report(ImportPlace, FilePanelState.ImportOutdated); changed = true; }
                 if (changed) VersionChanged();
-            } catch (Exception e) { attachment.Fault.Fail(EditingFailure.FileCheck, e.GetBaseException().Message); }
+            } catch (Exception e) { attachment.Fault.Fail(EditingFailure.FileCheck, e.GetBaseException().Message, attachment.FileLabel); }
         }
         void VersionChanged() {
             if (attachment != null) feedback.ObserveFileVersion(attachment.Session, RecoveryPlace);
@@ -1032,7 +1029,7 @@ namespace RailroaderScenePatcher {
             PatcherLog.Debug("Reconciled scene patch targets for the retained world: " + reentry.Retained + " retained, " + reentry.Released + " released, " + reentry.Failures.Count + " cleanup failures.");
             // Local only: no other peer is told, rolled back or disconnected.
             foreach (var failure in reentry.Failures)
-                Report("reentry/" + failure, "Scene patch cleanup failed for the retained world: " + failure + ". " + WindowGuidance.RetriedAtNextLoad + " Report this to the patcher maintainer.");
+                Report("reentry/" + failure, "The patcher couldn't undo its changes from the previous load of this map: " + failure + ". " + WindowGuidance.RetriedAtNextLoad + " Report this to the patcher maintainer.");
         }
         // Ends the load attempt: parts bound to the native map editor of this world end with it; the world's patcher state stays.
         // The window, its entry icon and its title-bar help button are disposed here and built again by Attach when the
@@ -1291,7 +1288,7 @@ namespace RailroaderScenePatcher {
         void PickCoverageEnd(SpatialCandidate candidate, ConfirmedSelection picked, int role, bool to) {
             const string action = "Track location from the click";
             var segment = picked.Identity.Identifier;
-            if (trackPoses == null) { coverageForm.PickSegment(role, to, segment); feedback.Refuse(CoveragePlace, action, "the track graph is unavailable in this game build, so the click cannot give a distance; enter end and distance by hand"); return; }
+            if (trackPoses == null) { coverageForm.PickSegment(role, to, segment); feedback.Refuse(CoveragePlace, action, "the track graph is unavailable in this game build, so the click cannot give a distance. " + WindowGuidance.EnterByHand); return; }
             try {
                 var point = selection.ClickedPoint(candidate);
                 if (point == null) throw new InvalidOperationException("the click on the track could not be found on the segment's curve");
@@ -1301,7 +1298,7 @@ namespace RailroaderScenePatcher {
                 coverageForm.Pick(role, to, at);
             } catch (Exception e) {
                 coverageForm.PickSegment(role, to, segment);
-                feedback.Refuse(CoveragePlace, action, e.GetBaseException().Message.TrimEnd('.') + "; enter end and distance by hand");
+                feedback.Refuse(CoveragePlace, action, e.GetBaseException().Message.TrimEnd('.') + ". " + WindowGuidance.EnterByHand);
             }
         }
         // Fills a marker's complete track location from where the confirmed segment was clicked. The segment is
@@ -1671,7 +1668,7 @@ namespace RailroaderScenePatcher {
             loggedVerdicts = loadId;
             if (!PatcherLog.DebugEnabled) return;
             try {
-                PatcherLog.Debug(String.Join(Environment.NewLine, BakedSceneryChecks.Summary(GroupWorld.Report()).Select(line => LoadAttempt.Label + ": " + line)));
+                foreach (var line in BakedSceneryChecks.Summary(GroupWorld.Report())) PatcherLog.Debug(LoadAttempt.Label + ": " + line);
             } catch (Exception e) { PatcherLog.Debug(LoadAttempt.Label + ": The patcher couldn't report the baked scenery checks: " + e.GetBaseException().Message); }
         }
         void Inspect() {

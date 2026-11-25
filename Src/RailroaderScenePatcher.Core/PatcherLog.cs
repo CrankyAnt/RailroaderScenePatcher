@@ -24,15 +24,31 @@ namespace RailroaderScenePatcher.Core {
         public static bool DebugEnabled { get; set; }
         public static void Warning(string text) => Write(LogLevel.Warning, text);
         public static void Error(string text) => Write(LogLevel.Error, text);
-        // A failure with its exception: player mode gets the base message, debug mode also the full exception.
+        // A failure with its exception: player mode gets the base message, debug mode also the full exception, marked as
+        // the detail of the line before it.
         public static void Error(string text, Exception failure) {
-            Write(LogLevel.Error, failure == null ? text : text + ": " + failure.GetBaseException().Message);
-            if (failure != null) Debug(failure.ToString);
+            Write(LogLevel.Error, WithReason(text, failure));
+            if (failure != null) Debug(() => ExceptionDetail + failure);
         }
         public static void Warning(string text, Exception failure) {
-            Write(LogLevel.Warning, failure == null ? text : text + ": " + failure.GetBaseException().Message);
-            if (failure != null) Debug(failure.ToString);
+            Write(LogLevel.Warning, WithReason(text, failure));
+            if (failure != null) Debug(() => ExceptionDetail + failure);
         }
+        // The start of the debug line that carries a warning's or error's full exception.
+        public const string ExceptionDetail = "Exception detail for the line above: ";
+        // Joins a sentence and the exception message once: "... Report this to the patcher maintainer: <message>", never
+        // a period before the colon.
+        internal static string WithReason(string text, Exception failure) {
+            if (failure == null) return text;
+            var message = failure.GetBaseException().Message;
+            if (String.IsNullOrEmpty(text)) return message;
+            return text.TrimEnd().TrimEnd('.') + ": " + message;
+        }
+        // A log entry is one physical line: the line breaks of a text, such as those of an exception's stack trace, become
+        // " | ". A caller that has several lines to report writes one entry per line.
+        internal static string OneLine(string text) =>
+            text.IndexOfAny(LineBreaks) < 0 ? text : String.Join(" | ", text.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries));
+        static readonly char[] LineBreaks = { '\r', '\n' };
         public static void Debug(string text) { if (DebugEnabled) Write(LogLevel.Debug, text); }
         // A debug line that costs work to build is built only while the debug option is on.
         public static void Debug(Func<string> text) {
@@ -55,7 +71,7 @@ namespace RailroaderScenePatcher.Core {
         static void Write(LogLevel level, string text) {
             var output = Output;
             if (output == null || text == null) return;
-            try { output.Write(level, WithoutAbsolutePaths(LoadAttempt.Prefixed(WithoutGuidance(text)))); } catch { /* Logging cannot stop the work it reports. */ }
+            try { output.Write(level, OneLine(WithoutAbsolutePaths(LoadAttempt.Prefixed(WithoutGuidance(text))))); } catch { /* Logging cannot stop the work it reports. */ }
         }
         // A log line records what happened; the repair steps and fallbacks the window shows with a reason stay out of it.
         // An attempt trace keeps its JSON payload as the engine recorded it.

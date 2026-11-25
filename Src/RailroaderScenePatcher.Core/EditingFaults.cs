@@ -61,10 +61,15 @@ namespace RailroaderScenePatcher.Core {
                 default: throw new ArgumentOutOfRangeException(nameof(failure));
             }
         }
-        public void Fail(EditingFailure failure, string detail = null) {
+        // subject is the scene patch file or object the failure concerns, as the log names it; the window line stands
+        // beside that file or object already.
+        public void Fail(EditingFailure failure, string detail = null, string subject = null) {
             var text = Describe(failure, detail);
             if (failure != EditingFailure.HistoryError) Text = text;
-            written.Error(text, text + " Report this to the patcher maintainer.");
+            var sentence = text.TrimEnd();
+            if (!sentence.EndsWith(".", StringComparison.Ordinal) && !sentence.EndsWith("!", StringComparison.Ordinal) && !sentence.EndsWith("?", StringComparison.Ordinal)) sentence += ".";
+            var line = (String.IsNullOrEmpty(subject) ? "" : subject + ": ") + sentence + " Report this to the patcher maintainer.";
+            written.Error(line, line);
         }
         public void Refuse(string text) { Text = text; }
         public void Clear() { Text = null; }

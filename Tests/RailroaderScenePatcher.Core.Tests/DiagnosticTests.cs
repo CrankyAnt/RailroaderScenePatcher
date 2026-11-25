@@ -32,7 +32,8 @@ static class DiagnosticTests {
         Check(failure.Message.StartsWith("Example Mod [example/mod; version 2.1].", StringComparison.Ordinal), "The description starts with the supplying mod; its separate originator supplies the diagnostic source once");
         Check(failure.Cause == FailureCause.Unknown && failure.ReportTo == "patcher maintainer", "An injected native mutation fault must not blame the supplying mod");
         Check(failure.Message.Contains("Example Mod") && failure.Message.Contains("example/mod") && failure.Message.Contains("2.1") && failure.Message.Contains("0.5.0") && failure.Message.Contains("game-build"), "Reports must include supplying identity and relevant versions");
-        Check(failure.Message.Contains("Mod author: Example author.") && failure.Message.Contains("https://example.com/mod"), "Reports name the mod author and retain the published website");
+        Check(failure.Message.EndsWith("Patcher 0.5.0; game game-build. Report this to the patcher maintainer.", StringComparison.Ordinal) && !failure.Message.Contains("Example author") && !failure.Message.Contains("https://example.com/mod"),
+            "A patcher failure names only the maintainer as whom to report to: " + failure.Message);
         InvalidDefinitionsAndEditingRecovery();
         EarlyCheckUsesCompleteScenePatchFileProtection();
         ExactFallbackRequiresVerifiedRepair();

@@ -17,6 +17,16 @@ namespace RailroaderScenePatcher.Core {
         public string Author { get; }
         public string Website { get; }
     }
+    // The line about one mod's scene patch file: the mod, the file, what happened, the patcher version and whom to report
+    // to, said once. A patcher failure names the patcher maintainer; a diagnostic of the mod's own file names its author.
+    public static class ScenePatchFileReport {
+        public static string Line(PatchSource mod, string message, string patcherVersion, bool toMaintainer) {
+            var reason = (message ?? "").TrimEnd();
+            return (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + " " + mod.Version + "] Data/scene-patches.json: " + reason + (reason.EndsWith(".", StringComparison.Ordinal) ? "" : ".") +
+                " Patcher " + patcherVersion + "." + (toMaintainer ? " Report this to the patcher maintainer." :
+                " Mod author: " + (mod.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(mod.Website) ? "" : "; website: " + mod.Website));
+        }
+    }
     public sealed class PatchFailure {
         internal PatchFailure(PatchSource mod, string operation, TargetIdentity target, string error, FailureCause cause, string patcherVersion, string gameVersion, string diagnosticKey) {
             DiagnosticKey = diagnosticKey; ModIdentifier = mod.Identifier; Operation = operation; ObjectPath = target?.Path; Cause = cause;
@@ -25,9 +35,14 @@ namespace RailroaderScenePatcher.Core {
             var endOfReason = error?.EndsWith(".", StringComparison.Ordinal) == true ? " " : ". ";
             Message = (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + "; version " + (mod.Version ?? "not supplied") + "]. " +
                 (cause == FailureCause.NotApplicable ? "Definition Data/scene-patches.json. " : "Definition Data/scene-patches.json; operation " + operation + "; object " + (target == null ? "not resolved" : target.Label) + ". ") + error + endOfReason +
-                "Patcher " + patcherVersion + "; game " + gameVersion + "." + (ReportTo == null ? "" : " Report to the " + ReportTo + ".");
-            if (!String.IsNullOrWhiteSpace(mod.Author)) Message += " Mod author: " + mod.Author + ".";
-            if (Uri.TryCreate(mod.Website, UriKind.Absolute, out var site) && (site.Scheme == "https" || site.Scheme == "http")) Message += " Published website: " + mod.Website + ".";
+                "Patcher " + patcherVersion + "; game " + gameVersion + ".";
+            var author = String.IsNullOrWhiteSpace(mod.Author) ? null : mod.Author;
+            // A row says once whom to report to: the patcher maintainer alone, or the mod author by name.
+            if (ReportTo == "patcher maintainer") Message += " Report this to the patcher maintainer.";
+            else {
+                Message += ReportTo == null ? (author == null ? "" : " Mod author: " + author + ".") : " Report this to the mod author" + (author == null ? "." : ": " + author + ".");
+                if (Uri.TryCreate(mod.Website, UriKind.Absolute, out var site) && (site.Scheme == "https" || site.Scheme == "http")) Message += " Published website: " + mod.Website + ".";
+            }
         }
         public string Source => "Railroader Scene Patcher";
         public string ModIdentifier { get; }

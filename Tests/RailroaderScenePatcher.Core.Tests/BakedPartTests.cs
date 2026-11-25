@@ -207,7 +207,7 @@ static class BakedPartTests {
         const string expectedWarning = "Example Map [example/map; version 1.0.0]. Definition Data/scene-patches.json; operation yard; object " +
             "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Yard [UnityEngine.Transform]. " +
             "This path names a container object, which isn't a scenery group. Edit the groups it holds. " +
-            "Patcher 0.5.0; game 0.6.3. Report to the mod author. Mod author: Example author.";
+            "Patcher 0.5.0; game 0.6.3. Report this to the mod author: Example author.";
         Assert(warning.Message == expectedWarning, "The native warning gives the author the reason to correct the file entry: " + warning.Message);
         Assert(warning.Cause == FailureCause.InvalidDefinition, "The container path is an invalid definition.");
         var yard = result.Outcomes["yard"]; var part = result.Outcomes["post-as-part"];
