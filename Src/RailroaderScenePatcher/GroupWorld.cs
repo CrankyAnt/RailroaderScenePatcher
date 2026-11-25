@@ -120,8 +120,8 @@ namespace RailroaderScenePatcher {
         public void Dispose() {
             if (disposed) return;
             disposed = true;
-            try { own.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't restore the game's visibility checks for moved baked scenery parts. They may appear or disappear at the wrong distance", e); }
-            try { ownSwitches.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't restore how progression, map features, and track construction turn objects on or off. Affected objects may stay on when they should turn off, or stay off when they should turn on", e); }
+            try { own.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't restore visibility checks for moved baked scenery parts. Report this to the patcher maintainer.", e); }
+            try { ownSwitches.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't restore game control of scene object activity. Report this to the patcher maintainer.", e); }
             if (ReferenceEquals(switches, ownSwitches)) { switches = null; switchHost = null; }
             ownHost.Dispose();
             if (ReferenceEquals(culling, own)) { culling = null; host = null; }
@@ -449,8 +449,8 @@ namespace RailroaderScenePatcher {
         static bool FeatureReadable => ObjectList(featureObjects);
         // Why the patcher cannot see what progression or a map feature switches, or null.
         static string SwitchMembersProblem =>
-            progression != null && !ProgressionReadable ? "The patcher can't read the game's progression controls. Progression may enable an object that a scene patch file disables."
-            : mapFeature != null && !FeatureReadable ? "The patcher can't read the game's map feature controls. A map feature may enable an object that a scene patch file disables." : null;
+            progression != null && !ProgressionReadable ? "The patcher can't read the game's progression controls because their object lists are unavailable. Report this to the patcher maintainer."
+            : mapFeature != null && !FeatureReadable ? "The patcher can't read the game's map feature controls because their object lists are unavailable. Report this to the patcher maintainer." : null;
         // The loaded components of the switch types, read again only when the loaded scenes change: a switch is a scene
         // component, so the frames between scene changes find the same ones.
         static readonly Dictionary<Type, Component[]> loadedSwitches = new Dictionary<Type, Component[]>();
@@ -909,6 +909,6 @@ namespace RailroaderScenePatcher {
         void OnDisable() { try { Changed?.Invoke(false); } catch (Exception e) { Failed(e); } }
         // A switch can turn many times in one frame: each failure is written once.
         static readonly LogOnce failures = new LogOnce();
-        static void Failed(Exception e) { var message = e.GetBaseException().Message; failures.Warning(message, "A moved baked scenery part may not turn on or off with a game switch because the patcher couldn't update it: " + message); }
+        static void Failed(Exception e) { var message = e.GetBaseException().Message; failures.Warning(message, "The patcher couldn't update a moved baked scenery part's activity after a game switch: " + message + ". Report this to the patcher maintainer."); }
     }
 }

@@ -185,7 +185,7 @@ static class PatchEditingTests {
     // it and changes nothing; an object with one modification is not blocked.
     static void SeveralModificationsBlockEveryEditOfAnyObject() {
         var w = new World(Doc(Mod("move-p", "p", Fixed(112)) + "," + Mod("move-p-again", "p", Fixed(120)) + "," + Mod("move-q", "q", Fixed(5))));
-        Assert(PatchEditingSession.SeveralModifications == "This scene patch file has more than one modification for this object. Combine them into one modification in the file",
+        Assert(PatchEditingSession.SeveralModifications == "This scene patch file has more than one modification for this object. Combine them into one modification in the file.",
             "The shared refusal names the modifications and the file to correct");
         Assert(w.Session.SeveralModificationsBlock(P) == PatchEditingSession.SeveralModifications, "The object with two modifications is blocked: " + w.Session.SeveralModificationsBlock(P));
         Assert(w.Session.SeveralModificationsBlock(Q) == null, "The object with one modification is not blocked");
@@ -349,7 +349,7 @@ static class PatchEditingTests {
         Assert(accepted.Session.Blocked == null && accepted.Box.X == 12, "A scene patch file naming the bottom map layer is accepted in the map patch: " + accepted.Session.Blocked);
         Assert(accepted.Session.Edit(P, PlacementAt(130), null).Applied && accepted.MapEditor.Save() == null && (string)accepted.Saved["sourceMap"]["mapId"] == "rr/bushnell-whittier", "Editing and Save keep the bottom map layer");
         var diagnosis = refused.Session.ScenePatchFileDiagnostics.Single(d => d.Path == "sourceMap.mapId");
-        Assert(diagnosis.Expected == null && diagnosis.Message.EndsWith("Use the bottom map layer, rr/bushnell-whittier.", StringComparison.Ordinal), "The repair gives the bottom map layer once: " + diagnosis.Message);
+        Assert(diagnosis.Expected == null && diagnosis.Message.EndsWith("bottom map layer: rr/bushnell-whittier. Use the bottom map layer.", StringComparison.Ordinal), "The repair gives the bottom map layer once: " + diagnosis.Message);
         var other = InPatch(Doc(Mod("move-p", "p", Fixed(112))).Replace("\"mapId\":\"map\"", "\"mapId\":\"other/map\""));
         var otherHint = other.Session.ScenePatchFileDiagnostics.Single(d => d.Path == "sourceMap.mapId").Expected;
         Assert(other.Session.Blocked != null && other.Session.Blocked.StartsWith(SceneTargetMapCheck.Mismatch, StringComparison.Ordinal) && otherHint.Contains("rr/bushnell-whittier") && !otherHint.Contains("author/station-patch"),
@@ -782,7 +782,7 @@ static class PatchEditingTests {
         Assert(w.Session.Edit(P, PlacementAt(112), null, inspected).Applied && w.Box.X == 12, "An edit bound to the current inspection applies");
         var mutations = w.Scene.MutationCalls;
         var outcome = w.Session.Edit(P, PlacementAt(130), null, inspected);
-        Assert(!outcome.Applied && outcome.Error.Contains("refresh and inspect again") && w.Box.X == 12 && w.Scene.MutationCalls == mutations && w.MapEditor.UndoGroups.Count == 1 && (double)w.ScenePatchFile["modifications"].First.First["placement"]["position"][0] == 112,
+        Assert(!outcome.Applied && outcome.Error.Contains("Inspected target changed") && w.Box.X == 12 && w.Scene.MutationCalls == mutations && w.MapEditor.UndoGroups.Count == 1 && (double)w.ScenePatchFile["modifications"].First.First["placement"]["position"][0] == 112,
             "An edit bound to an outdated inspection is refused before mutation, scene patch file change or history: " + outcome.Error);
         Assert(!w.Session.Remove(P, inspected).Applied && !w.Session.Recheck(P, inspected).Applied && w.Box.X == 12, "Removal and recheck are bound to the inspection in the same way");
         try { inventory.Pin(inventory.Entries.Single()); throw new Exception("A stale inventory issued a token"); } catch (InvalidOperationException) { }

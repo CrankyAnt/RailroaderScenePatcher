@@ -118,7 +118,7 @@ static class ShapeTests {
         var applied = leftEngine.Apply(leftover);
         var failed = applied.Outcomes["old-style"];
         Assert(applied.Error == null && !failed.Applied && failed.MapEditorOnly && failed.Error.StartsWith("Unsupported modification content", StringComparison.Ordinal) && left.Untouched, "A modification that carries an id member fails as unsupported content: " + failed.Error);
-        Assert(failed.Error.Contains("modification old-style carries an id member") && failed.Error.Contains("The ID of a modification is its key, old-style"), "The diagnosis names the key and says the ID is the key: " + failed.Error);
+        Assert(failed.Error == "Unsupported modification content: modification old-style carries an id member. Remove the id member: the key of a modification is its ID.", "The diagnosis names the unsupported id member and modification key: " + failed.Error);
         Assert(applied.Outcomes["good"].Applied && left.Other.X == 60, "The modification beside a leftover id still applies");
         AssertPreserved(left, leftEngine, leftover, "a leftover id member");
     }

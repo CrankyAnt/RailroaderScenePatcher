@@ -12,7 +12,7 @@ namespace RailroaderScenePatcher {
     // clears the tab's own results and keeps general results. A refusal reported after the inspection was cleared stays
     // until an object is inspected again. UI-independent, shared with controlled replay.
     internal sealed class EditFeedback {
-        internal const string CopyIdPlace = "Copy ID";
+        internal const string CopyIdPlace = "Copy ID", HistoryPlace = "Undo/Redo";
         // What the message area shows first. A version choice is never one of them: it stands in the file panel.
         internal enum PrimaryMessage { None, BackupDiagnosis, Working, WorldChoice, ConfirmedChoice, Reported }
         internal static PrimaryMessage Primary(PatchEditingSession session, bool working, bool worldChoice) =>
@@ -71,10 +71,16 @@ namespace RailroaderScenePatcher {
         // Adds the log context of a result, such as its action group, object and outstanding work. Each result is a debug
         // line: the message area shows it in both modes.
         internal Func<string, string> Describe;
+        // The places whose actions concern the scene patch file, such as Save and Import: their log lines name the file,
+        // not the object that happens to be inspected.
+        internal readonly System.Collections.Generic.HashSet<string> FilePlaces = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+        // The log line of a result: its action group and what it is about, the scene patch file or the inspected object.
+        internal string LogLine(string message, string objectPath, string fileLabel) =>
+            CommandBand.LogLine(Place, Place != null && FilePlaces.Contains(Place) ? fileLabel : objectPath, message);
         void Log() { var result = Result; var describe = Describe; PatcherLog.Debug(() => describe == null ? result : describe(result)); }
         string pendingHistoryNotice;
         internal void QueueHistoryNotice(string message) { pendingHistoryNotice = message; }
-        internal void FlushHistoryNotice() { if (pendingHistoryNotice == null) return; var message = pendingHistoryNotice; pendingHistoryNotice = null; Report("Undo/Redo", message); }
+        internal void FlushHistoryNotice() { if (pendingHistoryNotice == null) return; var message = pendingHistoryNotice; pendingHistoryNotice = null; Report(HistoryPlace, message); }
         object inspected;
         // A result is about the object inspected when it was reported: inspecting another object clears it. An object
         // that is no longer present clears nothing.
@@ -149,7 +155,7 @@ namespace RailroaderScenePatcher {
         // pin supplies the inspection token; without it the edit pins and compares the whole scene in this call.
         internal bool Run(string place, string action, string blocked, SceneInventory inventory, SceneObservation selected, Func<InspectedTarget, Outcome> change, Func<SceneObservation, InspectedTarget> pin = null, string completed = null, Func<Outcome> guard = null) {
             if (blocked != null) { Refuse(place, action, blocked); return false; }
-            if (inventory == null || selected == null) { Refuse(place, action, "no inspected object; refresh the inventory and inspect the object first"); return false; }
+            if (inventory == null || selected == null) { Refuse(place, action, "no object is inspected. " + WindowGuidance.RefreshInventoryAndInspect); return false; }
             // An object an earlier failure guards is refused for that failure before the pin compares the scene: an
             // incomplete cleanup leaves the object changed, so the comparison would call the inspection stale instead.
             Outcome guarded = null;

@@ -49,7 +49,7 @@ namespace RailroaderScenePatcher.Core {
     // separate construction controller at Ela share.
     public static class ConstructionSegmentRule {
         public const string RequiredVersion = "0.5.0";
-        public const string NoDetach = "A rail bridge needs construction segments, so they can't be detached. Select the segments of the bridge's track instead, or clear this mod's value to keep the native segments.";
+        public const string NoDetach = "The rail bridge's construction segments can't be detached because the bridge needs them. " + WindowGuidance.SelectBridgeTrackSegments;
         public const string NoRelationship = "This object has no supported construction-segment relationship.";
         internal static string Missing(string id) => "Construction segment " + id + " is missing on the loaded track. No other segment is used.";
         internal static string Ambiguous(string id) => "Construction segment " + id + " matches more than one segment on the loaded track. No other segment is used.";

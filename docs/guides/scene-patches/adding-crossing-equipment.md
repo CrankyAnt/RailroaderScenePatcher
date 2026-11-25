@@ -27,7 +27,7 @@ The editor lists every device beneath a loaded crossing controller, including th
 
 | Reason | Meaning |
 | --- | --- |
-| it contains a bell player; add bells from a bell definition using the bell pattern | Bells use the controller-bound bell pattern; see [add a bell to an existing crossing](adding-crossing-bells.md). |
+| it contains a bell player and is not a light or gate source. Add bells from a bell definition using the bell pattern. | Bells use the controller-bound bell pattern; see [add a bell to an existing crossing](adding-crossing-bells.md). |
 | it holds its own key-value object, which would intercept the crossing controller's keys | The copy's lamps and gates would observe that object instead of the crossing controller. |
 | it holds a crossing controller; a copy would be a second crossing | A copy would duplicate a crossing. |
 | it holds a detection span | A copy would duplicate detection. |
@@ -40,7 +40,7 @@ The editor lists every device beneath a loaded crossing controller, including th
 | it is in a different Unity scene from the destination crossing and could unload while the copy still uses its assets | The other scene could unload the shared assets while the copy still uses them. |
 | the destination crossing controller has ... key-value objects, so it cannot address the copy | The controller has no key-value object or more than one, so the copy could not be addressed unambiguously. |
 | the destination crossing controller has several cullers, so it is unclear which one should control the copy's visibility | The copy could not be culled unambiguously. |
-| the patcher added this equipment; choose a device already present in the map | Copy the map's own device instead. |
+| the patcher added this equipment; it isn't an eligible native source. Choose a device already present in the map. | Copy the map's own device instead. |
 | a script in its hierarchy is missing | The device cannot be checked or copied safely. |
 
 ## What an addition does

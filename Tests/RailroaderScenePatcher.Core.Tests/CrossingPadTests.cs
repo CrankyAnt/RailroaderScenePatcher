@@ -420,6 +420,7 @@ static class CrossingPadTests {
         Assert(!session.ReconcileTrackFollowing().Any() && world.PadGenerations[pad] == padGenerations, "A curve change waits one check to hold still");
         var moved = session.ReconcileTrackFollowing();
         Assert(moved.Count == 1 && moved[0].Value.Applied && world.PadGenerations[pad] == padGenerations + 1 && pad.Position[0] == 20, "A curve-only change regenerates the following pad once: " + String.Join(",", moved.Select(m => m.Key + "=" + m.Value.Error)));
+        Assert(moved[0].Value.Target?.Path == Pad.Path, "A held follow update names the object it moved: " + moved[0].Value.Target?.Path);
         Assert(Mesh(world, pad) == Baseline + "~longer", "The regenerated mesh follows the changed curve: " + Mesh(world, pad));
         Assert(!session.ReconcileTrackFollowing().Any() && world.PadGenerations[pad] == padGenerations + 1, "The current curve is not regenerated again");
         Assert(world.PadGenerations[rear] == rearGenerations && Mesh(world, rear) == "Sj7c|a|211@1045", "The pad that is only rebound is untouched, as the game leaves it");

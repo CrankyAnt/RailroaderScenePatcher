@@ -112,9 +112,9 @@ namespace RailroaderScenePatcher {
                         if (call.Instance == null || !(call.Instance is Behaviour behaviour) || !behaviour.isActiveAndEnabled) continue;
                         var action = (Action)Delegate.CreateDelegate(typeof(Action), call.Instance, call.Hook.Method);
                         notifier.RegisterForRestore((int)enablePriority.GetValue(call.Instance, null), call.Instance, action);
-                    } catch (Exception e) { PatcherLog.Warning(call.Instance + " may not match its saved state because the patcher couldn't let the game finish restoring it", e); }
+                    } catch (Exception e) { PatcherLog.Warning(call.Instance + " couldn't resume its deferred restoration. Report this to the patcher maintainer.", e); }
                 }
-            } catch (Exception e) { skipped.Clear(); PatcherLog.Warning("Some objects may not match their saved state because the patcher couldn't let the game finish restoring them", e); }
+            } catch (Exception e) { skipped.Clear(); PatcherLog.Warning("Deferred scene objects couldn't resume restoration. Report this to the patcher maintainer.", e); }
         }
     }
     // Hands the skipped callbacks back once, in a frame after the skip and once the restore notifier is complete, so a restore

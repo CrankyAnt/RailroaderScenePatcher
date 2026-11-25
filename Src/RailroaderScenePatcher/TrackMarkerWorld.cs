@@ -291,9 +291,10 @@ namespace RailroaderScenePatcher {
         }
         // Crossing pads share this: a pad marker emits the same native warning for a binding that is not on the track.
         public void AfterVerifiedState(object target) {
+            string markerId = null;
             try {
                 var m = MarkerOf(target);
-                var id = (string)Field(m, "id");
+                var id = markerId = (string)Field(m, "id");
                 if (String.IsNullOrEmpty(id) || Resources.FindObjectsOfTypeAll(marker).OfType<Component>().Count(c => c != null && c.gameObject.scene.IsValid() && (string)Field(c, "id") == id) != 1) return;
                 var resolved = markerLocation.GetValue(m);
                 var valid = resolved != null && (bool)Native.Read(resolved, "IsValid");
@@ -314,7 +315,7 @@ namespace RailroaderScenePatcher {
                     finally { collector.OnMessageAdded -= observe; collector.OnMessageUpdated -= observe; }
                     return emitted.Count == 1 ? emitted[0] : null;
                 });
-            } catch (Exception e) { PatcherLog.Debug("The restored marker's Log window row wasn't updated. Its current rows remain: " + e.GetBaseException().Message); }
+            } catch (Exception e) { PatcherLog.Debug("Restored marker " + (markerId ?? "with an unreadable ID") + " Log window row update failed: " + e.GetBaseException().Message); }
         }
         object Builder() => Native.Read(mapBuilder, "Shared");
         // The registered map labels in this object's hierarchy; the map builder caches the track group of the nearest marker location above each.

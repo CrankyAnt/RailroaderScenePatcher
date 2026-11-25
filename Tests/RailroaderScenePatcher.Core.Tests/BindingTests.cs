@@ -324,7 +324,9 @@ static class BindingTests {
         Assert(session.ReconcileTrackFollowing().Count == 0, "An unchanged track needs no follow update");
         var at = whistle.Position[0]; var checks = world.PlacementChecks;
         tracks.Poses["node:N1"] = new TrackPose(new[] { 1060.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
-        var moved = session.ReconcileTrackFollowing().Single().Value;
+        var movedEntry = session.ReconcileTrackFollowing().Single(); var moved = movedEntry.Value;
+        Assert(PatchEditingSession.FollowLogLine(movedEntry.Key, moved) == "Modification " + movedEntry.Key + " at " + WhistlePath + " followed its track",
+            "The follow line names the object it moved: " + PatchEditingSession.FollowLogLine(movedEntry.Key, moved));
         Assert(moved.Applied && whistle.Position[0] == at + 10 && world.PlacementChecks > checks && Entry(world, whistle) == "S377|a|7.511661", "A track move carries it through the placement-only check: " + moved.Error);
         var detached = session.Bind(sign, MarkerBinding.Detached);
         Assert(detached.Applied && whistle.Segment == null && world.Registrations(whistle).Count == 0 && whistle.CachedGroup == null, "Its binding can be detached: " + detached.Error);

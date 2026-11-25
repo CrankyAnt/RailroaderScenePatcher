@@ -189,7 +189,7 @@ static class BakedPartTests {
         var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Bulb").Solid()).With("Helpers.Culling.RendererCuller"))))));
         var yardVerdict = verdicts.Single(v => v.Path == Yard);
         var lamp = verdicts.Single(v => v.Path == Post);
-        Assert(yardVerdict.Disposition == GroupDisposition.ContainerObject && BakedSceneryRules.GroupRefusal(yardVerdict) == "This path names a container object. A container object isn't a group. Edit the groups it holds." && BakedSceneryRules.GroupRefusal(lamp) == null && BakedSceneryRules.GroupRefusal(null) == null, "Only a container object is refused with the container object message");
+        Assert(yardVerdict.Disposition == GroupDisposition.ContainerObject && BakedSceneryRules.GroupRefusal(yardVerdict) == "This path names a container object, which isn't a scenery group. Edit the groups it holds." && BakedSceneryRules.GroupRefusal(lamp) == null && BakedSceneryRules.GroupRefusal(null) == null, "Only a container object is refused with the container object message");
         Assert(BakedSceneryRules.PartRefusal(null, lamp) == BakedSceneryRules.GroupRootRefusal && BakedSceneryRules.PartRefusal(null, null) == null, "A group root is refused as a part with its own reason");
         Assert(BakedSceneryRules.ResolvesGroup(yardVerdict) && BakedSceneryRules.ResolvesGroup(lamp) && !BakedSceneryRules.ResolvesGroup(null), "A container object resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
         f.World.GroupVerdicts = verdicts.ToDictionary(v => v.Path);
@@ -206,7 +206,7 @@ static class BakedPartTests {
         var warning = diagnostics.Failures.Single(failure => failure.Operation == "yard");
         const string expectedWarning = "Example Map [example/map; version 1.0.0]. Definition Data/scene-patches.json; operation yard; object " +
             "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Yard [UnityEngine.Transform]. " +
-            "This path names a container object. A container object isn't a group. Edit the groups it holds. " +
+            "This path names a container object, which isn't a scenery group. Edit the groups it holds. " +
             "Patcher 0.5.0; game 0.6.3. Report to the mod author. Mod author: Example author.";
         Assert(warning.Message == expectedWarning, "The native warning gives the author the reason to correct the file entry: " + warning.Message);
         Assert(warning.Cause == FailureCause.InvalidDefinition, "The container path is an invalid definition.");
@@ -236,7 +236,7 @@ static class BakedPartTests {
         var before = f.World.Mutations;
         var result = f.Engine.Apply(Doc(Part("container", "Culled", JettyTarget), Part("move-jetty", "Jetty", JettyTarget, JettyTurn)));
         var failure = result.Outcomes["container"];
-        Assert(!failure.Applied && (failure.Error ?? "").Contains("This path names a culling container. It holds parts for the game's culling. Edit those parts directly."), "A path that names a culling container fails that modification with the reason: " + failure.Error);
+        Assert(!failure.Applied && (failure.Error ?? "").Contains("This path names a culling container, which isn't an editable scenery part."), "A path that names a culling container fails that modification with the reason: " + failure.Error);
         Assert(result.Outcomes["move-jetty"].Applied && f.World.Mutations == before + 1 && Near(f.MapOf(f.Jetty).Position, JettyTarget), "The other modification still applies, and the refused one mutates nothing");
     }
 
@@ -539,7 +539,7 @@ static class BakedPartTests {
 
     static void RefreshClearsTheStaleRefusal() {
         var feedback = new EditFeedback();
-        feedback.Refuse("Placement", "Placement", SceneInventory.StaleRefusal + " (World/Jetty changed); refresh and inspect again");
+        feedback.Refuse("Placement", "Placement", SceneInventory.StaleRefusal + " (World/Jetty changed)");
         feedback.InventoryCurrent();
         Assert(feedback.Messages.Count == 0, "A refresh that makes the inventory current removes the stale refusal");
         feedback.Refuse("Placement", "Placement", "the object is no longer present");

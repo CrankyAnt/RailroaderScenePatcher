@@ -29,8 +29,8 @@ static class SelectionTests {
         var several = new PendingSelection(candidates, SelectionKind.SceneObject, "Replace scene target");
         var twin = new SelectionCandidate(original, SelectionIdentity.SceneObject(new TargetIdentity("scene", "original", "Culler")), "Original board");
         several.Offer(new[] { candidate, twin });
-        Check(several.Candidate == null && several.Problem == "Select a row from the list next to the pointer.", "A group or overlapping offers direct the choice to the list without claiming the objects share one spot");
-        Check(several.OfferCountText + " " + several.OfferListInstruction == "2 objects. Select a row from the list next to the pointer.",
+        Check(several.Candidate == null && several.Problem == "More than one world-choice candidate is available. Select a row from the list next to the pointer.", "A group or overlapping offers direct the choice to the list without claiming the objects share one spot");
+        Check(several.OfferCountText + " " + several.OfferListInstruction == "2 objects. More than one world-choice candidate is available. Select a row from the list next to the pointer.",
             "Overlapping object markers have a generic footer");
         Check(several.Number(candidate) == 1 && several.Number(twin) == 2 && several.Number(new SelectionCandidate(original, twin.Identity, "Other")) == 0, "Offers carry their numbers from 1; a candidate that is not offered has none");
         // The list of one spot closes without a choice, as a dropdown does on Escape: the choice stays pending.
@@ -179,7 +179,7 @@ static class SelectionTests {
         scene.Items.Clear(); scene.Items.Add(source); scene.Items.Add(segment);
         choice = new PendingSelection(scene, SelectionKind.TrackSegment, "Select replacement track segment", source);
         choice.Offer(new[] { segment }); scene.Items.Add(new SelectionCandidate(new object(), source.Identity, "Board"));
-        Check(!choice.Confirm() && scene.Discoveries == 0 && choice.Problem == "The inspected object shares its identity scene/board [Culler] with another object, so a patch cannot target it. Cancel; a choice for this object cannot be confirmed.",
+        Check(!choice.Confirm() && scene.Discoveries == 0 && choice.Problem == "The inspected object shares its identity scene/board [Culler] with another object, so a patch cannot target it. Cancel; a choice for this object can't be confirmed.",
             "A source that shares its identity refuses the confirmation, names the identity and does not ask to inspect again: " + choice.Problem);
         // A candidate that shares its identity with another object.
         scene.Items.Clear(); scene.Items.Add(source); scene.Items.Add(new SelectionCandidate(new object(), source.Identity, "Board"));
@@ -287,7 +287,7 @@ static class SelectionTests {
         Check(choices.Pending.ListOpen && choices.Pending.Offers.SequenceEqual(members) && choices.Pending.Candidate == null && Unchanged(),
             "A click that picks a group opens the choice list of the group's objects and changes nothing");
         Check(choices.Pending.OfferCountText + " " + choices.Pending.OfferListInstruction ==
-            "3 objects from the crossing you clicked are listed next to the pointer. Select a row from that list.", "The footer counts the listed objects and identifies the crossing that was clicked");
+            "3 objects from the crossing you clicked are listed next to the pointer. More than one world-choice candidate is available. Select a row from that list.", "The footer counts the listed objects and identifies the crossing that was clicked");
         choices.Pending.Highlight = members[2];
         choices.Pending.Choose(members[1]);
         Check(ReferenceEquals(choices.Pending.Candidate, members[1]) && choices.Pending.IsPending && Unchanged(), "Choosing an entry makes that object the candidate and changes nothing");

@@ -268,9 +268,9 @@ namespace RailroaderScenePatcher.Core {
         // With validateEvery the first validation is not taken as done: every validation observes the target. That costs
         // a scene that can observe one object next to nothing, and it is what a use with a single validation needs.
         public InspectedTarget PinAfterPass(SceneObservation entry, int passesBefore, bool validateEvery = false) {
-            if (IsStale) throw new InvalidOperationException(StaleRefusal + " (" + StaleReason + "); refresh and inspect again");
+            if (IsStale) throw new InvalidOperationException(StaleRefusal + " (" + StaleReason + "). " + WindowGuidance.RefreshAndInspect);
             if (CompletedPasses <= passesBefore) throw new InvalidOperationException("The scene comparison for this edit has not completed");
-            if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory; refresh and inspect again");
+            if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory. " + WindowGuidance.RefreshAndInspect);
             return new InspectedTarget(maps, entry) { ComparedNow = !validateEvery };
         }
         // A pin without a comparison of the whole scene, for a caller that knows the snapshot was compared after the last
@@ -279,8 +279,8 @@ namespace RailroaderScenePatcher.Core {
         // observe one object compares the whole scene instead, as Pin does.
         public InspectedTarget PinCompared(SceneObservation entry) {
             if (!(scene is ITargetedInspectionScene)) return Pin(entry);
-            if (IsStale) throw new InvalidOperationException(StaleRefusal + " (" + StaleReason + "); refresh and inspect again");
-            if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory; refresh and inspect again");
+            if (IsStale) throw new InvalidOperationException(StaleRefusal + " (" + StaleReason + "). " + WindowGuidance.RefreshAndInspect);
+            if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory. " + WindowGuidance.RefreshAndInspect);
             return new InspectedTarget(maps, entry);
         }
         // The observations that are inventory: every one except those of the patcher's own runtime objects.
@@ -361,8 +361,8 @@ namespace RailroaderScenePatcher.Core {
         }
         public InspectedTarget Pin(SceneObservation entry) {
             CheckFreshness();
-            if (IsStale) throw new InvalidOperationException(StaleRefusal + " (" + StaleReason + "); refresh and inspect again");
-            if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory; refresh and inspect again");
+            if (IsStale) throw new InvalidOperationException(StaleRefusal + " (" + StaleReason + "). " + WindowGuidance.RefreshAndInspect);
+            if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory. " + WindowGuidance.RefreshAndInspect);
             return new InspectedTarget(maps, entry);
         }
         // A pin for an edit that runs in the same call. The pin has just compared the whole scene with the snapshot, so
@@ -446,7 +446,7 @@ namespace RailroaderScenePatcher.Core {
             (scene as SceneCapabilities)?.CheckAvailable(resolved);
             if (!maps.SequenceEqual(scene.MapIds) || !ReferenceEquals(resolved, observed.Handle) ||
                 !TargetIdentity.SameObject(identity, observed.Identity) || (identity.Structure != null && identity.Structure != observed.Identity.Structure) || !(scene is IInspectionScene inspection))
-                throw new InvalidOperationException("Inspected target context changed; refresh and inspect again");
+                throw new InvalidOperationException("Inspected target context changed. " + WindowGuidance.RefreshAndInspect);
             if (ComparedNow) { ComparedNow = false; return; }
             // A scene that can observe one object reads the target now and compares it with the inspection. The engine's
             // guard checks beside this that the identity still resolves to this one object.
@@ -464,6 +464,6 @@ namespace RailroaderScenePatcher.Core {
         // observation. One path for every caller.
         public static string Changed(SceneObservation observed, SceneObservation now) =>
             Changed(now == null ? "missing" : !ReferenceEquals(now.Handle, observed.Handle) ? "another object" : observed.Difference(now));
-        static string Changed(string difference) => "Inspected target changed (" + difference + "); refresh and inspect again";
+        static string Changed(string difference) => "Inspected target changed (" + difference + "). " + WindowGuidance.RefreshAndInspect;
     }
 }

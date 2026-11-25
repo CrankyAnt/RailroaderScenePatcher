@@ -51,7 +51,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) {
                 try { patcher.UnpatchAll(Id); } catch { }
                 mapEditorField = null;
-                Problem = "The patcher could not add its checks to the Save button. Refused saves will show the game's Save Failed alert. Details: " + e.GetBaseException().Message;
+                Problem = "The patcher couldn't add scene patch file checks to the Map Editor Save button. Report this to the patcher maintainer. Reason: " + e.GetBaseException().Message;
             }
         }
         internal static void Remove() { harmony?.UnpatchAll(Id); harmony = null; mapEditorField = null; }
@@ -62,7 +62,7 @@ namespace RailroaderScenePatcher {
             try { refusal = current.Session.SaveRefusalBeforeWrite(); }
             catch (Exception e) { refusal = "The scene patch file could not be checked before saving: " + e.GetBaseException().Message; }
             if (refusal == null) return true;
-            try { PatcherLog.Debug("Save refused: " + refusal); current.SaveRefused(refusal); }
+            try { PatcherLog.Debug("Save refused for " + current.FileLabel + ": " + refusal); current.SaveRefused(refusal); }
             finally { current.VersionChanged(); current.RefreshChrome(); }
             return false;
         }
@@ -108,6 +108,8 @@ namespace RailroaderScenePatcher {
         internal readonly EditingFault Fault = new EditingFault();
         internal Action VersionChanged = () => { };
         internal Action<string> SaveRefused = _ => { };
+        // The scene patch file the Save and history lines are about: the edited mod's identifier, as the load lines name it.
+        internal string FileLabel => "[" + Session.ScenePatchFileKey + "] scene patch file";
         internal string Outstanding() { var list = Session.Outstanding(NativeDirty); return list.Count == 0 ? "none" : String.Join(", ", list.Select(PatchEditingSession.DisplayItem)); }
         readonly EventInfo changed;
         readonly Action handler;
@@ -209,14 +211,14 @@ namespace RailroaderScenePatcher {
             if (current == null) return;
             current.Session.CompleteNativeSave();
             current.NativeSaved();
-            PatcherLog.Debug(() => "Save completed: " + String.Join(", ", current.Session.LastSave.Completed.Select(PatchEditingSession.DisplayItem)) + "; still to save: " + current.Outstanding());
+            PatcherLog.Debug(() => "Save completed for " + current.FileLabel + ": " + String.Join(", ", current.Session.LastSave.Completed.Select(PatchEditingSession.DisplayItem)) + "; still to save: " + current.Outstanding());
         }
         static Exception SaveFinalizer(object __instance, Exception __exception) {
             var current = For(__instance);
             if (__exception == null || current == null) return __exception;
             try {
                 var failure = new IOException(current.Session.FailSave(__exception), __exception);
-                PatcherLog.Error("The Map Editor didn't save: " + failure.Message);
+                PatcherLog.Error("The Map Editor save of " + current.FileLabel + " failed. Report this to the patcher maintainer. Reason: " + failure.Message);
                 return failure;
             } catch { return __exception; }
         }
@@ -234,7 +236,7 @@ namespace RailroaderScenePatcher {
                 // Native Undo and Redo rebuild the chrome before the history identity is settled here.
                 current.RefreshChrome();
                 if (__exception != null) current.Fault.Fail(EditingFailure.HistoryError, __exception.GetBaseException().Message);
-                try { PatcherLog.Debug(() => "Map Editor Undo or Redo step" + (__exception == null ? "" : " with error " + __exception.GetBaseException().Message) + "; still to save: " + current.Outstanding() + (current.Session.IncompleteOperation == null ? "" : "; incomplete: " + current.Session.IncompleteOperation)); }
+                try { PatcherLog.Debug(() => "Map Editor Undo or Redo step for " + current.FileLabel + (__exception == null ? "" : " with error " + __exception.GetBaseException().Message) + "; still to save: " + current.Outstanding() + (current.Session.IncompleteOperation == null ? "" : "; incomplete: " + current.Session.IncompleteOperation)); }
                 catch (Exception e) { current.Fault.Fail(EditingFailure.HistoryCheck, e.GetBaseException().Message); }
             }
             return __exception;

@@ -80,7 +80,7 @@ namespace RailroaderScenePatcher.Core {
                     if (files.Exists(path) && (removePartial || Digest(files.Read(path)).SequenceEqual(Digest(original)))) files.Delete(path);
                     mayRemain = files.Exists(path);
                 } catch { }
-                if (mayRemain) throw new IOException("The failed backup might remain at " + path + ". Delete it when you no longer need it. " + error.Message, error);
+                if (mayRemain) throw new IOException("The failed backup might remain at " + path + ". " + WindowGuidance.DeleteBackup + " " + error.Message, error);
                 throw;
             }
             backups[path] = Digest(original);
@@ -90,7 +90,7 @@ namespace RailroaderScenePatcher.Core {
         public void RemoveVersionBackupIfUnchanged(string path) {
             try {
                 if (backups.TryGetValue(path, out var digest) && files.Exists(path) && Digest(files.Read(path)).SequenceEqual(digest)) files.Delete(path);
-                if (files.Exists(path)) throw new IOException("The failed backup remains at " + path + ". Delete it when you no longer need it.");
+                if (files.Exists(path)) throw new IOException("The failed backup remains at " + path + ". " + WindowGuidance.DeleteBackup);
             } finally { backups.Remove(path); }
         }
         // Copies the scene patch file's exact bytes, also bytes that are not UTF-8, to a new file beside it whose name no

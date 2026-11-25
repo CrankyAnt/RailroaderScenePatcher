@@ -249,7 +249,7 @@ namespace RailroaderScenePatcher.Core {
         public const string ObjectSettings = "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; place the marker on the track under Connections";
         public const string OtherRelationships = "A starter placement marker's track location is set through starterPlacement, not through relationships";
         // What a starter placement modification that sets neither a track location nor a wreck setting fails with.
-        public const string NothingSet = "Invalid starter placement: set track, wreck or both in starterPlacement";
+        public const string NothingSet = "Invalid starter placement: starterPlacement contains neither track nor wreck. " + WindowGuidance.SetStarterFields;
         // Why the track location of a used marker cannot be detached: the game reads it to place the cut.
         public const string NoDetach = "The track location of a starter placement marker cannot be detached: the new-game car placement reads it to place its cars, and a missing location stops the whole setup";
         // Why the Generic track-marker capability leaves a used marker alone: its track location is edited in the

@@ -19,9 +19,12 @@ namespace RailroaderScenePatcher.Core {
     public sealed class LocalWorldBinding<T> : IDisposable where T : class {
         readonly Func<T> create;
         readonly Action<T> release, reenter;
+        readonly Action opening;
         object world, attempt;
         bool bound, open, attemptBound, startedHere;
-        public LocalWorldBinding(Func<T> create, Action<T> release, Action<T> reenter) {
+        // opening runs when a load attempt opens, before the state is created or reconciled for it.
+        public LocalWorldBinding(Func<T> create, Action<T> release, Action<T> reenter, Action opening = null) {
+            this.opening = opening;
             this.create = create ?? throw new ArgumentNullException(nameof(create));
             this.release = release ?? throw new ArgumentNullException(nameof(release));
             this.reenter = reenter ?? throw new ArgumentNullException(nameof(reenter));
@@ -55,6 +58,7 @@ namespace RailroaderScenePatcher.Core {
         void Open(object world) {
             if (bound && Equals(this.world, world)) {
                 if (open) return;
+                opening?.Invoke();
                 open = true; startedHere = false; ReentryError = null;
                 if (State == null) { Start(); return; }
                 try { reenter(State); return; }
@@ -65,6 +69,7 @@ namespace RailroaderScenePatcher.Core {
                 return;
             }
             Release();
+            opening?.Invoke();
             this.world = world; bound = true; open = true; ReentryError = null;
             Start();
         }

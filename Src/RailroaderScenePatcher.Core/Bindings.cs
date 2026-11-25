@@ -363,33 +363,33 @@ namespace RailroaderScenePatcher.Core {
     public static class ReplacementMarkerIds {
         public const string Member = "markerId", RequiredVersion = "0.5.0";
         public static readonly IReadOnlyList<string> ReservedPrefixes = Array.AsReadOnly(new[] { "passengerStop:", "flare:" });
-        public const string Empty = "The replacement ID is empty. Enter an ID that no other scene marker or map object uses.";
+        public const string Empty = "The replacement ID is empty. " + WindowGuidance.EnterUnusedId;
         public const string NotAString = "The replacement ID must be a string.";
         public const string NotSupported = "Only objects in the Track marker family can have a replacement ID.";
         // The reason the Connections tab gives for an object of another family. A milepost or a starter placement marker
         // is a native track marker of type Generic too, so the reason names the families.
         public static string NotSupportedFor(string family) => NotSupported + (String.IsNullOrWhiteSpace(family) ? "" : " This object is in the " + family + " family.");
-        public const string Offer = "Give one of them a replacement ID to repair it.";
+        public const string Offer = WindowGuidance.GiveReplacementId;
         public const string ForeignOwner = "an object that is not a scene marker";
         // Why the id cannot be a replacement ID whatever the world holds, or null. A space at either end would make an ID
         // that looks like another one.
         public static string Problem(string id) {
             if (String.IsNullOrWhiteSpace(id)) return Empty;
-            if (id.Trim() != id) return "Replacement ID \"" + id + "\" begins or ends with a space. Remove the space.";
+            if (id.Trim() != id) return "Replacement ID \"" + id + "\" begins or ends with a space. " + WindowGuidance.RemoveSpace;
             var prefix = ReservedPrefixes.FirstOrDefault(p => id.StartsWith(p, StringComparison.Ordinal));
-            return prefix == null ? null : "Replacement ID " + id + " begins with " + prefix + ", which the game uses for its own track registrations. Choose an ID without that prefix.";
+            return prefix == null ? null : "Replacement ID " + id + " begins with " + prefix + ", which the game uses for its own track registrations. " + WindowGuidance.ChooseIdWithoutPrefix;
         }
-        public static string UsedBy(string id, string user) => "Replacement ID " + id + " is already used by " + (user == ForeignOwner ? user : "the scene marker " + user) + ". Choose an ID that no other scene marker uses.";
-        public static string UsedByMapObject(string id) => "Replacement ID " + id + " is already used by map object " + id + " in the map context. Choose another ID.";
+        public static string UsedBy(string id, string user) => "Replacement ID " + id + " is already used by " + (user == ForeignOwner ? user : "the scene marker " + user) + ". " + WindowGuidance.ChooseIdNoMarkerUses;
+        public static string UsedByMapObject(string id) => "Replacement ID " + id + " is already used by map object " + id + " in the map context. " + WindowGuidance.ChooseAnotherId;
         // The map objects of the map context could not be read, so the ID is not known to be free.
-        public static string MapObjectsUnknown(string id) => "The game hasn't loaded the map objects in the map context, so replacement ID " + id + " couldn't be checked against them. Try again after the map has loaded.";
+        public static string MapObjectsUnknown(string id) => "The game hasn't loaded the map objects in the map context, so replacement ID " + id + " couldn't be checked against them. " + WindowGuidance.TryAfterMapLoaded;
         // The modifications of other holders whose settings need this modification's replacement ID, by key.
         public static string DependentRefusal(IReadOnlyList<string> dependents) => "This marker's replacement ID can't be cleared because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name")
-            + " its modification in dependsOn. Another holder's activity, binding, or track-following settings need this ID. Change or remove " + (dependents.Count == 1 ? "that modification" : "those modifications") + " first.";
+            + " its modification in dependsOn. Another holder's activity, binding, or track-following settings need this ID. " + (dependents.Count == 1 ? WindowGuidance.ChangeDependentFirst : WindowGuidance.ChangeDependentsFirst);
         public static string Shared(string id) => "Replacement ID " + id + " is used by more than one modification. A replacement ID must identify one marker in its scene patch file.";
         // Clearing the replacement ID would return a duplicate marker ID while the modification still changes the
         // marker's activity, binding or track-following placement.
-        public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also held by " + user + ", so this marker's activity, binding, and track-following settings need its replacement ID. Clear those settings first, or click Remove modification.";
+        public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also held by " + user + ", so this marker's activity, binding, and track-following settings need its replacement ID. " + WindowGuidance.ClearSettingsFirst;
     }
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:
@@ -508,7 +508,7 @@ namespace RailroaderScenePatcher.Core {
         string Incoherent(object target, string difference) {
             var holders = Holders(target);
             return holders != null && holders.Duplicate ? Mismatched(holders, target, difference)
-                : "The game's track information for this marker is out of sync. " + difference.TrimEnd('.') + ". Reload the Map Editor before editing it.";
+                : "The game's track information for this marker is out of sync. " + difference.TrimEnd('.') + ". " + WindowGuidance.ReloadMapEditorBeforeEditing;
         }
         internal void CheckRelationships(object target, ObjectState state) {
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
@@ -536,7 +536,7 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Active == false && world.DisableRefusal(target) is string reason) throw new InvalidOperationException(reason);
             var group = world.GroupActivity(target);
             if (group != null && state?.Active == true)
-                throw new InvalidPatchDefinitionException("The object's activity follows track group " + (String.IsNullOrEmpty(group.LocationGroup) ? "of its bound segment" : group.LocationGroup) + "; only an explicit disable is supported. Omit active to keep group-driven activity");
+                throw new InvalidPatchDefinitionException("The object's activity follows track group " + (String.IsNullOrEmpty(group.LocationGroup) ? "of its bound segment" : group.LocationGroup) + "; only an explicit disable is supported. " + WindowGuidance.OmitActive);
             var location = state?.Marker?.Location;
             if (location == null) return;
             var problem = Unresolved(location);

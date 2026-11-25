@@ -93,7 +93,7 @@ static class FileImportTests {
         var before = session.ScenePatchFileText;
         world.Store.Patch = Doc(Item("a", "p", 118));
         var refused = session.ApplyImport();
-        Assert(!refused.Applied && refused.Error.Contains("The file changed again") && session.Import == null, "A file changed again refuses Import and closes the overview: " + refused.Error);
+        Assert(!refused.Applied && refused.Error.Contains("The file changed after the version choice was shown") && session.Import == null, "A file changed again refuses Import and closes the overview: " + refused.Error);
         Assert(world.X("p") == 110 && session.ScenePatchFileText == before, "The refused Import changes nothing");
     }
     static void TargetMovedAwayFromEditedObjectConflicts() {

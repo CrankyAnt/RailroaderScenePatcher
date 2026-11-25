@@ -17,8 +17,8 @@ namespace RailroaderScenePatcher.Core {
     // The recovery of a protected scene patch file: its diagnostics, confirmed re-reading after an outside correction and
     // confirmed fresh start behind a verified backup. Neither route clears history or changes the scene.
     public sealed partial class PatchEditingSession {
-        const string ProtectedSuffix = ". The scene patch file is protected from overwrite. Correct it outside scene patch editing and read it again, or start fresh behind a backup of the original.";
-        const string MetadataSuffix = ". Scene patch editing and Save of the scene patch file are unavailable. Correct Info.json outside scene patch editing and read it again.";
+        const string ProtectedSuffix = ". The scene patch file is protected from overwrite. " + WindowGuidance.CorrectProtectedFile;
+        const string MetadataSuffix = ". Scene patch editing and Save of the scene patch file are unavailable. " + WindowGuidance.CorrectInfoJson;
         const string InvalidUtf8Message = "The scene patch file is not valid UTF-8 text.";
         static ScenePatchFileDiagnostic InvalidUtf8Diagnostic(DecoderFallbackException error) =>
             ScenePatchFileDiagnostic.Create(null, "", InvalidUtf8Message, null, technicalDetail: error.Message);
@@ -56,7 +56,7 @@ namespace RailroaderScenePatcher.Core {
         void CheckRecoverable(bool nativeDirty) {
             if (Blocked == null || scenePatchFile != null) throw new InvalidOperationException("The scene patch file is not protected; recovery is only for a protected scene patch file");
             if (nativeDirty || identity.Current != savedIdentity || unrecovered != null || uncertain)
-                throw new InvalidOperationException("Save your map edits and reopen the Map Editor before trying to recover the scene patch file.");
+                throw new InvalidOperationException("Scene patch file recovery is unavailable after map edits have started. " + WindowGuidance.SaveAndReopen);
         }
         // Reads the edited mod's scene patch file again after the modder corrected it outside scene patch editing, and makes
         // it the session's scene patch file when it reads as a scene patch file of this session. The file is not written. The scene patch file's
@@ -65,7 +65,7 @@ namespace RailroaderScenePatcher.Core {
         public Outcome Reread(bool confirmed, bool nativeDirty = false) {
             var outcome = new Outcome();
             try {
-                if (!confirmed) throw new InvalidOperationException("Confirm the outside correction before reading the scene patch file again");
+                if (!confirmed) throw new InvalidOperationException("Reading the outside correction wasn't confirmed. " + WindowGuidance.ConfirmOutsideCorrection);
                 CheckRecoverable(nativeDirty);
                 string text;
                 try { text = storage.ReadScenePatchFile(); }
@@ -73,7 +73,7 @@ namespace RailroaderScenePatcher.Core {
                     ScenePatchFileDiagnostics = new[] { InvalidUtf8Diagnostic(e) };
                     throw new InvalidOperationException(InvalidUtf8Message + " The scene patch file stays protected.");
                 }
-                if (text == null) throw new InvalidOperationException("The scene patch file no longer exists. Restore the file and read it again, or reopen the Map Editor to start a new one.");
+                if (text == null) throw new InvalidOperationException("The scene patch file no longer exists. " + WindowGuidance.RestoreOrReopen);
                 var loaded = ScenePatchFile.Load(text);
                 var refusal = Refusal(loaded, text);
                 if (refusal != null) { scenePatchFileProblem = true; throw new InvalidOperationException(ScenePatchFile.Sentence(refusal) + ". The scene patch file stays protected."); }
@@ -95,11 +95,11 @@ namespace RailroaderScenePatcher.Core {
         public Outcome FreshStart(bool confirmed, bool nativeDirty = false) {
             var outcome = new Outcome();
             try {
-                if (!confirmed) throw new InvalidOperationException("Confirm that fresh start removes all content of the scene patch file");
+                if (!confirmed) throw new InvalidOperationException("Fresh start wasn't confirmed; the scene patch file is unchanged. " + WindowGuidance.ConfirmFreshStart);
                 CheckRecoverable(nativeDirty);
-                if (!scenePatchFileProblem) throw new InvalidOperationException("The scene patch file is not what blocks scene patch editing; correct Info.json and read it again");
+                if (!scenePatchFileProblem) throw new InvalidOperationException("Scene patch editing is blocked by Info.json, not by the scene patch file. " + WindowGuidance.CorrectInfoJsonAndRead);
                 if (!(storage is IRecoveryStorage recovery)) throw new InvalidOperationException("This storage cannot secure a backup of the original scene patch file");
-                if (!ScenePatchFileExists()) throw new InvalidOperationException("The scene patch file no longer exists. Reopen the Map Editor to start a new one.");
+                if (!ScenePatchFileExists()) throw new InvalidOperationException("The scene patch file no longer exists. " + WindowGuidance.ReopenToStartNew);
                 var backup = recovery.BackupScenePatchFile();
                 if (String.IsNullOrWhiteSpace(backup) || !recovery.MatchesPatchBackup(backup)) throw new InvalidOperationException("The backup of the original scene patch file could not be verified; the original stays protected");
                 scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds)); ResetStartState(); ResetApplied(scenePatchFile.Modifications);
@@ -120,11 +120,11 @@ namespace RailroaderScenePatcher.Core {
         void CheckReplacement() {
             if (versionBackup) {
                 if (((IVersionBackupStorage)storage).VersionFingerprint() != backedVersionFingerprint)
-                    throw new InvalidOperationException("the file changed after its backup was written. Review the new file version before saving");
+                    throw new InvalidOperationException("the file changed after its backup was written. " + WindowGuidance.ReviewBeforeSaving);
                 return;
             }
             if (!((IRecoveryStorage)storage).MatchesPatchBackup(replacementBackup))
-                throw new InvalidOperationException("the original scene patch file or its backup changed after fresh start. Both are kept. Reopen the Map Editor to read the scene patch file again.");
+                throw new InvalidOperationException("the original scene patch file or its backup changed after fresh start. Both are kept. " + WindowGuidance.ReopenToRead);
         }
     }
 }

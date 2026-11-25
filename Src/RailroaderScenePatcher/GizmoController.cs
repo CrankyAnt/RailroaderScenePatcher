@@ -86,7 +86,7 @@ namespace RailroaderScenePatcher {
                 var nativeGizmo = Native.Read(controller, "TransformGizmo");
                 var native = nativeGizmo == null ? null : Native.Read(nativeGizmo, "_gizmo") as TransformGizmo;
                 if (native == null) throw new InvalidOperationException("The Map Editor gizmo is unavailable");
-                if (native.IsDragging) throw new InvalidOperationException("Release the Map Editor gizmo first");
+                if (native.IsDragging) throw new InvalidOperationException("The Map Editor gizmo is being dragged. " + WindowGuidance.ReleaseNativeGizmo);
                 var box = Native.Read(controller, "BoxSelect");
                 if (box != null && (bool)Native.Read(box, "IsDragging")) {
                     Native.Call(box, "Cancel");

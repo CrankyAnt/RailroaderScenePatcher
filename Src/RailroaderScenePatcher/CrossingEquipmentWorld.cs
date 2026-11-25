@@ -78,7 +78,7 @@ namespace RailroaderScenePatcher {
                 if (transformer.GetMethods(Native.Flags).Count(m => m.Name == method && m.GetParameters().Length == 1) != 1) throw new MissingMethodException(TransformerType, method);
             try { bells = new CrossingBells(controller); } catch (Exception e) {
                 bellsUnavailable = EquipmentAddition.BellsUnavailable;
-                PatcherLog.Debug(() => "Crossing bells are unavailable: " + e);
+                PatcherLog.Debug(() => "Crossing bell capability check failed: " + e);
             }
         }
         // Why bells are unavailable on this build, or null.
@@ -184,7 +184,7 @@ namespace RailroaderScenePatcher {
                     foreach (var bell in bells.All()) found.Add(SourceCandidate.Bell(bell.Identifier, bell.Name, SourceProblem(bell, destination, EquipmentAddition.BellPattern)));
                     result.AddRange(found);
                 } catch (Exception e) {
-                    PatcherLog.Warning("The patcher couldn't list the available bells because it couldn't read the bell definitions in the game's content library", e);
+                    PatcherLog.Warning("The patcher couldn't list bell definitions from the game's content library. Report this to the patcher maintainer.", e);
                     result.Add(SourceCandidate.UnavailableBells(EquipmentAddition.BellDefinitionsUnreadable));
                 }
             }

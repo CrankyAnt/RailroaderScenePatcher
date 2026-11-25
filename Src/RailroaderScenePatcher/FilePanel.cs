@@ -122,7 +122,7 @@ namespace RailroaderScenePatcher {
         }
         void CancelImport() {
             attachment.Session.CancelImport();
-            feedback.Report(ImportPlace, "Import canceled. Nothing changed. Choose a version to continue.");
+            feedback.Report(ImportPlace, "Import canceled. Nothing changed. " + WindowGuidance.ChooseVersion);
             VersionChanged();
         }
         // What the file panel's look depends on beyond the version state, for the rebuild key.

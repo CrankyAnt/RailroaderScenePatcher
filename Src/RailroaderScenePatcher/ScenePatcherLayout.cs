@@ -436,7 +436,7 @@ namespace RailroaderScenePatcher {
             try {
                 shown = OutlinerGrouping.Rows(inventory, filter, outlinerFilter, IsChanged, OutlinerTrackPoint);
                 return OutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, OutlinerTrackPoint);
-            } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The patcher couldn't build the outliner. Try Refresh. If the object list still doesn't appear, report this to the patcher maintainer and include the Player log.", e); return null; }
+            } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The patcher couldn't build the scene object outliner. Report this to the patcher maintainer.", e); return null; }
         }
         // The object count line's text. The count is that of the tree: container objects and native track spans have no row.
         string OutlinerSummary(OutlinerGrouping.Result tree) =>
@@ -559,7 +559,7 @@ namespace RailroaderScenePatcher {
             StoreOutlinerWidth(outlinerWidth);
             // The same fit without a window limit tells whether the cap stopped it.
             var wanted = InventoryPresentationState.FitWidth(widths, RowDecoration, 100000, OutlinerMinimumWidth, InspectorMinimumWidth, divider);
-            if (wanted > outlinerWidth + 0.5f) feedback.Report("Fit", "Most names need " + Mathf.RoundToInt(wanted) + "; the column stops at " + Mathf.RoundToInt(outlinerWidth) + ", 40 percent of the window. Widen the window for more.");
+            if (wanted > outlinerWidth + 0.5f) feedback.Report("Fit", "Most names need " + Mathf.RoundToInt(wanted) + "; the column stops at " + Mathf.RoundToInt(outlinerWidth) + ", 40 percent of the window. " + WindowGuidance.WidenWindow);
         }
 
         void DrawInspector(UIPanelBuilder builder) {
@@ -986,10 +986,10 @@ namespace RailroaderScenePatcher {
                     }
                     Button(row, "Add detection", () => {
                         var id = (newAddition ?? "").Trim();
-                        if (id.Length == 0) { feedback.Refuse(CoveragePlace, "Detection addition", "give the addition an ID first"); return; }
+                        if (id.Length == 0) { feedback.Refuse(CoveragePlace, "Detection addition", "the addition has no ID. " + WindowGuidance.GiveAdditionId); return; }
                         var existing = circuits.Circuits.FirstOrDefault(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == id);
                         CloseEquipmentForm(); coverageAddition = id; coverageCircuit = existing.Key ?? DetectionAddition.Key("", id); preparedCoverage = null; ReadCoverage(existing.Value);
-                        OpenedForm("Detection addition " + id + " is open at the top of this tab: select its tracks, then Preview.");
+                        OpenedForm("Detection addition " + id + " is open. " + WindowGuidance.SelectTracksThenPreview);
                     }).Inactive(wait != null).Tooltip("Add detection with this ID", CommandBand.Tooltip("Make the crossing detect an extra track: give the addition an ID that is unique in this mod's scene patch file, then select its tracks.", wait));
                 });
             }
@@ -1062,7 +1062,7 @@ namespace RailroaderScenePatcher {
                         catch (Exception e) {
                             state = "The equipment status could not be checked";
                             var failure = e;
-                            equipmentStatusFailures.Debug(item.Id + "/" + e.GetBaseException().Message, () => "Could not check equipment status for " + item.Id + ": " + failure.GetBaseException());
+                            equipmentStatusFailures.Debug(item.Id + "/" + e.GetBaseException().Message, () => "Equipment status check failed for " + item.Id + ": " + failure.GetBaseException());
                         }
                     }
                     EquipmentNameField(builder, item, name, entry.Built != null);
@@ -1241,7 +1241,7 @@ namespace RailroaderScenePatcher {
         void ApplySegments() {
             var identity = selected.Identity;
             var ids = CommandBand.SegmentIds(segmentFields[0]);
-            if (ids.Count == 0) { feedback.Refuse(SegmentsPlace, "Construction segments", "enter at least one segment ID"); return; }
+            if (ids.Count == 0) { feedback.Refuse(SegmentsPlace, "Construction segments", "the segment ID list is empty. " + WindowGuidance.EnterSegmentId); return; }
             Edit(SegmentsPlace, "Construction segments", (current, inspection) => current.SetConstructionSegments(identity, ids, inspection), true);
         }
         bool HasBindingValue(TargetIdentity identity) {
@@ -1616,7 +1616,7 @@ namespace RailroaderScenePatcher {
                             Slot("Start", "Start following: keep the current placement relative to the picked track or endpoint.", unavailable ?? (picked == null ? "Choose a track or endpoint and confirm it first." : null), () => {
                                 var maps = picked.MapIds.ToArray();
                                 Edit(FollowPlace, "Track following", (current, inspection) => {
-                                    if (!maps.SequenceEqual(capabilities.MapIds)) throw new InvalidOperationException("Map context changed; select the track again");
+                                    if (!maps.SequenceEqual(capabilities.MapIds)) throw new InvalidOperationException("The map context changed after the track was selected. " + WindowGuidance.SelectTrackAgain);
                                     var anchor = picked.Identity.Kind == SelectionKind.TrackNode ? TrackAnchor.Endpoint(picked.Identity.Identifier)
                                         : TrackAnchor.At(trackPoses.Nearest(picked.Identity.Identifier, ((GameObject)selected.Handle).transform.position));
                                     return current.Follow(identity, anchor, inspection);
@@ -1788,7 +1788,7 @@ namespace RailroaderScenePatcher {
             var identity = selected.Identity;
             var location = EnteredEditValues.TrackLocation(binding);
             if (location == null) {
-                feedback.Refuse(BindingPlace, "Track location", "enter a segment ID, end a or b, and a distance with a decimal point");
+                feedback.Refuse(BindingPlace, "Track location", "the segment ID, end a or b, or numeric distance is missing or invalid. " + WindowGuidance.EnterTrackLocation);
                 return;
             }
             Edit(BindingPlace, CommandBand.StarterAction(location.Segment, location.End, location.Distance), (current, inspection) => current.PlaceStarter(identity, location, inspection), true);
@@ -1799,14 +1799,14 @@ namespace RailroaderScenePatcher {
         void ApplyPlacement() {
             var identity = selected.Identity;
             var placement = EnteredPlacement(placementFields, PlacementValues(), selected);
-            if (placement == null) { feedback.Refuse(PlacementPlace, "Placement", "enter six numbers with a decimal point"); return; }
+            if (placement == null) { feedback.Refuse(PlacementPlace, "Placement", "the six position and rotation values aren't valid numbers. " + WindowGuidance.EnterPlacement); return; }
             Edit(PlacementPlace, "Placement", (current, inspection) => current.Edit(identity, placement, null, inspection));
         }
         void ApplyBinding() {
             var identity = selected.Identity;
             var location = EnteredEditValues.TrackLocation(binding);
             if (location == null) {
-                feedback.Refuse(BindingPlace, "Track binding", "enter a segment ID, end a or b, and a distance with a decimal point");
+                feedback.Refuse(BindingPlace, "Track binding", "the segment ID, end a or b, or numeric distance is missing or invalid. " + WindowGuidance.EnterTrackLocation);
                 return;
             }
             var value = MarkerBinding.At(location);

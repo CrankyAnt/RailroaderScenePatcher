@@ -31,7 +31,7 @@ namespace RailroaderScenePatcher.Core {
             if (scene.Capability == Capability.Incompatible) throw new InvalidOperationException("Placement capability is incompatible");
             if (session.Blocked != null) throw new InvalidOperationException(session.Blocked);
             target = engine.ResolveUnique(identity); maps = scene.MapIds.ToArray();
-            if (engine.IsUnsafe(target)) throw new InvalidOperationException("Target cleanup is unverified; recheck before editing");
+            if (engine.IsUnsafe(target)) throw new InvalidOperationException("Target cleanup is unverified. " + WindowGuidance.RecheckBeforeEditing);
             engine.GuardMutation(identity, target, maps, inspected);
             var own = ScenePatchFile.Load(session.ScenePatchFileText).Items.Where(item => {
                 try { return ReferenceEquals(engine.ResolveUnique(PatchEngine.ParseTarget(item["target"] as JObject)), target); }
@@ -104,7 +104,7 @@ namespace RailroaderScenePatcher.Core {
             if (!active) return new Outcome { Applied = true, ResolvedTarget = target };
             active = false;
             try { Restore(); engine.AwaitOutput(target); return new Outcome { Applied = true, ResolvedTarget = target }; }
-            catch (Exception e) { engine.SetUnsafe(target, true); return new Outcome { Error = "Gizmo cleanup is unverified; recheck or reload before another edit: " + e.Message, ResolvedTarget = target }; }
+            catch (Exception e) { engine.SetUnsafe(target, true); return new Outcome { Error = "Gizmo cleanup is unverified: " + e.Message.TrimEnd('.') + ". " + WindowGuidance.RecheckBeforeEditing, ResolvedTarget = target }; }
         }
         void Restore() {
             if (!mutated) return;

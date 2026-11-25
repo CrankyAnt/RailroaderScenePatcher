@@ -129,10 +129,10 @@ namespace RailroaderScenePatcher.Core {
         }
         // A group's objects or overlapping markers offer a list next to the pointer. The same number names each
         // offer wherever the panel lists it.
-        public const string SeveralOffers = "Select a row from the list next to the pointer.";
+        public const string SeveralOffers = "More than one world-choice candidate is available. " + WindowGuidance.SelectOfferRow;
         public string OfferCountText => Offers.Count + (crossingSetup && ListOpen ? " objects from the crossing you clicked are listed next to the pointer." :
             Kind == SelectionKind.SceneObject ? " objects." : " candidates.");
-        public string OfferListInstruction => crossingSetup && ListOpen ? "Select a row from that list." : SeveralOffers;
+        public string OfferListInstruction => crossingSetup && ListOpen ? "More than one world-choice candidate is available. " + WindowGuidance.SelectListRow : SeveralOffers;
         // A click that met no candidate, and one that met only the slot's current binding, which cannot be picked.
         public const string NoOffer = "No candidate at this point. Nothing available for this selection is under the pointer.";
         const string NoOfferStart = "No candidate at this point. ";
@@ -168,25 +168,25 @@ namespace RailroaderScenePatcher.Core {
         public bool Confirm() {
             if (!IsPending || Candidate == null) return false;
             if (!maps.SequenceEqual(scene.MapIds, StringComparer.Ordinal))
-                return Reject("The loaded map changed. Cancel and start a new selection.");
+                return Reject("The loaded map changed during world choice. " + WindowGuidance.CancelAndStartAgain);
             // An identity that several objects share cannot be targeted by a patch: a scene patch file names its target by that
             // identity, and nothing in it could tell the objects apart. Inspecting or picking again does not change
             // that, so the refusal says so instead of asking for it.
             var sharedSource = false;
             var difference = Source == null ? null : Difference(Source, out sharedSource);
             if (difference != null)
-                return Reject(sharedSource ? "The inspected object shares its identity " + Source.Identity + " with another object, so a patch cannot target it. Cancel; a choice for this object cannot be confirmed."
-                    : "The source object changed or no longer resolves uniquely: " + difference + ". Cancel and inspect it again.");
+                return Reject(sharedSource ? "The inspected object shares its identity " + Source.Identity + " with another object, so a patch cannot target it. " + WindowGuidance.CancelChoice
+                    : "The source object changed or no longer resolves uniquely: " + difference + ". " + WindowGuidance.CancelAndInspect);
             difference = Difference(Candidate, out var sharedCandidate);
             // An object chosen only to be inspected (InspectOnly) needs no identity a patch could name: it is
             // confirmed by itself when it is still there, and it then says under its supported edits why it cannot
             // be edited. As a replacement target it is refused, since the scene patch file would have to name it.
             if (difference != null && sharedCandidate && InspectOnly && Source == null && Kind == SelectionKind.SceneObject && StillOffered(Candidate)) difference = null;
             if (difference != null)
-                return Reject(sharedCandidate ? "The candidate shares its identity " + Candidate.Identity + " with another object, so a patch cannot target it. Pick an object whose path is unique."
-                    : "The candidate changed or no longer resolves uniquely: " + difference + ". Pick again.");
+                return Reject(sharedCandidate ? "The candidate shares its identity " + Candidate.Identity + " with another object, so a patch cannot target it. " + WindowGuidance.PickUniquePath
+                    : "The candidate changed or no longer resolves uniquely: " + difference + ". " + WindowGuidance.PickAgain);
             if (!maps.SequenceEqual(scene.MapIds, StringComparer.Ordinal))
-                return Reject("The loaded map changed. Cancel and start a new selection.");
+                return Reject("The loaded map changed during world choice. " + WindowGuidance.CancelAndStartAgain);
             Confirmed = new ConfirmedSelection(Candidate.Identity, Source?.Identity, Source ?? Candidate, maps);
             End();
             return true;

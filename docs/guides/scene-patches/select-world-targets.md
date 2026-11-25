@@ -19,7 +19,7 @@ After you click a candidate, the footer shows it on a blue `Object <n>: …` lin
 
 ## Choose between overlapping markings
 
-A numbered choice list opens next to the pointer when a click can't distinguish two or more `+` markers that are closer than half a marker. The footer says `N objects. Select a row from the list next to the pointer.` Each row starts with a name that distinguishes the object. Select a row to make that object the candidate.
+A numbered choice list opens next to the pointer when a click can't distinguish two or more `+` markers that are closer than half a marker. The footer says `N objects. More than one world-choice candidate is available. Select a row from the list next to the pointer.` Each row starts with a name that distinguishes the object. Select a row to make that object the candidate.
 
 The row under the pointer has a blue background. Hover over a row or the candidate's `+` to see its blue world marking. A track shows a ribbon; an object shows a box. Press **Escape** to close the choice list and leave the world choice open so you can click elsewhere. You can navigate the world while the list is open.
 
@@ -103,7 +103,7 @@ Beyond 125 meters, only the group appears, with one square marker and one object
 
 Beyond 125 meters, click the group's square marker or object frame to open a choice list next to the pointer. The object frame turns blue wherever a click would select the group. The list contains the group's objects, excluding a grade-crossing setup's detection spans. If the group's square marker overlaps other markers at the pointer, those objects appear in the same list.
 
-When you select a single grade-crossing setup and the list contains only its objects, the footer says `N objects from the crossing you clicked are listed next to the pointer. Select a row from that list.`
+When you select a single grade-crossing setup and the list contains only its objects, the footer says `N objects from the crossing you clicked are listed next to the pointer. More than one world-choice candidate is available. Select a row from that list.`
 
 Select a row to make that object the candidate, then click **Confirm** to inspect it. The candidate has its own blue square marker and object frame. The inspected object has its own gold square marker and object frame. The rest of the group keeps its shared marking. Opening, using or closing the choice list changes no scene objects, scene patch data, or completed edits. You can still navigate the world while it is open.
 

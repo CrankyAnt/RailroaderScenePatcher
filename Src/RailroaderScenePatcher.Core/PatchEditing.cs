@@ -159,7 +159,7 @@ namespace RailroaderScenePatcher.Core {
                 if (constraints.Any(c => c.Key != "<" && c.Key != "<=" && Number(c.Value) >= need)) return null;
                 var kept = constraints.Where(c => c.Key != ">=" && c.Key != ">").ToList();
                 var excluding = kept.FirstOrDefault(c => !Satisfies(need, c.Key, Number(c.Value)));
-                if (excluding.Value != null) throw new InvalidOperationException("Info.json constrains " + modId + " to " + excluding.Key + excluding.Value + ", which excludes the required minimum " + minimum + ". Correct that constraint and save again");
+                if (excluding.Value != null) throw new InvalidOperationException("Info.json constrains " + modId + " to " + excluding.Key + excluding.Value + ", which excludes the required minimum " + minimum + ". " + WindowGuidance.CorrectConstraint);
                 entries[0].Replace(String.Join(" ", new[] { entry }.Concat(kept.Select(c => (c.Key.Length == 0 ? "==" : c.Key) + c.Value))));
             }
             return json.Write();
@@ -397,7 +397,7 @@ namespace RailroaderScenePatcher.Core {
         // current placement relative to the anchor's current native pose. Activity and relationships keep their mod values.
         public Outcome Follow(TargetIdentity target, TrackAnchor anchor, InspectedTarget inspected = null, Action validateBeforeMutation = null) {
             return Change("Follow track", target, inspected, existing => {
-                if (anchor == null) throw new InvalidOperationException("Explicitly select a track or endpoint to follow");
+                if (anchor == null) throw new InvalidOperationException("No track or endpoint is selected for track following. " + WindowGuidance.SelectFollowAnchor);
                 if (existing != null) PatchEngine.Parse(existing);
                 var current = scene.Read(engine.ResolveUnique(target)).Placement;
                 PatchEngine.CheckPlacement(current?.Position, current?.Rotation);
@@ -511,6 +511,9 @@ namespace RailroaderScenePatcher.Core {
             reconciled[key] = new KeyValuePair<object, int>(resolved, reconciliations);
             return resolved;
         }
+        // The debug line of one track-following update: the modification and the object it moved, by its target path.
+        public static string FollowLogLine(string key, Outcome outcome) =>
+            "Modification " + key + " at " + (outcome.Target?.Path ?? "an unresolved target") + (outcome.Applied ? " followed its track" : " could not follow its track: " + outcome.Error);
         public IReadOnlyList<KeyValuePair<string, Outcome>> ReconcileTrackFollowing() {
             reconciliations++;
             engine.ResolveOverride = ReconcileTarget;
@@ -529,14 +532,14 @@ namespace RailroaderScenePatcher.Core {
                 if (Current(item, parsed, items)) continue;
                 var held = HeldUpdate(item, parsed, items);
                 if (held != null) { results.Add(new KeyValuePair<string, Outcome>(parsed.Id, held)); continue; }
-                var outcome = new Outcome();
+                var outcome = new Outcome { Target = parsed.Identity };
                 object resolved;
                 try { resolved = engine.ResolveUnique(parsed.Identity); } catch (InvalidOperationException) { heldTargets.Remove(parsed.Id); continue; }
                 heldTargets[parsed.Id] = new Held { Item = item, Target = resolved };
                 outcome.ResolvedTarget = resolved;
                 var report = true;
                 try {
-                    if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before following the track again");
+                    if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. " + WindowGuidance.RecheckBeforeFollowing);
                     var mapContext = scene.MapIds.ToArray();
                     scene.Preflight(resolved);
                     var desired = engine.Desired(scenePatchFile.Modifications, resolved, scenePatchFileKey);
@@ -599,7 +602,7 @@ namespace RailroaderScenePatcher.Core {
                 if (prior.Active != desired.Active || prior.MarkerId != desired.MarkerId || !MarkerBinding.Same(prior.Marker, desired.Marker) || !CrossingCoverage.Same(prior.Coverage, desired.Coverage) || !StarterSetting.Same(prior.Starter, desired.Starter)) return null;
                 placement.PreflightPlacement(target);
             } catch (Exception) { return null; }
-            var outcome = new Outcome { ResolvedTarget = target };
+            var outcome = new Outcome { ResolvedTarget = target, Target = parsed.Identity };
             try {
                 FollowUpdate(target, desired);
                 if (!Same(scene.Read(target), desired)) throw new InvalidOperationException("Applied state did not verify");
@@ -753,7 +756,7 @@ namespace RailroaderScenePatcher.Core {
         // tracks of the addition that has it. The ID names one addition in the scene patch file. Native circuits keep their coverage.
         public Outcome AddDetection(TargetIdentity target, string id, CircuitCoverage tracks, InspectedTarget inspected = null) {
             return Change("Add crossing detection", target, inspected, existing => {
-                if (tracks == null || tracks.Kind != CircuitKind.Added) throw new InvalidOperationException("Explicitly select the tracks of the approach A, island, and approach B spans for the addition");
+                if (tracks == null || tracks.Kind != CircuitKind.Added) throw new InvalidOperationException("The addition has no explicit tracks for its approach A, island, and approach B spans. " + WindowGuidance.SelectSpanTracks);
                 return CoverageValue(target, existing, id, tracks, true);
             }, null, "cover-");
         }
@@ -765,7 +768,7 @@ namespace RailroaderScenePatcher.Core {
         // The effect AddDetection, or with null tracks DeleteDetection, would have on every circuit and addition, without
         // changing the scene, the scene patch file or the history.
         public CoveragePreview PreviewAddition(TargetIdentity target, string id, CircuitCoverage tracks, InspectedTarget inspected = null) {
-            if (tracks != null && tracks.Kind != CircuitKind.Added) return new CoveragePreview(Array.Empty<string>(), "Explicitly select the tracks of the approach A, island, and approach B spans for the addition");
+            if (tracks != null && tracks.Kind != CircuitKind.Added) return new CoveragePreview(Array.Empty<string>(), "The addition has no explicit tracks for its approach A, island, and approach B spans. " + WindowGuidance.SelectSpanTracks);
             return Preview(target, id, tracks, inspected, true);
         }
         // The construction segments the object's construction controller names now, or null for an object without one.
@@ -807,7 +810,7 @@ namespace RailroaderScenePatcher.Core {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
-                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
+                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. " + WindowGuidance.RecheckBeforeEditing);
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
@@ -832,12 +835,12 @@ namespace RailroaderScenePatcher.Core {
         // The modification with one entry of its crossing coverage set, replaced or, for a null coverage, cleared. An entry
         // names a native circuit by its island span, or a detection addition by its ID.
         JObject CoverageValue(TargetIdentity target, JObject existing, string circuit, CircuitCoverage coverage, bool addition) {
-            if (String.IsNullOrWhiteSpace(circuit)) throw new InvalidOperationException(addition ? "Give the addition an ID" : "Choose a circuit of the crossing");
-            if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the coverage set by this mod for the circuit to return it to the map's own detection spans.");
-            if (coverage != null && (coverage.Kind == CircuitKind.Added) != addition) throw new InvalidOperationException(addition ? "An addition needs its own selected tracks" : "Add detection for extra tracks as an addition; a native circuit takes selected tracks or a detach");
+            if (String.IsNullOrWhiteSpace(circuit)) throw new InvalidOperationException(addition ? "The addition has no ID. " + WindowGuidance.GiveAdditionId : "No crossing circuit is selected. " + WindowGuidance.ChooseCircuit);
+            if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("A native circuit's original detection can't be set as explicit mod coverage. " + WindowGuidance.ClearCoverageForNative);
+            if (coverage != null && (coverage.Kind == CircuitKind.Added) != addition) throw new InvalidOperationException(addition ? "An addition needs its own selected tracks" : "A native circuit can't take addition coverage; it accepts selected tracks or detachment. " + WindowGuidance.AddDetectionAsAddition);
             if (existing != null) PatchEngine.Parse(existing);
             if (addition && coverage != null && scenePatchFile.Items.Any(m => !ReferenceEquals(m, existing) && PatchEngine.AdditionIds(m).Contains(circuit, StringComparer.Ordinal)))
-                throw new InvalidOperationException("Addition ID " + circuit + " is already used by another modification of this scene patch file; an addition ID names one addition, so choose another ID");
+                throw new InvalidOperationException("Addition ID " + circuit + " is already used by another modification of this scene patch file; an addition ID must identify one addition. " + WindowGuidance.ChooseAnotherId);
             var name = addition ? "additions" : "circuits";
             var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
             var relationships = value["relationships"] as JObject ?? new JObject();
@@ -980,7 +983,7 @@ namespace RailroaderScenePatcher.Core {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
-                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again.");
+                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. " + WindowGuidance.RecheckBeforeEditing);
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
@@ -995,9 +998,9 @@ namespace RailroaderScenePatcher.Core {
                         var stays = " Nothing is built because the modification is still refused. Reason: " + ScenePatchFile.Sentence(e.Message) + ".";
                         var introduced = addition == null ? null : IntroducedRefusal(resolved, value, addition.Id);
                         if (introduced != null) throw new InvalidOperationException(introduced);
-                        if (addition != null) return new EquipmentPreview(new[] { "Save " + CrossingEquipment.Named(addition, displayName) + " in the scene patch file." + stays }, null);
+                        if (addition != null) return new EquipmentPreview(new[] { "Would save " + CrossingEquipment.Named(addition, displayName) + " in the scene patch file." + stays }, null);
                         var removed = PatchEngine.Parse(existing, scenePatchFileKey).State.Equipment.Additions.First(a => a.Id == id);
-                        return new EquipmentPreview(new[] { "Remove " + CrossingEquipment.Named(removed, displayName) + " from the scene patch file." + stays }, null);
+                        return new EquipmentPreview(new[] { "Would remove " + CrossingEquipment.Named(removed, displayName) + " from the scene patch file." + stays }, null);
                     }
                 }
                 var candidate = (JObject)scenePatchFile.Modifications.DeepClone();
@@ -1010,11 +1013,11 @@ namespace RailroaderScenePatcher.Core {
         // The modification with one entry of its crossing equipment set or, for a null addition, removed. An entry is keyed by
         // the equipment ID and holds no id member.
         JObject EquipmentValue(TargetIdentity target, JObject existing, EquipmentAddition addition, string id) {
-            if (addition == null && String.IsNullOrWhiteSpace(id)) throw new InvalidOperationException("Choose an addition");
+            if (addition == null && String.IsNullOrWhiteSpace(id)) throw new InvalidOperationException("No addition is selected. " + WindowGuidance.ChooseAddition);
             if (existing != null) PatchEngine.Parse(existing);
             var key = addition?.Id ?? id;
             if (addition != null && scenePatchFile.Items.Any(m => !ReferenceEquals(m, existing) && PatchEngine.AdditionIds(m).Contains("equipment " + key, StringComparer.Ordinal)))
-                throw new InvalidOperationException("Equipment ID " + key + " is already used by another modification of the scene patch file; choose another ID");
+                throw new InvalidOperationException("Equipment ID " + key + " is already used by another modification of the scene patch file. " + WindowGuidance.ChooseAnotherId);
             var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
             var relationships = value["relationships"] as JObject ?? new JObject();
             var entries = relationships["crossingEquipment"] as JObject ?? new JObject();
@@ -1048,7 +1051,7 @@ namespace RailroaderScenePatcher.Core {
         // marker and the new track location. The capability checks the location and the whole car cut before anything changes.
         public Outcome PlaceStarter(TargetIdentity target, TrackLocation location, InspectedTarget inspected = null) {
             return Change("Place starter marker", target, inspected, existing => {
-                if (location == null) throw new InvalidOperationException("Choose a location on the track");
+                if (location == null) throw new InvalidOperationException("No track location is selected. " + WindowGuidance.ChooseTrackLocation);
                 if (existing != null) PatchEngine.Parse(existing);
                 // The capability names why no single car placement reads the marker.
                 var setup = StarterSetup(target);
@@ -1144,7 +1147,7 @@ namespace RailroaderScenePatcher.Core {
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
                 outcome.ResolvedTarget = resolved;
-                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
+                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. " + WindowGuidance.RecheckBeforeEditing);
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
@@ -1165,12 +1168,12 @@ namespace RailroaderScenePatcher.Core {
                 // A modification that stays in the scene patch file but does not take effect would be reported as applied
                 // without changing the object, so the edit is refused with the reason. Removing it remains possible.
                 if (value != null && ineffective != null)
-                    throw new InvalidOperationException("Modification " + ScenePatchFile.Key(existing) + " is not effective because " + ineffective + "; correct that first. Nothing was changed");
+                    throw new InvalidOperationException("Modification " + ScenePatchFile.Key(existing) + " is not effective because " + ineffective + ". " + WindowGuidance.CorrectThatFirst + " Nothing was changed");
                 // A modification another modification names in dependsOn cannot leave the scene patch file: the dependents would stop taking effect.
                 if (value == null && existing != null) {
                     var dependents = Dependents(ScenePatchFile.Key(existing));
                     if (dependents.Count != 0)
-                        throw new InvalidOperationException("Modification " + ScenePatchFile.Key(existing) + " cannot leave the scene patch file because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name") + " it in dependsOn; change or remove " + (dependents.Count == 1 ? "that modification" : "those modifications") + " first. Nothing was changed");
+                        throw new InvalidOperationException("Modification " + ScenePatchFile.Key(existing) + " cannot leave the scene patch file because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name") + " it in dependsOn. " + (dependents.Count == 1 ? WindowGuidance.ChangeDependentFirst : WindowGuidance.ChangeDependentsFirst) + " Nothing was changed");
                 }
                 // An axis the edit leaves at the scene patch file's value as the game stores it keeps that value.
                 if (value != null && existing != null) {
@@ -1381,12 +1384,12 @@ namespace RailroaderScenePatcher.Core {
                 } else {
                     value = current;
                     uncertain = true;
-                    IncompleteOperation = name + " couldn't be reversed or reapplied: " + ScenePatchFile.Sentence(withdrawal) + ". The scene patch file keeps the state shown. Save is still available.";
+                    IncompleteOperation = name + " couldn't be reversed or reapplied: " + ScenePatchFile.Sentence(withdrawal) + ". The scene patch file keeps the state shown. " + WindowGuidance.SaveStillAvailable;
                 }
             } catch (Exception e) {
                 value = current;
                 uncertain = true;
-                IncompleteOperation = name + " couldn't be reversed or reapplied: " + e.Message + ". The scene patch file keeps the state shown. Save is still available.";
+                IncompleteOperation = name + " couldn't be reversed or reapplied: " + e.Message + ". The scene patch file keeps the state shown. " + WindowGuidance.SaveStillAvailable;
             }
             RegisterPatchAction(() => Replay(name, slot, target, current, generation, keyGeneration, equipmentStep && currentRefused, equipmentStep), name);
         }
@@ -1560,7 +1563,7 @@ namespace RailroaderScenePatcher.Core {
         }
         // Why scene patch editing refuses every edit of an object before any change: several modifications of the scene patch
         // file target it. The panel shows the controls of such an object inactive with this reason; the edit still refuses.
-        public const string SeveralModifications = "This scene patch file has more than one modification for this object. Combine them into one modification in the file";
+        public const string SeveralModifications = "This scene patch file has more than one modification for this object. " + WindowGuidance.CombineModifications;
         // SeveralModifications when more than one modification of the scene patch file targets the object, or null.
         public string SeveralModificationsBlock(TargetIdentity target) => Own(engine.ResolveUnique(target)).Count > 1 ? SeveralModifications : null;
         List<JObject> Own(object target) {
@@ -1604,7 +1607,7 @@ namespace RailroaderScenePatcher.Core {
             if (alignNativeCleanPending && error == null && nativeIdentity != null) savedNativeIdentity = nativeIdentity.Current;
             alignNativeCleanPending = false;
             if (error == null) return;
-            unrecovered = "Undo or Redo stopped on an error: " + error.Message + ". Undo history could not be recovered and might stop recording edits. Save still writes the current changes. Reload the Map Editor to clear its unsaved status.";
+            unrecovered = "Undo or Redo stopped on an error: " + error.Message + ". Undo history couldn't be recovered; further edits might not be recorded. " + WindowGuidance.SaveAfterHistoryError;
             IncompleteOperation = unrecovered;
         }
         // Raised after a history change outside native Undo and Redo was accounted, such as a patch-only edit, so the native
@@ -1714,7 +1717,7 @@ namespace RailroaderScenePatcher.Core {
         public string FailSave(Exception error) {
             LastSave = new SaveReport(written, Outstanding(true), error.Message);
             return error.Message.TrimEnd('.') + ". Scene Patcher: completed writes: " + (written.Count == 0 ? "none" : String.Join(", ", written.Select(DisplayItem)))
-                + "; outstanding: " + String.Join(", ", LastSave.Outstanding.Select(DisplayItem)) + ". Edits remain in memory. Correct the cause and Save again.";
+                + "; outstanding: " + String.Join(", ", LastSave.Outstanding.Select(DisplayItem)) + ". Edits remain in memory. " + WindowGuidance.CorrectAndSave;
         }
     }
 }

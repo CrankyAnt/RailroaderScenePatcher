@@ -35,7 +35,7 @@ Some objects below a group root are not listed as parts:
 
 - Sibling objects with the same name share one path. A scene patch file cannot tell them apart, so neither they nor the objects below them are listed.
 - A level of a LOD group, such as `LOD0` and `LOD1` below a lamp, belongs to the entry of the object that holds the LOD group.
-- A culling container, such as `Bryson House Track / Culled`, only groups parts for the game's culling. It has no row of its own and appears in no world choice list, but the parts in it are listed under their group, with the container in their name. A group whose root carries the culler, such as Sylva Culled, keeps its group row and lists its models as parts. A modification whose path names a culling container fails with the message "This path names a culling container. It holds parts for the game's culling. Edit those parts directly." The file's other modifications still apply.
+- A culling container, such as `Bryson House Track / Culled`, only groups parts for the game's culling. It has no row of its own and appears in no world choice list, but the parts in it are listed under their group, with the container in their name. A group whose root carries the culler, such as Sylva Culled, keeps its group row and lists its models as parts. A modification whose path names a culling container fails with the message "This path names a culling container, which isn't an editable scenery part. Edit the parts it holds directly." The file's other modifications still apply.
 - Objects the game moves during play, such as a clock hand at Bryson depot or the flame of a lantern, which the game turns toward the camera, are not listed as parts. Neither are the objects below them. These objects remain in their group and move with it.
 - Objects without a renderer, collider, light, storage pile, or log pond, objects created while the game runs, and objects listed by another family have no part entry. The exception is an object that holds a scene ground mask, which is listed as a part.
 
@@ -272,7 +272,7 @@ The part placement uses map coordinates, not coordinates relative to the group.
 
 ## What the patcher checks
 
-Before changing a group, the patcher checks that its scene is loaded, its path names exactly one listed group root, and it contains no missing script or rigidbody. If the path names a container object, such as `World/Large Scenery/Bryson/Bryson Yard`, the modification fails with the message "This path names a container object. A container object isn't a group. Edit the groups it holds." A modification also fails if its path names no group or several groups. In each case, the file's other modifications still apply.
+Before changing a group, the patcher checks that its scene is loaded, its path names exactly one listed group root, and it contains no missing script or rigidbody. If the path names a container object, such as `World/Large Scenery/Bryson/Bryson Yard`, the modification fails with the message "This path names a container object, which isn't a scenery group. Edit the groups it holds." A modification also fails if its path names no group or several groups. In each case, the file's other modifications still apply.
 
 For a part, the path must name exactly one listed part, and its group must pass the same checks. If a part modification names a group root, such as a yard lamp post below Bryson Yard, it fails with an explanation that the path names a group root. The file's other modifications still apply. Edit that object as a baked scenery group.
 

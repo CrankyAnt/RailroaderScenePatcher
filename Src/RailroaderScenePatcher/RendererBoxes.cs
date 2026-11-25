@@ -77,15 +77,15 @@ namespace RailroaderScenePatcher {
         static readonly PropertyInfo batchRoot = typeof(Renderer).GetProperty("staticBatchRootTransform", Native.Flags),
             batchStart = typeof(Renderer).GetProperty("subMeshStartIndex", Native.Flags);
         static bool unavailableSaid, notReadableSaid;
-        static void Unavailable(string reason) {
+        static void Unavailable(Renderer renderer, string reason) {
             if (unavailableSaid) return;
             unavailableSaid = true;
-            PatcherLog.Debug("The patcher uses the game's world-aligned boxes to frame scenery parts drawn together. This game build doesn't provide each part's location in the combined drawing data: " + reason + ".");
+            PatcherLog.Debug("Combined scenery frame uses world-aligned bounds; part locations unavailable for " + BoardScene.PathOf(renderer.transform) + ": " + reason + ".");
         }
-        static void NotReadable(Mesh mesh) {
+        static void NotReadable(Renderer renderer, Mesh mesh) {
             if (notReadableSaid) return;
             notReadableSaid = true;
-            PatcherLog.Debug("The patcher uses the game's world-aligned boxes to frame scenery parts whose combined drawing data can't be read. One example is " + mesh.name + ".");
+            PatcherLog.Debug("Combined scenery frame uses world-aligned bounds; unreadable mesh " + mesh.name + " of " + BoardScene.PathOf(renderer.transform) + ".");
         }
         static bool Expected(Exception e) => e is UnityException || e is MissingReferenceException || e is TargetInvocationException || e is ArgumentException || e is InvalidCastException;
 
@@ -151,12 +151,12 @@ namespace RailroaderScenePatcher {
         FittedBox StartPart(Renderer renderer, Mesh combined) {
             var part = new FittedBox();
             if (batchStart == null || batchRoot == null) {
-                Unavailable((batchStart == null ? "Renderer.subMeshStartIndex" : "Renderer.staticBatchRootTransform") + " is missing");
+                Unavailable(renderer, (batchStart == null ? "Renderer.subMeshStartIndex" : "Renderer.staticBatchRootTransform") + " is missing");
                 part.Source = OwnBoxSource.BatchUnavailable;
                 return part;
             }
             try {
-                if (!combined.isReadable) { NotReadable(combined); part.Source = OwnBoxSource.BatchNotReadable; return part; }
+                if (!combined.isReadable) { NotReadable(renderer, combined); part.Source = OwnBoxSource.BatchNotReadable; return part; }
                 if (!batchPoints.TryGetValue(combined, out var points)) {
                     if (budget.Spent > 0) return null;
                     batchPoints[combined] = points = budget.Read(() => combined.vertices);
@@ -174,7 +174,7 @@ namespace RailroaderScenePatcher {
                 part.Pending = new PointsRead { Points = points, Ranges = ranges, ToSpace = root != null ? root.localToWorldMatrix : Matrix4x4.identity,
                     Builder = new BoxAlongBuilder(WorldSelectionOverlay.Basis(renderer.transform)) };
             } catch (Exception e) when (e is TargetInvocationException || e is InvalidCastException) {
-                Unavailable(e.GetBaseException().Message);
+                Unavailable(renderer, e.GetBaseException().Message);
                 part.Source = OwnBoxSource.BatchUnavailable; part.Pending = null;
             } catch (Exception e) when (Expected(e)) { part.Source = OwnBoxSource.BatchUnavailable; part.Pending = null; }
             return part;

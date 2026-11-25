@@ -44,15 +44,15 @@ namespace RailroaderScenePatcher.Core {
         }
         public SnapRequest Prepare(TargetIdentity target, InspectedTarget inspected, ConfirmedSelection selected, SelectionCandidate confirmedCandidate) {
             if (selected == null || selected.Identity.Kind == SelectionKind.SceneObject)
-                throw new InvalidOperationException("Explicitly select a track segment or endpoint first");
-            if (inspected == null) throw new InvalidOperationException("Inspect the object before snapping");
+                throw new InvalidOperationException("No track segment or endpoint is selected for snapping. " + WindowGuidance.SelectSnapTrack);
+            if (inspected == null) throw new InvalidOperationException("Snapping failed because no object is inspected. " + WindowGuidance.InspectBeforeSnapping);
             var maps = selected.MapIds.ToArray();
             CheckMaps(maps);
             if (selected.Source != null && !selected.Source.Equals(SelectionIdentity.SceneObject(target)))
                 throw new InvalidOperationException("The selected snap target belongs to another inspected object");
             var geometry = Resolve(selected.Identity);
             if (confirmedCandidate == null || !confirmedCandidate.Matches(geometry.Candidate))
-                throw new InvalidOperationException("Snap target changed after confirmation; select it again");
+                throw new InvalidOperationException("Snap target changed after confirmation. " + WindowGuidance.SelectAgain);
             var resolved = scene.Resolve(target);
             if (resolved == null || resolved.Count != 1) throw new InvalidOperationException(resolved == null || resolved.Count == 0 ? PatchEngine.TargetMissing : PatchEngine.TargetAmbiguous);
             inspected.Validate(scene, target, resolved[0]);
@@ -66,24 +66,24 @@ namespace RailroaderScenePatcher.Core {
         }
         public Outcome Apply(SnapRequest request) {
             try {
-                if (request == null || !ReferenceEquals(request.Owner, this)) throw new InvalidOperationException("Prepare a snap for this scene patch editing session first");
+                if (request == null || !ReferenceEquals(request.Owner, this)) throw new InvalidOperationException("No snap is prepared for this scene patch editing session. " + WindowGuidance.PrepareSnap);
                 Validate(request);
                 return session.Edit(request.Target, request.Desired, null, request.Inspected, () => Validate(request));
             } catch (Exception e) { return new Outcome { Error = e.Message }; }
         }
         void Validate(SnapRequest request) {
             CheckMaps(request.Maps);
-            if (!request.Geometry.Matches(Resolve(request.Identity))) throw new InvalidOperationException("Snap target changed; select it again");
+            if (!request.Geometry.Matches(Resolve(request.Identity))) throw new InvalidOperationException("Snap target changed. " + WindowGuidance.SelectAgain);
             CheckMaps(request.Maps);
         }
         SnapGeometry Resolve(SelectionIdentity identity) {
             var matches = tracks.DiscoverSnapTargets(identity.Kind).Where(g => g.Candidate.Identity.Equals(identity)).Take(2).ToArray();
-            if (matches.Length != 1) throw new InvalidOperationException(matches.Length == 0 ? "Snap target is missing; select it again" : "Snap target is ambiguous; select a unique identity");
+            if (matches.Length != 1) throw new InvalidOperationException(matches.Length == 0 ? "Snap target is missing. " + WindowGuidance.SelectAgain : "Snap target is ambiguous. " + WindowGuidance.SelectUniqueIdentity);
             return matches[0];
         }
         void CheckMaps(string[] maps) {
             if (maps.Length == 0 || !maps.SequenceEqual(scene.MapIds) || !maps.SequenceEqual(tracks.MapIds))
-                throw new InvalidOperationException("Snap map context changed; select the target again");
+                throw new InvalidOperationException("Snap map context changed. " + WindowGuidance.SelectTargetAgain);
         }
     }
 }

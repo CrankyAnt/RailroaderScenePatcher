@@ -61,7 +61,7 @@ namespace RailroaderScenePatcher {
                     if (value == 0 || !ReferenceEquals(Hooks.Current, current)) return;
                     var choice = value == 1 ? ReloadChoice.Save : value == 2 ? ReloadChoice.Discard : ReloadChoice.Cancel;
                     var problem = current.Session.Reload(choice, () => current.NativeDirty, () => Save(current), () => {
-                        if (!ModScenePatchFiles.IsMapEditor || !ReferenceEquals(Hooks.Current, current)) throw new InvalidOperationException("The active Map Editor changed; request reload again");
+                        if (!ModScenePatchFiles.IsMapEditor || !ReferenceEquals(Hooks.Current, current)) throw new InvalidOperationException("The active Map Editor changed before reload. " + WindowGuidance.RequestReloadAgain);
                         CaptureLocation(current, mapIdentifier);
                         var state = Native.Read(Native.Type("Game.State.StateManager"), "Shared");
                         relaunching = returns.Active(DateTime.UtcNow);
@@ -85,7 +85,7 @@ namespace RailroaderScenePatcher {
                 if (dismissed) return;
                 // Like the native generic factory, a failed callback leaves the prompt open.
                 try { choose(value); }
-                catch (Exception e) { PatcherLog.Error("The Map Editor couldn't carry out your reload choice. The prompt stays open", e); return; }
+                catch (Exception e) { PatcherLog.Error("The Map Editor couldn't carry out the reload choice. Report this to the patcher maintainer.", e); return; }
                 dismissed = true;
                 dismiss();
             }
@@ -124,7 +124,7 @@ namespace RailroaderScenePatcher {
                 var point = GroundPoint(selector);
                 var id = returns.Capture(mapIdentifier, ControllerId(), Coordinates(point), DateTime.UtcNow);
                 PatcherLog.Debug("Recorded working location " + point + " on map " + mapIdentifier + " for reload return " + id + ".");
-            } catch (Exception e) { returns.Cancel(); PatcherLog.Debug("Couldn't record the working location for reload. The game will choose the camera location: " + e.GetBaseException().Message); }
+            } catch (Exception e) { returns.Cancel(); PatcherLog.Debug("Working-location capture for reload on map " + mapIdentifier + " failed: " + e.GetBaseException().Message); }
         }
         static int ControllerId() {
             var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as UnityEngine.Object;
@@ -166,13 +166,13 @@ namespace RailroaderScenePatcher {
                     var strategy = Enum.Parse(selectorType.GetNestedType("CameraIdentifier", Native.Flags), "Strategy");
                     if (!returns.MarkRequested(pending.RequestId, map, controller, now)) return;
                     Native.Call(selector, "JumpToPoint", point, Quaternion.identity, strategy);
-                    PatcherLog.Debug("Reload return " + pending.RequestId + " requested to working location " + point + ". Waiting for arrival.");
+                    PatcherLog.Debug("Reload return " + pending.RequestId + " requested to working location " + point + " on map " + map + "; arrival pending.");
                     return;
                 }
                 var measured = GroundPoint(selector);
                 if (returns.Complete(pending.RequestId, map, controller, Coordinates(measured), now)) {
                     relaunching = false;
-                    PatcherLog.Debug("Reload return " + pending.RequestId + " completed at working location " + measured + ".");
+                    PatcherLog.Debug("Reload return " + pending.RequestId + " completed at working location " + measured + " on map " + map + ".");
                 }
             } catch (Exception e) {
                 relaunching = false; returns.Cancel();

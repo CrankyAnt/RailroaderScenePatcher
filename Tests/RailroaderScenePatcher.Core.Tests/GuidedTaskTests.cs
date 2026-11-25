@@ -179,9 +179,9 @@ static class GuidedTaskTests {
     }
     static void ClearingPinnedTargetIsRefused() {
         var state = new GuidedTaskState(); var first = Target("first"); state.Start(GuidedTaskKind.Placement, first, new[] { "draft" });
-        Check(!state.Select(null) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft" && state.Message == "Finish this task or return to Inspector before clearing the selection or selecting another object.", "Clearing Values is refused with the selection feedback");
+        Check(!state.Select(null) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft" && state.Message == "The selection can't change while a guided task is at Values or Review. Finish this task or return to Inspector before clearing the selection or selecting another object.", "Clearing Values is refused with the selection feedback");
         state.Review();
-        Check(!state.Select(null) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft" && state.Message == "Finish this task or return to Inspector before clearing the selection or selecting another object.", "Clearing Review is refused with the selection feedback");
+        Check(!state.Select(null) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft" && state.Message == "The selection can't change while a guided task is at Values or Review. Finish this task or return to Inspector before clearing the selection or selecting another object.", "Clearing Review is refused with the selection feedback");
     }
     static void StartHandlesMissingValuesWithoutCorruptingState() {
         var state = new GuidedTaskState(); var first = Target("first"); var second = Target("second");

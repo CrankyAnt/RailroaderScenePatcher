@@ -87,7 +87,7 @@ namespace RailroaderScenePatcher {
             }
         }
         string GuidedBlock(GuidedTaskKind kind) {
-            if (selected == null) return "Inspect an object first.";
+            if (selected == null) return "No object is inspected. " + WindowGuidance.InspectFirst;
             var block = (IsStarter ? StarterEditBlock() : EditBlock()) ?? GuidedTaskState.TargetBlock(kind, selected.Identity);
             if (block != null) return block;
             switch (kind) {
@@ -98,7 +98,7 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.Wreck: return CommandBand.WreckTaskReason(IsStarter, NativeInventory.StartersError, selected.Bindings.Where(IsReader).ToArray());
                 case GuidedTaskKind.MarkerId: return MarkerIdBlock();
                 case GuidedTaskKind.DetachBinding:
-                    if (IsPad) return "A crossing pad cannot be detached. Disable it instead.";
+                    if (IsPad) return "A crossing pad can't be detached. " + WindowGuidance.DisablePad;
                     if (IsStarter) return StarterPlacements.NoDetach;
                     return selected.Identity.Structure != TrackMarkerScene.Structure ? BindingUnavailable() : null;
                 default: return selected.Identity.Structure == TrackMarkerScene.Structure || IsPad ? null : BindingUnavailable();
@@ -233,12 +233,12 @@ namespace RailroaderScenePatcher {
         string GuidedValuesBlock() {
             if (guided.Kind == GuidedTaskKind.Snap) {
                 var request = guided.Step == GuidedTaskStep.Review ? guidedSnap : preparedSnap;
-                return request == null ? "Choose and confirm a track or endpoint first." : null;
+                return request == null ? "No track or endpoint is confirmed. " + WindowGuidance.ConfirmTrack : null;
             }
-            if (guided.Kind == GuidedTaskKind.Placement) return EnteredPlacement(guidedFields, guidedPlacement, guided.Target) == null ? "Enter a number in each of the six fields. Use a point for decimals."
+            if (guided.Kind == GuidedTaskKind.Placement) return EnteredPlacement(guidedFields, guidedPlacement, guided.Target) == null ? "The six position and rotation values aren't valid numbers. " + WindowGuidance.EnterPlacement
                 : CommandBand.FieldReason(null, guidedFields, guidedBefore, CommandBand.SamePlacement);
             if (guided.Kind == GuidedTaskKind.Binding || guided.Kind == GuidedTaskKind.StarterPlacement) {
-                return EnteredEditValues.TrackLocation(guidedFields) == null ? "Enter the segment ID, end a or b, and a distance. Use a point for decimals."
+                return EnteredEditValues.TrackLocation(guidedFields) == null ? "The segment ID, end a or b, or numeric distance is missing or invalid. " + WindowGuidance.EnterTrackLocation
                     : CommandBand.FieldReason(null, guidedFields, guidedBefore, guided.Kind == GuidedTaskKind.StarterPlacement ? CommandBand.SameLocation : CommandBand.SameBinding, CommandBand.BindingIds);
             }
             if (guided.Kind == GuidedTaskKind.DetachBinding) return String.IsNullOrWhiteSpace(guidedBefore[0]) ? CommandBand.AlreadyDetached : null;
@@ -360,11 +360,11 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.Binding:
                 case GuidedTaskKind.StarterPlacement:
                     var location = EnteredEditValues.TrackLocation(guidedFields);
-                    if (location == null) throw new InvalidOperationException("Enter the segment ID, end a or b, and a distance. Use a point for decimals.");
+                    if (location == null) throw new InvalidOperationException("The segment ID, end a or b, or numeric distance is missing or invalid. " + WindowGuidance.EnterTrackLocation);
                     return guided.Kind == GuidedTaskKind.StarterPlacement ? session.PlaceStarter(identity, location, guidedInspection) : session.Bind(identity, MarkerBinding.At(location), guidedInspection);
                 default:
                     var placement = EnteredPlacement(guidedFields, guidedPlacement, guided.Target);
-                    if (placement == null) throw new InvalidOperationException("Enter a number in each of the six fields. Use a point for decimals.");
+                    if (placement == null) throw new InvalidOperationException("The six position and rotation values aren't valid numbers. " + WindowGuidance.EnterPlacement);
                     return session.Edit(identity, placement, null, guidedInspection);
             }
         }

@@ -210,7 +210,7 @@ static class CommandBandTests {
     // The footer's amber Editing line ends each edit block with a full stop, as its tooltip does, and keeps the text as it
     // stands: a block that already ends a sentence keeps its ending, and a label is not stripped.
     static void EditingLinesEndWithAFullStop() {
-        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications) == PatchEditingSession.SeveralModifications + ".",
+        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications) == PatchEditingSession.SeveralModifications.TrimEnd('.') + ".",
             "The several-modifications block ends with a full stop: " + CommandBand.EditingLine(PatchEditingSession.SeveralModifications));
         Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications).EndsWith(CommandBand.Tooltip("x", PatchEditingSession.SeveralModifications).Substring("Unavailable: ".Length), StringComparison.Ordinal),
             "The footer line ends as the tooltip does");
@@ -593,7 +593,7 @@ static class CommandBandTests {
             Check(CommandBand.Shown(row[0], row[1]) == row[2], "The value " + row[0] + "=" + row[1] + " shows as " + row[2]);
         // An offered list and a miss are instructions, not errors; a refusal is a problem.
         Check(PendingSelection.IsInstruction(PendingSelection.SeveralOffers) && PendingSelection.IsInstruction(PendingSelection.NoOffer) && PendingSelection.NoOffer == "No candidate at this point. Nothing available for this selection is under the pointer.", "An offered list and a click that met no candidate read as ordinary text: nothing is broken");
-        Check(!PendingSelection.IsInstruction(null) && !PendingSelection.IsInstruction("The candidate changed or no longer resolves uniquely: it is no longer found. Pick again."), "A refusal stays a problem, in red");
+        Check(!PendingSelection.IsInstruction(null) && !PendingSelection.IsInstruction("The candidate changed or no longer resolves uniquely: it is no longer found."), "A refusal stays a problem, in red");
         // The log line of a world choice names the candidates of the clicked spot, and the object the choice is for only when it is for one.
         var offered = new[] { "Crossing light: World/Roads/Everett/Signal 1/Signal 1", "Crossing gate: World/Roads/Everett/Signal 1/Signal 1/Wishbone" };
         var logged = CommandBand.ChoiceLog(null, PendingSelection.SeveralOffers, offered);

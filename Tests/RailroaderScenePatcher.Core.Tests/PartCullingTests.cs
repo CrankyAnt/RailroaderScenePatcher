@@ -767,15 +767,15 @@ static class PartCullingTests {
         });
         var warnings = log.At(LogLevel.Warning).ToArray();
         Assert(warnings.Length == 4, "Each group and failure is written once over five frames: " + String.Join(" | ", warnings));
-        Assert(warnings.Count(w => w.Contains("of " + Mill + " may") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1
-            && warnings.Count(w => w.Contains("of " + Other + " may") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1, "Two groups with the same failure each get one warning that names the group: " + String.Join(" | ", warnings));
+        Assert(warnings.Count(w => w.Contains("of " + Mill + ". Report") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1
+            && warnings.Count(w => w.Contains("of " + Other + ". Report") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1, "Two groups with the same failure each get one warning that names the group: " + String.Join(" | ", warnings));
         Assert(warnings.Count(w => w.EndsWith(": another failure", StringComparison.Ordinal)) == 2, "A new failure of the same group is written once more");
-        Assert(warnings[0] == "Moved parts of " + Mill + " may appear or disappear at the wrong distance because the patcher couldn't update when they are shown: game function gone", "The warning says what the player may see: " + warnings[0]);
+        Assert(warnings[0] == "The patcher couldn't update visibility for moved parts of " + Mill + ". Report this to the patcher maintainer: game function gone", "The warning names the failed visibility update and report recipient: " + warnings[0]);
         // One failing group leaves the other updating.
         f.World.Native.FailAlive = target => ReferenceEquals(target, f.Group) ? new InvalidOperationException("only the mill") : null;
         f.World.Objects.Remove(Other);
         var quiet = RecordingLog.Capture(false, () => f.World.Culling.Tick());
-        Assert(quiet.At(LogLevel.Warning).Single().Contains("of " + Mill + " may") && f.World.Culling.RegionCount == 1, "The other group still updates and gives back its sphere when it goes, while the failing group keeps its own");
+        Assert(quiet.At(LogLevel.Warning).Single().Contains("of " + Mill + ". Report") && f.World.Culling.RegionCount == 1, "The other group still updates and gives back its sphere when it goes, while the failing group keeps its own");
     }
 
     static void UnloadReadsNoCullingManager() {
@@ -803,9 +803,13 @@ static class PartCullingTests {
         // The report is a debug line, once, and never a warning.
         var faults = new List<string>();
         f.World.Culling.Fault = faults.Add;
-        var log = RecordingLog.Capture(true, () => { f.World.Culling.Report(); f.World.Culling.Report(); });
+        // Reported during a load, the line carries that load's attempt number although culling knows nothing of the load.
+        LoadAttempt.Reset();
+        RecordingLog log;
+        try { LoadAttempt.Begin("rr/bushnell-whittier"); log = RecordingLog.Capture(true, () => { f.World.Culling.Report(); f.World.Culling.Report(); }); }
+        finally { LoadAttempt.Reset(); }
         Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Debug && faults.Count == 0, "The wrapper that stays is reported once as a debug line, not as a warning: " + log.Lines.Count + " / " + faults.Count);
-        Assert(log.Lines[0].Value == "Another component changed the show and hide handler for game culler " + own.Id + ", which controls scenery visibility. The patcher left that handler in place and stopped applying its own visibility rules for this culler. If the patcher's handler is still called, it only passes requests to the previous handler", "The line names the visibility controller and distinguishes released rules from conditional forwarding: " + log.Lines[0].Value);
+        Assert(log.Lines[0].Value == "load attempt 1, map rr/bushnell-whittier: Released visibility rules for game culler " + own.Id + "; another component replaced its handler; replacement handler retained", "The line names the visibility controller and distinguishes released rules from conditional forwarding: " + log.Lines[0].Value);
         var playerMode = RecordingLog.Capture(false, () => new Fixture().World.Culling.Report());
         var quiet = RecordingLog.Capture(true, () => new Fixture().World.Culling.Report());
         Assert(quiet.Lines.Count == 0 && playerMode.Lines.Count == 0, "Without such a wrapper nothing is reported");

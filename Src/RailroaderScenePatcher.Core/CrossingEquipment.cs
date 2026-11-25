@@ -143,13 +143,13 @@ namespace RailroaderScenePatcher.Core {
             string Name(EquipmentAddition addition) => Named(addition, displayName);
             foreach (var want in desired.additions) {
                 var now = current.Find(want.Key);
-                if (now == null) changes.Add("Add " + Name(want) + "; the crossing controller drives it.");
-                else if (!EquipmentAddition.SameBuild(now, want)) changes.Add("Rebuild " + Name(want) + "; the copy of " + (displayName == null ? now.Source.ToString() : displayName(now)) + " is removed.");
-                else if (!EquipmentAddition.SamePlacement(now.Placement, want.Placement)) changes.Add("Move " + Name(want) + ".");
-                else kept.Add("Keep " + Name(want) + ".");
+                if (now == null) changes.Add("Would add " + Name(want) + ". " + WindowGuidance.ControllerDrivesCopy);
+                else if (!EquipmentAddition.SameBuild(now, want)) changes.Add("Would rebuild " + Name(want) + "; the copy of " + (displayName == null ? now.Source.ToString() : displayName(now)) + " is removed.");
+                else if (!EquipmentAddition.SamePlacement(now.Placement, want.Placement)) changes.Add("Would move " + Name(want) + ".");
+                else kept.Add("Would keep " + Name(want) + ".");
             }
             foreach (var gone in current.additions.Where(a => desired.Find(a.Key) == null))
-                changes.Add("Remove " + Name(gone) + (displayName == null ? "; its copy is released from the controller and its culling." : "."));
+                changes.Add("Would remove " + Name(gone) + (displayName == null ? "; its copy is released from the controller and its culling." : "."));
             return changes.Concat(kept).ToList();
         }
         // The place a crossing stands at, for a label: the part after "Grade Crossing - " of its own name, or else the
@@ -194,7 +194,7 @@ namespace RailroaderScenePatcher.Core {
         public static string Problem(DeviceFacts d, IReadOnlyList<string> keys) {
             if (d == null) throw new ArgumentNullException(nameof(d));
             if (keys == null || keys.Count == 0) throw new ArgumentException("The controller's keys are required", nameof(keys));
-            if (d.AddedByPatcher) return "the patcher added this equipment; choose a device already present in the map";
+            if (d.AddedByPatcher) return "the patcher added this equipment; it isn't an eligible native source. " + WindowGuidance.ChooseMapDevice;
             if (d.DestinationKeyValueObjects != 1) return "the destination crossing controller has " + (d.DestinationKeyValueObjects == 0 ? "no" : "several") + " key-value objects, so it cannot address the copy";
             if (d.DestinationCullers > 1) return "the destination crossing controller has several cullers, so it is unclear which one should control the copy's visibility";
             if (d.ContainsDestination) return "it contains the destination crossing";
@@ -204,7 +204,7 @@ namespace RailroaderScenePatcher.Core {
             if (d.KeyValueObjects > 0) return "it holds its own key-value object, which would intercept the crossing controller's keys";
             if (d.Spans > 0) return "it holds a detection span";
             if (d.Cullers > 0) return "it holds its own culler";
-            if (d.Bells > 0) return "it contains a bell player; add bells from a bell definition using the bell pattern";
+            if (d.Bells > 0) return "it contains a bell player and is not a light or gate source. " + WindowGuidance.AddBellsFromDefinition;
             if (d.Lamps.Count + d.Gates.Count == 0) return "it has no lamp or gate that observes the controller's " + String.Join(" or ", keys) + " key";
             foreach (var l in d.Lamps) {
                 if (!keys.Contains(l.Key)) return "lamp " + l.Name + " observes key '" + l.Key + "', which the crossing controller does not publish";
@@ -406,21 +406,21 @@ namespace RailroaderScenePatcher.Core {
         // world load's warning names the mod author; only crossing bells this game build cannot provide stay a patcher problem.
         internal object Source(object controller, EquipmentAddition addition, bool stale = false) {
             var name = addition.Source.StoredName();
-            if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported. Use pattern " + String.Join(" or ", EquipmentAddition.Patterns) + ". Otherwise remove the addition");
+            if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported; supported patterns: " + String.Join(" or ", EquipmentAddition.Patterns) + ". " + WindowGuidance.UseSupportedPattern);
             var kind = EquipmentAddition.SourceKindProblem(addition.Pattern, addition.Source);
-            if (kind != null) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": " + kind + ". Change its source in your scene patch file or remove the addition");
+            if (kind != null) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": " + kind.TrimEnd('.') + ". " + WindowGuidance.ChangeSourceOrRemove);
             var matches = world.ResolveSource(addition.Source) ?? Array.Empty<object>();
             if (matches.Count == 0) {
                 var what = "Equipment " + addition.Id + ": " + (stale ? "the added equipment is missing, and " : "");
                 var rebuilt = stale ? ", so the equipment cannot be rebuilt" : "";
                 throw new InvalidPatchDefinitionException(addition.Source.IsDefinition
-                    ? what + "bell definition " + name + " is unavailable in the content library" + rebuilt + ". The patcher only uses bell definitions already available and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition"
-                    : what + "light or gate " + name + " is not in the map" + rebuilt + ". The patcher only copies lights and gates already in the map and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition");
+                    ? what + "bell definition " + name + " is unavailable in the content library" + rebuilt + ". " + WindowGuidance.OnlyAvailableBells + " " + WindowGuidance.SelectAnotherBell
+                    : what + "light or gate " + name + " is not in the map" + rebuilt + ". " + WindowGuidance.OnlyMapLights + " " + WindowGuidance.SelectAnotherLight);
             }
-            if (matches.Count > 1) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " bell definitions share its identifier. Edit this addition on the crossing's Connections tab to select another bell definition" : " objects in the map share its scene and path. Edit this addition on the crossing's Connections tab to select another light or gate") + ", or remove the addition");
+            if (matches.Count > 1) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " bell definitions share its identifier. " + WindowGuidance.SelectAnotherBell : " objects in the map share its scene and path. " + WindowGuidance.SelectAnotherLight));
             var problem = world.SourceProblem(matches[0], controller, addition.Pattern);
             if (problem != null) {
-                var message = "Equipment " + addition.Id + ": source " + name + " does not conform to " + addition.Pattern + ": " + problem + ". Select an eligible source or remove the addition";
+                var message = "Equipment " + addition.Id + ": source " + name + " does not conform to " + addition.Pattern + ": " + problem.TrimEnd('.') + ". " + WindowGuidance.SelectEligibleSource;
                 if (problem.StartsWith(EquipmentAddition.BellsUnavailable, StringComparison.Ordinal)) throw new InvalidOperationException(message);
                 throw new InvalidPatchDefinitionException(message);
             }
@@ -428,7 +428,7 @@ namespace RailroaderScenePatcher.Core {
         }
         internal void Check(object controller, CrossingEquipment equipment, List<object> owned) {
             foreach (var addition in equipment.Additions) {
-                if (addition.Placement?.Position == null || addition.Placement.Rotation == null) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + " needs a fixed placement. Give it a position and rotation or remove the addition");
+                if (addition.Placement?.Position == null || addition.Placement.Rotation == null) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + " has no fixed position and rotation. " + WindowGuidance.GivePlacement);
                 Source(controller, addition, StaleAt(owned, addition));
             }
         }
@@ -442,7 +442,8 @@ namespace RailroaderScenePatcher.Core {
             var difference = Faulty(owned, desired, out var pattern);
             if (difference == null) return null;
             return "The crossing's added equipment does not meet its pattern's requirements: " + difference + (pattern == EquipmentAddition.BellPattern
-                ? ". Remove or replace that bell. You can still edit crossing coverage" : ". Reload before editing the crossing's equipment. You can still edit crossing coverage");
+                ? ". " + WindowGuidance.RemoveOrReplaceBell + " " + WindowGuidance.CoverageStillEditable
+                : ". " + WindowGuidance.ReloadBeforeEditingEquipment + " " + WindowGuidance.CoverageStillEditable);
         }
         string Faulty(List<object> owned, CrossingEquipment desired, out string pattern) {
             pattern = null;

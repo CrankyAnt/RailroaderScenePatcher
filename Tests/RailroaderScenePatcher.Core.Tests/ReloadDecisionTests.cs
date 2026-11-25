@@ -139,7 +139,7 @@ static class ReloadDecisionTests {
             && reloads == 1 && w.Store.PatchWrites == 1 && !w.MapEditor.IsDirty, "Retry completes outstanding writes before reloading");
         w.MapEditor.NativeEdit(8); w.MapEditor.ThrowInNativeAction = true; w.MapEditor.Undo();
         message = w.Session.Reload(ReloadChoice.Save, () => w.MapEditor.NativeDirty, () => w.MapEditor.Save(), () => reloads++);
-        Assert(message.Contains("Undo history could not be recovered") && reloads == 1, "Save cannot silently discard work after an unrecovered native history error");
+        Assert(message.Contains("Undo history couldn't be recovered") && reloads == 1, "Save cannot silently discard work after an unrecovered native history error");
         Assert(w.Session.Reload(ReloadChoice.Discard, () => w.MapEditor.NativeDirty, () => w.MapEditor.Save(), () => reloads++) == null
             && reloads == 2, "An explicit discard remains available after incomplete persistence");
     }
@@ -151,9 +151,9 @@ static class ReloadDecisionTests {
         w.MapEditor.Undo(); w.MapEditor.Redo(); w.Session.Remove(P);
         Assert(w.Session.ReloadRequirement == null, "Undo, Redo and removal retain effective live updates without a stale reload flag");
         w.MapEditor.NativeEdit(3); w.MapEditor.ThrowInNativeAction = true; w.MapEditor.Undo();
-        Assert(w.Session.ReloadRequirement.Contains("Undo history could not be recovered"), "An unrecovered native history remains a concrete reload requirement");
+        Assert(w.Session.ReloadRequirement.Contains("Undo history couldn't be recovered"), "An unrecovered native history remains a concrete reload requirement");
         w.MapEditor.Save();
-        Assert(w.Session.ReloadRequirement.Contains("Undo history could not be recovered"), "Save does not claim to repair native history");
+        Assert(w.Session.ReloadRequirement.Contains("Undo history couldn't be recovered"), "Save does not claim to repair native history");
     }
     static void ReloadPreservesSaveFailureDetails() {
         var w = new World(); var reloads = 0;

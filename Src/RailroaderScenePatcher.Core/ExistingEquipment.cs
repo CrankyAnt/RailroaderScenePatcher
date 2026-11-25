@@ -44,7 +44,7 @@ namespace RailroaderScenePatcher.Core {
         public static string MastProblem(MastFacts m, IReadOnlyList<string> keys) {
             if (m == null) throw new ArgumentNullException(nameof(m));
             if (keys == null || keys.Count == 0) throw new ArgumentException("The controller's keys are required", nameof(keys));
-            if (m.AddedByPatcher) return "the patcher added this equipment; edit or remove it on its crossing controller's Connections tab";
+            if (m.AddedByPatcher) return "the patcher added this equipment; it isn't an independently editable native device. " + WindowGuidance.EditOnController;
             if (m.SharedPath > 1) return m.SharedPath + " objects share this hierarchy path, so a scene patch file cannot name this one";
             if (m.MissingScript) return "a script in its hierarchy is missing";
             if (!m.BelowController) return "its nearest key-value object does not belong to a crossing controller, so no crossing controller drives it";
@@ -126,8 +126,8 @@ namespace RailroaderScenePatcher.Core {
         // Placement and activity leave the logical binding: the equipment takes no relationship of any kind.
         public void CheckRelationships(object target, ObjectState state) {
             if (state?.Marker != null) throw new InvalidOperationException("An existing crossing " + noun + " does not support a track-marker relationship");
-            if (state?.Coverage != null) throw new InvalidOperationException("An existing crossing " + noun + " does not support a crossing-coverage relationship. Set coverage on its crossing controller");
-            if (state?.Equipment != null) throw new InvalidOperationException("An existing crossing " + noun + " does not support a crossing-equipment relationship. Add equipment on its crossing controller");
+            if (state?.Coverage != null) throw new InvalidOperationException("An existing crossing " + noun + " does not support a crossing-coverage relationship. " + WindowGuidance.SetCoverageOnController);
+            if (state?.Equipment != null) throw new InvalidOperationException("An existing crossing " + noun + " does not support a crossing-equipment relationship. " + WindowGuidance.AddEquipmentOnController);
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             // The capability covers fixed placement: nothing here re-evaluates a placement when its track changes.
             if (state?.Placement?.Following != null) throw new InvalidOperationException(NoFollowing);

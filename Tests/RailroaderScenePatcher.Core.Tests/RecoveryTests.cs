@@ -199,7 +199,7 @@ static class RecoveryTests {
             var w = new World(new ModStorage(folder.Root, files));
             Assert(w.Session.Blocked != null, "The newer scene patch file is protected");
             var unconfirmed = w.Session.Reread(false);
-            Assert(!unconfirmed.Applied && unconfirmed.Error.Contains("Confirm") && w.Session.Blocked != null, "Reading again needs confirmation");
+            Assert(!unconfirmed.Applied && unconfirmed.Error.Contains("wasn't confirmed") && w.Session.Blocked != null, "Reading again needs confirmation");
             var still = w.Session.Reread(true);
             Assert(!still.Applied && still.Error.Contains("Newer format version") && w.Session.Blocked != null && w.Session.ScenePatchFileDiagnostics.Single().Path == "formatVersion", "An uncorrected scene patch file stays protected with its diagnostics: " + still.Error);
             files.UnreadablePath = folder.PatchPath;
@@ -318,7 +318,7 @@ static class RecoveryTests {
             Assert(w.MapEditor.UndoGroups.Count == groups && w.Scene.MutationCalls == mutations && !w.Box.Active && JObject.Parse(w.Session.ScenePatchFileText)["modifications"]["base"] != null, name + " changes nothing");
         }
         var single = w.Session.Remove(Q);
-        Assert(!single.Applied && single.Error.Contains("because also names it in dependsOn; change or remove that modification first"), "One dependent is named in the singular: " + single.Error);
+        Assert(!single.Applied && single.Error.Contains("because also names it in dependsOn. Change or remove that modification first."), "One dependent is named in the singular: " + single.Error);
         foreach (var target in new[] { new TargetIdentity("s", "q2", "c"), Q, P }) {
             var removed = w.Session.Remove(target);
             Assert(removed.Applied, "Once no modification names it, " + target.Path + " can leave the scene patch file: " + removed.Error);
@@ -357,7 +357,7 @@ static class RecoveryTests {
             var w = new World(Doc(items));
             var x = w.Box.X; var groups = w.MapEditor.UndoGroups.Count;
             var edit = w.Session.Edit(P, At(150), null);
-            Assert(!edit.Applied && edit.Error == "Modification move is not effective because " + reason + "; correct that first. Nothing was changed", name + ": the edit is refused with the reason: " + edit.Error);
+            Assert(!edit.Applied && edit.Error == "Modification move is not effective because " + reason + ". Correct that first. Nothing was changed", name + ": the edit is refused with the reason: " + edit.Error);
             Assert(w.Box.X == x && w.MapEditor.UndoGroups.Count == groups && (double)JObject.Parse(w.Session.ScenePatchFileText)["modifications"]["move"]["placement"]["position"][0] == 112, name + ": nothing changed");
             Assert(!w.Session.Edit(P, null, false).Applied, name + ": an activity edit is refused as well");
             var remove = w.Session.Remove(P);

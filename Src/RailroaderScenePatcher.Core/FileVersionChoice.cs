@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher.Core {
                 var text = storage.ReadScenePatchFile();
                 if (storage is IVersionBackupStorage checkedStorage && checkedStorage.VersionFingerprint() != fingerprint) {
                     observedVersion = null;
-                    throw new InvalidOperationException("The file changed while it was being read. Refresh to check it again");
+                    throw new InvalidOperationException("The file changed while it was being read. " + WindowGuidance.RefreshToCheck);
                 }
                 if (!(storage is IVersionBackupStorage)) observedVersion = text;
                 observedMissing = text == null && fingerprint == null;
@@ -92,7 +92,7 @@ namespace RailroaderScenePatcher.Core {
             try {
                 var shown = observedVersion;
                 CheckFileVersion();
-                if (shown != observedVersion) throw new InvalidOperationException("The file changed again. Review the updated choice before continuing");
+                if (shown != observedVersion) throw new InvalidOperationException("The file changed after the version choice was shown. " + WindowGuidance.ReviewUpdatedChoice);
                 if (VersionState == FileVersionState.None) throw new InvalidOperationException("There is no file version to choose");
                 if (VersionState == FileVersionState.Repair) {
                     if (shown == null && observedMissing) {
@@ -106,19 +106,19 @@ namespace RailroaderScenePatcher.Core {
                     try {
                         path = backup.BackupScenePatchFile(backupPreview);
                         if (!backup.MatchesPatchBackup(path)) throw new InvalidOperationException("The backup could not be verified");
-                        if (backup.VersionFingerprint() != shown) throw new InvalidOperationException("The file changed while the backup was being written. Review the updated diagnosis before continuing");
+                        if (backup.VersionFingerprint() != shown) throw new InvalidOperationException("The file changed while the backup was being written. " + WindowGuidance.ReviewUpdatedDiagnosis);
                     } catch (Exception error) {
                         Exception cleanupError = null;
                         if (path != null) { try { backup.RemoveVersionBackupIfUnchanged(path); } catch (Exception e) { cleanupError = e; } }
                         backupPreview = backup.ReserveVersionBackup();
-                        if (cleanupError != null) throw new InvalidOperationException(error.Message + " The backup might remain at " + path + "; delete it when no longer needed.", error);
+                        if (cleanupError != null) throw new InvalidOperationException(error.Message + " The backup might remain at " + path + ". " + WindowGuidance.DeleteBackup, error);
                         throw;
                     }
                     replacementBackup = path; versionBackup = true; backedVersionFingerprint = shown; LastBackup = path; lastVersionBackup = true;
                     VersionMessage = "Scene Patcher will not change the backup. Delete it when you no longer need it. It will be published with the mod while it remains there.";
                 } else {
                     var text = storage.ReadScenePatchFile();
-                    if ((storage is IVersionBackupStorage versionStorage ? versionStorage.VersionFingerprint() : text) != shown) throw new InvalidOperationException("The file changed again. Review the updated choice before continuing");
+                    if ((storage is IVersionBackupStorage versionStorage ? versionStorage.VersionFingerprint() : text) != shown) throw new InvalidOperationException("The file changed after the version choice was shown. " + WindowGuidance.ReviewUpdatedChoice);
                     acceptedContent = PreservingJson.Parse(text).Root; acceptedVersion = true;
                     VersionMessage = null;
                 }
@@ -134,10 +134,10 @@ namespace RailroaderScenePatcher.Core {
             try {
                 var shown = observedVersion;
                 CheckFileVersion();
-                if (shown != observedVersion) throw new InvalidOperationException("The file changed again. Review the updated choice before continuing");
+                if (shown != observedVersion) throw new InvalidOperationException("The file changed after the version choice was shown. " + WindowGuidance.ReviewUpdatedChoice);
                 if (VersionState != FileVersionState.Changed) throw new InvalidOperationException("There is no readable file version to use");
                 var text = storage.ReadScenePatchFile();
-                if ((storage is IVersionBackupStorage versionStorage ? versionStorage.VersionFingerprint() : text) != shown) throw new InvalidOperationException("The file changed again. Review the updated choice before continuing");
+                if ((storage is IVersionBackupStorage versionStorage ? versionStorage.VersionFingerprint() : text) != shown) throw new InvalidOperationException("The file changed after the version choice was shown. " + WindowGuidance.ReviewUpdatedChoice);
                 var loaded = ScenePatchFile.Load(text);
                 var refusal = Refusal(loaded, text);
                 if (refusal != null) throw new InvalidOperationException(refusal);
@@ -147,7 +147,7 @@ namespace RailroaderScenePatcher.Core {
                     TargetIdentity target; object resolved;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(target); }
                     catch (InvalidOperationException) { continue; }
-                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before using the file version");
+                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. " + WindowGuidance.RecheckBeforeFileVersion);
                     // A current modification that is not applied changed nothing, so there is nothing to capture or
                     // restore: its refusal refuses only itself, never the choice of another file version.
                     if (NotAppliedOf(ScenePatchFile.Key(item)) != null) continue;
@@ -174,14 +174,14 @@ namespace RailroaderScenePatcher.Core {
                     TargetIdentity target; object resolved;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(target); }
                     catch (InvalidOperationException) { continue; }
-                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before using the file version");
+                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. " + WindowGuidance.RecheckBeforeFileVersion);
                     if (NotAppliedOf(property.Name) != null) continue;
                     scene.Preflight(resolved);
                     mutationStarted = true;
                     Commit(target, resolved, null, property.Name, item, null);
                 }
                 if ((storage is IVersionBackupStorage finalStorage ? finalStorage.VersionFingerprint() : storage.ReadScenePatchFile()) != shown)
-                    throw new InvalidOperationException("The file changed while the choice was being applied. Review the updated choice before continuing");
+                    throw new InvalidOperationException("The file changed while the choice was being applied. " + WindowGuidance.ReviewUpdatedChoice);
                 scenePatchFile = loaded; diskText = text; saved = PreservingJson.Parse(text).Root; comparedVersion = -1;
                 ResetStartState(); stepKeys.Clear(); Import = null;
                 ClearVersionAcceptance(); VersionState = FileVersionState.None; VersionMessage = null;

@@ -155,9 +155,9 @@ static class BellTests {
         // A bell whose source names a scene object is no definition: it is invalid, so no scene is resolved or loaded for it.
         var g = new Fixture();
         var scene = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Bell("bell", source: "{\"scene\":\"UnloadedScene\",\"path\":\"World/Bell\"}"))));
-        Assert(!scene.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment bell needs a bell definition as its source", "scene patch file (Data/scene-patches.json)", "set the source's definition to the bell definition's identifier", "remove any other members from the source" }.All(scene.Outcomes["bad"].Error.Contains) && g.World.Mutations == 0 && g.Unchanged, "A bell from a scene path is refused without resolving a scene: " + scene.Outcomes["bad"].Error);
+        Assert(!scene.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment bell needs a bell definition as its source", "Data/scene-patches.json", "the source must contain only definition with the bell definition's identifier" }.All(scene.Outcomes["bad"].Error.Contains) && g.World.Mutations == 0 && g.Unchanged, "A bell from a scene path is refused without resolving a scene: " + scene.Outcomes["bad"].Error);
         var light = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Bell("lamp", pattern: EquipmentAddition.LightGatePattern))));
-        Assert(!light.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment lamp needs a light or gate in the map as its source", "scene patch file (Data/scene-patches.json)", "only a scene and a path" }.All(light.Outcomes["bad"].Error.Contains) && g.Unchanged, "A light or gate from a definition is refused: " + light.Outcomes["bad"].Error);
+        Assert(!light.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment lamp needs a light or gate in the map as its source", "Data/scene-patches.json", "the source must contain only the scene and path" }.All(light.Outcomes["bad"].Error.Contains) && g.Unchanged, "A light or gate from a definition is refused: " + light.Outcomes["bad"].Error);
     }
     static void InvalidBellContentIsRefused() {
         foreach (var invalid in new[] { Bell("bell", source: "{}"), Bell("bell", source: "{\"definition\":\"\"}"), Bell("bell", source: "{\"definition\":5}"),
@@ -270,7 +270,7 @@ static class BellTests {
         var offered = session.EquipmentSources(Crossing).Where(c => c.Pattern == EquipmentAddition.BellPattern).ToList();
         Assert(offered.Count == 1 && offered[0].Eligible && offered[0].Source.Definition == CrossingBell, "Scene patch editing offers the bell definitions");
         var preview = session.PreviewEquipment(Crossing, NewBell(), null);
-        Assert(preview.Error == null && preview.Lines.Single().StartsWith("Add author/pack bell: " + EquipmentAddition.BellPattern + " from definition " + CrossingBell, StringComparison.Ordinal) && f.World.Mutations == 0, "The preview names the bell and changes nothing: " + preview.Error + String.Join("|", preview.Lines));
+        Assert(preview.Error == null && preview.Lines.Single().StartsWith("Would add author/pack bell: " + EquipmentAddition.BellPattern + " from definition " + CrossingBell, StringComparison.Ordinal) && f.World.Mutations == 0, "The preview names the bell and changes nothing: " + preview.Error + String.Join("|", preview.Lines));
         var added = session.AddEquipment(Crossing, NewBell());
         f.World.FinishLoads();
         Assert(added.Applied && f.Bells.Count == 1 && f.World.AudioReferences == 1, "Scene patch editing builds the bell: " + added.Error);
