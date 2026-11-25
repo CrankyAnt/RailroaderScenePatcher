@@ -91,9 +91,10 @@ namespace RailroaderScenePatcher {
             var block = (IsStarter ? StarterEditBlock() : EditBlock()) ?? GuidedTaskState.TargetBlock(kind, selected.Identity);
             if (block != null) return block;
             switch (kind) {
-                case GuidedTaskKind.Placement: return PadBlock ?? (IsStarter ? StarterPlacements.ObjectSettings : null);
-                case GuidedTaskKind.Snap: return PadBlock ?? (IsStarter ? StarterPlacements.ObjectSettings : snap == null ? "Snapping is unavailable." : null);
-                case GuidedTaskKind.Activity: return IsStarter ? StarterPlacements.ObjectSettings : null;
+                // The placement and activity tasks meet the reasons that Supported edits names for Move and Enabled.
+                case GuidedTaskKind.Placement: return EditUnavailable(SupportedEdits.Move);
+                case GuidedTaskKind.Snap: return EditUnavailable(SupportedEdits.Move) ?? (snap == null ? "Snapping is unavailable." : null);
+                case GuidedTaskKind.Activity: return EditUnavailable(SupportedEdits.Activity);
                 case GuidedTaskKind.StarterPlacement: return IsStarter ? null : "This object is not a starter placement marker.";
                 case GuidedTaskKind.Wreck: return CommandBand.WreckTaskReason(IsStarter, NativeInventory.StartersError, selected.Bindings.Where(IsReader).ToArray());
                 case GuidedTaskKind.MarkerId: return MarkerIdBlock();

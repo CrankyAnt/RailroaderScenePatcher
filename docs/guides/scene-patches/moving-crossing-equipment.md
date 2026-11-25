@@ -14,7 +14,7 @@ In the native map editor, open **Scene Patcher** and click **Refresh** in the co
 - The bell that a crossing controller creates has one row under **Grade crossing**, such as `Crossing Bell at Bryson Everett`.
 - Each detection span appears under its controller in the outliner. The **Object** tab starts with **Detection span of:** and the controller's name. You cannot set a span's placement because its track locations determine its position. To change which tracks the crossing detects, select the span and click **Select controller** on the **Object** tab. Then use the controller's **Connections** tab, as described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md).
 
-**Supported edits** on the **Object** tab lists what you can change. If it starts with **Not editable:**, the mast or bell does not match its supported source pattern. The text explains why. See [refusal reasons](#refusal-reasons).
+**Supported edits** on the **Object** tab lists the edits you can make under **Available:** and the edits you cannot make under **Unavailable:**, each with its reason. A mast or bell that does not match its supported source pattern has its edits under **Unavailable:**, with the reason. See [refusal reasons](#refusal-reasons).
 
 ## Move or rotate a mast, or move a bell
 

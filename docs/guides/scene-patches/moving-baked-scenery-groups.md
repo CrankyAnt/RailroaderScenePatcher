@@ -47,7 +47,7 @@ Some objects below a group root are not listed as parts:
 
 The group root moves at once with everything below it. Save, Undo, Redo, and **Remove modification** in the footer work as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). Removal returns the group to the placement the loaded map gives it, together with the values other mods still set.
 
-If **Supported edits** on the **Object** tab starts with **Not editable:**, the reason follows, for example a hierarchy path that two groups share.
+If **Supported edits** on the **Object** tab lists the group's edits under **Unavailable:**, the reason on that line follows, for example a hierarchy path that two groups share.
 
 ## Disable or enable a group
 

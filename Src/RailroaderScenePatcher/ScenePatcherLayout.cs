@@ -759,8 +759,9 @@ namespace RailroaderScenePatcher {
             // A group root's own flag can be off while only its simple culler hides it; the observation reads the authored flag.
             Field(builder, "Enabled", EnabledText()).Tooltip("Enabled", "Whether this object is active in the scene.");
             if (FollowsGroup) Field(builder, "Track group", CommandBand.TrackGroup(Editable));
+            // The edits that the controls offer and why each other one is not available, from the controls' own rules.
             FieldLabel(builder, "Supported edits");
-            PlainLabel(builder, selected.Operations);
+            foreach (var line in SupportedEdits.Lines(InspectedEdits())) PlainLabel(builder, line);
             // A mast or bell that does not conform to its pattern links to the guide's refusal reasons.
             if (IsRefusedEquipment)
                 Button(builder, CommandBand.EquipmentGuide[0], () => Application.OpenURL(GuideRoot + CommandBand.EquipmentGuide[1])).Tooltip(CommandBand.EquipmentGuide[0], "Open the guide's refusal reasons in your browser.");
@@ -826,13 +827,39 @@ namespace RailroaderScenePatcher {
             }
             return result.ToString();
         });
-        bool FollowsGroup => selected != null && selected.Bindings.Any(b => b.IndexOf("follows track group", StringComparison.OrdinalIgnoreCase) >= 0 || b.IndexOf("targetActiveFollowsTrackGroup=True", StringComparison.OrdinalIgnoreCase) >= 0);
+        bool FollowsGroup => SupportedEdits.FollowsGroup(selected);
+        // The inspected object's edits and the reason of each one that is not available, which Supported edits lists and
+        // every control of the Placement, Object and Connections tabs takes as its object reason. The loaded world adds what
+        // the inventory entry does not hold: whether the object still stands, its own activity, the game's switches of
+        // that activity, the marker adapter's refusal and the marker ID's sharers.
+        IReadOnlyList<SupportedEdits.Edit> InspectedEdits() {
+            if (selected == null) return Array.Empty<SupportedEdits.Edit>();
+            var target = selected.Handle as GameObject;
+            var editable = Editable;
+            var live = new SupportedEdits.Live {
+                Present = selected.Handle is GameObject, Enabled = OwnActivity(selected), Bridge = InspectedBridge, HoldsConstructionSegments = HoldsConstructionSegments,
+                StartersError = NativeInventory.StartersError, MarkerRefusal = IsStarter || SupportedEdits.EditsBinding(selected.Identity.Structure) ? null : MarkerAdapterRefusal(),
+            };
+            if (editable && target != null) {
+                live.ActivitySwitched = selected.GroupPath != null || selected.Family == BakedSceneryRules.Family ? GroupWorld.ActivityProblem(target) : IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
+                live.DisableProblem = GroupWorld.DisableProblem(target);
+            }
+            if (IsGenericMarker) {
+                var reading = ReadSharers();
+                live.MarkerIdReason = CommandBand.MarkerIdUnavailable(selected.Family, true, reading.Underlying, reading.Sharers.Count, HasMarkerIdValue(selected.Identity));
+            }
+            return SupportedEdits.Of(selected, live);
+        }
+        // The reason of one edit of the inspected object, or null while its controls offer it.
+        string EditUnavailable(string edit) => SupportedEdits.ReasonOf(InspectedEdits(), edit);
 
         // The Placement tab: every way to put the object somewhere. The tab's pinned row holds the actions of the chosen way.
         void DrawPlacement(UIPanelBuilder builder) {
             // A crossing pad has no placement of its own, and an object that cannot be edited has none to set: the tab
             // shows the placement, and no other mode is open.
-            if (CommandBand.ForcesNumeric(IsPad, Editable, IsController)) placementMode = CommandBand.NumericMode;
+            var edits = InspectedEdits();
+            var moveBlock = SupportedEdits.ReasonOf(edits, SupportedEdits.Move);
+            if (moveBlock != null) placementMode = CommandBand.NumericMode;
             // A new-game car placement puts its cars at the marker's track point, which the world marks in gold; the
             // object position below plays no part in it.
             if (selected.Family == StarterPlacements.Family) {
@@ -845,14 +872,13 @@ namespace RailroaderScenePatcher {
             builder.AddSegmentedControlCompact(segments => {
                 for (var i = 0; i < PlacementModes.Length; i++) {
                     var mode = i;
-                    // A mode that cannot be used on the inspected object is inactive and says why.
-                    // A starter placement marker's object does not change where its cars start: every mode but Numeric,
-                    // which shows the object's placement, says so.
-                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment || IsRefusedEquipment, IsRailBridge, IsController, IsRoadBridge);
-                    segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.ModeTip(i, tips[i], padMode, EditBlock() ?? PadBlock ?? ControllerBlock));
+                    // A mode that cannot be used on the inspected object is inactive and says why, in the words of
+                    // Supported edits. Numeric stays open to show the placement, its fields unavailable with the reason.
+                    var padMode = SupportedEdits.ModeBlock(edits, i, !IsPad && !IsRefusedEquipment);
+                    segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.ModeTip(i, tips[i], padMode, moveBlock ?? EditBlock()));
                 }
             }, true);
-            var block = EditBlock() ?? PadBlock ?? ControllerBlock;
+            var block = moveBlock ?? EditBlock();
             if (placementMode == 0) {
                 for (var group = 0; group < 2; group++) {
                     if (group != 0) builder.Spacer(6f);
@@ -1131,19 +1157,14 @@ namespace RailroaderScenePatcher {
         // Why the inspected object has no editable track binding: its own detected reason when it holds a marker the
         // adapter refuses, or that the operation is for markers, mileposts and pads. It is one plain sentence
         // (CommandBand.Sentence): the tooltip's Unavailable: and the section it stands in name what is unavailable.
-        string BindingUnavailable() {
-            // A marker or pad the adapter refuses says why under Supported edits; so does a starter placement marker.
-            var family = selected?.Family;
-            if (CommandBand.HoldsMarker(family) && CommandBand.Refusal(selected.Operations) is string reason)
-                return CommandBand.Sentence(reason);
-            // Another object that holds a marker: ask the marker adapter why it refuses this object.
+        string BindingUnavailable() => EditUnavailable(SupportedEdits.Binding) ?? CommandBand.NoBindingReason(selected);
+        // Why the marker adapter refuses the inspected object when it holds a track marker, or null.
+        string MarkerAdapterRefusal() {
             try {
-                if (selected?.Handle is GameObject target && target != null && target.GetComponents<Component>().Any(c => c != null && c.GetType().FullName == TrackMarkerWorld.MarkerType)) {
-                    var refusal = TrackMarkerWorld.Problem(target, NativeInventory.LastReferrers, null);
-                    if (refusal != null) return CommandBand.Sentence(refusal);
-                }
+                if (selected?.Handle is GameObject target && target != null && target.GetComponents<Component>().Any(c => c != null && c.GetType().FullName == TrackMarkerWorld.MarkerType))
+                    return TrackMarkerWorld.Problem(target, NativeInventory.LastReferrers, null);
             } catch { }
-            return CommandBand.NoBindingReason(selected);
+            return null;
         }
         // Why a role's Segment button cannot start a world choice now, or null.
         string CoveragePickBlock => ChoiceBlock ?? EditBlock() ?? (selection == null ? "World selection is unavailable." : null);
@@ -1263,7 +1284,7 @@ namespace RailroaderScenePatcher {
             // The native checkbox shows the effective wreck setting of the one car placement that reads the marker and
             // sets this mod's value; the result appears in the footer.
             Section(builder, "Starting cars");
-            var wreckBlock = block ?? CommandBand.WreckReason(NativeInventory.StartersError, readers);
+            var wreckBlock = EditUnavailable(SupportedEdits.Wreck) ?? block;
             var identity = selected.Identity;
             // A checkbox that cannot be used refuses the click and dims its label, as an inactive button does.
             var wreckRow = builder.HStack(row => {
@@ -1577,7 +1598,7 @@ namespace RailroaderScenePatcher {
             var identity = selected?.Identity;
             switch (id) {
                 case PlacementTab:
-                    block = CommandBand.PlacementBlock(block, PadBlock, ControllerBlock);
+                    block = (selected == null ? null : EditUnavailable(SupportedEdits.Move)) ?? block;
                     // An object whose placement stands as running lines keeps Apply and Read, inactive with the reason.
                     if (placementMode == 0 || IsPad) {
                         var placementBlock = block;
@@ -1696,13 +1717,12 @@ namespace RailroaderScenePatcher {
                         }, "Retry terrain output") };
                 }
                 default: {
-                    var target = selected?.Handle as GameObject;
                     var enabled = OwnActivity(selected);
-                    // A part that a culler of the game switches by camera distance, and a group root or part that a rail
-                    // bridge's construction controller switches, cannot hold an Enabled setting.
-                    var switched = block == null && target != null && (selected.GroupPath != null || selected.Family == BakedSceneryRules.Family) ? GroupWorld.ActivityProblem(target) : block == null && target != null && IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
+                    // Why the object takes no Enabled setting, as Supported edits names it: such as a part that a culler of
+                    // the game switches by camera distance, or a controller whose activity the game needs.
+                    var activity = selected == null ? null : EditUnavailable(SupportedEdits.Activity);
                     return new[] {
-                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched ?? ControllerActivity ?? (enabled && target != null ? GroupWorld.DisableProblem(target) : null) ?? CommandBand.ActivityReason(!enabled, FollowsGroup), () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
+                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", activity ?? block, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.
                         Slot(CommandBand.ClearActivity, "Clear this mod's value for the activity; the object returns to its underlying activity.", block ?? ControllerActivity ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
                             () => Edit(ActivityPlace, "Clearing the activity's mod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
@@ -1756,13 +1776,10 @@ namespace RailroaderScenePatcher {
                 HasPickedBinding ? Slot("Cancel", "Restore the current binding in the fields.", null, CancelPickedBinding) :
                 Slot("Picked", "Fill the segment field with the confirmed segment.", unavailable ?? (segment ? null : "Choose a replacement segment and confirm it first."), () => { binding[0] = confirmed.Identifier; }, "Picked segment", 1, 70));
         }
-        // Why no placement mode edits the inspected object when it is a crossing pad; null for any other object.
-        string PadBlock => IsPad ? CommandBand.PadFollowsTrack : null;
         // A construction controller on an object of its own takes no placement and no Enabled setting: its position has
         // no effect, and the construction's visibility control runs on it.
         bool IsController => selected?.Identity.Structure == ConstructionSceneryScene.Structure;
-        string ControllerBlock => IsController ? CommandBand.ControllerNoPlacement : null;
-        string ControllerActivity => IsController ? CommandBand.ControllerNoActivity : null;
+        string ControllerActivity => IsController ? CommandBand.ControllerNoActivity : CommandBand.EditsCoverage(selected?.Identity) ? SupportedEdits.CrossingNoEdit : null;
         bool HasStarterTrack(TargetIdentity identity) {
             try { return attachment != null && identity != null && attachment.Session.HasStarterTrack(identity); } catch { return false; }
         }
@@ -1925,7 +1942,7 @@ namespace RailroaderScenePatcher {
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ObjectTab] = new HelpText { Title = "Object", Intro = "Check the object's state, problems, and dependencies before choosing an edit.",
                 Terms = new[] {
-                    new[] { "Supported edits", "What this patcher can change on this object, or why it cannot be edited. That reason is not a problem." },
+                    new[] { "Supported edits", "The edits that the Placement, Object, and Connections tabs offer for this object. Each edit that is not available is listed with the reason its control gives. That reason is not a problem." },
                     new[] { "Detected problems", "Defects you can repair with the patcher, each with its repair. On a crossing controller, these include a detection span with an end outside its track segment, or with no track route between its ends: the game detects no train on such a span." },
                     new[] { "Information", "What the inspection found that the patcher cannot repair on this object, such as the detection findings of a crossing controller that cannot be edited. Each names the reason." },
                     new[] { "Inspection notes", "What the inspection could not read or check. Nothing here can be repaired with the patcher, so it is not listed as a problem." },

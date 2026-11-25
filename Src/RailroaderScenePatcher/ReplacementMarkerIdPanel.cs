@@ -49,12 +49,11 @@ namespace RailroaderScenePatcher {
             try { return attachment != null && identity != null && attachment.Session.HasMarkerId(identity); } catch { return false; }
         }
         // Why the replacement ID is unavailable for the inspected object now, or null when it is offered.
-        string MarkerIdBlock() {
-            var block = IsStarter ? StarterEditBlock() : EditBlock();
-            if (block != null) return block;
-            var reading = ReadSharers();
-            return CommandBand.MarkerIdUnavailable(selected?.Family, IsGenericMarker, reading.Underlying, reading.Sharers.Count, HasMarkerIdValue(selected?.Identity));
-        }
+        // The object's own reason comes first, as Supported edits names it; an object without a Marker ID section, which
+        // only the guided task reaches, takes no replacement ID for its family.
+        string MarkerIdBlock() =>
+            EditUnavailable(SupportedEdits.MarkerId) ?? (IsStarter ? StarterEditBlock() : EditBlock())
+            ?? (IsGenericMarker ? null : CommandBand.MarkerIdUnavailable(selected?.Family, false, null, 0, false));
         // The Marker ID section: the field with Set ID and Clear ID, then the scene markers that hold the underlying ID.
         // The section stays visible for every marker; for a marker that takes no replacement ID it is disabled with the reason.
         void DrawMarkerId(UIPanelBuilder builder) {

@@ -326,6 +326,7 @@ class Program {
         EmptyListReasonTests.Run();
         BakedPartTests.Run();
         CrossbuckTests.Run();
+        SupportedEditsTests.Run();
         IndustryObjectTests.Run();
         LakeSurfaceTests.Run();
         StationMapIconTests.Run();

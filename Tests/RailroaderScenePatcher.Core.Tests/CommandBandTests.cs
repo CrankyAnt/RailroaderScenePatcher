@@ -242,11 +242,11 @@ static class CommandBandTests {
         foreach (var row in new[] {
             new[] { blocked, starter },
             new[] { CommandBand.EditReason(blocked), starter },
-            new[] { CommandBand.ModeBlock(CommandBand.GizmoMode, false, false, blocked), starter },
+            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of(StarterPlacements.Family, StarterPlacementScene.Structure, blocked)), CommandBand.GizmoMode, false), starter },
             new[] { StarterPlacements.NoDetach, StarterPlacements.NoDetach + "." },
             new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
             new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
-            new[] { CommandBand.ModeBlock(CommandBand.SnapMode, false, false, CommandBand.NotYetSupported("the Track span family")), "The Track span family cannot be edited." },
+            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Track span", null, CommandBand.NotYetSupported("the Track span family"))), CommandBand.SnapMode, false), "The Track span family cannot be edited." },
             new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects have this hierarchy path, and a scene patch file names an object by its path." },
             new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
             new[] { "Inspect an object first.", "Inspect an object first." },
@@ -568,7 +568,7 @@ static class CommandBandTests {
                 "The editing message of added equipment names its edit route: " + CommandBand.EditReason(CommandBand.AddedEquipmentOperations(name)));
         // No placement mode moves a crossing pad: each is inactive for a pad, with the one reason.
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
-            Check(CommandBand.PadModeBlock(mode) == CommandBand.PadFollowsTrack, "Placement mode " + mode + " is inactive for a crossing pad");
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Crossing pad marker", CrossingPadScene.Structure, CommandBand.PadOperations)), mode, false) == CommandBand.PadFollowsTrack, "Placement mode " + mode + " is inactive for a crossing pad");
         Check(CommandBand.PadFollowsTrack.Contains("follows its track") && CommandBand.PadFollowsTrack.Contains("under Connections"), "The reason says the pad follows its track and where to bind it");
         Check(CommandBand.PadOperations.StartsWith("The pad moves only when you change its track location.", StringComparison.Ordinal) && !CommandBand.PadOperations.Contains("fixed placement") && CommandBand.PadOperations.Contains("Enable or disable it separately."), "A pad's Supported edits promises no placement");
         // An edit whose fields hold the current values is disabled.
@@ -641,9 +641,9 @@ static class CommandBandTests {
         // Placement modes per object: a pad has none, an object that cannot be edited keeps Numeric only.
         var why = CommandBand.NotYetSupported("the Milepost family");
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode }) {
-            Check(CommandBand.ModeBlock(mode, false, true, "Fixed placement") == null, "Mode " + mode + " is open for an object that can be edited");
-            Check(CommandBand.ModeBlock(mode, true, true, "x") == CommandBand.PadFollowsTrack, "Mode " + mode + " is inactive for a pad");
-            Check(CommandBand.ModeBlock(mode, false, false, why) == (mode == CommandBand.NumericMode ? null : "The Milepost family cannot be edited."), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Track marker", TrackMarkerScene.Structure, "Fixed placement")), mode, true) == null, "Mode " + mode + " is open for an object that can be edited");
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Crossing pad marker", CrossingPadScene.Structure, "x")), mode, false) == CommandBand.PadFollowsTrack, "Mode " + mode + " is inactive for a pad");
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Milepost", null, why)), mode, true) == (mode == CommandBand.NumericMode ? null : "The Milepost family cannot be edited."), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
         }
         Check(CommandBand.ShowsCurrentRelations(false) && !CommandBand.ShowsCurrentRelations(true), "A confirmed target that is not yet used is the one green relation");
         // A candidate among several offers carries one number everywhere.
