@@ -39,13 +39,29 @@ namespace RailroaderScenePatcher.Core {
         // segment is a problem, and the controller has one note (Unknown). The recovery is the one the controller's
         // Connections tab offers for the kind of circuit.
         public static string Unresolved(string circuit, string role, string span, string lower, string upper, ISet<string> segments) {
+            var fault = UnresolvedFault(circuit, role, span, lower, upper, segments);
+            if (fault == null) return null;
+            return fault + " " + Recovery(circuit);
+        }
+        // The one recovery of a circuit's span finding: the edit on the controller's Connections tab that sets the
+        // circuit's tracks or detaches it, or that sets an addition's tracks or deletes it.
+        internal static string Recovery(string circuit) {
             var addition = DetectionAddition.Id(circuit);
-            var name = (addition == null ? "Circuit " + circuit : "Detection addition " + addition) + " " + CircuitCoverage.RoleCaption(role) + " span " + span;
-            var recovery = addition == null ? "On the controller's Connections tab, select tracks for this circuit or detach it." : "On the controller's Connections tab, select other tracks for this addition or delete it.";
-            if (String.IsNullOrWhiteSpace(lower) || String.IsNullOrWhiteSpace(upper)) return name + " has an end with no track segment assigned. " + recovery;
+            return addition == null ? "On the controller's Connections tab, click Edit circuit " + circuit + " and select tracks for this circuit or detach it."
+                : "On the controller's Connections tab, click Edit detection addition " + addition + " and select other tracks for this addition or delete it.";
+        }
+        // What Unresolved reports, without its recovery.
+        internal static string UnresolvedFault(string circuit, string role, string span, string lower, string upper, ISet<string> segments) {
+            var name = SpanName(circuit, role, span);
+            if (String.IsNullOrWhiteSpace(lower) || String.IsNullOrWhiteSpace(upper)) return name + " has an end with no track segment assigned.";
             if (segments == null) return null;
             var missing = new[] { lower, upper }.Where(id => !segments.Contains(id)).Distinct(StringComparer.Ordinal).ToArray();
-            return missing.Length == 0 ? null : name + " refers to track that no longer exists. Missing segment IDs: " + String.Join(", ", missing) + ". " + recovery;
+            return missing.Length == 0 ? null : name + " refers to track that no longer exists. Missing segment IDs: " + String.Join(", ", missing) + ".";
+        }
+        // A circuit's span as the Connections tab names it: the circuit or addition, the span's role caption and its ID.
+        internal static string SpanName(string circuit, string role, string span) {
+            var addition = DetectionAddition.Id(circuit);
+            return (addition == null ? "Circuit " + circuit : "Detection addition " + addition) + " " + CircuitCoverage.RoleCaption(role) + " span " + span;
         }
         // The one inspection note of a controller whose circuit spans could not be checked against the track graph.
         public static string Unknown(string graphError) => "Circuit span validity unknown. The track graph could not be read: " + graphError;

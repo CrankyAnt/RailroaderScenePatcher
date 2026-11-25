@@ -354,6 +354,7 @@ class Program {
         GameSwitchTests.Run();
         CoverageTests.Run();
         CoverageTests.RunAdditions();
+        DetectionCheckTests.Run();
         LocalWorldTests.Run();
         RetainedWorldTests.Run();
         CoverageTests.RunRetained();

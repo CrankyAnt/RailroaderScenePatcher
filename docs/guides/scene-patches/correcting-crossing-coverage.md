@@ -49,6 +49,23 @@ If the patcher can't read the track graph, the controller shows one inspection n
 
 If an edit fails, the panel reports whether the prior coverage was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
 
+### Detection that no longer fits its track
+
+Moving a track node in the Map Editor keeps the segment IDs, so a span still refers to existing segments. Its stored distances don't move with the track, though. When you inspect a crossing controller, the patcher checks the detection spans of its circuits against the current track for the two faults that the game itself checks or reports:
+
+- **An end outside its track segment**: the stored distance of a span end is longer than its segment, for example after the segment got shorter. The game detects no train on the span.
+- **No track route between the span's ends**: the game finds no route from one end of the span to the other. The game logs that the span has no route, gives it length zero, and detects no train on it.
+
+The patcher checks nothing that the game doesn't check. It doesn't check the length of a route that the game accepts, or whether an approach starts next to its island.
+
+Each fault is a problem with a plain explanation and its repair route: on the **Connections** tab, click **Edit circuit** and select tracks for the circuit or detach it, or click **Edit detection addition** and select other tracks for the addition or delete it. A span on a segment that no longer exists is reported once, as described above, and not as a fault.
+
+After a track node moves, the game keeps the route it already built for a span until the span is edited or the world loads again. The patcher checks the route on the current track, which is the route the game builds after a repair or the next load.
+
+A crossing controller that the patcher can't edit, such as a crossing object with a missing script, has no repair route. All its circuit findings, a missing span included, appear under **Information** on the **Object** tab with the reason, and not as problems.
+
+The checks read only the current scene: the patcher stores no earlier positions or distances, and inspecting changes nothing. Whether the island still covers the road is not checked; compare it with the world.
+
 ## Write coverage in the scene patch file
 
 Target the crossing controller with `component` set to `Track.Crossings.GradeCrossingController` and `structure` set to `crossing-coverage-v1`. In `relationships.crossingCoverage.circuits`, key each circuit you set by the ID of the map's own island span. Put the modification itself under its ID in `modifications`:

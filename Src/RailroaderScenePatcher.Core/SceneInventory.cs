@@ -147,6 +147,9 @@ namespace RailroaderScenePatcher.Core {
         // What the inspection could not read or check. The modder cannot repair these with the patcher, so they are no
         // problems: they are shown without the problem marker.
         public IReadOnlyList<string> Notes { get; }
+        // What the inspection found that is neither a problem nor a note, such as a detection finding of a crossing
+        // controller that fails its pattern check. Shown on the Object tab.
+        public IReadOnlyList<string> Information { get; }
         // Why this object is inspection only, or null: the inventory finds it, no supported family covers its kind and
         // the native map editor does not edit it. Such an object is listed under its category, marked inspection only, shows no
         // problem and offers no edit; what would be a problem for a supported kind is a note here.
@@ -169,8 +172,9 @@ namespace RailroaderScenePatcher.Core {
         public string Storage { get; }
         public SceneObservation(object handle, TargetIdentity identity, string family, bool active, IEnumerable<double> position,
             IEnumerable<double> rotation, IEnumerable<string> bindings, IEnumerable<string> dependencies, IEnumerable<string> problems, string operations,
-            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null, string category = null, string subcategory = null, string holderPath = null, string storage = null, BridgeKind bridge = BridgeKind.None) {
+            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null, string category = null, string subcategory = null, string holderPath = null, string storage = null, BridgeKind bridge = BridgeKind.None, IEnumerable<string> information = null) {
             Enabled = enabled ?? active; HolderPath = holderPath; Storage = storage; GroupPath = groupPath; Category = category; Subcategory = subcategory; Bridge = bridge;
+            Information = Array.AsReadOnly((information ?? Array.Empty<string>()).ToArray());
             InspectionOnly = inspectionOnly;
             var noted = (notes ?? Array.Empty<string>()).ToArray();
             if (inspectionOnly != null) { noted = noted.Concat(problems).ToArray(); problems = Array.Empty<string>(); }
@@ -204,7 +208,8 @@ namespace RailroaderScenePatcher.Core {
             foreach (var part in new[] { new KeyValuePair<string, IReadOnlyList<string>[]>("bindings", new[] { Bindings, other.Bindings }),
                 new KeyValuePair<string, IReadOnlyList<string>[]>("dependencies", new[] { Dependencies, other.Dependencies }),
                 new KeyValuePair<string, IReadOnlyList<string>[]>("problems", new[] { Problems, other.Problems }),
-                new KeyValuePair<string, IReadOnlyList<string>[]>("notes", new[] { Notes, other.Notes }) }) {
+                new KeyValuePair<string, IReadOnlyList<string>[]>("notes", new[] { Notes, other.Notes }),
+                new KeyValuePair<string, IReadOnlyList<string>[]>("information", new[] { Information, other.Information }) }) {
                 if (part.Value[0].SequenceEqual(part.Value[1])) continue;
                 var line = part.Value[0].Except(part.Value[1]).Concat(part.Value[1].Except(part.Value[0])).FirstOrDefault() ?? "order";
                 return part.Key + ": " + (line.Length > 160 ? line.Substring(0, 160) + "..." : line);
@@ -212,7 +217,7 @@ namespace RailroaderScenePatcher.Core {
             return "identity";
         }
         internal string Fingerprint => new JArray(Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family, Active,
-            new JArray(Rotation), new JArray(Bindings), new JArray(Dependencies), new JArray(Problems), Operations, new JArray(Notes), InspectionOnly).ToString(Newtonsoft.Json.Formatting.None);
+            new JArray(Rotation), new JArray(Bindings), new JArray(Dependencies), new JArray(Problems), Operations, new JArray(Notes), InspectionOnly, new JArray(Information)).ToString(Newtonsoft.Json.Formatting.None);
         public bool Matches(SceneObservation current) => current != null && ReferenceEquals(Handle, current.Handle) && Fingerprint == current.Fingerprint && SamePosition(current);
         // Whether a search text matches the object by what it says about itself. A group root names every component
         // below it among its dependencies, so a search for a part also finds its group: such a dependency line,
@@ -221,12 +226,12 @@ namespace RailroaderScenePatcher.Core {
             if (String.IsNullOrEmpty(text)) return true;
             var below = Identity.Path + "/";
             var own = String.Join(" ", new[] { DisplayName, Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family, Category, Subcategory, Active ? "active" : "inactive", Operations, InspectionOnly }
-                .Concat(Bindings).Concat(Dependencies.Where(line => line.IndexOf(below, StringComparison.Ordinal) < 0)).Concat(Problems).Concat(Notes));
+                .Concat(Bindings).Concat(Dependencies.Where(line => line.IndexOf(below, StringComparison.Ordinal) < 0)).Concat(Problems).Concat(Notes).Concat(Information));
             return own.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0;
         }
         // The visible name and the group-qualified part name are searchable as shown.
         internal string SearchText => String.Join(" ", new[] { DisplayName, Identity.Scene, Identity.Path, GroupPath == null ? null : BakedSceneryRules.PartName(GroupPath, Identity.Path), Identity.Component, Identity.Structure, Family, Category, Subcategory,
-            Active ? "active" : "inactive", Operations, InspectionOnly }.Concat(Bindings).Concat(Dependencies).Concat(Problems).Concat(Notes));
+            Active ? "active" : "inactive", Operations, InspectionOnly }.Concat(Bindings).Concat(Dependencies).Concat(Problems).Concat(Notes).Concat(Information));
     }
     public sealed class SceneInventory {
         readonly IInspectionScene scene;

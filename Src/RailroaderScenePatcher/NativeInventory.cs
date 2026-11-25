@@ -282,6 +282,8 @@ namespace RailroaderScenePatcher {
         static IEnumerable<SceneObservation> Steps(Func<GameObject, string> boardRefusal, bool whole) {
             // A whole discovery reads the group roots again; a stepped pass reuses them while the hierarchy above them stays.
             if (whole) GroupWorld.Invalidate();
+            // A whole discovery measures the crossing detection routes afresh; a changed track node clears them anyway.
+            if (whole) CrossingDetectionTrack.Invalidate();
             CrossingDeviceWorld.InvalidateHolders();
             var incoming = new Dictionary<UnityEngine.Object, List<string>>(); var scanErrors = 0;
             // A reference in a field Unity does not serialize is working state of a running manager, such as a culling or
@@ -397,6 +399,8 @@ namespace RailroaderScenePatcher {
             var enabled = AuthoredActivity.Enabled(GroupWorld.OwnActivity(go), culled.ContainsKey(go), !hidden.Contains(go));
             // What the game reads whatever the object's activity: listed as a problem also for a disabled object.
             var anyway = new List<string>();
+            // The circuits of the inspected crossing controller itself, by place, key and spans, for its detection checks.
+            var detection = new List<Tuple<int, string, DetectionSpan[]>>();
             // The game enables and disables child behaviours while it runs, for example a crossing bell's audio player
             // by distance. Which components exist is a dependency; whether each is enabled is runtime state.
             var runtime = new List<string>();
@@ -498,8 +502,10 @@ namespace RailroaderScenePatcher {
                 var sets = Field(controller, "circuitSets") as IEnumerable;
                 if (sets == null) throw new InvalidOperationException("Crossing circuit sets unavailable");
                 int index = 0;
-                // The controller itself reports a span of its circuit that no longer resolves to an existing track
-                // segment, under the circuit's name on its Connections tab. Without the track graph it has one note.
+                // The controller itself reads the spans of its circuits, under the circuit's name on its Connections tab;
+                // they are judged below (CircuitSpanChecks), once it is known whether a repair route applies. An object
+                // below the controller lists the circuits and their missing roles as before. Without the track graph the
+                // controller has one note.
                 var own = ReferenceEquals(controller, c);
                 if (own && segmentIds == null) problems.Add(CircuitSpanProblems.Unknown(graphError));
                 foreach (var set in sets) {
@@ -508,18 +514,17 @@ namespace RailroaderScenePatcher {
                         var island = Field(set, "island") as Component;
                         circuit = island == null ? null : CircuitSpanProblems.CircuitKey(Text(Field(island, "id")), CrossingCoverageWorld.AdditionOf(set));
                     } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); }
-                    foreach (var role in CircuitCoverage.Roles) {
-                        var span = Field(set, role) as Component;
-                        bindings.Add("Circuit " + index + " " + role + "=" + Label(span));
-                        if (span == null) { problems.Add("Missing circuit " + index + " " + role); continue; }
-                        if (String.IsNullOrWhiteSpace(circuit)) continue;
+                    var read = new DetectionSpan[CircuitCoverage.Roles.Length];
+                    for (var role = 0; role < read.Length; role++) {
+                        var span = Field(set, CircuitCoverage.Roles[role]) as Component;
+                        bindings.Add("Circuit " + index + " " + CircuitCoverage.Roles[role] + "=" + Label(span));
+                        if (!own) { if (span == null) problems.Add("Missing circuit " + index + " " + CircuitCoverage.Roles[role]); continue; }
+                        if (span == null) continue;
                         // A span that cannot be read is a note of its own, so the other spans and circuits stay listed.
-                        try {
-                            var problem = CircuitSpanProblems.Unresolved(circuit, role, Text(Field(span, "id")),
-                                Text(Field(Field(span, "_lower"), "segmentId")), Text(Field(Field(span, "_upper"), "segmentId")), segmentIds);
-                            if (problem != null) problems.Add(problem);
-                        } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); }
+                        try { read[role] = new DetectionSpan(Text(Field(span, "id")), StoredLocation(Field(span, "_lower")), StoredLocation(Field(span, "_upper"))); }
+                        catch (Exception e) { read[role] = DetectionSpan.Unreadable(null, e.GetBaseException().Message); }
                     }
+                    if (own) detection.Add(Tuple.Create(index, circuit, read));
                     index++;
                 }
             });
@@ -712,6 +717,7 @@ namespace RailroaderScenePatcher {
             string padMarkerId = null;
             if (groupRoot && verdict?.Crossbuck == true) Read(() => { padMarkerId = GroupWorld.TargetPadMarkerId(go); displayName = BakedSceneryRules.CrossbuckName(verdict.Path, padMarkerId, GroupWorld.SharedCrossingNames()); });
             if ((mast || ownBell) && controller != null) Read(() => displayName = go.name + " at " + CrossingEquipment.Place(controller.gameObject.name, Ancestors(controller.transform)));
+            string sharedPath = null;
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {
@@ -719,7 +725,7 @@ namespace RailroaderScenePatcher {
                 var holders = padMarkerId != null ? GroupWorld.Crossbucks(go.scene.name, BoardScene.PathOf(go.transform)).Count(pair => pair.Value == padMarkerId)
                     : BoardScene.LoadedAt(go.scene.name, BoardScene.PathOf(go.transform)).Count(held => held != null && Get(held, TypeName(c)) != null);
                 var shared = CommandBand.SharedPath(holders);
-                if (shared != null) { structure = null; operations = CommandBand.NotEditable(shared); }
+                if (shared != null) { structure = null; operations = CommandBand.NotEditable(shared); sharedPath = shared; }
             });
             // What the inspection could not read or check is a note, whatever the object's activity. Of the rest, a
             // disabled object keeps only what the game reads anyway.
@@ -736,6 +742,19 @@ namespace RailroaderScenePatcher {
             // stays, without a problem. Like any problem it is hidden while the object is switched off itself: the game's
             // controller (a GameBehaviour) runs only while its object is active, so a disabled construction does not fail.
             problems.AddRange(CommandBand.RepairableConstructionProblems(structure, constructionIds, segmentIds, graphError));
+            // A crossing controller's detection findings are problems where Edit circuit or Edit detection addition can
+            // repair them: on a controller whose crossing coverage is editable. Any other controller lists them as
+            // information with the reason. The checks read the current scene only.
+            var information = new List<string>();
+            if (detection.Count != 0 && CircuitSpanChecks.Judges(ReferenceEquals(controller, c), structure, coverageRefusal, sharedPath, out var detectionRefusal)) Read(() => {
+                IDetectionTrack track = null;
+                if (segmentIds != null) try { track = CrossingDetectionTrack.Current(); } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); }
+                foreach (var circuit in detection) {
+                    var findings = CircuitSpanChecks.Findings(circuit.Item1, circuit.Item2, circuit.Item3, segmentIds, track, detectionRefusal);
+                    problems.AddRange(findings.Problems.Concat(findings.Notes));
+                    information.AddRange(findings.Information);
+                }
+            });
             // A ground mask that flattens the terrain height blocks every move of the object: Supported edits then names
             // only what still applies, and the Placement tab gives the reason.
             if (structure != null && CommandBand.GroundMaskMoveBlock(dependencies) != null) operations = CommandBand.OperationsWithoutMove(operations);
@@ -745,7 +764,7 @@ namespace RailroaderScenePatcher {
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
                 bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: displayName, groupPath: groupPath,
                 category: groupRoot ? verdict?.Category : null, subcategory: groupRoot ? verdict?.Subcategory : null, bridge: groupRoot && verdict != null ? verdict.Bridge : BridgeKind.None,
-                holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform), storage: storageName);
+                holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform), storage: storageName, information: information);
         }
         // The names of the objects that enclose a transform, from its parent upwards.
         static IReadOnlyList<string> Ancestors(Transform t) { var names = new List<string>(); for (var p = t.parent; p != null; p = p.parent) names.Add(p.name); return names; }
@@ -760,6 +779,9 @@ namespace RailroaderScenePatcher {
             if (note != null) bindings.Add("Marker binding note: " + note);
             // Existence is not proof that the binding names the intended track.
         }
+        // A span end as the scene stores it: segment, end and distance, without resolving it on the graph.
+        static TrackLocation StoredLocation(object location) =>
+            new TrackLocation(Text(Field(location, "segmentId")), Text(Field(location, "end")) == "A" ? "a" : "b", Convert.ToDouble(Field(location, "distance"), CultureInfo.InvariantCulture));
         static void Location(object location, string role, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {
             var segment = Text(Field(location, "segmentId"));
             bindings.Add(role + " segment=" + segment + "; end=" + Text(Field(location, "end")) + "; distance=" + Text(Field(location, "distance")));

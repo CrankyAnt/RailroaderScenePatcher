@@ -250,12 +250,12 @@ static partial class CoverageTests {
         Assert(missing != null && !BindingRules.IsNote(missing), "A span with an end on a missing segment is a problem, not an inspection note: " + missing);
         Assert(missing.StartsWith("Circuit Pipr Approach A span " + f.Rerouted.Spans[0].Id + " ", StringComparison.Ordinal) && missing.Contains("Sgone"),
             "The problem names the circuit as the Connections tab does, the span by its role caption and ID, and the missing segment: " + missing);
-        Assert(missing.EndsWith("On the controller's Connections tab, select tracks for this circuit or detach it.", StringComparison.Ordinal), "A circuit's recovery is to select tracks or detach it: " + missing);
+        Assert(missing.EndsWith("On the controller's Connections tab, click Edit circuit Pipr and select tracks for this circuit or detach it.", StringComparison.Ordinal), "A circuit's recovery is to select tracks or detach it: " + missing);
         var empty = CircuitSpanProblems.Unresolved("Pipr", "approachB", "P1db", "", "S2", segments);
         Assert(empty != null && !BindingRules.IsNote(empty) && empty.Contains("Approach B span P1db") && empty.Contains("Connections tab"), "A span with an end on no segment is a problem: " + empty);
         var addition = CircuitSpanProblems.Unresolved(CircuitSpanProblems.CircuitKey(added.Spans[1].Id, added.Addition), "island", added.Spans[1].Id, "Sgone", "S2", segments);
         Assert(addition.StartsWith("Detection addition siding Island span ", StringComparison.Ordinal), "A detection addition is named as on the Connections tab: " + addition);
-        Assert(addition.EndsWith("On the controller's Connections tab, select other tracks for this addition or delete it.", StringComparison.Ordinal) && addition.IndexOf("detach", StringComparison.OrdinalIgnoreCase) < 0,
+        Assert(addition.EndsWith("On the controller's Connections tab, click Edit detection addition siding and select other tracks for this addition or delete it.", StringComparison.Ordinal) && addition.IndexOf("detach", StringComparison.OrdinalIgnoreCase) < 0,
             "An addition's recovery is to select other tracks or delete it, not to detach it: " + addition);
         // Without the track graph no span can be checked: one note for the controller, and an empty end stays a problem.
         Assert(CircuitSpanProblems.Unresolved("Pipr", "island", "Pipr", "S1", "S2", null) == null, "Without the track graph a span with both ends set reports nothing of its own");
