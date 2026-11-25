@@ -30,11 +30,12 @@ namespace RailroaderScenePatcher {
                 PatcherLog.HideRoot(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "~");
             } catch { }
             PreferencesModsTab.Install(context.ModDirectory);
-            Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this); DeferredRestores.Install(); NewGameStartHook.Install(this);
+            Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this); DeferredRestores.Install(); NewGameStartHook.Install(this); ClickedTooltips.Install();
             if (NativeSaveClick.Problem != null) PatcherLog.Warning(NativeSaveClick.Problem);
             if (NativeRepairHooks.Error != null) PatcherLog.Warning(NativeRepairHooks.Error + ". The game still checks track markers and shows warnings about them.");
             if (DeferredRestores.Error != null) PatcherLog.Warning(DeferredRestores.Error + ". The game finishes restoring objects before scene patch files are applied.");
             if (NewGameStartHook.Error != null) PatcherLog.Warning(NewGameStartHook.Error + ". A new game starts at the spawn point's scene placement.");
+            if (ClickedTooltips.Error != null) PatcherLog.Warning(ClickedTooltips.Error + ". A tooltip can appear right after a click. Report this to the patcher maintainer.");
         }
         LocalWorldBinding<PatcherBehaviour> Binding() => world ?? (world = new LocalWorldBinding<PatcherBehaviour>(CreateHost, DestroyHost, h => h.BeginAttempt()));
         // Every exit path hands the restore-time callbacks the patcher deferred back to the game, after the apply.
@@ -126,7 +127,7 @@ namespace RailroaderScenePatcher {
             NativeRepairHooks.Reset();
             world?.Release();
             ReleaseReporter();
-            MapEditorReload.Remove(); NativeSaveClick.Remove(); Hooks.Remove(); NativeRepairHooks.Remove(); DeferredRestores.Remove(); NewGameStartHook.Remove();
+            MapEditorReload.Remove(); NativeSaveClick.Remove(); Hooks.Remove(); NativeRepairHooks.Remove(); DeferredRestores.Remove(); NewGameStartHook.Remove(); ClickedTooltips.Remove();
             PreferencesModsTab.Remove();
             PatcherLog.DebugEnabled = false; PatcherLog.Output = null; PatcherLog.HideRoot(null, null);
         }
@@ -731,6 +732,7 @@ namespace RailroaderScenePatcher {
         }
         void Update() {
             rows?.Flush();
+            ClickedTooltips.Tick();
             if (!Initialized || engine == null) return;
             // Own culling of moved parts installs what waited for a game culler to start. What it could not take out
             // again is information for the log, not a warning.

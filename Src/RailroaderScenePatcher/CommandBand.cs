@@ -331,6 +331,26 @@ namespace RailroaderScenePatcher {
         // Whether the tooltip callout is hidden now: the game is paused, and either the panel is open or the tooltip
         // was hidden already in this pause. It so stays hidden until the pause menu closes, whatever the panel does.
         internal static bool HidesTooltip(bool paused, bool panelOpen, bool hidden) => paused && (panelOpen || hidden);
+        // Whether the tooltips of the patcher's controls are held back after a click. The person who clicked knows what
+        // the control did, so after a press on a control its tooltip stays hidden while the pointer stays on it, also
+        // when the click rebuilt the control in a new state at the same place. Once the pointer has left the control's
+        // rectangle, recorded in screen pixels at the press, tooltips show again with the game's own delay. One rule
+        // serves every control of every patcher window.
+        internal sealed class ClickedTooltip {
+            bool held;
+            float left, bottom, right, top;
+            // Whether tooltips are hidden in the current frame.
+            internal bool Hides { get; private set; }
+            // A pointer button went down on a patcher control with this screen rectangle.
+            internal void Press(float x, float y, float width, float height) {
+                held = true; left = x; bottom = y; right = x + width; top = y + height;
+            }
+            // One frame with the pointer at this screen position; it comes after a press of the same frame.
+            internal void Frame(float x, float y) {
+                if (held && (x < left || x > right || y < bottom || y > top)) held = false;
+                Hides = held;
+            }
+        }
         // Whether a text field of the panel has the keyboard for Escape's purpose: it had the focus in this frame or
         // in one of the two before it. The field itself takes Escape first and gives up its focus with it, so by the
         // time the panel is asked the field no longer reports the focus it had when the key went down.

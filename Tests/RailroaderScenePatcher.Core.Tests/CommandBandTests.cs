@@ -38,6 +38,7 @@ static class CommandBandTests {
         AClosedPanelCancelsTheWaitingRequest();
         QueuingGizmoSetupKeepsTheConnectionsPreview();
         SharedRulesHoldAtEveryCallSite();
+        AClickedControlShowsItsTooltipOnlyAfterThePointerReturns();
         NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
         ReasonsReadAsOnePlainSentence();
         EditingLinesEndWithAFullStop();
@@ -819,6 +820,38 @@ static class CommandBandTests {
     }
     // A request waits for the comparison of the scene. Closing the panel or leaving the native map editor cancels it: it never
     // runs, and a refusal says why.
+    // A control's tooltip stays hidden after a click while the pointer stays on the control, also when the click rebuilt
+    // the control in a new state at the same place, and shows again once the pointer has left it and returned.
+    static void AClickedControlShowsItsTooltipOnlyAfterThePointerReturns() {
+        var rule = new CommandBand.ClickedTooltip();
+        rule.Frame(50, 20);
+        Check(!rule.Hides, "A control the pointer comes onto without a click keeps its tooltip");
+        // Apply at x 40..120, y 10..34 in screen pixels.
+        rule.Press(40, 10, 80, 24);
+        rule.Frame(50, 20);
+        Check(rule.Hides, "Right after a click the tooltip of the control under the pointer is hidden");
+        rule.Frame(52, 21);
+        Check(rule.Hides, "The tooltip stays hidden while the pointer moves on the clicked control");
+        rule.Frame(120, 34);
+        Check(rule.Hides, "The control's edge still belongs to the control");
+        rule.Frame(30, 20);
+        Check(!rule.Hides, "Once the pointer has left the control, tooltips show again");
+        rule.Frame(50, 20);
+        Check(!rule.Hides, "The pointer that returns to the clicked control sees its tooltip as for a control it comes onto without a click");
+        // A second click hides it again; leaving upwards counts as leaving too.
+        rule.Press(40, 10, 80, 24);
+        rule.Frame(50, 20);
+        Check(rule.Hides, "A second click hides the tooltip again");
+        rule.Frame(50, 35);
+        Check(!rule.Hides, "Leaving the control over its top edge counts as leaving");
+        // A click on another control moves the rule to that control.
+        rule.Press(40, 10, 80, 24);
+        rule.Press(200, 10, 24, 24);
+        rule.Frame(210, 20);
+        Check(rule.Hides, "A click on another control hides that control's tooltip");
+        rule.Frame(50, 20);
+        Check(!rule.Hides, "The control clicked before shows its tooltip again");
+    }
     // The rules that every window, tab and row of the panel shares: one table per rule, over all call sites.
     static void SharedRulesHoldAtEveryCallSite() {
         // Button padding: every button of every row is as wide as its widest label plus the native padding on both

@@ -558,6 +558,7 @@ namespace RailroaderScenePatcher {
                 // The owner builds the content through this presentation, which it holds only after this constructor has
                 // returned: the window opens on the first tick, not here.
                 openOnTick = savedShown;
+                ClickedTooltips.Own(Owns);
             } catch { Dispose(); throw; }
         }
 
@@ -1163,6 +1164,7 @@ namespace RailroaderScenePatcher {
             // The window can go while compact, such as when the Map Editor is left.
             if (Compact) { try { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=window removed (Map Editor left or reloaded)"); } catch { } }
             HideTooltip();
+            ClickedTooltips.Release(Owns);
             ClearFocus(); disposed = true;
             entryPanel?.Dispose();
             if (entry != null) { entry.SetActive(false); UnityEngine.Object.Destroy(entry); }
