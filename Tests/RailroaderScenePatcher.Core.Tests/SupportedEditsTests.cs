@@ -107,7 +107,7 @@ static class SupportedEditsTests {
             + NoReplacementId + "Starter placement family. | Unavailable: Choose Start derailed. No new-game car placement in an active setup reads this marker, so it is not a starter placement marker.",
         ["shared board"] = Placed + SharedBlock + " | " + NoBinding,
         ["detection span"] = Placed + "A span's track locations determine its position, so you cannot set its placement. To change which tracks the crossing detects, use its controller's Connections tab. | Unavailable: Set track binding. A detection span's tracks come from its controller's crossing coverage. To change which tracks it detects, edit the coverage on its controller's Connections tab.",
-        ["sign group"] = Placed + "You can't move this group as a whole. Edit its track markers individually in the Track marker family. | " + NoBinding,
+        ["sign group"] = Placed + "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Track marker family. | " + NoBinding,
         // A refused marker: the fixture does not record why the adapter refused it, so it stands in for that reason.
         ["refused marker"] = "Unavailable: Move, Rotate, Follow a track, Disable, and Set track binding. The marker adapter refused this marker.",
     };
