@@ -322,6 +322,7 @@ class Program {
         SceneObjectCategoryTests.Run();
         SceneClassificationTests.Run();
         FamilyMappingTests.Run();
+        WindowWordsTests.Run();
         OutlineTreeTests.Run();
         OutlinerGroupingTests.Run();
         EmptyListReasonTests.Run();

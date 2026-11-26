@@ -870,7 +870,21 @@ namespace RailroaderScenePatcher {
         // The family the panel shows for an object. A child object is a Part, as the glossary and the
         // Object tab's "Part of" line name it; its observed family is Child object.
         internal const string PartFamily = "Part";
-        internal static string ShownFamily(SceneObservation entry) => entry == null ? null : entry.GroupPath != null ? PartFamily : entry.Family;
+        // A top scene object, the top of a complex, is a Group: the window's word for a complex.
+        internal const string GroupFamily = "Group";
+        internal static string ShownFamily(SceneObservation entry) => entry == null ? null : entry.GroupPath != null ? PartFamily : entry.Family == SceneObjectRules.Family ? GroupFamily : entry.Family;
+        // Whether a modder could take a group for a track group of the native map editor: a group at a crossing, at a
+        // rail bridge or at a trackside station, where track runs through or beside it. category and bridge are the
+        // top scene object's, for a group of scene objects; a grade-crossing setup and a rail bridge construction are
+        // such groups whatever they hold.
+        internal static bool TrackSide(ComplexKind kind, string category, BridgeKind bridge) =>
+            kind == ComplexKind.GradeCrossingSetup || kind == ComplexKind.RailBridgeConstruction
+            || (kind == ComplexKind.SceneObject && (category == SceneObjectCategories.GradeCrossing || category == SceneObjectCategories.StationBuilding || (category == SceneObjectCategories.Bridge && bridge == BridgeKind.Rail)));
+        // The tooltip line that says what a group is: scene objects, and where it could be taken for one, no track group.
+        internal static string GroupLine(bool trackSide) => "Group of scene objects" + (trackSide ? ", not a track group" : "");
+        // The label a group's square marker shows under the pointer: the group's name and what the group is.
+        internal static string GroupMarkerText(string name, bool trackSide) => (String.IsNullOrEmpty(name) ? "" : name + "\n") + GroupLine(trackSide);
+        internal const string SelectGroupTip = "Inspect the group of scene objects that this part belongs to.";
         // A scene object's label as a world choice offers it: "Family: path", with "[inactive]" for an inactive object.
         internal static string CandidateLabel(SceneObservation entry) =>
             ShownFamily(entry) + ": " + entry.Identity.Path + (entry.Active ? "" : " [inactive]");

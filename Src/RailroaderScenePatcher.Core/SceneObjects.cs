@@ -207,7 +207,7 @@ namespace RailroaderScenePatcher.Core {
         });
         // Why a group with a map icon is left out. Station map icons, in the Station Icons holder, have their own family;
         // a map icon elsewhere is in no family and has no edit. No ticket is needed.
-        public const string MapIconReason = "This group contains a map icon, which the patcher can't move with a group.";
+        public const string MapIconReason = "This group contains a map icon, which the patcher can't move with the group.";
         // Why a group with a station click spot is left out: in Railroader 0.6.3 station click spots are native map data,
         // which the native map editor edits. No ticket is needed.
         public const string StationAgentReason = "This group contains a station click spot. It's native map data, which you edit in the Map Editor.";

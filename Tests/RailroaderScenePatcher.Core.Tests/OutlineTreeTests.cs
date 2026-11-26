@@ -57,8 +57,14 @@ static class OutlineTreeTests {
                 Check(All(tops).Where(IsPlaceFolder).SelectMany(f => f.Children).All(c => c.Row == null || (c.Row.GroupPath == null && c.Row.HolderPath == null)), view.Name + ": no part and no detection span is a loose row");
             }
             var tree = byCategory.Tops;
-            Check(tree.Select(t => t.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Platform", "Railroad service building", "Road scenery", "Sign", "Spawn point", "Starter placement", "Station building", "Station map icon", "Storage display", "Track marker", "Water" }),
+            Check(tree.Select(t => t.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Mileposts", "Platform", "Railroad service building", "Road scenery", "Sign", "Spawn point", "Starter placement", "Station building", "Station map icon", "Storage display", "Track marker", "Water" }),
                 "the categories of the base map, in alphabetical order (got " + String.Join(", ", tree.Select(t => t.Label)) + ")");
+            // Mileposts are a category of their own: the 54 Milepost rows of the base map stand under Mileposts, none under Sign.
+            var mileposts = tree.Single(t => t.Label == "Mileposts");
+            var postRows = All(new[] { mileposts }).Where(n => n.Row != null).Select(n => n.Row).ToArray();
+            Check(mileposts.Count == 54 && postRows.Length == 54 && postRows.All(r => r.Family == SceneFamilies.Milepost) && entries.Count(e => e.Family == SceneFamilies.Milepost) == 54,
+                "the 54 mileposts of the base map are listed under Mileposts (got " + mileposts.Count + ")");
+            Check(!All(tree.Where(t => t.Label == "Sign")).Any(n => n.Row?.Family == SceneFamilies.Milepost) && mileposts.Children.All(IsPlaceFolder), "no milepost is listed under Sign, and Mileposts lists its posts by place");
             // Lights: its kinds, and the places below each kind.
             var lights = tree.Single(t => t.Label == "Lights");
             Check(lights.Children.Select(c => c.Label).SequenceEqual(new[] { "Spotlight Outdoor", "Tall Post Shade" }), "Lights holds its kinds (got " + String.Join(", ", lights.Children.Select(c => c.Label)) + ")");
@@ -86,7 +92,7 @@ static class OutlineTreeTests {
             Check(placeTops.Single(t => t.Label == "Log Camp").Count == 0 && placeTops.Count(t => t.Count == 0) == 1, "Log Camp is the one place without objects");
             Check(placeTops.Single(t => t.Label == "Connelly Creek").Count >= 5 && !All(placeTops).Any(n => n.Row == null && n.Label == "Connelly"), "Connelly Creek holds the Connelly objects, and no node is named Connelly");
             var whittier = placeTops.Single(t => t.Label == "Whittier");
-            Check(whittier.Children.Select(c => c.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Sign", "Spawn point", "Starter placement", "Station building", "Station map icon", "Storage display", "Track marker" }),
+            Check(whittier.Children.Select(c => c.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Mileposts", "Sign", "Spawn point", "Starter placement", "Station building", "Station map icon", "Storage display", "Track marker" }),
                 "the categories of a place are in alphabetical order (got " + String.Join(", ", whittier.Children.Select(c => c.Label)) + ")");
             // A search narrows the rows; the levels stay, and a place without matches is not shown.
             var lamps = entries.Where(e => e.Category == "Lights").ToArray();

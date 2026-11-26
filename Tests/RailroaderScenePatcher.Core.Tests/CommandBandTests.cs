@@ -706,15 +706,16 @@ static class CommandBandTests {
         var part = Baked("World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)", "World/Large Scenery/Bryson/Bryson Depot");
         var root = Baked("World/Large Scenery/Bryson/Bryson Depot", null);
         Check(part.Family == SceneObjectRules.ChildFamily, "The observed family of a child object is Child object");
-        Check(CommandBand.ShownFamily(part) == "Part" && CommandBand.ShownFamily(root) == SceneObjectRules.Family, "A part shows as Part, a top scene object as Scene object: " + CommandBand.ShownFamily(part));
+        Check(CommandBand.ShownFamily(part) == "Part" && CommandBand.ShownFamily(root) == "Group", "A part shows as Part, a top scene object as Group: " + CommandBand.ShownFamily(part));
         Check(CommandBand.CandidateLabel(part) == "Part: World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)", "A part's candidate label names it a Part: " + CommandBand.CandidateLabel(part));
         Check(CommandBand.CandidateLabel(Baked(part.Identity.Path, part.GroupPath, active: false)).EndsWith(" [inactive]", StringComparison.Ordinal), "An inactive part says so");
         var labels = new[] { CommandBand.CandidateLabel(part), CommandBand.CandidateLabel(root) };
         var line = CommandBand.ChoiceLine("Object", 0, 1, labels[0], new[] { labels[0] }, part);
         Check(line == "Object: Spotlight Outdoor (1) (Part).", "The world choice's line reads the part as a Part: " + line);
-        Check(CommandBand.ChoiceLabel(labels[0], labels) == "Spotlight Outdoor (1) (Part)" && CommandBand.ChoiceLabel(labels[1], labels) == "Bryson Depot (Scene object)",
+        Check(CommandBand.ChoiceLabel(labels[0], labels) == "Spotlight Outdoor (1) (Part)" && CommandBand.ChoiceLabel(labels[1], labels) == "Bryson Depot (Group)",
             "The world choice list reads the part as a Part and the group as a group: " + String.Join(" | ", labels.Select(label => CommandBand.ChoiceLabel(label, labels))));
-        Check(!line.Contains("(Scene object)"), "No part reads as a Scene object");
+        Check(CommandBand.CandidateLabel(root) == "Group: World/Large Scenery/Bryson/Bryson Depot", "A group's candidate label names it a Group: " + CommandBand.CandidateLabel(root));
+        Check(labels.All(l => l.IndexOf("complex", StringComparison.OrdinalIgnoreCase) < 0 && l.IndexOf("child object", StringComparison.OrdinalIgnoreCase) < 0 && l.IndexOf("Scene object", StringComparison.Ordinal) < 0), "No world choice label reads as a complex, a child object or a scene object");
     }
     static void AConfirmedWorldChoiceIsADebugLineLikeItsRefusals() {
         var label = "Part: World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)";

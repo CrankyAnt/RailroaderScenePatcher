@@ -349,13 +349,21 @@ namespace RailroaderScenePatcher {
         static string Describe(Unit u) => u.Node.Label + " [" + (u.Row?.Family ?? "no row") + "] " + (u.Row?.Identity.Path ?? u.Node.Key.Replace("\n", " "));
 
         // What a row's tooltip says: the object's name and hierarchy path, where the outliner lists it, and what the
-        // row's markers mean. It names no family and no rule: only what the outliner itself shows.
+        // row's markers mean, and for a group or a part the window's word for it. It names no rule: only what the
+        // outliner itself shows.
         internal static string Tooltip(Result result, SceneObservation item, bool changed, FailureKind? failure) {
             var equipment = CommandBand.IsAddedFamily(item.Family);
             string[] shown = null;
             result?.Shown.TryGetValue(item, out shown);
             var lines = new List<string> { OwnName(item) };
             if (!equipment) lines.Add(item.Identity.Path);
+            // A group says that it is a group of scene objects, and a part names its group: the same in both views.
+            if (item.GroupPath != null) lines.Add(InventoryPresentationState.PartOf(item));
+            else if (item.Family == SceneObjectRules.Family) {
+                // A group the outliner lists under Rail bridges stands at a rail bridge, as one the edits treat as a rail bridge does.
+                var railBridge = item.Bridge == BridgeKind.Rail || (shown?[1] ?? item.Subcategory) == SceneObjectCategories.RailBridges;
+                lines.Add(CommandBand.GroupLine(CommandBand.TrackSide(ComplexKind.SceneObject, shown?[0] ?? item.Category, railBridge ? BridgeKind.Rail : item.Bridge)));
+            }
             if (shown != null) {
                 lines.Add(shown[0] + (shown[1] == null ? "" : " / " + shown[1]));
                 if (shown[2] != null) lines.Add("Place: " + shown[2]);
