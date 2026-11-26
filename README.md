@@ -31,6 +31,8 @@ If multiple mods try to change the same existing scene object, an informational 
 
 Testing covers the base-game map (`rr/bushnell-whittier`, terrain `rr/nc-bryson`) and maps that inherit it as a map layer. Maps with a different terrain tile set, such as a whole new map, are untested. The patcher still runs on these maps.
 
+On some maps, the game creates every scene object while the map is running. On such a map, the patcher lists no objects to edit, and its window explains why.
+
 ## For map modders
 
 See the [modder manual](docs/guides/scene-patches/modder-manual.md) for editing and distributing your own scene changes.
