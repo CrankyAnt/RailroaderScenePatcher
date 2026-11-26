@@ -331,6 +331,8 @@ namespace RailroaderScenePatcher {
             if (coverage && coverageCircuit != null)
                 return Enumerable.Range(0, CircuitCoverage.Roles.Length).Select(role => CoverageRoleAct(role, CircuitCoverage.RoleCaption(CircuitCoverage.Roles[role]), CoveragePickBlock)).ToArray();
             if (coverage && attachment != null) return ReplacementActs();
+            // An object that holds no track binding has neither replacement targets nor a track location row.
+            if (!IsStarter && !HoldsConstructionSegments && !HoldsBinding) return coverage ? ReplacementActs() : new Act[0];
             var row = TrackLocationActs(EditBlock());
             return ReplacementActs().Concat(new[] { row.Set, row.Pick }).ToArray();
         }

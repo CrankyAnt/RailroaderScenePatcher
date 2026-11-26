@@ -387,8 +387,9 @@ static class ConstructionSegmentTests {
             BakedSceneryGroups.Structure, BakedSceneryParts.Structure, StationMapIconRules.Structure, SpawnPoints.Structure, ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure })
             Assert(CommandBand.EditableStructure(structure), "Still editable: " + structure);
         Assert(!CommandBand.EditableStructure(null) && !CommandBand.EditableStructure(StarterPlacementScene.Structure), "No structure, or a starter placement marker with its own workflow, is not editable here");
-        Assert(CommandBand.PlacementBlock(null, null, CommandBand.ControllerNoPlacement) == CommandBand.ControllerNoPlacement
-            && CommandBand.ModeBlock(CommandBand.NumericMode, false, true, CommandBand.ConstructionSceneryOperations, controller: true) == null,
+        var controllerEdits = SupportedEdits.Of(EditEntries.Of(CommandBand.ConstructionSceneryFamily, ConstructionSceneryScene.Structure, CommandBand.ConstructionSceneryOperations));
+        Assert(SupportedEdits.ReasonOf(controllerEdits, SupportedEdits.Move) == CommandBand.ControllerNoPlacement
+            && SupportedEdits.ModeBlock(controllerEdits, CommandBand.NumericMode, true) == null,
             "Numeric stays open for the Ela controller and its fields give the placement reason");
         var ela = new TargetIdentity(SceneName, Ela, ConstructionSceneryScene.ComponentType, ConstructionSceneryScene.Structure);
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, ela) == CommandBand.ControllerNoPlacement && GuidedTaskState.TargetBlock(GuidedTaskKind.Snap, ela) == CommandBand.ControllerNoPlacement
@@ -412,7 +413,7 @@ static class ConstructionSegmentTests {
             "The Ela controller's Supported edits: " + CommandBand.ConstructionSceneryOperations);
         Assert(CommandBand.InspectionOnly(CommandBand.ConstructionSceneryFamily, false) == null, "No bridge construction controller is inspection only");
         for (var mode = 0; mode < 4; mode++)
-            Assert(CommandBand.ModeBlock(mode, false, true, null, controller: true) == (mode == CommandBand.NumericMode ? null : CommandBand.ControllerNoPlacement), "Every placement mode but Numeric is unavailable for the controller, with the reason: mode " + mode);
+            Assert(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of(CommandBand.ConstructionSceneryFamily, ConstructionSceneryScene.Structure, null)), mode, true) == (mode == CommandBand.NumericMode ? null : CommandBand.ControllerNoPlacement),"Every placement mode but Numeric is unavailable for the controller, with the reason: mode " + mode);
         Assert(CommandBand.ControllerNoPlacement == ConstructionSceneryScene.NoPlacement && CommandBand.ControllerNoActivity == ConstructionSceneryScene.NoActivity, "Placement and Enabled give the capability's reasons");
     }
 }

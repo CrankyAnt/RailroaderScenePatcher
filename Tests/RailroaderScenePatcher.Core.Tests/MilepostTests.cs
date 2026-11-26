@@ -342,10 +342,11 @@ static class MilepostTests {
     }
     // Follow keeps a placement relative to a track; this capability covers fixed placement, activity and binding only.
     static void FollowModeIsInactiveForAMilepost() {
-        var follow = RailroaderScenePatcher.CommandBand.ModeBlock(RailroaderScenePatcher.CommandBand.FollowMode, false, true, RailroaderScenePatcher.CommandBand.MilepostOperations, milepost: true);
+        var edits = RailroaderScenePatcher.SupportedEdits.Of(EditEntries.Of("Milepost", MilepostScene.Structure, RailroaderScenePatcher.CommandBand.MilepostOperations));
+        var follow = RailroaderScenePatcher.SupportedEdits.ModeBlock(edits, RailroaderScenePatcher.CommandBand.FollowMode, true);
         Assert(follow == RailroaderScenePatcher.CommandBand.MilepostNoFollow, "Follow is inactive for a milepost with its reason: " + follow);
         foreach (var mode in new[] { RailroaderScenePatcher.CommandBand.NumericMode, RailroaderScenePatcher.CommandBand.GizmoMode, RailroaderScenePatcher.CommandBand.SnapMode })
-            Assert(RailroaderScenePatcher.CommandBand.ModeBlock(mode, false, true, RailroaderScenePatcher.CommandBand.MilepostOperations, milepost: true) == null, "Mode " + mode + " stays open for a milepost");
+            Assert(RailroaderScenePatcher.SupportedEdits.ModeBlock(edits, mode, true) == null, "Mode " + mode + " stays open for a milepost");
     }
     // Two mileposts share a marker ID: a rebind of one would remove the other's registration and is refused before
     // mutation; a fixed placement touches no registration and applies.

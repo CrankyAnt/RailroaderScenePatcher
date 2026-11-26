@@ -78,7 +78,7 @@ For an object that supports fixed placement, six fields show the position and ro
 
 Fields display three decimal places and never use scientific notation. An unchanged field keeps the object's exact value. Changing X alone therefore leaves the other axes and rotation unchanged.
 
-**Apply** is disabled while the fields match the current placement. **Supported edits** on the **Object** tab explains why it is unavailable. As soon as a keystroke changes a value, **Apply** becomes available without requiring Enter or leaving the field. It becomes disabled again if the value matches the current one. Applying the object's placement without this mod removes the placement from the modification.
+**Apply** is disabled while the fields match the current placement. If the object cannot be edited at all, **Supported edits** on the **Object** tab gives the reason under **Unavailable:**. As soon as a keystroke changes a value, **Apply** becomes available without requiring Enter or leaving the field. It becomes disabled again if the value matches the current one. Applying the object's placement without this mod removes the placement from the modification.
 
 Applying moves the object and creates or updates its modification in the scene patch file. The modification stores the fixed position and stores rotation as a quaternion. If an axis's stored value hasn't changed, its text in the file stays the same. For example, changing only Z doesn't replace X with a longer number read back from the game. Applying again replaces the values in the same modification. It doesn't add a second modification or accumulate movement. Click **Read** to refill the fields from the inspected observation.
 

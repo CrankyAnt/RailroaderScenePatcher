@@ -369,8 +369,9 @@ static class RailBridgeTests {
         var result = f.Engine.Apply(Doc(Follow("follow-bryson", Bryson, BakedSceneryGroups.Structure), Follow("follow-steel", Bryson + "/Steel", BakedSceneryParts.Structure)));
         Assert(result.Outcomes.Values.All(o => !o.Applied && o.Failure == FailureKind.Refused && o.Error.Contains("fixed placement")) && f.World.Mutations == 0 && Near(f.At(f.Bridge1), BridgeAuthored),
             "Track-following placement of a rail bridge is refused before mutation: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Failure + " " + o.Error)));
-        Assert(CommandBand.ModeBlock(CommandBand.FollowMode, false, true, CommandBand.GroupOperations, railBridge: true) == CommandBand.RailBridgeNoFollow && CommandBand.RailBridgeNoFollow.Contains("fixed placement")
-            && CommandBand.ModeBlock(CommandBand.NumericMode, false, true, CommandBand.GroupOperations, railBridge: true) == null, "Follow is unavailable for a rail bridge with the reason; Numeric stays");
+        var railEdits = SupportedEdits.Of(EditEntries.Of(BakedSceneryRules.Family, BakedSceneryGroups.Structure, CommandBand.GroupOperations, BridgeKind.Rail));
+        Assert(SupportedEdits.ModeBlock(railEdits, CommandBand.FollowMode, true) == CommandBand.RailBridgeNoFollow && CommandBand.RailBridgeNoFollow.Contains("fixed placement")
+            && SupportedEdits.ModeBlock(railEdits, CommandBand.NumericMode, true) == null, "Follow is unavailable for a rail bridge with the reason; Numeric stays");
     }
     sealed class FixedTrack : ITrackPoseScene { public TrackPose TrackPose(TrackAnchor anchor) => new TrackPose(new[] { 3000.0, 530, 4300 }, new[] { 0.0, 0, 0, 1 }); }
 

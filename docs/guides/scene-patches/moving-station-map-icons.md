@@ -19,7 +19,7 @@ If the station's building group is a scene object, move it as a baked scenery gr
 
 ## Move the icon in the native map editor
 
-1. Open **Scene Patcher**, click **Refresh** in the command band, search for the station's name, and select its row under **Station map icon** in the outliner. **Select in world** with a click on the icon's marking also selects it, as described in [select world targets](select-world-targets.md). The **Identity** section of the **Object** tab shows the structure `station-map-icon-v1`. If **Supported edits** on the **Object** tab starts with **Not editable:**, the reason follows.
+1. Open **Scene Patcher**, click **Refresh** in the command band, search for the station's name, and select its row under **Station map icon** in the outliner. **Select in world** with a click on the icon's marking also selects it, as described in [select world targets](select-world-targets.md). The **Identity** section of the **Object** tab shows the structure `station-map-icon-v1`. If **Supported edits** on the **Object** tab lists the icon's edits under **Unavailable:**, the reason on that line follows.
 2. Click **Focus** in the command band to see the icon.
 3. On the **Placement** tab, in **Numeric** mode, change the position in map coordinates and, if needed, the rotation in degrees. Click **Apply** at the bottom of the tab. You can also drag the icon with the transform gizmo, as described in [use transform gizmos](using-transform-gizmos.md).
 4. Open the map window and check that the icon stands at the station's new place.

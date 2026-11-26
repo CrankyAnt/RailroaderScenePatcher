@@ -21,7 +21,7 @@ The patcher can rebind a pad only when it meets all these requirements:
 
 A pad inside a protected crossing qualifies too, because the crossing controller does not read the pad's marker. The crossing's own track spans and circuits are a separate operation.
 
-The inventory shows such an object in the `Crossing pad marker` family with the structure `crossing-pad-v1`. For any other pad, **Supported edits** on the **Object** tab reads **Not editable:** with the reason. An enabled pad without a usable binding is listed under the **Problems** filter; a disabled one is not.
+The inventory shows such an object in the `Crossing pad marker` family with the structure `crossing-pad-v1`. For any other pad, **Supported edits** on the **Object** tab lists **Set track binding** under **Unavailable:**, with the reason. An enabled pad without a usable binding is listed under the **Problems** filter; a disabled one is not.
 
 ## Set or replace the binding in the native map editor
 

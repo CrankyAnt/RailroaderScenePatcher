@@ -1307,11 +1307,16 @@ namespace RailroaderScenePatcher.Core {
                 if (!relationships.HasValues) result.Remove("relationships");
             }
             // A native circuit whose selected tracks are the track its own spans cover keeps those spans: the entry leaves.
+            // Selected tracks that replace this mod's detach of the circuit stay: a detached circuit's Edit circuit opens
+            // with the map's own spans, and applying them unchanged gives the circuit those tracks as selected tracks.
+            // Clear circuit is the route back to the map's own detection.
             relationships = result["relationships"] as JObject;
             var coverage = relationships?["crossingCoverage"] as JObject;
             if (coverage?["circuits"] is JObject circuits && state.Coverage != null && under.Coverage != null) {
-                foreach (var circuit in circuits.Properties().ToList())
-                    if (Changed(existing?["relationships"]?["crossingCoverage"]?["circuits"]?[circuit.Name], circuit.Value) && CircuitCoverage.CoversNativeTrack(state.Coverage[circuit.Name], under.Coverage[circuit.Name])) circuit.Remove();
+                foreach (var circuit in circuits.Properties().ToList()) {
+                    var was = existing?["relationships"]?["crossingCoverage"]?["circuits"]?[circuit.Name];
+                    if (Changed(was, circuit.Value) && !PreservingJson.SameValue((was as JObject)?["detach"], true) && CircuitCoverage.CoversNativeTrack(state.Coverage[circuit.Name], under.Coverage[circuit.Name])) circuit.Remove();
+                }
                 if (!circuits.HasValues) coverage.Remove("circuits");
                 if (!coverage.HasValues) relationships.Remove("crossingCoverage");
                 if (!relationships.HasValues) result.Remove("relationships");

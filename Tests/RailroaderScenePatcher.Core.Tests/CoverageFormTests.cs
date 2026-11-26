@@ -17,6 +17,53 @@ static partial class CoverageTests {
         WorldPickFillsOneEndOnly();
         AdditionWithEndsOnTwoSegmentsIsWritten();
         IncompleteEndIsNamed();
+        DetachedCircuitFillsTheMapsOwnSpans();
+    }
+    // The map's own spans of the fixture's circuit P6id, written out from TwoSegmentFixture and the fixture's P6id and P1db.
+    static bool ShowsP6idOwnSpans(CoverageFormFields form) =>
+        Shows(form, 0, false, "Sother", "b", "210.123") && Shows(form, 0, true, "Snew", "a", "12.5")
+        && Shows(form, 1, false, "Sother", "a", "190") && Shows(form, 1, true, "Sother", "a", "200")
+        && Shows(form, 2, false, "Sother", "a", "190") && Shows(form, 2, true, "Sother", "a", "10");
+    // A circuit the mod detached opens with the map's own spans of that circuit. An Apply without a change gives the
+    // circuit those tracks as selected tracks and the controller evaluates it again; Clear circuit returns it to the
+    // map's own detection.
+    static void DetachedCircuitFillsTheMapsOwnSpans() {
+        var (f, session, _, _) = Session(fixture: TwoSegmentFixture());
+        Assert(session.Cover(Crossing, "P6id", CircuitCoverage.Detached).Applied && f.Crossing.Circuits.Count == 1 && !f.Crossing.Circuits.Contains(f.Retained), "P6id is detached");
+        var detached = session.Coverage(Crossing)["P6id"];
+        Assert(detached.Kind == CircuitKind.Detached && detached.CurrentRanges == null, "A detached circuit covers no track now");
+        var form = new CoverageFormFields();
+        form.Read(detached);
+        Assert(ShowsP6idOwnSpans(form), "Edit circuit of a detached circuit fills every end from the map's own spans: " + String.Join(",", form.Values));
+        Assert(session.PreviewCoverage(Crossing, "P6id", CircuitCoverage.Detached).Lines.All(l => l.Contains(": retained,"))
+            && (bool)Only(session)["relationships"]["crossingCoverage"]["circuits"]["P6id"]["detach"], "The detach compares and is stored as before");
+
+        // Apply without a change: selected tracks equal to the map's own spans, and P6id back on the controller.
+        var value = form.Parse(false, out var problem);
+        Assert(value != null && value.Kind == CircuitKind.Tracks, "The filled form parses as selected tracks: " + problem);
+        var preview = session.PreviewCoverage(Crossing, "P6id", value);
+        Assert(preview.Error == null && preview.Lines.Any(l => l.StartsWith("Circuit P6id: detached", StringComparison.Ordinal) && l.Contains("-> selected tracks")), "The preview shows the detached circuit taking selected tracks: " + preview.Error + String.Join(" | ", preview.Lines));
+        var outcome = session.Cover(Crossing, "P6id", value);
+        Assert(outcome.Applied && !outcome.Unchanged, "The unchanged form applies: " + outcome.Error);
+        var circuit = Only(session)["relationships"]["crossingCoverage"]["circuits"]["P6id"];
+        Assert(circuit["detach"] == null && (string)circuit["approachA"]["from"]["segment"] == "Sother" && (string)circuit["approachA"]["from"]["end"] == "b" && (double)circuit["approachA"]["from"]["distance"] == Single(210.123456)
+            && (string)circuit["approachA"]["to"]["segment"] == "Snew" && (double)circuit["approachA"]["to"]["distance"] == Single(12.5)
+            && (double)circuit["island"]["from"]["distance"] == 190 && (double)circuit["island"]["to"]["distance"] == 200
+            && (double)circuit["approachB"]["from"]["distance"] == 190 && (double)circuit["approachB"]["to"]["distance"] == 10,
+            "The scene patch file stores the map's own spans as selected tracks: " + circuit);
+        var stored = session.Coverage(Crossing)["P6id"];
+        Assert(stored.Kind == CircuitKind.Tracks && f.Crossing.Circuits.Count == 2 && ReferenceEquals(f.Crossing.Circuits[1], f.Retained) && f.Retained.Spans.All(s => s.Owned),
+            "The controller's circuits hold P6id again, on spans the patcher owns for its selected tracks");
+        // The fake world detects within one segment only, so the island and approach B show it; approach A runs over two.
+        Assert(f.World.Detects(f.Crossing, "Sother", 195) && f.World.Detects(f.Crossing, "Sother", 100), "P6id detects on its track again");
+        var reopened = new CoverageFormFields();
+        reopened.Read(stored);
+        Assert(ShowsP6idOwnSpans(reopened), "Edit circuit reopens the stored selected tracks: " + String.Join(",", reopened.Values));
+
+        // Clear circuit returns P6id to the map's own detection, after the Apply and straight from a detach.
+        Assert(session.Cover(Crossing, "P6id", null).Applied && f.Native && session.Coverage(Crossing)["P6id"].Kind == CircuitKind.Native, "Clear circuit after the Apply returns the map's own detection");
+        Assert(session.Cover(Crossing, "P6id", CircuitCoverage.Detached).Applied && session.Cover(Crossing, "P6id", null).Applied && f.Native && session.ScenePatchFileText.Contains("\"modifications\": {}"),
+            "Clear circuit of a detached circuit returns the map's own detection");
     }
     // As the game stores it: a single-precision distance.
     static double Single(double value) => (float)value;
@@ -40,7 +87,7 @@ static partial class CoverageTests {
         Assert(Shows(form, 1, false, "Sother", "a", "190") && Shows(form, 1, true, "Sother", "a", "200") && Shows(form, 2, false, "Sother", "a", "190") && Shows(form, 2, true, "Sother", "a", "10"),
             "The island and approach B show their current ends: " + String.Join(",", form.Values));
         form.Read(CircuitCoverage.Detached);
-        Assert(form.Values.All(v => v == "" || v == "a"), "A detached circuit starts empty");
+        Assert(form.Values.All(v => v == "" || v == "a"), "A detach that carries no map's own spans, as a scene patch file states it, starts empty");
         form.Read(null);
         Assert(form.Values.All(v => v == "" || v == "a"), "A new addition starts empty");
         Assert(f.World.Mutations == 0, "Reading the form changes nothing");

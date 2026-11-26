@@ -115,17 +115,21 @@ namespace RailroaderScenePatcher.Core {
             if (spanRanges != null && (spanRanges.Count != 3 || spanRanges.Any(r => r == null))) throw new ArgumentException("A circuit has three spans", nameof(spanRanges));
             return new CircuitCoverage(CircuitKind.Native, null, spanIds.ToArray()) { nativeRanges = spanRanges?.ToArray() };
         }
+        // A detached circuit as read from the scene, with the track the map's own spans of the circuit cover, the track it
+        // covered before it was detached. Those ranges are not part of its identity: every detach is the same coverage.
+        internal static CircuitCoverage DetachedFrom(IReadOnlyList<SpanRange> spanRanges) =>
+            spanRanges == null ? Detached : new CircuitCoverage(CircuitKind.Detached, null, null) { nativeRanges = spanRanges.ToArray() };
         SpanRange[] nativeRanges;
         // Null unless Kind is Tracks or Added.
         public IReadOnlyList<SpanRange> Ranges => ranges;
         // Null unless Kind is Native.
         public IReadOnlyList<string> SpanIds => spans;
         // The track the map's own spans cover in role order, each from its lower to its upper end; null unless Kind is
-        // Native and the spans were read from the scene. It is not part of the coverage's identity: the spans are.
+        // Native or Detached and the spans were read from the scene. It is not part of the coverage's identity.
         public IReadOnlyList<SpanRange> SpanRanges => nativeRanges;
         // The track each role covers now: the selected tracks, or the map's own spans as read. Null for a detached
         // circuit and for native spans that were not read.
-        public IReadOnlyList<SpanRange> CurrentRanges => ranges ?? nativeRanges;
+        public IReadOnlyList<SpanRange> CurrentRanges => Kind == CircuitKind.Detached ? null : ranges ?? nativeRanges;
         // Whether these selected tracks are the track the map's own spans of the native circuit cover.
         internal static bool CoversNativeTrack(CircuitCoverage selected, CircuitCoverage native) =>
             selected?.Kind == CircuitKind.Tracks && native?.Kind == CircuitKind.Native && native.nativeRanges != null && selected.ranges.Zip(native.nativeRanges, SpanRange.Same).All(x => x);
@@ -465,7 +469,7 @@ namespace RailroaderScenePatcher.Core {
             return new CrossingCoverage(circuits, baseline.Owned.Where(o => !inUse.Any(u => ReferenceEquals(u, o)) && world.Registered(o)).Select(world.SpanId)).AsComplete();
         }
         CircuitCoverage Classify(Circuit circuit, IReadOnlyList<object> members, Baseline baseline) {
-            if (!members.Any(m => ReferenceEquals(m, circuit.Set))) return CircuitCoverage.Detached;
+            if (!members.Any(m => ReferenceEquals(m, circuit.Set))) return circuit.Original == null ? CircuitCoverage.Detached : CircuitCoverage.DetachedFrom(NativeRanges(circuit.Original));
             var spans = (world.Spans(circuit.Set) ?? Array.Empty<object>()).ToArray();
             var owned = spans.Length == 3 && spans.All(s => s != null && baseline.Owned.Any(o => ReferenceEquals(o, s)));
             if (circuit.Original == null) return owned ? CircuitCoverage.Added(world.Range(spans[0]), world.Range(spans[1]), world.Range(spans[2])) : throw new InvalidOperationException(DetectionAddition.Name(circuit.Key) + " holds spans this patcher does not own");

@@ -138,7 +138,14 @@ static class SceneClassificationTests {
         new BaseMapObject { Listed = true, Path = path, Family = BakedSceneryRules.Family, Structure = BaseMapObject.Part, Components = components, At = new[] { 0.0, 0 }, Today = "", Expected = "" };
     const string Baked = BakedSceneryRules.Family, Culler = "Helpers.Culling.RendererCuller", Mesh = "UnityEngine.MeshRenderer", Marker = "Track.TrackMarker", Relative = "Track.TrackRelativePosition";
     static void FictionalObjects() {
-        var fiction = new[] {
+        var fiction = Fictions();
+        var map = new BaseMapFixture(fiction);
+        var listed = fiction.Where(o => !o.BakedPart).ToArray();
+        Check(listed.Length >= 10 && listed.Length <= 30, "the fictional objects are a handful (" + listed.Length + ")");
+        CheckFictions(map, listed);
+    }
+    // The fictional objects, which the Supported edits test lists as well.
+    internal static BaseMapObject[] Fictions() => new[] {
             // A new station building in an existing town.
             Fiction("World/Large Scenery/Hewitt/Hewitt Depot", Baked, -13800, -8190, "Station building / Depots @ Hewitt"),
             Below("World/Large Scenery/Hewitt/Hewitt Depot/Roof", Mesh),
@@ -182,9 +189,7 @@ static class SceneClassificationTests {
             Fiction("World/POIs/Judson", "Spawn point", -9000, -3000, "Spawn point @ Judson", "Character.SpawnPoint"),
             Fiction("World/Map Labels/Station Icons/Judson Station", "Station map icon", -9005, -3005, "Station map icon @ Judson", "UI.Map.MapIcon"),
         };
-        var map = new BaseMapFixture(fiction);
-        var listed = fiction.Where(o => !o.BakedPart).ToArray();
-        Check(listed.Length >= 10 && listed.Length <= 30, "the fictional objects are a handful (" + listed.Length + ")");
+    static void CheckFictions(BaseMapFixture map, BaseMapObject[] listed) {
         var wrong = listed.Where(o => map.Outcome(o) != o.Expected).Select(o => o.Path + ": expected " + o.Expected + ", got " + map.Outcome(o)).ToArray();
         Check(wrong.Length == 0, "a fictional object built the game's way takes its category, kind and place from the rules: " + String.Join(" | ", wrong));
         // Each fictional group root is a group root for the inventory too, with the same category.
