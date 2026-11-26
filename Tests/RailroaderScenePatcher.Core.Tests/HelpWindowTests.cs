@@ -25,7 +25,7 @@ static class HelpWindowTests {
         var end = source.IndexOf("[PlacementTab] = new HelpText", start, StringComparison.Ordinal);
         Check(start >= 0 && end > start, "The Object tab has context help");
         var words = WindowWordsTests.Literals(source.Substring(start, end - start));
-        var headings = new[] { "Supported edits", "Placement fixed or set elsewhere", "The game controls its activity", "Edited elsewhere", "Not supported", "Blocked for now" };
+        var headings = new[] { "Supported edits", "Placement limits", "Activity set by the game", "Edit elsewhere", "Not supported", "Blocked for now" };
         var previous = -1;
         foreach (var heading in headings) {
             var index = words.IndexOf(heading);
@@ -33,9 +33,9 @@ static class HelpWindowTests {
             previous = index;
         }
         Check(words[words.IndexOf("Supported edits") + 1].Contains("disabled control's tooltip"), "Supported edits explains the disabled control's reason");
-        var activity = words[words.IndexOf("The game controls its activity") + 1];
+        var activity = words[words.IndexOf("Activity set by the game") + 1];
         Check(activity.Contains("When available, Clear activity"), "Track group help does not offer Clear activity for every object whose activity follows a track group");
-        var elsewhere = words[words.IndexOf("Edited elsewhere") + 1];
+        var elsewhere = words[words.IndexOf("Edit elsewhere") + 1];
         Check(elsewhere.Contains("Edit a marker on its milepost or crossing pad.") && !elsewhere.Contains("when its reason names one"), "Help names both marker owners directly");
         Check(elsewhere.Contains("Edit construction segments on their group."), "Help directs construction segment edits to the group");
         Check(words[words.IndexOf("Blocked for now") + 1].Contains("related object"), "Blocked for now includes related object states as well as failed reads");

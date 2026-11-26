@@ -47,7 +47,7 @@ namespace RailroaderScenePatcher {
         }
         // The reason that holds every placement and activity edit of a crossing controller: its capability takes only
         // its crossing coverage and added equipment.
-        internal const string CrossingNoEdit = "Its placement and activity aren't edited";
+        internal const string CrossingNoEdit = "Its placement and activity can't be edited";
         static readonly HashSet<string> MarkerStructures = new HashSet<string>(StringComparer.Ordinal) { CrossingPadScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure };
         // Whether the object's track binding is edited through its track marker: a crossing pad, a generic track marker or a milepost.
         internal static bool EditsBinding(string structure) => structure != null && MarkerStructures.Contains(structure);

@@ -211,10 +211,10 @@ static class StarterWreckTests {
             && world.WreckWrites == 0 && !mapEditor.CanUndo, "A marker that several car placements read is refused: " + refused.Error);
         // The greyed checkbox gives the short reason for the engine's refusal.
         var lines = world.Setups().Readers(hopper);
-        Check(CommandBand.WreckReason(null, lines) == "Several new-game car placements read it", "The checkbox names the multiple readers: " + CommandBand.WreckReason(null, lines));
+        Check(CommandBand.WreckReason(null, lines) == "Several new-game car placements use it", "The checkbox names the multiple readers: " + CommandBand.WreckReason(null, lines));
         world.Placements.RemoveAt(world.Placements.Count - 1); world.Placements.RemoveAt(2);
         refused = session.SetStarterWreck(Hopper, true);
-        Check(CommandBand.WreckReason(null, world.Setups().Readers(hopper)) == "No new-game car placement reads it", "Without a reader the checkbox names that reason: " + refused.Error);
+        Check(CommandBand.WreckReason(null, world.Setups().Readers(hopper)) == "No new-game car placement uses it", "Without a reader the checkbox names that reason: " + refused.Error);
         world.FailSetups = true;
         refused = session.SetStarterWreck(Hopper, true);
         Check(!refused.Applied && refused.Error == StarterPlacements.Unreadable("placements unavailable")

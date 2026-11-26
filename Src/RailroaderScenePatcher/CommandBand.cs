@@ -183,7 +183,7 @@ namespace RailroaderScenePatcher {
         // Why the activity control cannot run, or null. The patcher refuses an explicit enable of an object whose activity
         // follows its track group, so Enable is inactive with that reason beforehand; Disable stays available.
         internal static string ActivityReason(bool enable, bool followsGroup) => enable && followsGroup ? GroupEnableReason : null;
-        internal const string GroupEnableReason = "Clear activity returns it to its track group";
+        internal const string GroupEnableReason = "Clear activity restores track group control";
         // Whether the open help closes on a tab switch: the help of a tab that is no longer the open tab. The help of
         // the outliner or of the window stays.
         internal static bool ClosesHelp(string openRegion, string tab, IEnumerable<string> tabs) {
@@ -952,7 +952,7 @@ namespace RailroaderScenePatcher {
         internal static string NamedLocationLine(string segment, string end, double? distance, string registeredUnder, bool own) {
             if (segment == null && end == null && distance == null) return ListedTrackLocation + " none";
             var line = ListedTrackLocation + " " + new TrackLocation(segment ?? "no segment", end, distance ?? Double.NaN).Display;
-            if (registeredUnder != null && registeredUnder != segment) line += ". Registered under segment " + registeredUnder + ".";
+            if (registeredUnder != null && registeredUnder != segment) line += ". It's registered under segment " + registeredUnder + ".";
             if (!own) line += (line.EndsWith(".", StringComparison.Ordinal) ? " " : ". ") + "This location belongs to another object.";
             return line;
         }
@@ -972,7 +972,7 @@ namespace RailroaderScenePatcher {
         // controller holds (its inventory entry names that holder), takes its tracks from the controller's crossing
         // coverage; any other object names the families whose binding the patcher edits.
         internal const string DetectionSpanNoBinding = EditReasons.Crossing;
-        internal const string NoTrackBinding = "Only markers, mileposts and pads have one";
+        internal const string NoTrackBinding = "Only markers, mileposts and pads use bindings";
         internal static string NoBindingReason(SceneObservation entry) => entry?.HolderPath != null ? DetectionSpanNoBinding : NoTrackBinding;
         // The guide link offered for a mast or bell that does not conform to its pattern: its label and the guide page
         // with the anchor of the refusal reasons.

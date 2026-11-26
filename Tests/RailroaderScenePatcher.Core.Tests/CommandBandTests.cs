@@ -81,8 +81,8 @@ static class CommandBandTests {
             "A group that no ticket covers reads Not editable as a group with its reason: " + settled);
         Check(settled.IndexOf("yet", StringComparison.OrdinalIgnoreCase) < 0 && CommandBand.Refusal(settled) == null,
             "Its reason promises no later support and is no refusal of a supported family: " + settled);
-        Check(CommandBand.EditReason(settled) == "It holds track markers; edit them one by one" && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + SceneObjectRules.TrackMarkerReason
-            && CommandBand.Tooltip("Does something.", CommandBand.EditReason(settled)) == "It holds track markers; edit them one by one.",
+        Check(CommandBand.EditReason(settled) == "Edit its track markers one by one" && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + SceneObjectRules.TrackMarkerReason
+            && CommandBand.Tooltip("Does something.", CommandBand.EditReason(settled)) == "Edit its track markers one by one.",
             "The message, the Inspection only line and the tooltip give the reason without its label: " + CommandBand.Tooltip("Does something.", settled));
         var spawn = Verdict("Alarka Spawn", new Node("Spawn").With("Character.SpawnPoint"));
         Check(spawn.Ticket == null && CommandBand.GroupInspectionOnly(spawn, family) == "Not editable as a group: " + SceneObjectRules.SpawnPointReason,
@@ -240,14 +240,14 @@ static class CommandBandTests {
             new[] { StarterPlacements.NoDetach, StarterPlacements.NoDetach + "." },
             new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
             new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
-            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Track span", null, CommandBand.NotYetSupported("the Track span family"))), CommandBand.SnapMode, false), "No edit for this family." },
+            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Track span", null, CommandBand.NotYetSupported("the Track span family"))), CommandBand.SnapMode, false), "This family has no supported edits." },
             new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects have this hierarchy path, and a scene patch file names an object by its path." },
             new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
             new[] { "Inspect an object first.", "Inspect an object first." },
             new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
-            new[] { CommandBand.WreckReason(null, new string[0]), "No new-game car placement reads it." },
+            new[] { CommandBand.WreckReason(null, new string[0]), "No new-game car placement uses it." },
             new[] { CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no", StarterPlacements.ReaderPrefix + "ewh-diesel, car placement 1 of 1: cars rr/gb-gondola3; wreck: no" }),
-                "Several new-game car placements read it." },
+                "Several new-game car placements use it." },
             new[] { CommandBand.WreckReason("placements unavailable", new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }),
                 "The new-game setups can't be read." },
         }) {
@@ -547,10 +547,10 @@ static class CommandBandTests {
             "A single value repeats no label: " + CommandBand.RunningLine(new[] { "ID" }, new[] { "Myyi" }, null));
         // The reason an object cannot be edited is its own, wherever it is given, as one plain sentence.
         foreach (var row in new[] {
-            new[] { CommandBand.NotYetSupported("the Milepost family"), "No edit for this family" },
+            new[] { CommandBand.NotYetSupported("the Milepost family"), "This family has no supported edits" },
             new[] { CommandBand.NotEditable("the marker is inside a crossing"), "Its structure isn't supported" },
             new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", CommandBand.SharedPathBlock },
-            new[] { "Fixed placement and activity", "Uses fixed placement" }, new[] { null, "Its state couldn't be read" }, new[] { " ", "Its state couldn't be read" } })
+            new[] { "Fixed placement and activity", "Uses fixed placement" }, new[] { null, "Its state can't be read" }, new[] { " ", "Its state can't be read" } })
             Check(CommandBand.EditReason(row[0]) == row[1], "The editing message gives the object's own reason: " + row[1] + " / " + CommandBand.EditReason(row[0]));
         Check(!CommandBand.EditReason(CommandBand.NotYetSupported("x")).Contains("Object tab"), "The editing message does not send the user to another tab");
         // An added light, gate or bell is edited on its crossing controller's Connections tab: its editing message and the
@@ -677,11 +677,11 @@ static class CommandBandTests {
         // registered under another segment or belongs to another object, that is information of its own.
         Check(CommandBand.NamedLocationLine("Ss85", "A", 25.45431f, "Ss85", true) == "Named location: Ss85 / a / 25.454", "A named location reads in the shown form: " + CommandBand.NamedLocationLine("Ss85", "A", 25.45431f, "Ss85", true));
         var noted = CommandBand.NamedLocationLine("Ss85", "B", 3, "S9xx", false);
-        Check(noted == "Named location: Ss85 / b / 3. Registered under segment S9xx. This location belongs to another object.", "A named location keeps its notes as sentences of their own: " + noted);
-        Check(CommandBand.NamedLocationLine(null, "A", 1, "S1", true) == "Named location: no segment / a / 1. Registered under segment S1." && CommandBand.NamedLocationLine(null, null, null, null, true) == "Named location: none",
+        Check(noted == "Named location: Ss85 / b / 3. It's registered under segment S9xx. This location belongs to another object.", "A named location keeps its notes as sentences of their own: " + noted);
+        Check(CommandBand.NamedLocationLine(null, "A", 1, "S1", true) == "Named location: no segment / a / 1. It's registered under segment S1." && CommandBand.NamedLocationLine(null, null, null, null, true) == "Named location: none",
             "A location without a segment, and no named location, read as values");
         var named = CommandBand.NamedLocationRow(noted);
-        Check(named.Value == "Ss85 / b / 3" && named.Notes.SequenceEqual(new[] { "Registered under segment S9xx.", "This location belongs to another object." }),
+        Check(named.Value == "Ss85 / b / 3" && named.Notes.SequenceEqual(new[] { "It's registered under segment S9xx.", "This location belongs to another object." }),
             "The window shows the location as the row's value and each note as a line of its own: " + named.Value + " | " + String.Join(" | ", named.Notes));
         var plain = CommandBand.NamedLocationRow("Named location: Ss85 / a / 25.454");
         Check(plain.Value == "Ss85 / a / 25.454" && plain.Notes.Length == 0, "A location without notes is only the value");
@@ -699,7 +699,7 @@ static class CommandBandTests {
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode }) {
             Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Generic track marker", TrackMarkerScene.Structure, "Fixed placement")), mode, true) == null, "Mode " + mode + " is open for an object that can be edited");
             Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Crossing pad marker", CrossingPadScene.Structure, "x")), mode, false) == CommandBand.PadFollowsTrack, "Mode " + mode + " is inactive for a pad");
-            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Milepost", null, why)), mode, true) == (mode == CommandBand.NumericMode ? null : "No edit for this family"), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Milepost", null, why)), mode, true) == (mode == CommandBand.NumericMode ? null : "This family has no supported edits"), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
         }
         Check(CommandBand.ShowsCurrentRelations(false) && !CommandBand.ShowsCurrentRelations(true), "A confirmed target that is not yet used is the one green relation");
         // A candidate among several offers carries one number everywhere.

@@ -411,7 +411,7 @@ static class ReplacementMarkerIdTests {
     // reason for any marker that does not take one, and Set id and Clear id state why they cannot be used.
     static void MarkerIdRowStatesItsReasons() {
         // A milepost and a starter placement marker are native track markers of type Generic too; the reason names the family.
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false) == "Generic track markers only",
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false) == "Only the Generic track marker family",
             "A marker of another family keeps the row disabled with its reason: " + RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false));
         Assert(ReplacementMarkerIds.NotSupported == "Only objects in the Generic track marker family can have a replacement ID." && ReplacementMarkerIds.NotSupported.Contains(SceneFamilies.TrackMarker + " family"),
             "The refusal names the family Generic track marker, not the marker type Generic that a milepost also shows: " + ReplacementMarkerIds.NotSupported);
