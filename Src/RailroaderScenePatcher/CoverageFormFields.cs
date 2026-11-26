@@ -25,11 +25,11 @@ namespace RailroaderScenePatcher {
             Array.Clear(read, 0, read.Length);
         }
         // Fills every end from the track each role covers now: a circuit's selected tracks or an addition's tracks as the
-        // scene patch file holds them, or the map's own spans of a native circuit. A detached circuit and a new addition
-        // start empty.
+        // scene patch file holds them, or the map's own spans of a native circuit. A detached circuit fills from the map's
+        // own spans of that circuit, the track it covered before it was detached. A new addition starts empty.
         internal void Read(CircuitCoverage value) {
             Clear();
-            var ranges = value?.CurrentRanges;
+            var ranges = value?.CurrentRanges ?? (value?.Kind == CircuitKind.Detached ? value.SpanRanges : null);
             if (ranges == null) return;
             for (var role = 0; role < 3; role++) {
                 Fill(role, false, ranges[role].From);
