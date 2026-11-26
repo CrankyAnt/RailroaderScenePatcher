@@ -8,7 +8,7 @@ using RailroaderScenePatcher.Core;
 
 // The family names of the base-map inventory after the families were named by the family rule: each family value and
 // each label the window shows for it changes only by the mapping below, and no other family changes. The counts are
-// those of the base-map fixture before the rename, less the markers only inactive setups hold, which no family lists.
+// those of the base-map fixture before the rename.
 static class FamilyMappingTests {
     static void Check(bool value, string message) { if (!value) throw new Exception("Family mapping: " + message); }
 
@@ -96,20 +96,23 @@ static class FamilyMappingTests {
             && signs.Count(o => o.Structure == LocationSigns.Structure) == 8 && signs.Count(o => o.Structure == null) == 47,
             "the 55 Loc: rows, 8 with location-sign-v1 and 47 without a structure id, are Location sign by family value");
         Check(Count(StarterPlacementsBefore) == 8 && byFormer[StarterPlacementsBefore].All(o => o.Family == "Starter placement marker"), "the 8 starter placement rows are Starter placement marker");
-        Check(Count(GenericMarkersBefore) == 103 && byFormer[GenericMarkersBefore].All(o => o.Family == "Generic track marker" && o.Structure != StarterPlacementScene.Structure),
-            "the 103 generic track marker rows are Generic track marker, got " + Count(GenericMarkersBefore));
+        Check(Count(GenericMarkersBefore) == 111 && byFormer[GenericMarkersBefore].All(o => o.Family == "Generic track marker" && o.Structure != StarterPlacementScene.Structure),
+            "the 111 generic track marker rows are Generic track marker, got " + Count(GenericMarkersBefore));
         Check(Count(ControllersBefore) == 4 && byFormer[ControllersBefore].All(o => o.Family == "Grade crossing controller"), "the 4 crossing controller rows are Grade crossing controller");
         foreach (var pair in Kept) Check(Count(pair.Key) == pair.Value, "the kept family " + pair.Key + " holds " + pair.Value + " rows, got " + Count(pair.Key));
         Check(byFormer.Keys.All(k => k == FormerSceneObjects || Renamed.ContainsKey(k) || Kept.ContainsKey(k)), "no other family appears");
-        Check(listed.Length == 1547 + 55 + 8 + 4 + 103 + Kept.Values.Sum(), "the fixture lists the same number of objects as before, less the 8 markers only inactive setups hold: " + listed.Length);
-        // The markers of the base game's Starter Equipment Setup that only inactive setups hold: the game never reads
-        // them, so they are listed in no family, the Generic track marker family included.
+        Check(listed.Length == 1547 + 55 + 8 + 4 + 111 + Kept.Values.Sum(), "the fixture lists the same number of objects as before: " + listed.Length);
+        // The markers of the base game's Starter Equipment Setup that no setup's car placement holds: they are no
+        // starter placement markers (StarterUse.None), so they keep their own family and are listed as Generic track
+        // markers under Track marker / Setup markers. A marker that only inactive setups hold is not listed; the base map
+        // has none, so StarterPlacementTests checks that with a fictional setup.
         var unused = new[] { "starter-bc", "starter-br-coaling", "starter-dbs1", "starter-dbs2", "starter-dbtt2", "starter-editor", "starter-ewh-coaling", "starter-wh-p" }
             .Select(n => "Setups/Starter Equipment Setup/" + n).ToArray();
         var found = map.Objects.Where(o => unused.Contains(o.Path)).ToArray();
-        Check(found.Length == unused.Length && found.All(o => !o.Listed && o.Family == null), "the 8 markers only inactive setups hold are in the fixture and not listed: "
-            + String.Join(", ", found.Where(o => o.Listed).Select(o => o.Path + " (" + o.Family + ")")));
-        Check(!listed.Any(o => o.Family == SceneFamilies.TrackMarker && o.Path.StartsWith("Setups/", StringComparison.Ordinal)), "no marker below Setups is listed in the Generic track marker family");
+        Check(found.Length == unused.Length && found.All(o => o.Listed && o.Family == SceneFamilies.TrackMarker && o.Structure == "track-marker-v1"
+                && o.Expected.StartsWith(SceneClassification.TrackMarker + " / " + SceneClassification.SetupMarkers + " @ ", StringComparison.Ordinal)),
+            "the 8 markers no setup holds are listed as Generic track markers under Track marker / Setup markers: "
+            + String.Join(", ", found.Where(o => !o.Listed || o.Family != SceneFamilies.TrackMarker).Select(o => o.Path + " (" + (o.Family ?? "not listed") + ")")));
     }
 
     // Each family name the window shows for a listed object of the base map: sentence case with spaces, Milepost one
