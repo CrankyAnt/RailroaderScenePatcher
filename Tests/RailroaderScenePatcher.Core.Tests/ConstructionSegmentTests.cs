@@ -398,7 +398,7 @@ static class ConstructionSegmentTests {
         foreach (var task in new[] { GuidedTaskKind.Binding, GuidedTaskKind.DetachBinding, GuidedTaskKind.StarterPlacement, GuidedTaskKind.Wreck, GuidedTaskKind.MarkerId }) {
             var reason = GuidedTaskState.TargetBlock(task, ela);
             Assert(reason != null && reason.StartsWith("The construction controller ", StringComparison.Ordinal) && reason.EndsWith(".", StringComparison.Ordinal)
-                && CommandBand.Tooltip("Start this task for the inspected object.", reason).Contains("Unavailable: " + reason), "The guided task " + task + " of the Ela controller is unavailable with its reason: " + reason);
+                && CommandBand.Tooltip("Start this task for the inspected object.", reason) == reason, "The guided task " + task + " of the Ela controller is unavailable with its reason: " + reason);
         }
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela).Contains("no marker track location"), "The binding tasks state why a marker-location edit does not apply to the controller");
         // The controller is bound to track by its construction segments, which the Connections tab shows: the reason
@@ -408,12 +408,12 @@ static class ConstructionSegmentTests {
             "The binding tasks do not deny the construction segments: " + GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela));
         Assert(GuidedTaskState.Tasks.Count == 8, "The task list keeps every task visible");
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, GroupId(Bryson)) == null, "A rail bridge group keeps its guided move");
-        Assert(CommandBand.EditReason(CommandBand.ConstructionSceneryOperations) == "This object cannot be edited here.", "The generic reason is what the Ela controller showed while it counted as not editable");
+        Assert(CommandBand.EditReason(CommandBand.ConstructionSceneryOperations) == "Its structure isn't supported", "The fallback reason applies to unrecognized operations");
         Assert(CommandBand.ConstructionSceneryOperations == "Set this controller's construction segments. Its position has no effect in the game. It stays enabled because it controls which parts of the bridge the game shows.",
             "The Ela controller's Supported edits: " + CommandBand.ConstructionSceneryOperations);
         Assert(CommandBand.InspectionOnly(CommandBand.ConstructionSceneryFamily, false) == null, "No bridge construction controller is inspection only");
         for (var mode = 0; mode < 4; mode++)
             Assert(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of(CommandBand.ConstructionSceneryFamily, ConstructionSceneryScene.Structure, null)), mode, true) == (mode == CommandBand.NumericMode ? null : CommandBand.ControllerNoPlacement),"Every placement mode but Numeric is unavailable for the controller, with the reason: mode " + mode);
-        Assert(CommandBand.ControllerNoPlacement == ConstructionSceneryScene.NoPlacement && CommandBand.ControllerNoActivity == ConstructionSceneryScene.NoActivity, "Placement and Enabled give the capability's reasons");
+        Assert(CommandBand.ControllerNoPlacement == "Its placement has no effect in the game" && CommandBand.ControllerNoActivity == "The game needs it to show bridge parts", "Placement and Enabled give the short reasons");
     }
 }

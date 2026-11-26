@@ -15,12 +15,12 @@ namespace RailroaderScenePatcher {
         internal const string Move = "Move", Rotate = "Rotate", Follow = "Follow a track", Activity = "Activity", Binding = "Set track binding",
             MarkerId = "Set replacement marker ID", Coverage = "Edit crossing coverage", Equipment = "Edit crossing equipment", Segments = "Set construction segments", TrackLocation = "Set track location", Wreck = "Set Start derailed";
         internal sealed class Edit {
-            internal Edit(string key, string name, string reason) { Key = key; Name = name; Reason = reason; }
+            internal Edit(string key, string name, string reason) { Key = key; Name = name; Reason = EditReasons.Short(reason); }
             // The edit's constant above.
             internal string Key { get; }
             // The edit as Supported edits names it.
             internal string Name { get; }
-            // Why the edit is not available, or null: the reason its control's tooltip gives after "Unavailable:".
+            // Why the edit is not available, or null: the short reason its control's tooltip gives as a sentence.
             internal string Reason { get; }
         }
         // What the loaded world adds to the entry at the time the Object tab is drawn. Every value left null takes what
@@ -47,7 +47,7 @@ namespace RailroaderScenePatcher {
         }
         // The reason that holds every placement and activity edit of a crossing controller: its capability takes only
         // its crossing coverage and added equipment.
-        internal const string CrossingNoEdit = "The patcher edits only this controller's crossing coverage and crossing equipment.";
+        internal const string CrossingNoEdit = "Its placement and activity aren't edited";
         static readonly HashSet<string> MarkerStructures = new HashSet<string>(StringComparer.Ordinal) { CrossingPadScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure };
         // Whether the object's track binding is edited through its track marker: a crossing pad, a generic track marker or a milepost.
         internal static bool EditsBinding(string structure) => structure != null && MarkerStructures.Contains(structure);
@@ -73,7 +73,7 @@ namespace RailroaderScenePatcher {
             var equipment = structure == ExistingEquipmentScene.MastStructure || structure == ExistingEquipmentScene.BellStructure;
             var bridge = live?.Bridge ?? entry.Bridge;
             // The object's own reason, which every placement and activity edit meets.
-            var own = starter ? CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)) : !editable ? CommandBand.EditReason(entry.Operations) : coverage ? CrossingNoEdit : null;
+            var own = live?.Present == false ? EditReasons.Scene : starter ? CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)) : !editable ? CommandBand.EditReason(entry.Operations) : coverage ? CrossingNoEdit : null;
             var move = own ?? (structure == CrossingPadScene.Structure ? CommandBand.PadFollowsTrack : controller ? CommandBand.ControllerNoPlacement : null);
             var edits = new List<Edit> {
                 new Edit(Move, Move, move),
@@ -86,19 +86,21 @@ namespace RailroaderScenePatcher {
                 ?? (enabled ? live?.DisableProblem : null) ?? CommandBand.ActivityReason(!enabled, FollowsGroup(entry))));
             if (starter) {
                 edits.Add(new Edit(TrackLocation, TrackLocation, null));
-                edits.Add(new Edit(MarkerId, MarkerId, ReplacementMarkerIds.NotSupportedFor(entry.Family)));
+                edits.Add(new Edit(MarkerId, MarkerId, EditReasons.Replacement));
                 edits.Add(new Edit(Wreck, Wreck, CommandBand.WreckReason(live?.StartersError, entry.Bindings.Where(b => b.StartsWith(StarterPlacements.ReaderPrefix, StringComparison.Ordinal)).ToArray())));
-                return edits;
+                return InScene(edits, live);
             }
-            if (HoldsSegments(entry, live)) { edits.Add(new Edit(Segments, Segments, null)); return edits; }
+            if (HoldsSegments(entry, live)) { edits.Add(new Edit(Segments, Segments, null)); return InScene(edits, live); }
             // A crossing controller's Connections tab edits its coverage and, as a separate edit, its added lights, gates and bells.
-            if (coverage) { edits.Add(new Edit(Coverage, Coverage, null)); edits.Add(new Edit(Equipment, Equipment, live?.EquipmentReason == null ? null : CommandBand.Sentence(live.EquipmentReason))); }
+            if (coverage) { edits.Add(new Edit(Coverage, Coverage, null)); edits.Add(new Edit(Equipment, Equipment, live?.EquipmentReason == null ? null : "Its lights, gates and bells can't be read")); }
             // An object that holds a track binding: its own reason when the patcher does not edit it, as for every other edit.
             if (HoldsBinding(entry.Family)) edits.Add(new Edit(Binding, Binding, editable && EditsBinding(structure) ? null : own ?? CommandBand.EditReason(entry.Operations)));
             if (EditsBinding(structure))
-                edits.Add(new Edit(MarkerId, MarkerId, own ?? (structure == TrackMarkerScene.Structure ? live?.MarkerIdReason : ReplacementMarkerIds.NotSupportedFor(entry.Family))));
-            return edits;
+                edits.Add(new Edit(MarkerId, MarkerId, own ?? (structure == TrackMarkerScene.Structure ? live?.MarkerIdReason : EditReasons.Replacement)));
+            return InScene(edits, live);
         }
+        static IReadOnlyList<Edit> InScene(IReadOnlyList<Edit> edits, Live live) => live?.Present == false
+            ? edits.Select(edit => new Edit(edit.Key, edit.Name, EditReasons.Scene)).ToArray() : edits;
         // The reason of one edit, or null when it is available or not offered.
         internal static string ReasonOf(IEnumerable<Edit> edits, string key) => edits?.FirstOrDefault(edit => edit.Key == key)?.Reason;
         // Why a placement mode is not available: Numeric, Gizmo and Snap move and rotate, Follow follows a track.
@@ -112,9 +114,11 @@ namespace RailroaderScenePatcher {
         internal static IReadOnlyList<string> Lines(IReadOnlyList<Edit> edits) {
             var lines = new List<string>();
             var available = edits.Where(edit => edit.Reason == null).Select(edit => edit.Name).ToArray();
-            if (available.Length != 0) lines.Add("Available: " + Prose.Join(available) + ".");
-            foreach (var group in edits.Where(edit => edit.Reason != null).GroupBy(edit => CommandBand.Sentence(edit.Reason)))
-                lines.Add("Unavailable: " + Prose.Join(group.Select(edit => edit.Name)) + ". " + group.Key);
+            if (available.Length != 0) lines.Add("Available: " + String.Join(", ", available));
+            var unavailable = edits.Where(edit => edit.Reason != null).GroupBy(edit => edit.Reason.TrimEnd('.')).ToArray();
+            if (unavailable.Length != 0) lines.Add("Unavailable:");
+            foreach (var group in unavailable)
+                lines.Add("• " + group.Key + ": " + String.Join(", ", group.Select(edit => edit.Name)));
             return lines;
         }
     }

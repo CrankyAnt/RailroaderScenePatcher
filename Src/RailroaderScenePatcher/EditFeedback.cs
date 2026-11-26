@@ -149,7 +149,7 @@ namespace RailroaderScenePatcher {
         internal void Withdraw(string place, string message) { messages.RemoveAll(m => m.Source == place && m.Text == message); }
         // A refusal reads as one label, the action group of the message, followed by plain sentences: what was refused,
         // then why (CommandBand.Sentence), without a second label before the reason.
-        internal void Refuse(string place, string action, string reason) => Report(place, action + " refused. " + CommandBand.Sentence(reason));
+        internal void Refuse(string place, string action, string reason) => Report(place, action + " refused. " + CommandBand.Sentence(EditReasons.Message(reason)));
         // Runs one edit bound to the inspected observation. blocked is the reason the panel cannot edit now, or null.
         // Pinning compares the whole scene first, so a stale or changed inventory refuses the edit before it runs.
         // pin supplies the inspection token; without it the edit pins and compares the whole scene in this call.
@@ -175,7 +175,8 @@ namespace RailroaderScenePatcher {
         // guidance keeps the operation's guide for the footer and its failure kind for the message colour.
         void ReportFailure(string place, string action, SceneObservation selected, Outcome outcome) {
             var recovery = RecoveryGuidance.For(outcome, place, action, selected.Identity?.Structure);
-            Report(place, recovery.Line(action));
+            var reason = outcome.Failure == FailureKind.None || outcome.Failure == FailureKind.Refused ? EditReasons.Message(outcome.Error) : null;
+            Report(place, recovery.Line(action, reason));
             messages[0].Recovery = recovery;
         }
     }

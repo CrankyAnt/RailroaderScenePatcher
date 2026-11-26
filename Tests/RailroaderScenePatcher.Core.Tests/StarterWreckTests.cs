@@ -209,16 +209,16 @@ static class StarterWreckTests {
         refused = session.SetStarterWreck(Hopper, true);
         Check(!refused.Applied && refused.Error.StartsWith("2 new-game car placements read this marker", StringComparison.Ordinal) && refused.Error.EndsWith("so it cannot be used for this marker", StringComparison.Ordinal)
             && world.WreckWrites == 0 && !mapEditor.CanUndo, "A marker that several car placements read is refused: " + refused.Error);
-        // The greyed checkbox gives the reason the engine refuses with, from the marker's reader lines.
+        // The greyed checkbox gives the short reason for the engine's refusal.
         var lines = world.Setups().Readers(hopper);
-        Check(CommandBand.Sentence(CommandBand.WreckReason(null, lines)) == refused.Error + ".", "The checkbox's reason is the refusal: " + CommandBand.WreckReason(null, lines));
+        Check(CommandBand.WreckReason(null, lines) == "Several new-game car placements read it", "The checkbox names the multiple readers: " + CommandBand.WreckReason(null, lines));
         world.Placements.RemoveAt(world.Placements.Count - 1); world.Placements.RemoveAt(2);
         refused = session.SetStarterWreck(Hopper, true);
-        Check(CommandBand.Sentence(CommandBand.WreckReason(null, world.Setups().Readers(hopper))) == refused.Error + ".", "Without a reader the checkbox's reason is the refusal: " + refused.Error);
+        Check(CommandBand.WreckReason(null, world.Setups().Readers(hopper)) == "No new-game car placement reads it", "Without a reader the checkbox names that reason: " + refused.Error);
         world.FailSetups = true;
         refused = session.SetStarterWreck(Hopper, true);
         Check(!refused.Applied && refused.Error == StarterPlacements.Unreadable("placements unavailable")
-            && CommandBand.Sentence(CommandBand.WreckReason("placements unavailable", lines)) == "The new-game setups could not be read, so starter placement markers cannot be identified: placements unavailable.",
+            && CommandBand.WreckReason("placements unavailable", lines) == "The new-game setups can't be read",
             "Unreadable setups come first in the checkbox's reason, as in the refusal: " + refused.Error + " | " + CommandBand.WreckReason("placements unavailable", lines));
     }
     // Setting the native value again, or removing the modification, returns the effective underlying setting computed
