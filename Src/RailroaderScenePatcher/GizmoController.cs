@@ -51,11 +51,8 @@ namespace RailroaderScenePatcher {
         }
         // Binds the standing gizmo to a new inspection of the same object and lets it take drags again.
         internal void Rebind(InspectedTarget inspection) {
-            if (!Shown || Active) throw new InvalidOperationException("The gizmo is not standing");
-            var matches = scene.Resolve(identity);
-            if (matches.Count != 1) throw new InvalidOperationException(matches.Count == 0 ? PatchEngine.TargetMissing : PatchEngine.TargetAmbiguous);
-            inspection.Validate(scene, identity, matches[0]); scene.Preflight(matches[0]);
-            target = matches[0]; inspected = inspection;
+            if (!Shown || Active) throw new EditRefusal("The gizmo is not standing");
+            target = Checked(inspection); inspected = inspection;
             shown = scene.Read(target).Placement;
             Pose("rebind");
             holding = false;
@@ -70,23 +67,30 @@ namespace RailroaderScenePatcher {
             return true;
         }
         Placement shown, live;
+        DragFault dragFault;
+        // The one target the identity resolves to, checked against the inspection and the capability: every failure of
+        // these checks refuses the gizmo.
+        object Checked(InspectedTarget inspection) => EditRefusal.Check(() => {
+            var matches = scene.Resolve(identity);
+            if (matches.Count != 1) throw new InvalidOperationException(matches.Count == 0 ? PatchEngine.TargetMissing : PatchEngine.TargetAmbiguous);
+            inspection.Validate(scene, identity, matches[0]); scene.Preflight(matches[0]);
+            return matches[0];
+        });
 
         internal void Initialize(PatchEngine engine, IScene scene, MapEditorAttachment attachment, TargetIdentity identity, InspectedTarget inspected, TransformGizmoMode mode, Action<Outcome, string> finished) {
             this.engine = engine; this.scene = scene; this.attachment = attachment; this.identity = identity; this.inspected = inspected; this.finished = finished;
+            dragFault = new DragFault(attachment.Fault);
             try {
-                if (current != null) throw new InvalidOperationException("Another scene-patch gizmo is shown");
+                if (current != null) throw new EditRefusal("Another scene-patch gizmo is shown");
                 controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as Behaviour;
-                if (controller == null || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor)) throw new InvalidOperationException("The Map Editor changed");
-                var matches = scene.Resolve(identity);
-                if (matches.Count != 1) throw new InvalidOperationException(matches.Count == 0 ? PatchEngine.TargetMissing : PatchEngine.TargetAmbiguous);
-                inspected.Validate(scene, identity, matches[0]); scene.Preflight(matches[0]);
-                target = matches[0];
-                shown = scene.Read(matches[0]).Placement;
+                if (controller == null || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor)) throw new EditRefusal("The Map Editor changed");
+                target = Checked(inspected);
+                shown = scene.Read(target).Placement;
                 var position = MapToWorld(shown);
                 var nativeGizmo = Native.Read(controller, "TransformGizmo");
                 var native = nativeGizmo == null ? null : Native.Read(nativeGizmo, "_gizmo") as TransformGizmo;
                 if (native == null) throw new InvalidOperationException("The Map Editor gizmo is unavailable");
-                if (native.IsDragging) throw new InvalidOperationException("The Map Editor gizmo is being dragged. " + WindowGuidance.ReleaseNativeGizmo);
+                if (native.IsDragging) throw new EditRefusal("The Map Editor gizmo is being dragged. " + WindowGuidance.ReleaseNativeGizmo);
                 var box = Native.Read(controller, "BoxSelect");
                 if (box != null && (bool)Native.Read(box, "IsDragging")) {
                     Native.Call(box, "Cancel");
@@ -106,7 +110,8 @@ namespace RailroaderScenePatcher {
                 visual = gameObject.AddComponent<TransformGizmo>();
                 visual.Camera = Camera.main;
                 if (visual.Camera == null) throw new InvalidOperationException("The Map Editor camera is unavailable");
-                visual.Space = TransformGizmoSpace.World; visual.Mode = mode; visual.Visible = true;
+                // Local space, as the native map editor's gizmo: the handles follow the object's own rotation.
+                visual.Space = TransformGizmoSpace.Local; visual.Mode = mode; visual.Visible = true;
                 visual.SetPose(position, Rotation(shown));
                 activated = Time.unscaledTime;
                 visual.CanStartDrag = CanDrag;
@@ -147,23 +152,26 @@ namespace RailroaderScenePatcher {
             if (ReferenceEquals(owner.attachment.MapEditor, __instance) || ReferenceEquals(owner.attachment.Manager, __instance)) owner.Cancel();
         }
         void Begin() {
+            dragFault.Begin();
             try { gesture = new PlacementGesture(engine, attachment.Session, identity, inspected); live = gesture.Initial; }
             catch (Exception e) { Fail(e.Message); }
         }
         void Preview(TransformGizmoDelta delta) {
             if (!Active) return;
+            // Scaling is no placement edit: a refusal, not a failure.
+            if (delta.Kind != GizmoTransformKind.Move && delta.Kind != GizmoTransformKind.Rotate) { Fail("Scene-patch gizmos support movement and rotation only"); return; }
             try {
                 var start = gesture.Initial;
-                Placement placement;
-                if (delta.Kind == GizmoTransformKind.Move) placement = new Placement(new[] {
-                    start.Position[0] + delta.TotalTranslation.x, start.Position[1] + delta.TotalTranslation.y, start.Position[2] + delta.TotalTranslation.z }, start.Rotation);
-                else if (delta.Kind == GizmoTransformKind.Rotate) {
-                    var q = delta.TotalRotation * Rotation(start);
-                    placement = new Placement(start.Position, new double[] { q.x, q.y, q.z, q.w });
-                } else throw new InvalidOperationException("Scene-patch gizmos support movement and rotation only");
+                var placement = delta.Kind == GizmoTransformKind.Move
+                    ? GizmoDrag.Moved(start, new double[] { delta.TotalTranslation.x, delta.TotalTranslation.y, delta.TotalTranslation.z })
+                    : GizmoDrag.Turned(start, new double[] { delta.TotalRotation.x, delta.TotalRotation.y, delta.TotalRotation.z, delta.TotalRotation.w });
                 var result = gesture.Preview(placement);
                 if (!result.Applied) Fail(result.Error); else live = placement;
-            } catch (Exception e) { Fail(e.Message); }
+            } catch (Exception e) {
+                // An exception outside the gesture's own checks is a patcher failure, written as a player error.
+                dragFault.Fail(EditingFailure.GizmoPreview, e.GetBaseException().Message, identity?.Path);
+                Fail(e.Message);
+            }
         }
         void Complete() {
             if (stopping || gesture == null) return;
@@ -204,10 +212,12 @@ namespace RailroaderScenePatcher {
             try { hooks?.UnpatchAll(HookId); } catch (Exception e) { cleanup.Add(e.GetBaseException().Message); }
             hooks = null;
             try {
+                // A restoration that did not verify leaves the object guarded: a patcher failure, written as a player error.
+                if (gesture?.CleanupFailure != null) dragFault?.Fail(EditingFailure.GizmoRestore, gesture.CleanupFailure, identity?.Path);
                 if (cleanup.Count != 0) {
                     var detail = String.Join("; ", cleanup);
                     var message = EditingFault.Describe(EditingFailure.GizmoCleanup, detail);
-                    attachment.Fault.Fail(EditingFailure.GizmoCleanup, detail, identity?.Path);
+                    dragFault?.Fail(EditingFailure.GizmoCleanup, detail, identity?.Path);
                     if (notify) finished?.Invoke(result, message);
                 } else if (notify) finished?.Invoke(result, result?.Error == null ? "Gizmo drag cancelled; the prior placement is restored." : "Gizmo cancellation failed: " + result.Error);
             } finally { if (gameObject != null) Destroy(gameObject); }

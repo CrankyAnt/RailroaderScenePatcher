@@ -213,7 +213,30 @@ static class GroundMaskTests {
         availability.Release(next);
         Assert(!availability.Held, "The owning world's teardown makes them unavailable");
     }
+    // A terrain world whose tiles are all built, for the tracking of writes alone.
+    sealed class BuiltTerrain : ITerrainWorld {
+        public bool TileLoaded(double[] position) => true;
+        public void InvalidateTile(double[] position) { }
+        public bool TerrainIdle => true;
+        public double Now => 0;
+        public event Action<double[], double[]> TileBuilt { add { } remove { } }
+    }
+    // Writes within 0.05 m of an outstanding write, rounded to a tenth of a metre on each map axis, are one write; the
+    // label shows the position in the shown number format.
+    static void NearbyTerrainWritesMergeWithinFiveCentimetres() {
+        using (var output = new TerrainOutput(new BuiltTerrain())) {
+            var target = new object();
+            output.Track(target, new[] { 100.0, 5, 200 });
+            output.Track(target, new[] { 100.04, 5, 200.03 });
+            Assert(output.Output(target).Outstanding.Count == 1, "A write within 0.05 m merges with the outstanding one: " + String.Join("; ", output.Output(target).Outstanding));
+            output.Track(target, new[] { 100.06, 5, 200 });
+            Assert(output.Output(target).Outstanding.Count == 2, "A write 0.06 m away is a write of its own: " + String.Join("; ", output.Output(target).Outstanding));
+            Assert(output.Output(target).Outstanding.First() == "terrain output at map x=100, z=200" && output.Output(target).Outstanding.Last() == "terrain output at map x=100.06, z=200",
+                "The labels show the shown number format: " + String.Join("; ", output.Output(target).Outstanding));
+        }
+    }
     public static void Run() {
+        NearbyTerrainWritesMergeWithinFiveCentimetres();
         TheNextWorldKeepsTheMaskMembersWhenTheEarlierHostIsDestroyed();
         GroupMoveCarriesTheMaskOfItsRoot();
         PartMoveCarriesTheMaskItHolds();
@@ -314,7 +337,7 @@ static class GroundMaskTests {
         Assert(Close(f.At(f.Group), Authored) && f.Terrain.Store.Count == 2 && Close(f.Terrain.Store[f.Mask.Keys.Single()].Centre, Authored) && Close(f.Terrain.Store[second.Keys.Single()].Centre, new[] { 1100.0, 10, 24 }),
             "The placement and both registrations are restored, each once: " + f.Where());
         var output = f.Masks.Output(f.Group);
-        Assert(output.Outstanding.Count == 2 && output.Error == null && output.Outstanding.Any(l => l.Contains("x=1100.0")) && output.Outstanding.Any(l => l.Contains("x=1700.0")), "The terrain where the first mask stood and where it went is outstanding: " + String.Join("; ", output.Outstanding));
+        Assert(output.Outstanding.Count == 2 && output.Error == null && output.Outstanding.Any(l => l.Contains("x=1100,")) && output.Outstanding.Any(l => l.Contains("x=1700,")), "The terrain where the first mask stood and where it went is outstanding: " + String.Join("; ", output.Outstanding));
         var again = f.Engine.Apply(Doc(GroupMod("again", Near))).Outcomes["again"];
         Assert(!again.Applied && again.Failure == FailureKind.AwaitingOutput && Close(f.At(f.Group), Authored), "The next edit waits for the restored terrain output: " + again.Failure + " " + again.Error);
         f.Terrain.BuildTiles(); f.Masks.Poll();
@@ -374,7 +397,7 @@ static class GroundMaskTests {
         var outcome = f.Engine.Apply(Doc(GroupMod("move-station", Far, yaw: 40))).Outcomes["move-station"];
         Assert(outcome.Applied && Close(f.At(f.Group), Far) && f.RegisteredOnceAt(Far, 70), "A group move carries the flattening mask, centre and rotation: " + outcome.Error + " " + f.Where());
         var output = f.Masks.Output(f.Group);
-        Assert(output.Outstanding.Count == 2 && output.Outstanding.Any(l => l.Contains("x=1100.0")) && output.Outstanding.Any(l => l.Contains("x=1700.0")),
+        Assert(output.Outstanding.Count == 2 && output.Outstanding.Any(l => l.Contains("x=1100,")) && output.Outstanding.Any(l => l.Contains("x=1700,")),
             "The terrain at the old and the new place is tracked: " + String.Join("; ", output.Outstanding));
         f.Terrain.BuildTiles(); f.Masks.Poll();
         Assert(f.Masks.Output(f.Group).Settled && f.Masks.Output(f.Group).Completed.Count == 2, "Both terrain writes complete");
@@ -438,7 +461,7 @@ static class GroundMaskTests {
         f.Terrain.Clock = TerrainOutput.Timeout + 1; f.Masks.Poll();
         var output = session.Output(StationId);
         Assert(output.Error != null && output.Completed.Count == 1 && output.Outstanding.Count == 1 && !output.Settled, "The failed write names its completed and outstanding writes: " + output.Error);
-        Assert(output.Completed[0].Contains("x=1100.0") && output.Outstanding[0].Contains("x=1700.0"), "Each write names its place: " + output.Completed[0] + " | " + output.Outstanding[0]);
+        Assert(output.Completed[0].Contains("x=1100,") && output.Outstanding[0].Contains("x=1700,"), "Each write names its place: " + output.Completed[0] + " | " + output.Outstanding[0]);
         Assert(f.Masks.Failures.Count() == 1 && Close(f.At(f.Group), Far) && f.RegisteredOnceAt(Far, 30), "The edit and its registration are kept, and the failure is identifiable");
         Assert(mapEditor.Save() == null && !session.Output(StationId).Settled, "Save does not report the terrain output complete");
         Assert(session.RetryOutput(StationId).Applied && session.RetryOutput(StationId).Applied && f.Terrain.Invalidated.SequenceEqual(new[] { "3,0", "3,0" }) && session.Output(StationId).Error == null && !session.Output(StationId).Settled && f.RegisteredOnceAt(Far, 30),
@@ -507,7 +530,7 @@ static class GroundMaskTests {
         foreach (var item in Stations.Concat(Depots)) {
             var path = "World/Large Scenery/" + item[0] + "/" + item[1];
             var verdict = verdicts.SingleOrDefault(v => v.Path == path);
-            Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Category == SceneObjectCategories.StationBuilding && verdict.Ticket == null, path + " is a listed group under Station building: " + verdict?.Disposition + " " + verdict?.Reason);
+            Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Category == SceneObjectCategories.StationBuilding, path + " is a listed group under Station building: " + verdict?.Disposition + " " + verdict?.Reason);
             Assert(parts[path + "/Mask"].Disposition == PartDisposition.Part, "The object that holds the ground mask is a part of " + path);
         }
         var rhodo = "World/Large Scenery/Rhodo/Rhodo Station/";

@@ -193,6 +193,15 @@ static class DetectionCheckTests {
             "A controller that fails the pattern check judges with that reason: " + refusal);
         const string shared = "2 objects share this hierarchy path and component";
         Assert(CircuitSpanChecks.Judges(true, null, null, shared, out refusal) && refusal == shared, "A controller that shares its path judges with that reason: " + refusal);
+        // A controller without crossing coverage editing whose refusal no check names still names no repair route.
+        Assert(CircuitSpanChecks.Judges(true, null, null, null, out refusal) && refusal == CircuitSpanChecks.NoCoverageEdit, "A controller without a named refusal judges with a neutral reason: " + refusal);
+        var track = Track();
+        var spans = Valid();
+        spans[2] = null;
+        var findings = CircuitSpanChecks.Findings(1, "PI", spans, Ids(track), track, refusal);
+        Assert(findings.Problems.Count == 0 && findings.Information.Count == 1 && !findings.Information[0].Contains("Edit circuit")
+            && findings.Information[0].EndsWith("for this controller: " + CircuitSpanChecks.NoCoverageEdit + ".", StringComparison.Ordinal),
+            "Its findings are information that names no repair route: " + Lines(findings));
     }
     // A circuit without one of its spans keeps its existing line, Missing circuit N role: a problem on an editable
     // controller, information with the reason on any other.

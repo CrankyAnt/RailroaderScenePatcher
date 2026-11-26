@@ -34,6 +34,7 @@ static class SupportedEditsTests {
         WhatTheWorldAddsChangesTheList();
         EachReasonIsItsControlsTooltip();
         PatternRefusalsUseTheirShortReason();
+        EveryPatternRefusalNamesItsReason();
         AnAbsentSceneBlocksEveryEdit();
         LiveReasonsStayShortAndMatchTheirControls();
         Console.WriteLine("PASS: supported edits");
@@ -75,6 +76,7 @@ static class SupportedEditsTests {
             ["The board's scene is not loaded"] = "Its scene isn't loaded",
             ["2 objects share this hierarchy path, so a scene patch file cannot name this one"] = "Another object shares its hierarchy path",
             ["This object has no implemented bridge-placement capability"] = "Its structure isn't supported",
+            ["The crossing controller's scene isn't loaded"] = "Its scene isn't loaded",
             ["The board's parents must be active"] = "Its parent object must be active",
             ["Editing this board would leave one of its attached objects out of date: " + new string('x', 1000)] = "Its attached object is out of date",
             ["The board's renderer culler must be present and enabled"] = "Its structure isn't supported",
@@ -128,6 +130,102 @@ static class SupportedEditsTests {
         var values = new EditFeedback();
         values.Refuse("Placement", "Move", "Enter a finite number.");
         Check(values.Messages[0].Text == "Move refused. Enter a finite number.", "a value correction keeps its own text");
+    }
+
+    // Every refusal text that an inventory pattern check can return, read from the methods that write them, is named by a
+    // rule of EditReasons. A changed refusal text then fails here instead of falling back to "Its structure isn't
+    // supported" unseen. A literal that is only a joined fragment of a refusal is checked with the text it is joined to.
+    static readonly (string File, string Method)[] PatternProducers = {
+        ("Src/RailroaderScenePatcher.Core/Boards.cs", "Refusal"),
+        ("Src/RailroaderScenePatcher/BridgeWorld.cs", "PatternProblem"),
+        ("Src/RailroaderScenePatcher/TrackMarkerWorld.cs", "Problem"),
+        ("Src/RailroaderScenePatcher/CrossingPadWorld.cs", "PadProblem"),
+        ("Src/RailroaderScenePatcher/MilepostWorld.cs", "MilepostProblem"),
+        ("Src/RailroaderScenePatcher/StarterPlacementWorld.cs", "PatternProblem"),
+        ("Src/RailroaderScenePatcher/CrossingDeviceWorld.cs", "MastProblem"),
+        ("Src/RailroaderScenePatcher/CrossingDeviceWorld.cs", "BellProblem"),
+        ("Src/RailroaderScenePatcher/SpawnPointWorld.cs", "Problem"),
+        ("Src/RailroaderScenePatcher/MapIconWorld.cs", "Problem"),
+        ("Src/RailroaderScenePatcher/CrossingCoverageWorld.cs", "Problem"),
+        ("Src/RailroaderScenePatcher/ConstructionSegmentWorld.cs", "Refusal"),
+        ("Src/RailroaderScenePatcher/GroupWorld.cs", "Problem"),
+        ("Src/RailroaderScenePatcher/GroupWorld.cs", "PartProblem"),
+        ("Src/RailroaderScenePatcher/GroupWorld.cs", "PileProblem"),
+        ("Src/RailroaderScenePatcher/GroupWorld.cs", "MaskProblem"),
+        ("Src/RailroaderScenePatcher/GroupWorld.cs", "ConstructionProblem"),
+        ("Src/RailroaderScenePatcher/MarkerPattern.cs", "Refusal"),
+        ("Src/RailroaderScenePatcher.Core/Bindings.cs", "Refusal(object target, Func"),
+    };
+    static string Root([System.Runtime.CompilerServices.CallerFilePath] string path = "") => System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path), "..", ".."));
+    // The text of a method's body: from its declaration to the end of its braces, or of its expression body.
+    static string Body(string source, string method) {
+        var declaration = System.Text.RegularExpressions.Regex.Match(source, @"\bstring " + System.Text.RegularExpressions.Regex.Escape(method.Contains("(") ? method : method + "("));
+        Check(declaration.Success, "the refusal producer " + method + " exists");
+        var start = declaration.Index;
+        int depth = 0, i = source.IndexOf(')', start);
+        for (; i < source.Length; i++) {
+            var c = source[i];
+            if (c == '"') { i++; while (source[i] != '"') { if (source[i] == '\\') i++; i++; } continue; }
+            if (c == '{') depth++;
+            else if (c == '}' && --depth == 0) break;
+            else if (c == ';' && depth == 0) break;
+        }
+        return source.Substring(start, i - start + 1);
+    }
+    // Each text a body can return: a string literal, or a chain of literals joined by + with every other operand read as "x".
+    static IEnumerable<string> Texts(string body) {
+        int Literal(int at) { var i = at + 1; while (body[i] != '"') { if (body[i] == '\\') i++; i++; } return i + 1; }
+        int Skip(int at) { while (at < body.Length && Char.IsWhiteSpace(body[at])) at++; return at; }
+        bool Joined(int at) => at < body.Length && body[at] == '+' && body[at + 1] != '+' && body[at + 1] != '=';
+        // The end of one operand that is no literal: the next + , ; ? : or a closing parenthesis at its own depth.
+        int Operand(int at) {
+            for (var depth = 0; at < body.Length; at++) {
+                var c = body[at];
+                if (c == '"') { at = Literal(at) - 1; continue; }
+                if (c == '(' || c == '[' || c == '{') depth++;
+                else if (c == ')' || c == ']' || c == '}') { if (depth-- == 0) return at; }
+                else if (depth == 0 && (c == '+' || c == ',' || c == ';' || c == '?' || c == ':')) return at;
+            }
+            return at;
+        }
+        for (var i = 0; i < body.Length; i++) {
+            if (body[i] != '"' || i > 0 && (Char.IsLetterOrDigit(body[i - 1]) || body[i - 1] == '@' || body[i - 1] == '$')) continue;
+            var before = i - 1; while (before >= 0 && Char.IsWhiteSpace(body[before])) before--;
+            var end = Literal(i);
+            if (before >= 0 && body[before] == '+') { i = end - 1; continue; }
+            var text = body.Substring(i + 1, end - i - 2);
+            var next = Skip(end);
+            while (Joined(next)) {
+                next = Skip(next + 1);
+                if (body[next] == '"') { var close = Literal(next); text += body.Substring(next + 1, close - next - 2); next = Skip(close); }
+                else { text += "x"; next = Skip(Operand(next)); }
+            }
+            i = end - 1;
+            if (text.Contains(" ")) yield return text;
+        }
+    }
+    internal static IEnumerable<string> PatternRefusalTexts() {
+        var root = Root();
+        foreach (var (file, method) in PatternProducers)
+            foreach (var text in Texts(Body(System.IO.File.ReadAllText(System.IO.Path.Combine(root, file)), method)))
+                yield return file.Substring(file.LastIndexOf('/') + 1) + "|" + method + "|" + text;
+    }
+    static void EveryPatternRefusalNamesItsReason() {
+        var texts = PatternRefusalTexts().ToArray();
+        Check(texts.Length > 60, "the producers' refusal texts are read: " + texts.Length);
+        var unnamed = texts.Where(found => EditReasons.Matched(found.Substring(found.LastIndexOf('|') + 1)) == null).ToArray();
+        Check(unnamed.Length == 0, unnamed.Length + " pattern refusals have no rule in EditReasons: " + String.Join(" || ", unnamed));
+        // The texts that constants hold, and the inventory's own refusals.
+        foreach (var text in new[] { SceneObjectRules.TrackMarkerReason, SceneObjectRules.SpawnPointReason, SceneObjectRules.MapIconReason, SceneObjectRules.StationAgentReason,
+            SceneObjectRules.ConstructionOutsideBridge, SceneObjectRules.TopObjectRefusal, SceneObjectRules.CullerOnlyRefusal, SceneObjectRules.GroupHolderRefusal,
+            GameSwitchActivity.ProgressionMembersRefusal, GameSwitchActivity.MapFeatureMembersRefusal, GameSwitchActivity.UnsharedRefusal,
+            CommandBand.SharedPath(2), CommandBand.NotYetSupported("track markers of type Ctc"), CommandBand.InspectionOnly("Unrecognised family", false),
+            "Generic track marker editing is unavailable", "Crossing pad editing is unavailable", "Milepost editing is unavailable", "Scene spawn point editing is unavailable.",
+            "Existing crossing equipment editing is unavailable", "Crossing coverage editing is unavailable", "the marker reference scan failed: error",
+            "this gate does not stand on a light object, so it is not part of a mast" })
+            Check(EditReasons.Matched(text) != null, "a rule names the reason of: " + text);
+        // An unknown refusal text has no rule: Short falls back to the structure reason, and this check would catch it.
+        Check(EditReasons.Matched("A refusal text that no rule knows") == null && EditReasons.Short("A refusal text that no rule knows") == EditReasons.Structure, "an unknown refusal has no rule");
     }
 
     // The loaded world's facts that the entry does not hold change the edits and their reasons as they change the controls.

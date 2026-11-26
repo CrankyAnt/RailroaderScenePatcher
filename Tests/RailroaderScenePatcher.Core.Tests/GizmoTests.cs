@@ -81,6 +81,8 @@ static class GizmoTests {
         CompletedGesturePersistsOneFixedOperation();
         SmallRotationsCompleteAsOperations();
         RestorationVerifiesWithinTheReadBackTolerance();
+        RefusalsAreChecksAndOneDragWritesOneError();
+        LocalHandlesMoveAndTurnAlongTheObjectsOwnAxes();
         CancelAndOriginShiftRestoreMapState();
         StaleAndFailedPreviewsStayGuarded();
         UnsupportedExistingContentRejectsPreview();
@@ -187,6 +189,7 @@ static class GizmoTests {
         Assert(gesture.Preview(Turned(0.4)).Applied, "A preview precedes the cancellation");
         var cancelled = gesture.Cancel();
         Assert(cancelled.Applied && f.MapEditor.UndoGroups.Count == 0 && Modifications(f).Count() == 0, "Cancel verifies a restoration within the read-back tolerance: " + cancelled.Error);
+        Assert(gesture.CleanupFailure == null, "A verified restoration is no cleanup failure");
         f.Inventory.Refresh(); gesture = f.Begin();
         Assert(gesture.Preview(Turned(0.02)).Applied, "The object accepts another gesture after that cancellation");
         var completed = gesture.Complete();
@@ -195,8 +198,56 @@ static class GizmoTests {
         var far = new Fixture(); far.Scene.RestoredRotation = Turned(2).Rotation;
         gesture = far.Begin();
         Assert(gesture.Preview(Turned(0.4)).Applied && !gesture.Cancel().Applied, "A restoration that reads back two degrees off is reported");
+        // The gesture names the unverified restoration, which the gizmo writes as a player error (EditingFailure.GizmoRestore).
+        Assert(gesture.CleanupFailure != null && gesture.CleanupFailure.StartsWith("Gizmo cleanup is unverified: ", StringComparison.Ordinal), "The gesture names its cleanup failure: " + gesture.CleanupFailure);
+        var fault = new EditingFault();
+        var log = RecordingLog.Capture(false, () => fault.Fail(EditingFailure.GizmoRestore, gesture.CleanupFailure, "World/Box"));
+        Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Error && log.Lines[0].Value.StartsWith("World/Box: Gizmo cleanup is unverified: ", StringComparison.Ordinal)
+            && fault.Text == gesture.CleanupFailure, "The unverified restoration is a player error and stands in the window: " + String.Join(" | ", log.Lines.Select(line => line.Value)));
         far.Inventory.Refresh(); var refused = false;
         try { far.Begin(); } catch (InvalidOperationException e) { refused = e.Message.Contains("cleanup"); }
         Assert(refused, "The unverified restoration guards the next gesture");
     }
+    // A check step refuses whatever its exception type, a refusal keeps its own text, and one drag writes at most one
+    // player error however many of its steps fail.
+    static void RefusalsAreChecksAndOneDragWritesOneError() {
+        EditRefusal Caught(Action step) { try { step(); return null; } catch (EditRefusal r) { return r; } }
+        Assert(Caught(() => EditRefusal.Check(() => throw new InvalidOperationException("stale"))).Message == "stale"
+            && Caught(() => EditRefusal.Check(() => throw new NullReferenceException("missing"))).Message == "missing", "A check step refuses whatever its exception type");
+        Assert(Caught(() => EditRefusal.Check(() => throw new EditRefusal("own"))).Message == "own", "A refusal inside a check keeps its text");
+        var other = false;
+        try { new Action(() => throw new InvalidOperationException("outside"))(); } catch (EditRefusal) { } catch (InvalidOperationException) { other = true; }
+        Assert(other, "An exception outside a check step is no refusal, even an InvalidOperationException");
+        var fault = new EditingFault();
+        var drag = new DragFault(fault);
+        var log = RecordingLog.Capture(false, () => {
+            drag.Begin();
+            Assert(drag.Fail(EditingFailure.GizmoPreview, "first", "World/Box"), "The first failure of a drag is written");
+            Assert(!drag.Fail(EditingFailure.GizmoRestore, "second", "World/Box") && !drag.Fail(EditingFailure.GizmoCleanup, "third", "World/Box"), "Later failures of the same drag write nothing");
+            drag.Begin();
+            Assert(drag.Fail(EditingFailure.GizmoRestore, "next drag", "World/Box"), "The next drag writes its own failure");
+        });
+        Assert(log.Lines.Count(line => line.Key == LogLevel.Error) == 2 && log.Lines[0].Value.Contains("The gizmo drag failed: first") && log.Lines[1].Value.Contains("next drag"),
+            "One player error per drag: " + String.Join(" | ", log.Lines.Select(line => line.Value)));
+    }
+
+    // The gizmo stands in local space: a handle lies along the object's own axis as it stands in the world, and the
+    // gizmo reports a drag as a world translation along that axis or a world rotation about it. The placement then
+    // moves along, and turns about, the object's own axis, also for an object that is turned and tilted.
+    static void LocalHandlesMoveAndTurnAlongTheObjectsOwnAxes() {
+        double[] AxisAngle(double[] axis, double degrees) { var half = degrees * Math.PI / 360; var s = Math.Sin(half); return new[] { axis[0] * s, axis[1] * s, axis[2] * s, Math.Cos(half) }; }
+        bool Near(double[] a, double[] b) => a.Zip(b, (x, y) => Math.Abs(x - y)).All(d => d < 1e-9);
+        bool SameTurn(double[] a, double[] b) => Near(a, b) || Near(a, b.Select(v => -v).ToArray());
+        var tilted = Turn.Multiply(Turn.Yaw(90), AxisAngle(new[] { 1.0, 0, 0 }, 30));
+        var start = new Placement(new[] { 10.0, 5, 20 }, tilted);
+        foreach (var axis in new[] { new[] { 1.0, 0, 0 }, new[] { 0.0, 1, 0 }, new[] { 0.0, 0, 1 } }) {
+            var handle = Turn.Rotate(tilted, axis);
+            var moved = GizmoDrag.Moved(start, handle.Select(v => v * 2).ToArray());
+            var local = Turn.Rotate(Turn.Inverse(tilted), new[] { moved.Position[0] - 10, moved.Position[1] - 5, moved.Position[2] - 20 });
+            Assert(Near(local, axis.Select(v => v * 2).ToArray()) && Near(moved.Rotation, tilted), "A move along a local handle moves 2 m along the object's own axis " + String.Join(",", axis));
+            var turned = GizmoDrag.Turned(start, AxisAngle(handle, 25));
+            Assert(SameTurn(turned.Rotation, Turn.Multiply(tilted, AxisAngle(axis, 25))) && Near(turned.Position, start.Position), "A turn about a local handle turns the object about its own axis " + String.Join(",", axis));
+        }
+    }
+
 }

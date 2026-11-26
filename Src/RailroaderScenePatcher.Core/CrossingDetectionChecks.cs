@@ -66,13 +66,15 @@ namespace RailroaderScenePatcher.Core {
         // Whether an observed component judges its crossing's detection, and with which refusal. Only the crossing
         // controller itself does; a mast, gate, bell or span below it keeps its own lines. refusal is null for a
         // controller with crossing coverage editing (structure), whose findings have a repair route; otherwise it is
-        // why the controller cannot be edited: its pattern check's reason, or the hierarchy path it shares.
+        // why the controller cannot be edited: its pattern check's reason, the hierarchy path it shares, or, when neither
+        // names one, NoCoverageEdit. A controller without crossing coverage editing never names a repair route.
         public static bool Judges(bool controllerItself, string structure, string coverageRefusal, string sharedPath, out string refusal) {
             refusal = null;
             if (!controllerItself) return false;
-            if (structure != CrossingCoverageScene.Structure) refusal = coverageRefusal ?? sharedPath;
+            if (structure != CrossingCoverageScene.Structure) refusal = coverageRefusal ?? sharedPath ?? NoCoverageEdit;
             return true;
         }
+        public const string NoCoverageEdit = "No crossing coverage edit applies to it";
 
         // The findings of one circuit: a missing role (Missing circuit index role), a span that could not be read (a
         // note), the existing check for an end without an existing segment (CircuitSpanProblems.Unresolved), then the

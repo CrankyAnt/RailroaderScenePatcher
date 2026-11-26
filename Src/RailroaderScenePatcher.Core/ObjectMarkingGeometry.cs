@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
@@ -258,11 +257,11 @@ namespace RailroaderScenePatcher.Core {
             // one thing: one box around its boxes would cover the land between them and catch clicks on it. It gets no
             // frame and lends no boxes to a group; its marker stands where the object stands.
             if (whole && piece.Count > 1 && Spread(piece.Select(CornersOf))) {
-                foreach (var box in piece) decisions?.Add(box.Name + ": Not used for the frame because the object's boxes form separate sets with gaps over " + SpreadGap.ToString("0", CultureInfo.InvariantCulture) + " m between them.");
+                foreach (var box in piece) decisions?.Add(box.Name + ": Not used for the frame because the object's boxes form separate sets with gaps over " + ShownNumber.Text(SpreadGap) + " m between them.");
                 return new ObjectMarkingFrame(null, distance, null, bounds);
             }
             if (!(distance <= frameDistance)) {
-                foreach (var box in piece) decisions?.Add(box.Name + ": Used for the marker, but too far away for a frame at " + distance.ToString("0.0", CultureInfo.InvariantCulture) + " m.");
+                foreach (var box in piece) decisions?.Add(box.Name + ": Used for the marker, but too far away for a frame at " + ShownNumber.Text(distance) + " m.");
                 // Without a frame the marker stands on the center of the uncut box around the piece: the ground is
                 // not read for an object that shows only its marker.
                 var uncut = piece.Count == 1 ? CornersOf(piece[0]) : BoxAlongPieces(piece.Select(CornersOf), orientation ?? BasisOf(seed));
@@ -457,7 +456,7 @@ namespace RailroaderScenePatcher.Core {
             var d = Math.Abs(first.X) + Math.Abs(first.Z) > 1e-6 * (Length(first) + 1e-12) ? first : second;
             var yaw = Math.Atan2(-d.Z, d.X) * 180 / Math.PI;
             yaw = ((yaw % 180) + 180) % 180;
-            return yaw.ToString("0.0", CultureInfo.InvariantCulture) + " degrees";
+            return ShownNumber.Text(yaw) + " degrees";
         }
         // The yaw of a box's first horizontal edge, as Yaw gives it. Debug output only.
         public static string Yaw(IReadOnlyList<WorldPoint> box) => box == null || box.Count != 8 ? "none" : Yaw(EdgeOf(box, 1), EdgeOf(box, 4));

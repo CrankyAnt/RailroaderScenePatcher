@@ -6,7 +6,7 @@ Give a scene marker a replacement ID to repair a marker ID it shares with anothe
 
 The selected marker receives the replacement ID without moving. The other holders keep their marker ID and registrations.
 
-This description of the patcher's behavior comes from its code and automated tests. A run on the base map in Railroader 0.6.3 build 26740326, with the patcher at commit `325ad5f`, observed repairs of `Mg6m` and `Mkft`. See [limits](#limits).
+This description of the patcher's behavior comes from its code, its automated tests, and repairs of `Mg6m` and `Mkft` in Railroader 0.6.3. See [limits](#limits).
 
 ## When to use it
 
@@ -147,7 +147,7 @@ Before changing anything, the patcher checks the following rules. A refusal leav
 
 ## Limits
 
-- A run on the base map in Railroader 0.6.3 build 26740326, with the patcher at commit `325ad5f`, observed the game's registrations. The Yard Limit took `Mg6m-yard`, **Enable**, and a binding at `pi3pzp` in one modification: it registered under `Mg6m-yard` there, and the speed sign stayed registered under `Mg6m`. Undo and Redo, a dependent rebind of the speed sign, Save, and a world reload reproduced both registrations, and removing the modifications returned `Mg6m` to its registration before the repair. A `Whistle Sign W` at Bryson Everett that took a replacement ID and **Disable** left the other four holders of `Mkft` registered. The run did not cover track following, Lua scripts, or multiplayer. The automated tests check these rules against a controlled marker world with the `Mg6m` pair and a group of three holders of `Mkft`, including a replacement ID that applies before track following and the save and reload of dependent binding and track-following edits.
+- In Railroader 0.6.3, the game registers a repaired marker under its replacement ID, and every other holder of the old ID keeps its registration, also after **Undo**, **Redo**, Save, and a world reload. Removing the modification returns the marker to its registration before the repair. A repaired marker that follows a track hasn't been verified in Railroader, and neither has multiplayer.
 - The patcher doesn't check Lua scripts that look up a marker by ID, such as scripts that call `NativeTrack.GetMarkerLocation`. It doesn't check third-party mods that look up a marker by ID either.
 - Map object IDs come from the game's map object manager for the loaded map context. While the manager is not loaded, the patcher refuses every replacement ID.
 - A scene marker that is not loaded but still registers under the shared ID counts as a holder. A repair of another holder does not move its registration.

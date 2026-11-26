@@ -49,7 +49,7 @@ static class CoalLoaderTests {
         var verdicts = SceneObjectRules.Classify(World());
         var group = verdicts.SingleOrDefault(v => v.Path == Loader);
         var office = verdicts.SingleOrDefault(v => v.Path == Neighbour);
-        Assert(group?.Disposition == GroupDisposition.Group && group.Reason == null && group.Ticket == null && group.Category == SceneObjectCategories.IndustryBuilding && group.Subcategory == null,
+        Assert(group?.Disposition == GroupDisposition.Group && group.Reason == null && group.Category == SceneObjectCategories.IndustryBuilding && group.Subcategory == null,
             "The loader group is listed under Industry building: " + group?.Disposition + " " + group?.Reason + " " + group?.Category);
         Assert(office?.Disposition == GroupDisposition.Group && office.Category == group.Category, "The loader stands where the other Robinson Gap Mine groups stand: " + office?.Category);
         Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.InspectionOnly), "Nothing of the loader stands in the Inspection only group");

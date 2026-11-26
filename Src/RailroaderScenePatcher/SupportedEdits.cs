@@ -92,7 +92,7 @@ namespace RailroaderScenePatcher {
             }
             if (HoldsSegments(entry, live)) { edits.Add(new Edit(Segments, Segments, null)); return InScene(edits, live); }
             // A crossing controller's Connections tab edits its coverage and, as a separate edit, its added lights, gates and bells.
-            if (coverage) { edits.Add(new Edit(Coverage, Coverage, null)); edits.Add(new Edit(Equipment, Equipment, live?.EquipmentReason == null ? null : "Its lights, gates and bells can't be read")); }
+            if (coverage) { edits.Add(new Edit(Coverage, Coverage, null)); edits.Add(new Edit(Equipment, Equipment, live?.EquipmentReason == null ? null : EditReasons.EquipmentUnread)); }
             // An object that holds a track binding: its own reason when the patcher does not edit it, as for every other edit.
             if (HoldsBinding(entry.Family)) edits.Add(new Edit(Binding, Binding, editable && EditsBinding(structure) ? null : own ?? CommandBand.EditReason(entry.Operations)));
             if (EditsBinding(structure))

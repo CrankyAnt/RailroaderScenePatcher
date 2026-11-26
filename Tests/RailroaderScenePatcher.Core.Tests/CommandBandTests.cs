@@ -42,7 +42,7 @@ static class CommandBandTests {
         NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
         ReasonsReadAsOnePlainSentence();
         EditingLinesEndWithAFullStop();
-        GroupVerdictsSayNotYetOnlyWithATicket();
+        GroupVerdictsSayWhyTheyAreNotEditable();
         ARefusedAdditionTakesItsCorrectionFromUse();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
     }
@@ -68,30 +68,30 @@ static class CommandBandTests {
         Check(unchanged == "Coverage preview completed. The object already has this value." && !unchanged.Contains(WindowGuidance.ApplyPreview),
             "A preview whose edit changes nothing says so and does not ask for Apply: " + unchanged);
     }
-    // A group left out under a settled rule that needs no ticket, such as a group that holds track markers, is not
-    // waiting for support and never reads "Not yet supported:"; a group a ticket covers does.
-    static void GroupVerdictsSayNotYetOnlyWithATicket() {
+    // A group left out under a settled rule, such as a group that holds track markers, is not waiting for support and
+    // never reads "Not yet supported:".
+    static void GroupVerdictsSayWhyTheyAreNotEditable() {
         SceneObjectVerdict Verdict(string name, Node part) =>
             SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node(name, part, new Node("Shell").Solid())))))
                 .Single(v => v.Path == "World/Large Scenery/Town/" + name);
         const string family = "Scene object";
         var markers = Verdict("Signs", new Node("Yard Limit").With("Track.TrackMarker").Solid().Family());
         var settled = CommandBand.GroupInspectionOnly(markers, family);
-        Check(markers.Ticket == null && settled == "Not editable as a group: " + SceneObjectRules.TrackMarkerReason,
-            "A group that no ticket covers reads Not editable as a group with its reason: " + settled);
+        Check(settled == "Not editable as a group: " + SceneObjectRules.TrackMarkerReason,
+            "A group left out under a rule reads Not editable as a group with its reason: " + settled);
         Check(settled.IndexOf("yet", StringComparison.OrdinalIgnoreCase) < 0 && CommandBand.Refusal(settled) == null,
             "Its reason promises no later support and is no refusal of a supported family: " + settled);
         Check(CommandBand.EditReason(settled) == "Edit its track markers one by one" && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + SceneObjectRules.TrackMarkerReason
             && CommandBand.Tooltip("Does something.", CommandBand.EditReason(settled)) == "Edit its track markers one by one.",
             "The message, the Inspection only line and the tooltip give the reason without its label: " + CommandBand.Tooltip("Does something.", settled));
         var spawn = Verdict("Alarka Spawn", new Node("Spawn").With("Character.SpawnPoint"));
-        Check(spawn.Ticket == null && CommandBand.GroupInspectionOnly(spawn, family) == "Not editable as a group: " + SceneObjectRules.SpawnPointReason,
+        Check(CommandBand.GroupInspectionOnly(spawn, family) == "Not editable as a group: " + SceneObjectRules.SpawnPointReason,
             "A group with a spawn point reads Not editable as a group and names the Spawn point family: " + CommandBand.GroupInspectionOnly(spawn, family));
         var bridge = Verdict("Almond Road Bridge", new Node("Deck").Solid());
-        Check(bridge.Ticket == null && CommandBand.GroupInspectionOnly(bridge, family) == null, "A road bridge is a listed group: " + CommandBand.GroupInspectionOnly(bridge, family));
-        // A group with a map icon elsewhere needs no ticket: station map icons have their own family.
+        Check(CommandBand.GroupInspectionOnly(bridge, family) == null, "A road bridge is a listed group: " + CommandBand.GroupInspectionOnly(bridge, family));
+        // A group with a map icon elsewhere is not editable as a group: station map icons have their own family.
         var icon = Verdict("Depot", new Node("Icon").With("UI.Map.MapIcon"));
-        Check(icon.Ticket == null && CommandBand.GroupInspectionOnly(icon, family) == "Not editable as a group: " + SceneObjectRules.MapIconReason,
+        Check(CommandBand.GroupInspectionOnly(icon, family) == "Not editable as a group: " + SceneObjectRules.MapIconReason,
             "A group with a map icon reads Not editable as a group: " + CommandBand.GroupInspectionOnly(icon, family));
         Check(CommandBand.GroupInspectionOnly(Verdict("Platform", new Node("Deck").Solid()), family) == null, "A listed group is not inspection only");
         Check(CommandBand.GroupInspectionOnly(null, family) == "Not yet supported: this scene object cannot be edited", "A group without a verdict waits for support");
@@ -99,7 +99,7 @@ static class CommandBandTests {
         var crossbuck = SceneObjectRules.Classify(new Node("World", new Node("Roads Bryson", new Node("Crossing Unprotected",
             new Node("Crossing Pad").With("Track.TrackMarker", "Track.TrackCurveMeshBuilder").Solid().Family(), new Node("Sign-Crossing0 (1)", new Node("LOD0").Solid()).With("Helpers.Culling.RendererCuller")))))
             .Single(v => v.Path.EndsWith("Sign-Crossing0 (1)", StringComparison.Ordinal));
-        Check(crossbuck.Ticket == null && crossbuck.Crossbuck && CommandBand.GroupInspectionOnly(crossbuck, family) == null, "A crossbuck is a listed group: " + CommandBand.GroupInspectionOnly(crossbuck, family));
+        Check(crossbuck.Crossbuck && CommandBand.GroupInspectionOnly(crossbuck, family) == null, "A crossbuck is a listed group: " + CommandBand.GroupInspectionOnly(crossbuck, family));
     }
     static void QueuingGizmoSetupKeepsTheConnectionsPreview() {
         Check(!CommandBand.ClearsConnectionsPreviewOnQueue(CommandBand.GizmoPlace), "Queuing gizmo setup must preserve a prepared Connections preview");
@@ -281,15 +281,15 @@ static class CommandBandTests {
         // A window saved at its minimum of 660 by 410 has a content of 636 by 364 inside a frame of 24 by 46.
         Check(CommandBand.RestoredContent(636, 660, 24) == 636 && CommandBand.RestoredContent(364, 410, 46) == 364, "A content size saved at the minimum window is restored as saved, not raised to the window's minimum");
         Check(CommandBand.RestoredContent(900, 660, 24) == 900 && CommandBand.RestoredContent(100, 660, 24) == 636, "A larger saved size stays, and a smaller one is raised to the minimum window's content");
-        Check(CommandBand.LampTooltip(CommandBand.Inventory(false), "The object list is up to date. You can inspect objects and start edits.") ==
-            ("Current", "The object list is up to date. You can inspect objects and start edits."), "The Current tooltip body gives the next available actions.");
+        Check(CommandBand.LampTooltip(CommandBand.Inventory(false), "The inventory is up to date. You can inspect objects and start edits.") ==
+            ("Current", "The inventory is up to date. You can inspect objects and start edits."), "The Current tooltip body gives the next available actions.");
         var scene = new Scene();
         var inventory = new SceneInventory(scene);
         inventory.Refresh();
         scene.Maps = new[] { "another map" };
         inventory.CheckFreshness();
         Check(CommandBand.LampTooltip(CommandBand.Inventory(inventory.IsStale), InventoryPresentationState.Notice(inventory, false)) ==
-            ("Stale", "The map context changed. Click Refresh to update the object list. Edits are refused until then."), "The Stale tooltip gives the reason and tells the user how to update the object list.");
+            ("Stale", "The map context changed. Click Refresh to update the inventory. Edits are refused until then."), "The Stale tooltip gives the reason and tells the user how to update the inventory.");
         Check(CommandBand.LampTooltip(CommandBand.Inventory(true, false), FilePanelState.Reason(FilePanelState.Kind.Repair)) ==
             ("Paused", "The scene patch file needs repair. Use the Repair panel first."), "The Paused tooltip body names the panel without repeating its title.");
         Check(CommandBand.LampTooltip(CommandBand.Save(false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.None, false)) ==
@@ -651,21 +651,36 @@ static class CommandBandTests {
         foreach (var row in new[] { new object[] { 528.405334, "528.405" }, new object[] { 70.04144, "70.041" }, new object[] { 1.13392689E-05, "0" }, new object[] { -1.13392689E-05, "0" }, new object[] { 25692.9766, "25692.977" },
             new object[] { 0.0, "0" }, new object[] { 334.5, "334.5" }, new object[] { 1e21, "1000000000000000000000" }, new object[] { -0.0006, "-0.001" } })
             Check(CommandBand.Number((double)row[0]) == (string)row[1] && !CommandBand.Number((double)row[0]).Contains("E"), "A number reads " + row[1] + ", got " + CommandBand.Number((double)row[0]));
-        // Every shown number goes through the one shared formatter (ShownNumber). A number format elsewhere is a key
-        // form, a state signature, a full-precision verification record or the game's own text, each listed here.
+        // Every shown number goes through the one shared formatter (ShownNumber). Any other format string, in a
+        // ToString call, a composite format item or an interpolation hole, is a key form, a state signature, a full-precision verification
+        // record, the game's own text or the text form of a value that is no number, each listed here with its reason.
         var allowed = new[] {
             "Src/RailroaderScenePatcher.Core/ShownNumber.cs|0.###",   // the shared formatter itself
             "Src/RailroaderScenePatcher.Core/Bindings.cs|R",          // TrackLocation.ToString, a key form
             "Src/RailroaderScenePatcher/BridgeWorld.cs|R",            // the bridge's state signature
             "Src/RailroaderScenePatcher.Core/CrossingEquipment.cs|R", // the verification record, whose tolerances need full precision
             "Src/RailroaderScenePatcher/NativeDiagnostics.cs|F1",     // the game's own warning text, matched exactly
-            "Src/RailroaderScenePatcher/TrackMarkerWorld.cs|F1" };    // the game's own warning text, matched exactly
+            "Src/RailroaderScenePatcher/TrackMarkerWorld.cs|F1",      // the game's own warning text, matched exactly
+            "Src/RailroaderScenePatcher/CrossingPadWorld.cs|X16",     // the pad geometry signature's mesh hash
+            "Src/RailroaderScenePatcher/CrossingPadWorld.cs|0.00",    // the pad geometry signature's rounded bounds
+            "Src/RailroaderScenePatcher/CrossingPadWorld.cs|0.000",   // the pad geometry signature's rounded curve points
+            "Src/RailroaderScenePatcher/SpatialSelection.cs|R",       // a track candidate's identity evidence, compared exactly
+            "Src/RailroaderScenePatcher/EntryPoint.cs|N",             // a Guid's text form
+            "Src/RailroaderScenePatcher.Core/ReloadReturn.cs|N",      // a Guid's text form
+            "Src/RailroaderScenePatcher.Core/ModStorage.cs|N",        // a Guid's text form
+            "Src/RailroaderScenePatcher.Core/FaultInjection.cs|O" };  // a timestamp in the test-only fault record
+        // An interpolation hole is caught when its format follows the colon without a space, as C# requires; a
+        // conditional expression in a hole, such as {a ? b : c}, has a space there and is no format.
+        const string numberFormat = @"ToString\(""([^""]*)""|\{\d+(?:,-?\d+)?:([^}""]+)\}|\{[^{}"":]+:([^}""\s]+)\}";
         var root = System.IO.Path.GetFullPath(System.IO.Path.Combine(SourceDirectory(), "..", ".."));
         var formats = System.IO.Directory.GetFiles(System.IO.Path.Combine(root, "Src"), "*.cs", System.IO.SearchOption.AllDirectories)
-            .SelectMany(file => System.Text.RegularExpressions.Regex.Matches(System.IO.File.ReadAllText(file), @"ToString\(""(R|F\d|0\.#+)""").Cast<System.Text.RegularExpressions.Match>()
-                .Select(m => file.Substring(root.Length + 1).Replace('\\', '/') + "|" + m.Groups[1].Value))
-            .Where(found => !allowed.Contains(found)).ToArray();
+            .SelectMany(file => System.Text.RegularExpressions.Regex.Matches(System.IO.File.ReadAllText(file), numberFormat).Cast<System.Text.RegularExpressions.Match>()
+                .Select(m => file.Substring(root.Length + 1).Replace('\\', '/') + "|" + (m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value)))
+            .Distinct().Where(found => !allowed.Contains(found)).ToArray();
         Check(formats.Length == 0, "Every shown number goes through ShownNumber: " + String.Join(", ", formats));
+        Check(new[] { "x.ToString(\"0\")", "x.ToString(\"0.0\")", "x.ToString(\"N2\")", "String.Format(\"{0:0.0}\", x)", "$\"{v:0.0}\"", "$\"{point.x:F2} m\"" }
+            .All(sample => System.Text.RegularExpressions.Regex.IsMatch(sample, numberFormat)), "The number-format check catches every format string");
+        Check(!System.Text.RegularExpressions.Regex.IsMatch("$\"{(a ? b : c)}\"", numberFormat), "A conditional expression in an interpolation hole is no format");
         // A native distance read as text reaches the window only in a structured "distance=" binding line, which
         // CommandBand.Shown formats; any other line takes it as a number through ShownNumber.
         var rawDistances = System.IO.Directory.GetFiles(System.IO.Path.Combine(root, "Src"), "*.cs", System.IO.SearchOption.AllDirectories)

@@ -64,10 +64,10 @@ static class InteractiveBuildingTests {
         var verdicts = SceneObjectRules.Classify(World());
         foreach (var path in new[] { SectionHouse, Tower, Turntable, Roundhouse3 }) {
             var group = At(verdicts, path);
-            Assert(group?.Disposition == GroupDisposition.Group && group.Category == SceneObjectCategories.RailroadServiceBuilding && group.Ticket == null,
+            Assert(group?.Disposition == GroupDisposition.Group && group.Category == SceneObjectCategories.RailroadServiceBuilding,
                 path + " is a listed group under Railroad service building: " + group?.Disposition + " " + group?.Reason + " " + group?.Category);
         }
-        Assert(!SceneObjectRules.Exclusions.Any(e => e.Component == Toggle || e.Ticket == "#91"), "No exclusion names a pickable toggle");
+        Assert(!SceneObjectRules.Exclusions.Any(e => e.Component == Toggle), "No exclusion names a pickable toggle");
         var all = SceneObjectRules.Parts(verdicts);
         var parts = all.ToDictionary(p => p.Path, p => p);
         bool Part(string path) => parts.TryGetValue(path, out var verdict) && verdict.Disposition == PartDisposition.Part;

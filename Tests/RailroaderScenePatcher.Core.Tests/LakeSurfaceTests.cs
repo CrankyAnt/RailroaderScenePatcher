@@ -62,7 +62,7 @@ static class LakeSurfaceTests {
 
     // No exclusion keeps a group that holds a lake surface or a log pond out of the family any more.
     static void NoExclusionNamesALakeSurface() {
-        Assert(!SceneObjectRules.Exclusions.Any(e => e.Component == Lake || e.Component == "Scenery.LogPond" || e.Ticket == "#93"), "No exclusion names a lake surface or a log pond");
+        Assert(!SceneObjectRules.Exclusions.Any(e => e.Component == Lake || e.Component == "Scenery.LogPond"), "No exclusion names a lake surface or a log pond");
         var verdicts = SceneObjectRules.Classify(World());
         Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.InspectionOnly), "No lake is inspection only: " + String.Join(", ", verdicts.Where(v => v.Disposition == GroupDisposition.InspectionOnly).Select(v => v.Path)));
     }

@@ -190,13 +190,17 @@ static class StarterPlacementTests {
     }
 
     // A marker is used when an active setup holds it; one only inactive setups hold is unused and stays out of the
-    // inventory; one no setup holds is an ordinary marker.
+    // inventory, as does one below Setups that no setup holds; one outside Setups that no setup holds is an ordinary marker.
     static void FamilyFollowsTheActiveSetups() {
         var setups = Setups();
         foreach (var used in new[] { Wreck, Shed, Hopper })
             Check(setups.Use(used) == StarterUse.Used && setups.Family(used, "Generic track marker") == StarterPlacements.Family, "A marker an active setup holds is in the Starter placement family: " + used);
         Check(setups.Use(Retired) == StarterUse.Unused && setups.Family(Retired, "Generic track marker") == null, "A marker only an inactive setup holds stays out of the inventory");
-        Check(setups.Use(Sign) == StarterUse.None && setups.Family(Sign, "Generic track marker") == "Generic track marker", "A marker no setup holds keeps its own family");
+        Check(setups.Use(Sign) == StarterUse.None && setups.Family(Sign, "Generic track marker") == "Generic track marker", "A marker outside Setups that no setup holds keeps its own family");
+        Check(setups.Family(Retired, "Generic track marker", inSetups: true) == null, "A marker below Setups that only an inactive setup holds stays out of the inventory");
+        Check(setups.Family(Sign, "Generic track marker", inSetups: true) == null, "A marker below Setups that no setup holds is unused and stays out of the inventory");
+        Check(setups.Family(Wreck, "Generic track marker", inSetups: true) == StarterPlacements.Family, "A used marker below Setups is a starter placement marker");
+        Check(StarterSetups.Unreadable("x").Family(Sign, "Generic track marker", inSetups: true) == "Generic track marker", "Unreadable setups leave a marker below Setups its own family");
         Check(StarterPlacements.Family == "Starter placement marker", "The family is named Starter placement marker");
     }
 }

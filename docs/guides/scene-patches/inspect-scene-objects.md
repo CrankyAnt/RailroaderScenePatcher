@@ -37,7 +37,7 @@ You can drag and resize the compact window. It keeps that place and size until y
 
 Click **Refresh** in the command band to read the loaded scene and the edited mod's supplied definitions and verify stored target identities. Refresh doesn't apply scene patches, save files, change object activity, repair bindings, or regenerate dependent output. An object can appear without a scene patch or warning.
 
-The command band across the top is split by the divider between the two columns. Above the outliner are **Refresh** and two status lamps: a dot for the object list and a dot for saving. **Current** and **Saved** are green. **Stale**, **Paused**, **Unsaved**, and **Blocked** are amber. Resolve the file issue when inspection is paused. Hover over **Blocked** for the reason you cannot save. The lamps are informational, not buttons, and their tooltips give the reason.
+The command band across the top is split by the divider between the two columns. Above the outliner are **Refresh** and two status lamps: a dot for the inventory and a dot for saving. **Current** and **Saved** are green. **Stale**, **Paused**, **Unsaved**, and **Blocked** are amber. Resolve the file issue when inspection is paused. Hover over **Blocked** for the reason you cannot save. The lamps are informational, not buttons, and their tooltips give the reason.
 
 Above the inspector are **Select in world**, **Focus**, **Clear**, and **Copy ID**. **Clear** ends the inspection and cancels a pending world choice, gizmo, or snap. Applied changes stay. During guided **Values** or **Review**, click **Clear** or select the pinned object's row to cancel a pending world choice and keep the target and draft. With no pending world choice, **Clear** is unavailable and its tooltip reads **Unavailable: No world choice is pending.** Selecting the pinned object's row gives feedback and keeps the draft. Return to **Inspector** to cancel the task. Outside guided **Values** or **Review**, selecting the inspected row does the same as **Clear**.
 
@@ -72,7 +72,7 @@ Detected problems depend on how the game uses an object. Except for starter plac
 
 - A crossing pad needs its binding: an empty one, or one that names a segment that no longer exists, is a problem.
 - A starter placement marker needs its binding whether it is enabled or not, because a new-game setup reads it either way: an empty binding, or one that names a segment that no longer exists, is a problem. This is the one exception to the rule above; see [starter placement markers](#starter-placement-markers).
-- A yard limit, speed, station, or whistle sign, a milepost, a marker under `Setups` that no setup holds, and any other Generic marker need no binding. An empty binding is shown as a **Marker binding note** on the **Connections** tab, not as a problem. A stored segment that no longer exists is a problem while the object is enabled, and [repairing the binding](repairing-track-bindings.md) corrects it.
+- A yard limit, speed, station, or whistle sign, a milepost, and any other Generic marker need no binding. An empty binding is shown as a **Marker binding note** on the **Connections** tab, not as a problem. A stored segment that no longer exists is a problem while the object is enabled, and [repairing the binding](repairing-track-bindings.md) corrects it.
 - An active generic track marker that shares its marker ID with another scene marker, and can take a replacement ID, is a problem. [Repairing a duplicate marker ID](repairing-duplicate-marker-ids.md) gives one holder a replacement ID. An inactive holder of a shared ID is not a problem; its dependencies still name the shared ID, and a generic track marker's dependencies offer the repair. Its **Detected problems** section says that it has no problem while it's inactive and that its edits stay refused until the duplicate marker ID is repaired.
 - A location sign has no track binding and no binding problem.
 
@@ -124,7 +124,8 @@ The outliner lists these markers under the **Starter placement** category, once 
 
 - A marker that a car placement of an active setup holds is listed, enabled or not, because the game reads it at a new game.
 - A marker that only setups that are switched off hold is not listed: the game never reads it.
-- A marker that no setup holds isn't a starter placement marker. If its type is Generic, it belongs to the **Generic track marker** family, regardless of its name or its position under `Setups`.
+- A marker under `Setups` that no setup holds is not listed either: no setup uses it.
+- A marker elsewhere that no setup holds isn't a starter placement marker. If its type is Generic, it belongs to the **Generic track marker** family, regardless of its name.
 
 The **Object** tab lists under **Used by** every setup and car placement that reads the marker, with the cars of each cut and whether the placement is a wreck. A listed marker needs a usable binding whether it is enabled or not: an empty binding, or a stored track location whose segment no longer exists, is a problem. A binding on an existing segment shows no problem.
 
@@ -138,7 +139,7 @@ Use the **Connections** tab to choose where the starting cars appear and whether
 
 ## Focus and refresh
 
-Click **Focus** in the command band to jump the camera to the inspected object's current position in map coordinates. For an object the game does not move with its floating origin, such as a marker under `Setups` that no setup holds, that is its position in the scene. A track span is its track locations: Focus lands midway between them, and is refused with its reason when neither resolves. A starter placement marker is its track point, not its object position; see [starter placement markers](#starter-placement-markers). Focus keeps the inspected selection, works while the inventory is stale, and does not make a scene edit. If the object no longer exists, the message area reports the refusal under **Focus**. Native camera jumps might shift the floating origin or load terrain. Map coordinates remain the placement reference.
+Click **Focus** in the command band to jump the camera to the inspected object's current position in map coordinates. For an object the game does not move with its floating origin, such as a starter placement marker under `Setups`, that is its position in the scene. A track span is its track locations: Focus lands midway between them, and is refused with its reason when neither resolves. A starter placement marker is its track point, not its object position; see [starter placement markers](#starter-placement-markers). Focus keeps the inspected selection, works while the inventory is stale, and does not make a scene edit. If the object no longer exists, the message area reports the refusal under **Focus**. Native camera jumps might shift the floating origin or load terrain. Map coordinates remain the placement reference.
 
 Mouse actions inside the product button or panel belong to that UI. Scrolling an observation should not also zoom the world, and dragging the scrollbar or title should not select objects behind the panel. A drag that begins inside remains captured until release. Outside the panel, normal world navigation remains available.
 

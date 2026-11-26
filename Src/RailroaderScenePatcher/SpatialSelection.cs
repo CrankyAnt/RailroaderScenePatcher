@@ -95,7 +95,7 @@ namespace RailroaderScenePatcher {
             if (kind == SelectionKind.TrackNode) {
                 var point = (Vector3)Native.Read(member, "Position");
                 return new SpatialCandidate(new SelectionCandidate(member, identity, identity.ToString(), Coordinates(point)),
-                    Finite(point) ? new[] { point } : Array.Empty<Vector3>(), "Map position " + Coordinates(point));
+                    Finite(point) ? new[] { point } : Array.Empty<Vector3>(), "Map position " + ShownNumber.Text(point.x) + ", " + ShownNumber.Text(point.y) + ", " + ShownNumber.Text(point.z));
             }
 
             var a = Native.Read(member, "a");

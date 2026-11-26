@@ -65,7 +65,7 @@ namespace RailroaderScenePatcher {
         public bool Unsettled(object target) => target is GameObject go && go != null && go.scene.IsValid() && !go.scene.isLoaded;
         // Why the object does not conform to the supported crossing pattern, or null. Shared with the inventory.
         internal static string Problem(GameObject go) {
-            if (!Loaded(go)) return "This object has no implemented crossing-coverage capability";
+            if (!Loaded(go)) return "The crossing controller's scene isn't loaded";
             var type = Native.Type(CrossingCoverageScene.ComponentType);
             if (type == null) return "The crossing controller type is unavailable";
             var controllers = go.GetComponents(type);

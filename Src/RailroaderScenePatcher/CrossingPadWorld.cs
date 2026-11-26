@@ -68,7 +68,7 @@ namespace RailroaderScenePatcher {
         public override string PlacementProblem(object target) => PadProblem(target as GameObject, null, null, true);
         // Why the object does not conform to the supported crossing-pad pattern, or null. Shared with the inventory.
         internal static string PadProblem(GameObject go, ReferenceScan references, HolderIndex setups, bool placementOnly = false) {
-            if (!Loaded(go)) return "This object has no implemented crossing-pad capability";
+            if (!Loaded(go)) return "The crossing pad's scene isn't loaded";
             var markers = go.GetComponents<Component>().Where(c => c != null && c.GetType().FullName == MarkerType).ToArray();
             if (markers.Length != 1) return markers.Length == 0 ? "The object holds no track marker" : "The object holds several track markers";
             if (go.GetComponents<Component>().Any(c => c == null)) return "Missing script on the pad object";

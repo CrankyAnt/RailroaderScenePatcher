@@ -20,6 +20,9 @@ namespace RailroaderScenePatcher.Core {
         Placement desired;
         bool active = true, mutated, writingPreview;
         public bool Active => active;
+        // The failure of the restoration after a cancelled gesture, which leaves the target guarded; null while every
+        // restoration verified. A preview or completion that fails cancels the gesture and can set it too.
+        public string CleanupFailure { get; private set; }
         public Placement Initial => Copy(before.Placement);
         public Placement Current => Copy(desired ?? before.Placement);
         public PlacementGesture(PatchEngine engine, PatchEditingSession session, TargetIdentity identity, InspectedTarget inspected) {
@@ -104,7 +107,11 @@ namespace RailroaderScenePatcher.Core {
             if (!active) return new Outcome { Applied = true, ResolvedTarget = target };
             active = false;
             try { Restore(); engine.AwaitOutput(target); return new Outcome { Applied = true, ResolvedTarget = target }; }
-            catch (Exception e) { engine.SetUnsafe(target, true); return new Outcome { Error = "Gizmo cleanup is unverified: " + e.Message.TrimEnd('.') + ". " + WindowGuidance.RecheckBeforeEditing, ResolvedTarget = target }; }
+            catch (Exception e) {
+                engine.SetUnsafe(target, true);
+                CleanupFailure = "Gizmo cleanup is unverified: " + e.Message.TrimEnd('.') + ". " + WindowGuidance.RecheckBeforeEditing;
+                return new Outcome { Error = CleanupFailure, ResolvedTarget = target };
+            }
         }
         void Restore() {
             if (!mutated) return;

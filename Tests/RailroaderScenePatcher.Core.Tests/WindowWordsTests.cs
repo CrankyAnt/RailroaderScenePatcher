@@ -11,9 +11,10 @@ using RailroaderScenePatcher.Core;
 using OutlineNode = RailroaderScenePatcher.InventoryPresentationState.OutlineNode;
 
 // The window's words for a complex and a child object: "group" and "part". No window text says "complex" or "child
-// object", no window or Log text names the retired scenery terms, and the retired Pavilion kind and Track-relative
-// family are gone from the code. Where a modder could take a group for a track group of the native map editor, at a
-// crossing, a rail bridge or a trackside station, its tooltip says that the group means scene objects.
+// object", no window or Log text names the retired scenery terms or says "object list", and the retired Pavilion
+// kind and Track-relative family are gone from the code. Where a modder could take a group for a track group of the
+// native map editor, at a crossing, a rail bridge or a trackside station, its tooltip says that the group means scene
+// objects.
 static class WindowWordsTests {
     static void Check(bool value, string message) { if (!value) throw new Exception("Window words: " + message); }
     static string Root([CallerFilePath] string path = "") => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path), "..", ".."));
@@ -88,6 +89,9 @@ static class WindowWordsTests {
         Check(files.Any(f => f.EndsWith("/PatchEngine.cs", StringComparison.Ordinal)) && files.Any(f => f.EndsWith("/ScenePatcherLayout.cs", StringComparison.Ordinal)), "the check reads the window's and the core's sources");
         var hits = files.SelectMany(f => Hits(f, "baked scenery", "scenery group", "scenery part")).ToArray();
         Check(hits.Length == 0, "no window or Log text says baked scenery, scenery group or scenery part:\n" + String.Join("\n", hits));
+        // The glossary's term to avoid for the outliner; the window says outliner, or inventory for the listed objects.
+        var lists = files.SelectMany(f => Hits(f, "object list")).ToArray();
+        Check(lists.Length == 0, "no window or Log text says object list:\n" + String.Join("\n", lists));
     }
 
     // The family of the Generic track markers that no more specific family claims is Generic track marker. No window

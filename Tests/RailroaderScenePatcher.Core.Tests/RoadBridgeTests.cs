@@ -110,7 +110,7 @@ static class RoadBridgeTests {
         Assert(!outcome.Applied && outcome.Error.Contains("back as it was") && f.Terrain.Rebuilds == 2, "The failed attempt is restored with a second rebuild: " + outcome.Failure + " " + outcome.Error + " rebuilds=" + f.Terrain.Rebuilds);
         Assert(Close(f.At(f.Group), Authored) && f.RegisteredOnceAt(Authored, 90) && Close(f.Culls(), Authored) && f.CollidersFollow(), "Placement, culling, colliders and the one registration are restored: " + f.Where());
         var output = f.Masks.Output(f.Group);
-        Assert(!output.Settled && output.Error == null && output.Outstanding.Any(l => l.Contains("x=2100.0")) && output.Outstanding.Any(l => l.Contains("x=2700.0")), "The terrain at both places is outstanding: " + String.Join("; ", output.Outstanding));
+        Assert(!output.Settled && output.Error == null && output.Outstanding.Any(l => l.Contains("x=2100,")) && output.Outstanding.Any(l => l.Contains("x=2700,")), "The terrain at both places is outstanding: " + String.Join("; ", output.Outstanding));
         var again = f.Engine.Apply(Doc(GroupMod("again", Near))).Outcomes["again"];
         Assert(!again.Applied && again.Failure == FailureKind.AwaitingOutput && Close(f.At(f.Group), Authored), "The next edit waits for the restored terrain output: " + again.Failure + " " + again.Error);
         f.Terrain.BuildTiles(); f.Masks.Poll();
@@ -151,7 +151,7 @@ static class RoadBridgeTests {
         var parts = SceneObjectRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
         foreach (var path in Roots) {
             var found = verdicts.Where(v => v.Path == path).ToArray();
-            Assert(found.Length == 1 && found[0].Disposition == GroupDisposition.Group && found[0].Category == SceneObjectCategories.Bridge && found[0].Subcategory == SceneObjectCategories.RoadBridges && found[0].Ticket == null,
+            Assert(found.Length == 1 && found[0].Disposition == GroupDisposition.Group && found[0].Category == SceneObjectCategories.Bridge && found[0].Subcategory == SceneObjectCategories.RoadBridges,
                 path + " is listed once as a group under Bridge / Road bridges: " + String.Join(", ", found.Select(v => v.Disposition + " " + v.Category + "/" + v.Subcategory + " " + v.Reason)));
             Assert(parts.Where(p => p.GroupPath == path).Select(p => p.Path.Substring(path.Length + 1)).SequenceEqual(new[] { "Deck", "Abutment N", "Abutment S" }), path + " lists its parts");
         }
@@ -243,7 +243,7 @@ static class RoadBridgeTests {
         Assert(Close(f.Culls(), Far) && f.CollidersFollow() && Close(f.At(f.Deck), new[] { 2700.0, 526, 340 }), "The culling sphere, the colliders and the parts follow the bridge: " + f.Where());
         Assert(f.ControlUnchanged(), "The unedited control keeps its placement, culling and registration: " + f.Where());
         var output = f.Masks.Output(f.Group);
-        Assert(output.Outstanding.Count == 2 && !output.Settled && output.Error == null && output.Outstanding.Any(l => l.Contains("x=2100.0")) && output.Outstanding.Any(l => l.Contains("x=2700.0")),
+        Assert(output.Outstanding.Count == 2 && !output.Settled && output.Error == null && output.Outstanding.Any(l => l.Contains("x=2100,")) && output.Outstanding.Any(l => l.Contains("x=2700,")),
             "The terrain at the old and the new place is outstanding: " + String.Join("; ", output.Outstanding));
         Assert(f.Masks.Output(f.Other).Outstanding.Count == 0 && f.Masks.Output(f.Other).Completed.Count == 0, "The control has no terrain output");
         f.Terrain.BuildTiles(); f.Masks.Poll();
@@ -369,7 +369,7 @@ static class RoadBridgeTests {
         f.Terrain.Clock = TerrainOutput.Timeout + 1; f.Masks.Poll();
         var output = session.Output(BridgeId);
         Assert(output.Error != null && output.Completed.Count == 1 && output.Outstanding.Count == 1 && !output.Settled, "The failed write names its completed and outstanding writes: " + output.Error);
-        Assert(output.Completed[0].Contains("x=2100.0") && output.Outstanding[0].Contains("x=2700.0"), "Each write names its place: " + output.Completed[0] + " | " + output.Outstanding[0]);
+        Assert(output.Completed[0].Contains("x=2100,") && output.Outstanding[0].Contains("x=2700,"), "Each write names its place: " + output.Completed[0] + " | " + output.Outstanding[0]);
         Assert(f.Masks.Failures.Count() == 1 && Close(f.At(f.Group), Far) && f.RegisteredOnceAt(Far, 90) && Close(f.Culls(), Far), "The edit, its culling and its registration are kept, and the failure is identifiable");
         Assert(mapEditor.Save() == null && !session.Output(BridgeId).Settled, "Save does not report the terrain output complete");
         Assert(session.RetryOutput(BridgeId).Applied && session.RetryOutput(BridgeId).Applied && f.Terrain.Invalidated.SequenceEqual(new[] { "5,0", "5,0" }) && session.Output(BridgeId).Error == null && !session.Output(BridgeId).Settled && f.RegisteredOnceAt(Far, 90),

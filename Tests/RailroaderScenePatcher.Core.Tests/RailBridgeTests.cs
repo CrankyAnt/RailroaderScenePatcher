@@ -490,7 +490,6 @@ static class RailBridgeTests {
         Assert(!parts.Any(p => p.Path == Bryson + "/Steel/Plate Girder W"), "Two girders that share a path are no parts");
         Assert(!parts.Any(p => p.GroupPath.StartsWith(Girders, StringComparison.Ordinal)), "A plate girder bridge is one object without parts");
         Assert(SceneObjectRules.PartName(Almond, Almond + "/Steel") == "Almond Bridge / Steel", "A part is named with its construction");
-        Assert(!SceneObjectRules.Exclusions.Any(e => e.Ticket == "#95"), "No exclusion waits for #95 any more");
         // A group that holds a construction controller but is no supported rail bridge stays inspection only.
         var other = At(SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Tipple Scenery", new Node("Beam").Solid()).With(Controller))))), Large + "Sylva/Tipple Scenery");
         Assert(other?.Disposition == GroupDisposition.InspectionOnly && other.Reason == SceneObjectRules.ConstructionOutsideBridge && other.ReasonIsSentence,

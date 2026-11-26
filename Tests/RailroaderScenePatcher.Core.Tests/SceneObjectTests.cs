@@ -442,7 +442,7 @@ static class SceneObjectTests {
     static SceneObjectVerdict At(IReadOnlyList<SceneObjectVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
     public static void Run() {
         ListsSimpleTopObjects();
-        LeavesOutGroupsThatLaterTicketsCover();
+        LeavesOutGroupsThatHoldAnExcludedKind();
         CoverageRulesKeepObjectsOut();
         CrossingContainersHoldTheirChildren();
         GroupMoveMovesTheWholeGroup();
@@ -690,24 +690,24 @@ static class SceneObjectTests {
         Assert(SceneObjectRules.Classify(new Node("CTC", new Node("Panels", new Node("Panel").Solid()))).Count == 0, "No root outside World holds top scene objects");
     }
     // Each excluded kind anywhere below the root keeps the group out of the family and lists it as inspection only,
-    // with the reason and the ticket that covers it.
-    static void LeavesOutGroupsThatLaterTicketsCover() {
+    // with its reason.
+    static void LeavesOutGroupsThatHoldAnExcludedKind() {
         var cases = new[] {
-            new { Name = "Bryson Depot", Component = "Model.StationAgent", Kind = "station click spot", Ticket = (string)null },
-            new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "map icon", Ticket = (string)null },
+            new { Name = "Bryson Depot", Component = "Model.StationAgent", Kind = "station click spot" },
+            new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "map icon" },
         };
         foreach (var item in cases) {
             // The excluded component sits on a part, not on the root, and the root has no renderer of its own.
             var world = new Node("World", new Node("Large Scenery", new Node("Town", new Node(item.Name, new Node("Part").With(item.Component), new Node("Shell").Solid()))));
             var verdict = At(SceneObjectRules.Classify(world), "World/Large Scenery/Town/" + item.Name);
             Assert(verdict != null && verdict.Disposition == GroupDisposition.InspectionOnly, "A group that holds a " + item.Kind + " is inspection only");
-            Assert(verdict.Reason.Contains(item.Kind) && verdict.Ticket == item.Ticket, "The reason names the " + item.Kind + " and " + item.Ticket + ": " + verdict.Reason + " " + verdict.Ticket);
+            Assert(verdict.Reason.Contains(item.Kind), "The reason names the " + item.Kind + ": " + verdict.Reason);
         }
         // A group that holds track markers is not moved as a whole: its markers are edited one by one in their own
-        // family, so no ticket covers the group.
+        // family.
         var signs = At(SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Signs", new Node("Yard Limit").With("Track.TrackMarker").Solid().Family()))))), "World/Large Scenery/Bryson/Bryson Signs");
-        Assert(signs?.Disposition == GroupDisposition.InspectionOnly && signs.Ticket == null && signs.ReasonIsSentence &&
-            signs.Reason == "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Generic track marker family.", "A group with track markers states why it is left out, without a ticket: " + signs?.Reason + " " + signs?.Ticket);
+        Assert(signs?.Disposition == GroupDisposition.InspectionOnly && signs.ReasonIsSentence &&
+            signs.Reason == "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Generic track marker family.", "A group with track markers states why it is left out: " + signs?.Reason);
         ResearchHierarchy();
     }
     // The paths, components and physical presence recorded for the level4 scene of the base-game map

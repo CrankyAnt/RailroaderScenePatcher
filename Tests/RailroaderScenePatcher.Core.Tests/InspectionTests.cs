@@ -106,7 +106,6 @@ static class InspectionTests {
         BindingProblemsFollowTheGame();
         InspectionOnlyObjectsAreNotProblems();
         ChangesReadOneLinePerSetting();
-        SubgroupsFollowTheGame();
         RuntimeStateDoesNotMarkStale();
         RuntimeReferencesAreNotAuthoredSceneState();
         AnEditScansTheSceneTwice();
@@ -278,21 +277,21 @@ static class InspectionTests {
         scene.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
         var inventory = new SceneInventory(scene);
         var notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, true);
-        Check(notice == "not yet scanned. Click Refresh to update the object list. " + refused && Refused(() => inventory.Pin(null)), "An unscanned inventory refuses edits and says so: " + notice);
+        Check(notice == "not yet scanned. Click Refresh to update the inventory. " + refused && Refused(() => inventory.Pin(null)), "An unscanned inventory refuses edits and says so: " + notice);
         inventory.Refresh();
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, false);
-        Check(notice == "The object list is up to date. You can inspect objects and start edits.", "A current inventory with current definitions is a snapshot: " + notice);
+        Check(notice == "The inventory is up to date. You can inspect objects and start edits.", "A current inventory with current definitions is a snapshot: " + notice);
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, true);
-        Check(notice == "the supplied definitions changed or were not read. Click Refresh to update the object list." && inventory.Pin(inventory.Entries.Single()) != null,
+        Check(notice == "the supplied definitions changed or were not read. Click Refresh to update the inventory." && inventory.Pin(inventory.Entries.Single()) != null,
             "Changed definitions alone are named as stale without a refusal the pin does not make: " + notice);
         box.X = 8; inventory.CheckFreshness();
         foreach (var definitionsStale in new[] { false, true }) {
             notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, definitionsStale);
-            Check(notice == "p changed (position). Click Refresh to update the object list. " + refused && Refused(() => inventory.Pin(inventory.Entries.Single())),
+            Check(notice == "p changed (position). Click Refresh to update the inventory. " + refused && Refused(() => inventory.Pin(inventory.Entries.Single())),
                 "A stale inventory names its own reason and the refusal, whatever the definitions: " + notice);
         }
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(null, false);
-        Check(notice == "inspection is unavailable. Click Refresh to update the object list. " + refused, "A missing inventory refuses edits and says so: " + notice);
+        Check(notice == "inspection is unavailable. Click Refresh to update the inventory. " + refused, "A missing inventory refuses edits and says so: " + notice);
     }
 
     // Every edit that is refused or ignored names its reason for the panel and the log.
@@ -308,7 +307,7 @@ static class InspectionTests {
 
         box.X = 8;
         Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 0 && box.X == 8, "A stale inventory refuses the edit before it runs");
-        Check(feedback.Place == "placement" && feedback.Result == "Placement refused. The object list is stale (p changed (position)). Refresh and inspect again." && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
+        Check(feedback.Place == "placement" && feedback.Result == "Placement refused. The inventory is stale (p changed (position)). Refresh and inspect again." && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
         inventory.Refresh(); log.Clear();
         Check(!feedback.Run("binding", "Track binding", "a world selection is pending; confirm or cancel it first", inventory, inventory.Entries.Single(), move) && calls == 0,
             "An edit during a pending interaction does not run");
@@ -1145,18 +1144,6 @@ static class InspectionTests {
     }
 
     // The Changes tab lists what a modification changes, one line per setting, with the value without it.
-    // A family shows subgroups only by what the game tells apart: a track marker by its marker type, never by a name.
-    static void SubgroupsFollowTheGame() {
-        SceneObservation Row(string family, string path, params string[] bindings) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Marker"), family, true,
-            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "Track binding");
-        var station = Row("Generic track marker", "World/Bryson Station Sign", "Marker ID=M1; type=Generic", "Marker segment=S1; end=a; distance=2");
-        var whistle = Row("Generic track marker", "World/Whistle Sign E", "Marker ID=M2; type=Generic");
-        var starter = Row("Generic track marker", "World/Setups/starter-ewh-coaling", "Marker ID=M4; type=Generic");
-        var board = Row("Board", "World/Board", "Culler");
-        var bare = Row("Generic track marker", "World/Bare");
-        foreach (var row in new[] { new object[] { station, "Type Generic" }, new object[] { whistle, "Type Generic" }, new object[] { starter, "Type Generic" }, new object[] { board, null }, new object[] { bare, null }, new object[] { null, null } })
-            Check(RailroaderScenePatcher.InventoryPresentationState.Subgroup((SceneObservation)row[0]) == (string)row[1], "The subgroup of a row is its marker type or none: " + row[1]);
-    }
     static void ChangesReadOneLinePerSetting() {
         var before = new ObjectState(new Placement(new[] { 10.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }), true, MarkerBinding.At(new TrackLocation("S377", "a", 7.5116)));
         string Lines(ObjectState state, ObjectState was) => String.Join(" | ", PatchEditingSession.ChangeLines(state, was));
@@ -1198,8 +1185,8 @@ static class InspectionTests {
     static void RepeatedMessagesCollapse() {
         var log = new List<string>();
         var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
-        feedback.Refuse("Placement", "Placement", "The object list is stale");
-        feedback.Refuse("Placement", "Placement", "The object list is stale");
+        feedback.Refuse("Placement", "Placement", "The inventory is stale");
+        feedback.Refuse("Placement", "Placement", "The inventory is stale");
         Check(feedback.Messages.Count == 1 && log.Count == 2, "The same refusal again is one message, and both are logged");
         feedback.Refuse("Placement", "Placement", "enter six numbers");
         feedback.Report("Placement", "Placement completed.");

@@ -1061,8 +1061,8 @@ namespace RailroaderScenePatcher {
         void BeginObservation(PendingSelection pending, SpatialCandidate source, Camera camera) {
             observing = PatcherLog.DebugEnabled && ((object)pending ?? source) != null;
             if (!observing) return;
-            cameraLine = "Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
-                camera.pixelRect.height.ToString("0", CultureInfo.InvariantCulture) + " pixels. Near view limit: " + Number(camera.nearClipPlane) + " m. Far view limit: " + Number(camera.farClipPlane) +
+            cameraLine = "Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + Number(camera.pixelRect.width) + "x" +
+                Number(camera.pixelRect.height) + " pixels. Near view limit: " + Number(camera.nearClipPlane) + " m. Far view limit: " + Number(camera.farClipPlane) +
                 " m. Maximum frame distance: " + Number(ObjectMarkingGeometry.FrameDistance) + " m.";
         }
         static void Corners(IEnumerable<WorldPoint> corners, System.Text.StringBuilder text) {

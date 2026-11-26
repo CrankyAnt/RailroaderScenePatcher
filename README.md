@@ -13,13 +13,13 @@ Author: CrankyAnt
 3. Quit and reopen Railroader after installing the files, changing DLL permission, or replacing the patcher's DLL. Railroader needs a full restart to pick up those changes.
 4. On the main menu, click **Mods** to open **Manage Mods**. Enable the mod that requires the patcher and click **Apply**. Railroader enables its installed dependency automatically. If the dependency is missing, incompatible, or blocked by DLL permission, check the reason shown in **Manage Mods**.
 
-You are responsible for installing and updating mods and managing DLL permission on your own computer. In multiplayer, the host and each client must install the required mod versions and enable DLL permission locally. The patcher applies scene changes on each computer when the map loads.
+You are responsible for installing and updating mods and managing DLL permission on your own computer. Multiplayer hasn't been tested. The patcher is built to apply scene changes on each computer when the map loads, so the host and each client must install the required mod versions and enable DLL permission locally.
 
 See Railroader's [mod installation guide](https://docs.railroadergame.com/modding/installing-mods/) and [DLL mod settings](https://docs.railroadergame.com/modding/dll-mods/).
 
 ## Report an application failure
 
-If a scene change fails to apply, look for a **Railroader Scene Patcher** warning in the game's **Log** window. Include the full warning, the map you loaded, and how to reproduce the failure. The warning identifies the mod that supplied the change, its ID and version when available, the operation, the object if resolved, the error, and the patcher and game versions. For more detail, turn on **Debug logging** in **Preferences > Mods > Scene Patcher**, reproduce the problem, turn the option off again, and attach the Player log.
+If a scene change fails to apply, look for a **Railroader Scene Patcher** warning in the game's **Log** window. Include the full warning, the map you loaded, and how to reproduce the failure. The warning identifies the mod that supplied the change, its ID and version when available, the operation, the object if resolved, the error, and the patcher and game versions. For more detail, turn on **Debug logging** in **Preferences > Mods > Scene Patcher**, reproduce the problem, turn the option off again, and attach the Player log. On Windows, Railroader writes it to `%USERPROFILE%\AppData\LocalLow\Giraffe Lab LLC\Railroader\Player.log`.
 
 Follow the **Report to** instruction in the warning. For an invalid definition, contact the author of the mod that supplied the change. The warning can include the mod's author and published website. For an unknown cause or a patcher fault, contact the patcher maintainer through [GitHub Issues](https://github.com/CrankyAnt/RailroaderScenePatcher/issues).
 

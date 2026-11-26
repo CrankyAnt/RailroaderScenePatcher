@@ -42,7 +42,6 @@ static class StationMapIconTests {
         }
         Assert(verdicts.Single(v => v.Path == "World/Map Labels/Bryson").Disposition == GroupDisposition.NotListed, "A map label stays out");
         Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.InspectionOnly), "Nothing is inspection only: " + String.Join(", ", verdicts.Where(v => v.Disposition == GroupDisposition.InspectionOnly).Select(v => v.Path)));
-        Assert(!SceneObjectRules.Exclusions.Any(e => e.Ticket == "#89" && e.Component == StationMapIconRules.Component), "No exclusion of a map icon waits for #89 any more");
 
     }
 
@@ -61,7 +60,7 @@ static class StationMapIconTests {
         // A group elsewhere that holds a map icon is not moved as a whole, without a ticket.
         var held = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Depot", new Node("Icon").With(StationMapIconRules.Component), new Node("Shell").Solid())))))
             .Single(v => v.Path == "World/Large Scenery/Town/Depot");
-        Assert(held.Disposition == GroupDisposition.InspectionOnly && held.Ticket == null && held.Reason == SceneObjectRules.MapIconReason
+        Assert(held.Disposition == GroupDisposition.InspectionOnly && held.Reason == SceneObjectRules.MapIconReason
             && CommandBand.GroupInspectionOnly(held, SceneObjectRules.Family) == "Not editable as a group: " + SceneObjectRules.MapIconReason, "A group with a map icon elsewhere states why it is left out: " + held.Reason);
         // That reason promises no edit: such a map icon is in no family.
         Assert(SceneObjectRules.MapIconReason.IndexOf("family", StringComparison.OrdinalIgnoreCase) < 0 && SceneObjectRules.MapIconReason.IndexOf("edited", StringComparison.OrdinalIgnoreCase) < 0,
@@ -69,9 +68,8 @@ static class StationMapIconTests {
         // A station click spot is native map data in Railroader 0.6.3: a settled rule without a ticket.
         var spot = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Depot", new Node("Click").With("Model.StationAgent"), new Node("Shell").Solid())))))
             .Single(v => v.Path == "World/Large Scenery/Town/Depot");
-        Assert(spot.Ticket == null && spot.Reason == SceneObjectRules.StationAgentReason && CommandBand.GroupInspectionOnly(spot, SceneObjectRules.Family) == "Not editable as a group: " + SceneObjectRules.StationAgentReason,
-            "A group with a station click spot reads Not editable as a group without a ticket: " + spot.Reason + " " + spot.Ticket);
-        Assert(!SceneObjectRules.Exclusions.Any(e => e.Ticket == "#89"), "No exclusion names #89");
+        Assert(spot.Reason == SceneObjectRules.StationAgentReason && CommandBand.GroupInspectionOnly(spot, SceneObjectRules.Family) == "Not editable as a group: " + SceneObjectRules.StationAgentReason,
+            "A group with a station click spot reads Not editable as a group: " + spot.Reason);
         Assert(CommandBand.InspectionOnly(StationMapIconRules.Family, true) == null, "A station map icon is a supported kind");
         Assert(RecoveryGuidance.Guide("Object", null, StationMapIconRules.Structure).Value == "moving-station-map-icons.md", "A failed icon edit opens the station map icon guide");
     }

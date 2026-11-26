@@ -447,7 +447,7 @@ namespace RailroaderScenePatcher {
         }
         // The object count line's text. The count is that of the tree: scene objects that only hold other groups and native track spans have no row.
         string OutlinerSummary(OutlinerGrouping.Result tree) =>
-            inventory == null ? "Inspection is unavailable" : tree == null ? "The object list couldn't be built. The log has the cause." : OutlinerGrouping.Summary(tree, inventory.Entries);
+            inventory == null ? "Inspection is unavailable" : tree == null ? "The outliner couldn't be built. The log has the cause." : OutlinerGrouping.Summary(tree, inventory.Entries);
         // The outliner's rows, in a section that rebuilds by itself. countLine shows the object count, as countMarkup
         // words it. The full window and the compact rail share it.
         UIPanel DrawOutlinerRows(UIPanelBuilder builder, TMP_Text countLine, Func<string, string> countMarkup) {
@@ -727,7 +727,7 @@ namespace RailroaderScenePatcher {
             }
             // Problems first: the red count in the state line points at text that is in view.
             Section(builder, "Detected problems");
-            // A stale object list keeps the problems of its last refresh, also those another object's edit has solved.
+            // A stale inventory keeps the problems of its last refresh, also those another object's edit has solved.
             if (inventory == null || inventory.IsStale || definitionsStale) builder.AddLabel(Tint(Amber, CommandBand.StaleProblems));
             // Beside Repair duplicate ID, an inactive holder says why it has no problem, in a sentence that wraps.
             if (selected.Problems.Count == 0) {
@@ -764,7 +764,7 @@ namespace RailroaderScenePatcher {
             // and the start setups that name it.
             if (selected.Family == SpawnPoints.Family) {
                 Section(builder, "Use in the game");
-                // The game's order of active spawn points comes from the object list.
+                // The game's order of active spawn points comes from the inventory.
                 foreach (var use in SpawnPoints.Uses(selected.Bindings, SpawnPointWorld.NativeSpawnCount(), SpawnPoints.Rank(selected, inventory?.Entries))) PlainLabel(builder, use);
             }
             Section(builder, "State");
@@ -807,10 +807,10 @@ namespace RailroaderScenePatcher {
         }
         // Select group and Select controller: each inspects the object that holds the inspected one.
         Act SelectGroupAct() => Slot("Select group", CommandBand.SelectGroupTip,
-            InventoryPresentationState.GroupOf(inventory, selected) == null ? "the object list does not include this part's group; click Refresh" : null,
+            InventoryPresentationState.GroupOf(inventory, selected) == null ? "the inventory does not include this part's group; click Refresh" : null,
             () => InspectHolder(InventoryPresentationState.GroupOf(inventory, selected)));
         Act SelectControllerAct() => Slot("Select controller", "Inspect the crossing controller that holds this detection span. Set crossing coverage on its Connections tab.",
-            InventoryPresentationState.HolderOf(inventory, selected) == null ? "the object list does not include this detection span's crossing controller; click Refresh" : null,
+            InventoryPresentationState.HolderOf(inventory, selected) == null ? "the inventory does not include this detection span's crossing controller; click Refresh" : null,
             () => InspectHolder(InventoryPresentationState.HolderOf(inventory, selected)));
         void InspectHolder(SceneObservation entry) {
             if (entry == null || !inventoryPresentation.CanSelect(inventory, entry)) return;
@@ -1927,7 +1927,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Title bar", "Reset layout restores the window position and outliner width. Session details shows information about this editing session. Compact window switches to a narrow side rail; Full window switches back." },
                     new[] { "Clear", "Ends the inspection and cancels a pending world choice, gizmo, or snap. Clicking the inspected row does the same. Applied changes stay. During guided Values or Review, either action cancels a pending world choice and keeps the target and draft. Without a pending choice, neither action is allowed. Return to Inspector to cancel the task. With the pointer over this window, Escape closes an open choice list first. Further presses cancel a drag or a pending world choice, gizmo, or snap, one action per press. Escape keeps the inspection and guided task." },
                     new[] { "Undo and Redo", "Every completed edit here is one Undo step. Use Undo and Redo in the Map Editor." },
-                    new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after an edit in the native map editor, Undo, or Redo; a stale object list refuses edits." },
+                    new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after an edit in the native map editor, Undo, or Redo; a stale inventory refuses edits." },
                     new[] { "Map Editor reload", "Reloading the Map Editor ends the Undo and Redo history. Leaving the Map Editor discards unsaved work." },
                     new[] { "Current, Stale, Paused, Saved, Unsaved, Blocked", "The lamps above the outliner show whether its contents are current and whether changes need saving. When a lamp shows Paused, follow the instructions in Version choice, Repair, or Import before inspecting objects. Blocked means Save is unavailable. Hover over a lamp for details." },
                     new[] { "* and +", "* marks an object this mod changes. + marks an object this mod adds. The Unsaved lamp tells you when to save." },
@@ -1967,7 +1967,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Enabled", "Whether the object is active. Disable holds it inactive; Clear activity returns it to its underlying activity." },
                     new[] { "Track group", "Some markers switch with their track group. Disable holds the marker inactive. Click Clear activity to let the group control it again." },
                     new[] { "Dependencies", "Shows what else uses this object or changes with it, such as track locations, terrain masks, and visibility. The patcher checks direct links. The short form lists each object of this hierarchy by its relative path with its components; click the triangle after the heading for the full lines." },
-                    new[] { "Runtime state", "Whether the game switches parts of the object on or off while it runs. These values don't make the object list stale. Its triangle switches between the short form and the full lines, as for Dependencies." },
+                    new[] { "Runtime state", "Whether the game switches parts of the object on or off while it runs. These values don't make the inventory stale. Its triangle switches between the short form and the full lines, as for Dependencies." },
                     new[] { "Copy ID", "Copies the object's ID, placement, and the map ID needed by the scene patch file." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" } } },
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",

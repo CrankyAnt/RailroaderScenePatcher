@@ -108,7 +108,7 @@ If other holders take replacement IDs in the same file, a modification for the h
 
 When the marker is active and its binding resolves, applying the ID moves its registration to the new ID. Every other holder of the old ID keeps its registration. If the modification fails, or you remove the modification or the member, the patcher restores the effective underlying ID and its registration. It computes that ID from the loaded map and the file's remaining values.
 
-The member requires patcher 0.5.0 or later; see [dependency minimum](#dependency-minimum). Format version 1 does not change. The engine does not check Lua scripts that look a marker up by ID, such as those that call `NativeTrack.GetMarkerLocation`, or third-party mods that look a marker up by ID. A run on the base map in Railroader 0.6.3 build 26740326, with the patcher at commit `325ad5f`, observed the game register a repaired marker under its replacement ID while the other holders kept their registrations, also after Save and a world reload. For the editing steps, see [repair a duplicate marker ID](repairing-duplicate-marker-ids.md).
+The member requires patcher 0.5.0 or later; see [dependency minimum](#dependency-minimum). Format version 1 does not change. The engine does not check Lua scripts that look a marker up by ID, such as those that call `NativeTrack.GetMarkerLocation`, or third-party mods that look a marker up by ID. In Railroader 0.6.3, the game registers a repaired marker under its replacement ID while the other holders keep their registrations, also after Save and a world reload. For the editing steps, see [repair a duplicate marker ID](repairing-duplicate-marker-ids.md).
 
 ## Placement
 

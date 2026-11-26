@@ -48,7 +48,7 @@ static class CrossbuckTests {
     static void InventoryListsEachCrossbuckOnce() {
         var verdicts = SceneObjectRules.Classify(World(OldRiverIds));
         var bucks = verdicts.Where(v => v.Node.Name.StartsWith("Sign-Crossing0 (", StringComparison.Ordinal)).ToArray();
-        Check(bucks.Length == 10 && bucks.All(v => v.Disposition == GroupDisposition.Group && v.Crossbuck && v.Category == SceneObjectCategories.GradeCrossing && v.Subcategory == null && v.Ticket == null),
+        Check(bucks.Length == 10 && bucks.All(v => v.Disposition == GroupDisposition.Group && v.Crossbuck && v.Category == SceneObjectCategories.GradeCrossing && v.Subcategory == null),
             "each of the ten crossbucks is a group of its own under Grade crossing (got " + String.Join(", ", bucks.Select(v => v.Path + " " + v.Disposition + " " + v.Category)) + ")");
         Check(bucks.Select(v => v.Path + "|" + v.PadMarkerId).Distinct().Count() == 10 && bucks.Count(v => v.Path.StartsWith(OldRiver + "/", StringComparison.Ordinal)) == 6,
             "each crossbuck is listed once; the six of Old River Rd share their raw paths and differ by their crossing's pad marker ID");

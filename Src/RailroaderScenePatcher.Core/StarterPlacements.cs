@@ -29,8 +29,8 @@ namespace RailroaderScenePatcher.Core {
         }
     }
     // Whether the game reads a marker as a starter placement marker. Used: an active setup's car placement holds it.
-    // Unused: only inactive setups hold it, so the game never reads it. None: no setup holds it, and it is no starter
-    // placement marker.
+    // Unused: only inactive setups hold it, so the game never reads it. None: no setup holds it; below Setups it is a
+    // starter placement marker that no setup uses, elsewhere no starter placement marker.
     public enum StarterUse { None, Used, Unused }
     // The car placements of every loaded setup, as one discovery read them.
     public sealed class StarterSetups {
@@ -53,12 +53,14 @@ namespace RailroaderScenePatcher.Core {
             return holding.Length == 0 ? StarterUse.None : holding.Any(p => p.SetupActive) ? StarterUse.Used : StarterUse.Unused;
         }
         // The family a marker is listed in: Starter placement marker when it is used, none for an unused one, which stays out
-        // of the inventory, and its own family when no setup holds it.
-        public string Family(object marker, string otherwise) {
+        // of the inventory, and its own family when no setup holds it. A marker below Setups (inSetups) that no setup holds
+        // is a starter placement marker that no setup uses: it stays out of the inventory too. Setups that could not be
+        // read leave every marker its own family.
+        public string Family(object marker, string otherwise, bool inSetups = false) {
             switch (Use(marker)) {
                 case StarterUse.Used: return StarterPlacements.Family;
                 case StarterUse.Unused: return null;
-                default: return otherwise;
+                default: return inSetups && Error == null ? null : otherwise;
             }
         }
         // Every car placement of an active setup that reads the marker, one line each, in the order they were read:

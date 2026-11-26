@@ -16,7 +16,7 @@ namespace RailroaderScenePatcher {
         // no checks, so the window keeps its list.
         public IEnumerable<string> CheckedObjects() {
             try { return GroupWorld.Checks(); }
-            catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Debug("The patcher couldn't read the scene object checks for the object list: " + e.GetBaseException().Message); return Array.Empty<string>(); }
+            catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Debug("The patcher couldn't read the scene object checks for the inventory: " + e.GetBaseException().Message); return Array.Empty<string>(); }
         }
         // Observes one component with what the last discovery learned about the rest of the scene: who references what,
         // the graph's segments and the setup holders. A discovery sets it when that knowledge is complete.
@@ -252,9 +252,10 @@ namespace RailroaderScenePatcher {
                 // the builder photo marker. A milepost's marker is part of the Milepost row.
                 if (!BindingRules.Listed(MarkerKind(c), Get(go, MapObject) != null, PhotoMarkers().Contains(c)) || Get(go, Milepost) != null) return null;
                 // A marker an active setup's car placement holds is a starter placement marker; one only inactive
-                // setups hold is never read and stays out of the inventory. A marker no setup holds keeps its kind: a crossing
-                // pad's marker or a Generic track marker; a marker of another type is not listed.
-                return starters.Family(c, SceneFamilies.OfMarker(MarkerKind(c), Get(go, "Track.TrackCurveMeshBuilder") != null));
+                // setups hold, or one below Setups that no setup holds, is never read and stays out of the inventory. A
+                // marker elsewhere that no setup holds keeps its kind: a crossing pad's marker or a Generic track marker; a
+                // marker of another type is not listed.
+                return starters.Family(c, SceneFamilies.OfMarker(MarkerKind(c), Get(go, "Track.TrackCurveMeshBuilder") != null), c.transform.root.name == SceneObjectRules.Setups);
             }
             // A span the game builds from the map's operations data is not serialized and stays with the native map
             // editor; the spans this patcher adds for a crossing are listed.
@@ -757,7 +758,7 @@ namespace RailroaderScenePatcher {
             // repair them: on a controller whose crossing coverage is editable. Any other controller lists them as
             // information with the reason. The checks read the current scene only.
             var information = new List<string>();
-            if (detection.Count != 0 && CircuitSpanChecks.Judges(ReferenceEquals(controller, c), structure, coverageRefusal, sharedPath, out var detectionRefusal)) Read(() => {
+            if (detection.Count != 0 && CircuitSpanChecks.Judges(ReferenceEquals(controller, c), structure, coverageRefusal ?? (only == null ? null : CommandBand.EditReason(only)), sharedPath, out var detectionRefusal)) Read(() => {
                 IDetectionTrack track = null;
                 if (segmentIds != null) try { track = CrossingDetectionTrack.Current(); } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); }
                 foreach (var circuit in detection) {

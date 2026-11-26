@@ -57,7 +57,7 @@ static class OutlineTreeTests {
                 Check(All(tops).Where(IsPlaceFolder).SelectMany(f => f.Children).All(c => c.Row == null || (c.Row.GroupPath == null && c.Row.HolderPath == null)), view.Name + ": no part and no detection span is a loose row");
             }
             var tree = byCategory.Tops;
-            Check(tree.Select(t => t.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Mileposts", "Platform", "Railroad service building", "Road scenery", "Sign", "Spawn point", "Starter placement", "Station building", "Station map icon", "Storage display", "Track marker", "Water" }),
+            Check(tree.Select(t => t.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Mileposts", "Platform", "Railroad service building", "Road scenery", "Sign", "Spawn point", "Starter placement", "Station building", "Station map icon", "Storage display", "Water" }),
                 "the categories of the base map, in alphabetical order (got " + String.Join(", ", tree.Select(t => t.Label)) + ")");
             // Mileposts are a category of their own: the 54 Milepost rows of the base map stand under Mileposts, none under Sign.
             var mileposts = tree.Single(t => t.Label == "Mileposts");
@@ -92,7 +92,7 @@ static class OutlineTreeTests {
             Check(placeTops.Single(t => t.Label == "Log Camp").Count == 0 && placeTops.Count(t => t.Count == 0) == 1, "Log Camp is the one place without objects");
             Check(placeTops.Single(t => t.Label == "Connelly Creek").Count >= 5 && !All(placeTops).Any(n => n.Row == null && n.Label == "Connelly"), "Connelly Creek holds the Connelly objects, and no node is named Connelly");
             var whittier = placeTops.Single(t => t.Label == "Whittier");
-            Check(whittier.Children.Select(c => c.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Mileposts", "Sign", "Spawn point", "Starter placement", "Station building", "Station map icon", "Storage display", "Track marker" }),
+            Check(whittier.Children.Select(c => c.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Mileposts", "Sign", "Spawn point", "Starter placement", "Station building", "Station map icon", "Storage display" }),
                 "the categories of a place are in alphabetical order (got " + String.Join(", ", whittier.Children.Select(c => c.Label)) + ")");
             // A search narrows the rows; the levels stay, and a place without matches is not shown.
             var lamps = entries.Where(e => e.Category == "Lights").ToArray();
@@ -106,12 +106,14 @@ static class OutlineTreeTests {
         Console.WriteLine("PASS: outline tree");
     }
 
-    // The category Track marker keeps its name; only the family of its markers is Generic track marker. On the base map
-    // it holds the 8 markers below Setups that no setup holds: they are no starter placement markers, so they are
-    // Generic track markers under Track marker / Setup markers.
+    // The category Track marker keeps its name; only the family of its markers is Generic track marker. The base map
+    // lists no object under it: the markers below Setups that no active setup holds are not listed. A Generic track
+    // marker below Setups is listed only while the setups can't be read, and then stands under Track marker / Setup
+    // markers.
     static void TrackMarkerCategoryKeepsItsName() {
-        var map = new BaseMapFixture();
-        var setupMarkers = map.Objects.Where(o => o.Listed && o.Family == SceneFamilies.TrackMarker && o.Path.StartsWith("Setups/", StringComparison.Ordinal)).ToArray();
+        var spare = new BaseMapObject { Listed = true, Path = "Setups/Starter Equipment Setup/starter-spare", Family = SceneFamilies.TrackMarker, Structure = TrackMarkerScene.Structure,
+            Components = new[] { "Track.TrackMarker" }, At = new[] { 12489.0, 4907 }, Today = "", Expected = "" };
+        var map = new BaseMapFixture(new[] { spare });
         var entries = map.Observations(out var source);
         OutlinerGrouping.InvalidatePlaces();
         OutlinerGrouping.Scene = map.Scene(source);
@@ -119,12 +121,10 @@ static class OutlineTreeTests {
             OutlinerGrouping.ByPlace = false;
             var tree = OutlinerGrouping.Build(entries, entries, "", false, null);
             var category = tree.Tops.SingleOrDefault(t => t.Label == "Track marker");
-            Check(setupMarkers.Length == 8 && setupMarkers.All(o => map.ClassOf(o).ToString() == "Track marker / Setup markers"),
-                "the 8 Generic track markers below Setups are Track marker / Setup markers (got " + String.Join(", ", setupMarkers.Select(o => o.Name + ": " + map.ClassOf(o))) + ")");
-            var rows = category == null ? new OutlineNode[0] : All(new[] { category }).Where(n => n.Row != null).ToArray();
-            Check(category != null && category.Count == setupMarkers.Length && rows.Length == setupMarkers.Length
-                && setupMarkers.All(o => rows.Any(n => n.Row.Identity.Path == o.Path && n.Row.Family == "Generic track marker")),
-                "the Generic track markers no setup holds stand under the category Track marker (got " + Shape(tree.Tops.Where(t => t.Label.Contains("marker"))) + ")");
+            Check(map.ClassOf(spare).ToString() == "Track marker / Setup markers", "the marker's category and kind are Track marker / Setup markers (got " + map.ClassOf(spare) + ")");
+            Check(category != null && category.Count == 1
+                && All(new[] { category }).Any(n => n.Row?.Identity.Path == spare.Path && n.Row.Family == "Generic track marker"),
+                "a Generic track marker no setup holds stands under the category Track marker (got " + Shape(tree.Tops.Where(t => t.Label.Contains("marker"))) + ")");
             Check(!tree.Tops.Any(t => t.Label == "Generic track marker"), "no category is named after the family Generic track marker");
         } finally {
             OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();

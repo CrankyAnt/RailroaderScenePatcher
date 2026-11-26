@@ -1346,7 +1346,7 @@ namespace RailroaderScenePatcher {
             : IsStarter ? StarterBlock() ?? (inspectorTab.Value == ConnectionsTab ? null : CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)))
             : CommandBand.InspectorEditBlock(Editable, selected?.Operations)
             ?? (gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
-            : (GameObject)selected.Handle == null ? "The inspected object no longer exists. Refresh the object list." : null);
+            : (GameObject)selected.Handle == null ? "The inspected object no longer exists. Refresh the inventory." : null);
         // Why the inspected starter placement marker's modification cannot be changed now, whatever the tab, or null: what
         // Remove modification and Recheck in the footer, and the track location on the Connections tab, wait for.
         string StarterBlock() =>
@@ -1354,7 +1354,7 @@ namespace RailroaderScenePatcher {
             : FileLockReason != null ? FileLockReason
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
-            : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the object list." : null;
+            : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the inventory." : null;
         void ResetSnapState() { preparedSnap = null; choosingSnap = false; }
         void ResetConnectionsPreview() { choosingCoverageRole = null; preparedCoverage = null; preparedEquipment = null; }
         void ClearSnap() { ResetSnapState(); ResetConnectionsPreview(); EndWorldEditAction(); }
@@ -1647,16 +1647,16 @@ namespace RailroaderScenePatcher {
             Queue(GizmoPlace, "Gizmo", pin => {
                 var standing = gizmo;
                 if (standing == null || !standing.Holding) { StartGizmo(mode, pin); return; }
-                try { standing.Rebind(pin(selected)); standing.SetMode(mode); }
-                catch (Exception e) { CancelGizmo(); feedback.Report(GizmoPlace, "Gizmo unavailable: " + e.GetBaseException().Message); }
+                try { standing.Rebind(EditRefusal.Check(() => pin(selected))); standing.SetMode(mode); }
+                catch (Exception e) { CancelGizmo(); GizmoUnavailable(e); }
             });
         }
         // The object the standing gizmo belongs to.
         object gizmoHandle;
         void StartGizmo(UI.Gizmos.TransformGizmoMode mode, Func<SceneObservation, InspectedTarget> pin) {
             try {
-                if (!Editable || selection?.Pending != null || attachment == null) throw new InvalidOperationException("Gizmo placement requires an editable target, an editing session, and no pending world choice. " + WindowGuidance.InspectAndFinishChoice);
-                var inspection = pin(selected);
+                if (!Editable || selection?.Pending != null || attachment == null) throw new EditRefusal("Gizmo placement requires an editable target, an editing session, and no pending world choice. " + WindowGuidance.InspectAndFinishChoice);
+                var inspection = EditRefusal.Check(() => pin(selected));
                 var root = new GameObject("CrankyAnt Scene Patcher transform gizmo");
                 root.transform.SetParent(transform, false);
                 gizmo = root.AddComponent<GizmoController>();
@@ -1668,7 +1668,14 @@ namespace RailroaderScenePatcher {
                     feedback.Report(GizmoPlace, message ?? (outcome?.Applied == true ? (outcome.Unchanged ? "Gizmo released without a move; nothing changed." : IsPad ? CommandBand.PadPlacement("Gizmo placement") : "Gizmo placement completed.") : "Gizmo placement refused: " + outcome?.Error));
                     OwnChange(); RefreshAfterEdit(); attachment?.RefreshChrome();
                 });
-            } catch (Exception e) { gizmo = null; feedback.Report(GizmoPlace, "Gizmo unavailable: " + e.GetBaseException().Message); }
+            } catch (Exception e) { gizmo = null; GizmoUnavailable(e); }
+        }
+        // A gizmo that can't be shown: a refusal (EditRefusal), such as a stale inventory or a pending world choice,
+        // reaches the footer and the debug log; any other exception is a patcher failure, written as a player error.
+        void GizmoUnavailable(Exception e) {
+            var reason = e is EditRefusal ? e.Message : e.GetBaseException().Message;
+            if (!(e is EditRefusal)) attachment?.Fault.Fail(EditingFailure.GizmoUnavailable, reason, selected?.Identity.Path);
+            feedback.Report(GizmoPlace, "Gizmo unavailable: " + reason);
         }
         // A crossing pad's geometry is generated along its track binding: a placement moves the pad object and nothing
         // the player sees, and its result says so.

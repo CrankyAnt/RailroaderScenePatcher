@@ -245,7 +245,7 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<SceneObservation> Entries { get; private set; } = Array.Empty<SceneObservation>();
         public bool IsStale { get; private set; } = true;
         // How a refusal because the snapshot is stale begins.
-        public const string StaleRefusal = "The object list is stale";
+        public const string StaleRefusal = "The inventory is stale";
         // Why the snapshot is stale: the first difference a check found, or its failure. Null while it is not stale.
         public string StaleReason { get; private set; } = "not yet scanned";
         public SceneInventory(IInspectionScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }

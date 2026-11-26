@@ -24,7 +24,7 @@ namespace RailroaderScenePatcher.Core {
         readonly ITerrainWorld world;
         readonly Dictionary<object, Work> work = new Dictionary<object, Work>();
         readonly Action<double[], double[]> built;
-        sealed class Write { internal double[] Position; internal string Label; internal bool Built; }
+        sealed class Write { internal double[] Position; internal string Label; internal (long X, long Z) Key; internal bool Built; }
         sealed class Work {
             internal readonly List<Write> Outstanding = new List<Write>();
             internal readonly List<string> Completed = new List<string>();
@@ -44,8 +44,9 @@ namespace RailroaderScenePatcher.Core {
             item.Error = null; item.Since = world.Now;
             var label = "terrain output at map x=" + Text(position[0]) + ", z=" + Text(position[2]);
             if (!world.TileLoaded(position)) { item.Completed.Add(label + " (tile not built; it builds from the current mask)"); return; }
-            if (item.Outstanding.Any(w => w.Label == label)) { foreach (var w in item.Outstanding.Where(w => w.Label == label)) w.Built = false; return; }
-            item.Outstanding.Add(new Write { Position = (double[])position.Clone(), Label = label });
+            var key = KeyOf(position);
+            if (item.Outstanding.Any(w => w.Key == key)) { foreach (var w in item.Outstanding.Where(w => w.Key == key)) w.Built = false; return; }
+            item.Outstanding.Add(new Write { Position = (double[])position.Clone(), Label = label, Key = key });
         }
         void TileBuilt(double[] min, double[] max) {
             foreach (var item in work.Values)
@@ -86,6 +87,10 @@ namespace RailroaderScenePatcher.Core {
         public int Stopped => work.Count(p => p.Value.Error != null);
         public int Outstanding => work.Values.Sum(w => w.Outstanding.Count);
         public void Dispose() { world.TileBuilt -= built; work.Clear(); }
-        static string Text(double v) => v.ToString("0.0", CultureInfo.InvariantCulture);
+        static string Text(double v) => ShownNumber.Text(v);
+        // Writes at one place: positions that round to the same tenth of a metre on both map axes, so a write within
+        // 0.05 m of an outstanding one requests that write again. The shown label keeps the shown number format.
+        static (long X, long Z) KeyOf(double[] position) =>
+            ((long)Math.Round(position[0] * 10, MidpointRounding.AwayFromZero), (long)Math.Round(position[2] * 10, MidpointRounding.AwayFromZero));
     }
 }

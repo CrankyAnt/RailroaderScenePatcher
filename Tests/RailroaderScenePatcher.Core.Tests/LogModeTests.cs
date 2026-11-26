@@ -251,6 +251,9 @@ static class LogModeTests {
             [EditingFailure.ExitCancelled] = "The Map Editor stayed open because the patcher couldn't check for unsaved changes. x",
             [EditingFailure.FileCheck] = "Could not check the scene patch file: x",
             [EditingFailure.GizmoCleanup] = "The patcher couldn't confirm removal of the gizmo's temporary changes. Reload the Map Editor. x",
+            [EditingFailure.GizmoRestore] = "x",
+            [EditingFailure.GizmoPreview] = "The gizmo drag failed: x",
+            [EditingFailure.GizmoUnavailable] = "The gizmo couldn't be shown: x",
             [EditingFailure.HookUnavailable] = "Map Editor reload hook unavailable",
             [EditingFailure.HistoryTracking] = "The patcher couldn't track an Undo or Redo history change in the Map Editor: x",
             [EditingFailure.ChromeRefresh] = "The Map Editor title and Save button couldn't be updated: x",
@@ -487,9 +490,9 @@ static class LogModeTests {
         var feedback = new RailroaderScenePatcher.EditFeedback();
         box.X = 8;
         var stale = RecordingLog.Capture(true, () => feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), _ => null));
-        Assert(feedback.Result == "Placement refused. The object list is stale (p changed (position)). Refresh and inspect again.",
+        Assert(feedback.Result == "Placement refused. The inventory is stale (p changed (position)). Refresh and inspect again.",
             "The window shows the stale refusal with its repair step: " + feedback.Result);
-        Assert(stale.Lines.Count == 1 && stale.Lines[0].Key == LogLevel.Debug && stale.Lines[0].Value == "Placement refused. The object list is stale (p changed (position)).",
+        Assert(stale.Lines.Count == 1 && stale.Lines[0].Key == LogLevel.Debug && stale.Lines[0].Value == "Placement refused. The inventory is stale (p changed (position)).",
             "The debug line records the refusal without the repair step: " + String.Join(" | ", stale.Lines.Select(l => l.Value)));
 
         var nothing = RecordingLog.Capture(true, () => feedback.Run("placement", "Placement", null, null, null, _ => null));

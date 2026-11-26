@@ -46,16 +46,14 @@ namespace RailroaderScenePatcher.Core {
     // the group's technical kind. The outliner's category does not decide it.
     public enum BridgeKind { None, Rail, Road }
     public enum GroupDisposition { Group, InspectionOnly, ExistingFamily, NotListed, GroupHolder }
-    // What the rule decided for one candidate: a top scene object of the Scene object family, a top scene object that a later
-    // ticket covers, an object an existing family lists, or an object a coverage rule keeps out.
+    // What the rule decided for one candidate: a top scene object of the Scene object family, a top scene object that is
+    // listed for inspection only, an object an existing family lists, or an object a coverage rule keeps out.
     public sealed class SceneObjectVerdict {
-        internal SceneObjectVerdict(IHierarchyNode node, string path, GroupDisposition disposition, string reason, string ticket = null, bool sentence = false) {
-            Node = node; Path = path; Disposition = disposition; Reason = reason; Ticket = ticket; ReasonIsSentence = sentence;
+        internal SceneObjectVerdict(IHierarchyNode node, string path, GroupDisposition disposition, string reason, bool sentence = false) {
+            Node = node; Path = path; Disposition = disposition; Reason = reason; ReasonIsSentence = sentence;
         }
         // The reason of an inspection-only group is a whole clause, not the kind of group the patcher has no edit for.
         public bool ReasonIsSentence { get; }
-        // The ticket that covers an inspection-only group, such as "#89"; null otherwise.
-        public string Ticket { get; }
         public IHierarchyNode Node { get; }
         public string Path { get; }
         public GroupDisposition Disposition { get; }
@@ -186,33 +184,32 @@ namespace RailroaderScenePatcher.Core {
         public static bool GroupHolder(IHierarchyNode node) =>
             node != null && !node.HasFamily && node.Children.Count != 0 && node.Components.All(type => type == TransformType)
             && node.Children.All(child => !child.HasFamily && child.Components.Contains(RendererCuller)) && SceneClassification.ByName(node.Name) == null;
-        // A component anywhere in a group that a later ticket covers, with the kind it stands for and that ticket.
+        // A component anywhere in a group that keeps the group from being edited as a whole, with the kind it stands for
+        // and the whole reason the group is listed for inspection only.
         public sealed class Exclusion {
-            internal Exclusion(string component, string kind, string ticket, bool prefix = false, string reason = null) { Component = component; Kind = kind; Ticket = ticket; Prefix = prefix; Reason = reason; }
-            // The whole reason, where the group is left out for another cause than a kind the patcher has no edit for.
+            internal Exclusion(string component, string kind, string reason, bool prefix = false) { Component = component; Kind = kind; Reason = reason; Prefix = prefix; }
             public string Reason { get; }
             public string Component { get; }
             public string Kind { get; }
-            public string Ticket { get; }
             // The component names every type whose full name starts with it.
             public bool Prefix { get; }
             internal bool Matches(string type) => Prefix ? type.StartsWith(Component, StringComparison.Ordinal) : type == Component;
         }
         public static readonly IReadOnlyList<Exclusion> Exclusions = Array.AsReadOnly(new[] {
-            new Exclusion("Track.TrackMarker", "track marker", null, reason: TrackMarkerReason),
-            new Exclusion("Model.StationAgent", "station click spot", null, reason: StationAgentReason),
-            new Exclusion(ConstructionController, "construction controller", null, reason: ConstructionOutsideBridge),
-            new Exclusion(SpawnPoints.Component, "spawn point", null, reason: SpawnPointReason),
-            new Exclusion("UI.Map.MapIcon", "map icon", null, reason: MapIconReason),
+            new Exclusion("Track.TrackMarker", "track marker", TrackMarkerReason),
+            new Exclusion("Model.StationAgent", "station click spot", StationAgentReason),
+            new Exclusion(ConstructionController, "construction controller", ConstructionOutsideBridge),
+            new Exclusion(SpawnPoints.Component, "spawn point", SpawnPointReason),
+            new Exclusion("UI.Map.MapIcon", "map icon", MapIconReason),
         });
         // Why a group with a map icon is left out. Station map icons, in the Station Icons holder, have their own family;
-        // a map icon elsewhere is in no family and has no edit. No ticket is needed.
+        // a map icon elsewhere is in no family and has no edit.
         public const string MapIconReason = "This group contains a map icon, which the patcher can't move with the group.";
         // Why a group with a station click spot is left out: in Railroader 0.6.3 station click spots are native map data,
-        // which the native map editor edits. No ticket is needed.
+        // which the native map editor edits.
         public const string StationAgentReason = "This group contains a station click spot. It's native map data, which you edit in the Map Editor.";
         // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
-        // their own family. No ticket is needed.
+        // their own family.
         public const string TrackMarkerReason = "This group can't be moved as a whole because it contains track markers. " + WindowGuidance.EditTrackMarkersIndividually;
         // Why a group with a spawn point is left out: its spawn points are edited one by one in their own family.
         public const string SpawnPointReason = "This group can't be moved as a whole because it contains spawn points. " + WindowGuidance.EditSpawnPointsIndividually;
@@ -327,15 +324,9 @@ namespace RailroaderScenePatcher.Core {
             var rail = RailBridge(town, node.Name);
             // A supported rail bridge construction holds its own construction controller; any other group holding one is left out.
             var excluded = FirstExclusion(node, rail ? ConstructionController : null);
-            if (road || rail) {
-                var subgroup = road ? SceneObjectCategories.RoadBridges : SceneObjectCategories.RailBridges;
-                verdicts.Add(excluded != null
-                    ? new SceneObjectVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null) { Category = SceneObjectCategories.Bridge, Subcategory = subgroup, Bridge = road ? BridgeKind.Road : BridgeKind.Rail }
-                    : new SceneObjectVerdict(node, path, GroupDisposition.Group, null) { Category = SceneObjectCategories.Bridge, Subcategory = subgroup, Bridge = road ? BridgeKind.Road : BridgeKind.Rail });
-                return;
-            }
-            if (excluded != null) { verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null)); return; }
-            verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.Group, null));
+            var verdict = excluded != null ? new SceneObjectVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason, true) : new SceneObjectVerdict(node, path, GroupDisposition.Group, null);
+            if (road || rail) { verdict.Category = SceneObjectCategories.Bridge; verdict.Subcategory = road ? SceneObjectCategories.RoadBridges : SceneObjectCategories.RailBridges; verdict.Bridge = road ? BridgeKind.Road : BridgeKind.Rail; }
+            verdicts.Add(verdict);
         }
         // A renderer, collider or light at or below the node, or a storage pile, on an object the scene serializes. What
         // the game builds while it runs does not count: a storage pile builds its collider only while the camera is

@@ -449,8 +449,8 @@ namespace RailroaderScenePatcher {
         static bool FeatureReadable => ObjectList(featureObjects);
         // Why the patcher cannot see what progression or a map feature switches, or null.
         static string SwitchMembersProblem =>
-            progression != null && !ProgressionReadable ? "The patcher can't read the game's progression controls because their object lists are unavailable. Report this to the patcher maintainer."
-            : mapFeature != null && !FeatureReadable ? "The patcher can't read the game's map feature controls because their object lists are unavailable. Report this to the patcher maintainer." : null;
+            progression != null && !ProgressionReadable ? "The patcher can't read which objects the game's progression controls switch. Report this to the patcher maintainer."
+            : mapFeature != null && !FeatureReadable ? "The patcher can't read which objects the game's map feature controls switch. Report this to the patcher maintainer." : null;
         // The loaded components of the switch types, read again only when the loaded scenes change: a switch is a scene
         // component, so the frames between scene changes find the same ones.
         static readonly Dictionary<Type, Component[]> loadedSwitches = new Dictionary<Type, Component[]>();

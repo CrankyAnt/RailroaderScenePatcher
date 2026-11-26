@@ -179,8 +179,6 @@ namespace RailroaderScenePatcher {
             var facts = FactsOf(e);
             var found = SceneClassification.Of(e.Family, e.Identity.Path, facts.Own, facts.AtOrBelow, facts.NamesBelow, places.StripPlaces);
             if (e.Category != null && e.Category != found.Category) found = SceneClassification.Class(e.Category, e.Subcategory);
-            // The game tells track markers apart by their marker type.
-            if (found.Category == SceneClassification.TrackMarker && found.Kind == null) found = SceneClassification.Class(found.Category, InventoryPresentationState.Subgroup(e));
             return classCache[e] = found;
         }
         static ScenePlace PlaceOf(SceneObservation e, Func<SceneObservation, double[]> trackPoint) {
@@ -373,7 +371,7 @@ namespace RailroaderScenePatcher {
             if (failure != null) lines.Add(CommandBand.FailureTooltipLine(failure.Value));
             else if (changed) lines.Add(ChangedLine);
             if (item.Problems.Count != 0) {
-                if (equipment) lines.Add("Detected problems: " + item.Problems.Count + ". The Problems section of the Object tab lists them.");
+                if (equipment) lines.Add("Detected problems: " + item.Problems.Count + ". The Detected problems section of the Object tab lists them.");
                 else lines.AddRange(item.Problems.Select(problem => "Problem: " + problem));
             }
             return String.Join("\n", lines).Replace("<", "\\u003c").Replace(">", "\\u003e");

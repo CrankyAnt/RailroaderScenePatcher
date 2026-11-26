@@ -4,8 +4,8 @@
 #    map x, map z, the category before the generic rules (the category table for top scene objects, the family and
 #    name for others), and the expected
 #    category / kind @ place of the generic rules. A hyphen is an empty cell.
-# The family of the listed Generic track markers is Generic track marker. The markers under Setups that no setup's car
-#    placement holds are no starter placement markers and are listed as Generic track markers.
+# The markers that only inactive setups hold are context (K): the game never reads them, so the inventory lists them
+#    in no family. The family of the listed Generic track markers is Generic track marker.
 C	0	Audio.IntegerLoopingPlayer
 C	1	Character.SpawnPoint
 C	2	Helpers.Culling.RendererCuller
@@ -105,22 +105,22 @@ M	area	Whittier	12278	5770
 M	stop	Whittier	12255	5873
 M	area	Wilmot	16507	2281
 M	stop	Wilmot	16483	2296
-O	L	Setups/Starter Equipment Setup/starter-bc	4	Generic track marker	track-marker-v1	18369	242	Track marker	Track marker / Setup markers @ Barker's Creek
-O	L	Setups/Starter Equipment Setup/starter-br-coaling	4	Generic track marker	track-marker-v1	4174	5328	Track marker	Track marker / Setup markers @ Bryson
-O	L	Setups/Starter Equipment Setup/starter-dbs1	4	Generic track marker	track-marker-v1	21468	-1742	Track marker	Track marker / Setup markers @ Dillsboro
-O	L	Setups/Starter Equipment Setup/starter-dbs2	4	Generic track marker	track-marker-v1	21468	-1742	Track marker	Track marker / Setup markers @ Dillsboro
-O	L	Setups/Starter Equipment Setup/starter-dbtt2	4	Generic track marker	track-marker-v1	21468	-1742	Track marker	Track marker / Setup markers @ Dillsboro
-O	L	Setups/Starter Equipment Setup/starter-editor	4	Generic track marker	track-marker-v1	4469	5404	Track marker	Track marker / Setup markers @ Bryson
+O	K	Setups/Starter Equipment Setup/starter-bc	4	-	-	18369	242	-	-
+O	K	Setups/Starter Equipment Setup/starter-br-coaling	4	-	-	4174	5328	-	-
+O	K	Setups/Starter Equipment Setup/starter-dbs1	4	-	-	21468	-1742	-	-
+O	K	Setups/Starter Equipment Setup/starter-dbs2	4	-	-	21468	-1742	-	-
+O	K	Setups/Starter Equipment Setup/starter-dbtt2	4	-	-	21468	-1742	-	-
+O	K	Setups/Starter Equipment Setup/starter-editor	4	-	-	4469	5404	-	-
 O	L	Setups/Starter Equipment Setup/starter-ewh-btrk1	4	Starter placement marker	starter-placement-v1	12867	4594	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-btrk2	4	Starter placement marker	starter-placement-v1	12867	4594	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-btrk3	4	Starter placement marker	starter-placement-v1	12867	4594	Starter placement	Starter placement @ EWH Interchange
-O	L	Setups/Starter Equipment Setup/starter-ewh-coaling	4	Generic track marker	track-marker-v1	12652	4752	Track marker	Track marker / Setup markers @ Whittier
+O	K	Setups/Starter Equipment Setup/starter-ewh-coaling	4	-	-	12652	4752	-	-
 O	L	Setups/Starter Equipment Setup/starter-ewh-int2	4	Starter placement marker	starter-placement-v1	12859	4590	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-shed1	4	Starter placement marker	starter-placement-v1	12733	4682	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-shed2	4	Starter placement marker	starter-placement-v1	12794	4644	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-wreck	4	Starter placement marker	starter-placement-v1	12582	4885	Starter placement	Starter placement @ Whittier
 O	L	Setups/Starter Equipment Setup/starter-wh-l	4	Starter placement marker	starter-placement-v1	12499	4929	Starter placement	Starter placement @ Whittier
-O	L	Setups/Starter Equipment Setup/starter-wh-p	4	Generic track marker	track-marker-v1	12489	4907	Track marker	Track marker / Setup markers @ Whittier
+O	K	Setups/Starter Equipment Setup/starter-wh-p	4	-	-	12489	4907	-	-
 O	K	World/Builder Photo Setup	55	-	-	14699	3781	-	-
 O	K	World/Builder Photo Setup/Camera	53,54	-	-	14713	3798	-	-
 O	K	World/Builder Photo Setup/Marker	4	-	-	14699	3781	-	-

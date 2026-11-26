@@ -78,7 +78,7 @@ namespace RailroaderScenePatcher {
         // setups. Its object's activity does not matter to the setup, which reads the location either way.
         public override string PatternProblem(object target) {
             var go = target as GameObject;
-            if (!Loaded(go)) return "This object has no implemented starter placement capability";
+            if (!Loaded(go)) return "The starter placement marker's scene isn't loaded";
             var markers = go.GetComponents<Component>().Where(c => c != null && c.GetType().FullName == MarkerType).ToArray();
             var m = markers.Length == 1 ? markers[0] : null;
             var refusal = MarkerPattern.Refusal(new MarkerShape(markers.Length, go.GetComponents<Component>().Any(c => c == null), Get(go, Milepost) != null, Get(go, PadBuilder) != null,

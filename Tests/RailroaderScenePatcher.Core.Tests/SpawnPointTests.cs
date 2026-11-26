@@ -251,8 +251,8 @@ static class SpawnPointTests {
     static void GroupsWithSpawnPointsPointToTheFamily() {
         var verdict = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Depot", new Node("Spawn").With(SpawnPoints.Component), new Node("Shell").Solid())))))
             .Single(v => v.Path == "World/Large Scenery/Town/Depot");
-        Assert(verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Ticket == null && verdict.Reason == SceneObjectRules.SpawnPointReason && verdict.ReasonIsSentence,
-            "A group that holds a spawn point names the Spawn point family, without a ticket: " + verdict.Reason + " " + verdict.Ticket);
+        Assert(verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Reason == SceneObjectRules.SpawnPointReason && verdict.ReasonIsSentence,
+            "A group that holds a spawn point names the Spawn point family: " + verdict.Reason);
     }
     // A disabled spawn point is not in SpawnPoint.All: rescue, teleport and the default start pass it by;
     // a start setup that names it still reads it.

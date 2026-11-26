@@ -194,28 +194,13 @@ namespace RailroaderScenePatcher {
             var found = inventory.Entries.Where(entry => entry.GroupPath == null && SceneObjectRules.InFamilies(entry.Family) && entry.Identity.Scene == part.Identity.Scene && entry.Identity.Path == part.GroupPath).Take(2).ToArray();
             return found.Length == 1 ? found[0] : null;
         }
-        // The Object tab's line that names a part's group, or null for any object that is no part.
         // The mark after an outliner row's name for an object that no supported operation covers; null otherwise.
         internal const string InspectionOnlyMark = "inspection only";
         internal static string RowMark(SceneObservation entry) => entry?.InspectionOnly == null ? null : InspectionOnlyMark;
+        // The Object tab's line that names a part's group, or null for any object that is no part.
         internal static string PartOf(SceneObservation entry) =>
             entry?.GroupPath == null ? null : "Part of: " + entry.GroupPath.Substring(entry.GroupPath.LastIndexOf('/') + 1);
 
-        // What the game itself tells apart inside a family, or null: for a track marker its marker type
-        // (Track.TrackMarkerType), read from the observation's marker line. Never a name: a station sign and a whistle
-        // sign are both Generic markers to the game. A starter marker has no subgroup here.
-        internal static string Subgroup(SceneObservation entry) {
-            if (entry == null || entry.Family != SceneFamilies.TrackMarker) return null;
-            foreach (var line in entry.Bindings) {
-                if (!line.StartsWith(MarkerIdLine, StringComparison.Ordinal)) continue;
-                var at = line.IndexOf("; type=", StringComparison.Ordinal);
-                if (at < 0) return null;
-                var type = line.Substring(at + 7); var end = type.IndexOf(';');
-                type = (end < 0 ? type : type.Substring(0, end)).Trim();
-                return type.Length == 0 ? null : "Type " + type;
-            }
-            return null;
-        }
         // The outliner width that fits most names: the 95th percentile of the name widths, or the longest of fewer than
         // twenty, plus the row decoration. The column takes at most 40 percent of the window and leaves the inspector its
         // minimum beside the divider; it never drops below its own minimum.
@@ -230,10 +215,10 @@ namespace RailroaderScenePatcher {
         // The inventory line of the panel. Edits are refused while the inventory is missing or stale, because pinning
         // refuses then; changed definitions alone refuse no edit.
         internal static string Notice(SceneInventory inventory, bool definitionsStale) {
-            if (inventory != null && !inventory.IsStale && !definitionsStale) return "The object list is up to date. You can inspect objects and start edits.";
+            if (inventory != null && !inventory.IsStale && !definitionsStale) return "The inventory is up to date. You can inspect objects and start edits.";
             var refuses = inventory == null || inventory.IsStale;
             return (inventory == null ? "inspection is unavailable" : inventory.IsStale ? inventory.StaleReason : "the supplied definitions changed or were not read") +
-                ". Click Refresh to update the object list." + (refuses ? " Edits are refused until then." : "");
+                ". Click Refresh to update the inventory." + (refuses ? " Edits are refused until then." : "");
         }
 
         // A row of the current snapshot can be inspected, also while the snapshot is stale: only edits need a fresh

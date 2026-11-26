@@ -191,7 +191,7 @@ namespace RailroaderScenePatcher {
         // The pattern without the consumer scans, for an update that changes only the placement of a held object.
         public virtual string PlacementProblem(object target) => Problem(target as GameObject, null, null, ReferenceEquals(target, enablingTarget), true);
         internal static string Problem(GameObject go, ReferenceScan references, HolderIndex setups, bool enabling = false, bool placementOnly = false) {
-            if (!Loaded(go) && !(enabling && go != null && go.scene.IsValid())) return "This object has no implemented track-marker capability";
+            if (!Loaded(go) && !(enabling && go != null && go.scene.IsValid())) return "The track marker's scene isn't loaded";
             var markers = go.GetComponents<Component>().Where(c => c != null && c.GetType().FullName == MarkerType).ToArray();
             var m = markers.Length == 1 ? markers[0] : null;
             var shape = new MarkerShape(markers.Length, go.GetComponents<Component>().Any(c => c == null), Get(go, Milepost) != null, Get(go, PadBuilder) != null,

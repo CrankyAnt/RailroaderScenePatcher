@@ -26,6 +26,13 @@ namespace RailroaderScenePatcher.Core {
         FileCheck,
         // Cleanup after the gizmo could not be verified.
         GizmoCleanup,
+        // The restoration of the prior placement after a cancelled gizmo drag could not be verified; the detail is the
+        // gesture's cleanup failure.
+        GizmoRestore,
+        // A gizmo drag preview failed with an exception outside the gesture's own checks.
+        GizmoPreview,
+        // The gizmo could not be shown.
+        GizmoUnavailable,
         // A Map Editor hook is unavailable on this game build; the detail is its text.
         HookUnavailable,
         // A change of the Map Editor history could not be tracked.
@@ -54,6 +61,9 @@ namespace RailroaderScenePatcher.Core {
                 case EditingFailure.HistoryError: return "A Map Editor Undo or Redo step failed, so scene patch editing may not match the scene: " + detail;
                 case EditingFailure.ExitCancelled: return "The Map Editor stayed open because the patcher couldn't check for unsaved changes. " + detail;
                 case EditingFailure.FileCheck: return "Could not check the scene patch file: " + detail;
+                case EditingFailure.GizmoRestore: return detail;
+                case EditingFailure.GizmoPreview: return "The gizmo drag failed: " + detail;
+                case EditingFailure.GizmoUnavailable: return "The gizmo couldn't be shown: " + detail;
                 case EditingFailure.GizmoCleanup: return "The patcher couldn't confirm removal of the gizmo's temporary changes. " + WindowGuidance.ReloadMapEditor + " " + detail;
                 case EditingFailure.HistoryTracking: return "The patcher couldn't track an Undo or Redo history change in the Map Editor: " + detail;
                 case EditingFailure.ChromeRefresh: return "The Map Editor title and Save button couldn't be updated: " + detail;
