@@ -57,7 +57,7 @@ Every line of one load starts with the same identifiers: `load attempt <N>, map 
 4. Put a repair step or fallback that the window shows in `WindowGuidance` and append it to the reason; do not write it as plain text in a shared reason. A line written during a load gets its load identifiers from `PatcherLog`; a line outside a load names its scene object or file.
 5. Do not put an absolute path in a line. Use the object path or a path relative to the game's scene.
 6. Do not write to `Debug.Log`, the game's message log, the mod logger or the console directly. `LogSourceTests` rejects such writes outside `LogOutputs.cs`.
-7. Keep the text of `Attempt trace: ` and the JSON that follows it. `Tests/NativeObservation/Observation.cs` reads that debug line from the game's log, and a change to it breaks the observer. See [native observation](native-observation.md).
+7. Keep the text of `Attempt trace: ` and the JSON that follows it. `Tools/NativeObservation/Observation.cs` reads that debug line from the game's log, and a change to it breaks the observer. See [native observation](native-observation.md).
 
 ## Tests
 

@@ -2,14 +2,14 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Read the terrain height in a native journey
 
-A Railroader journey that moves a scene ground mask, such as the flattening mask of `Wilmot Station`, compares the terrain height before and after the edit. The test mod `Tests/TerrainHeightReadout` reads that height as a number, so the comparison doesn't rest on a screenshot alone. It reads the built terrain and changes nothing in the world.
+A Railroader journey that moves a scene ground mask, such as the flattening mask of `Wilmot Station`, compares the terrain height before and after the edit. The test mod `Tools/TerrainHeightReadout` reads that height as a number, so the comparison doesn't rest on a screenshot alone. It reads the built terrain and changes nothing in the world.
 
 ## Build and install the readout
 
 Build the mod beside the patcher build of the journey:
 
 ```powershell
-dotnet build Tests/TerrainHeightReadout --configuration Release -p:GameManaged=<Railroader_Data/Managed> -p:BuildArtifactsRoot=<build root>
+dotnet build Tools/TerrainHeightReadout --configuration Release -p:GameManaged=<Railroader_Data/Managed> -p:BuildArtifactsRoot=<build root>
 ```
 
 Install `TerrainHeightReadout.dll` and its `Info.json` from `<build root>\TerrainHeightReadout\bin\Release\net472` in a mod folder of their own in the test home, and enable the mod in the test profile. It depends on no other mod.

@@ -7,7 +7,7 @@ The patcher applies its scene patch files in its own world-load callback, which 
 This test-only mod records observations for the fixed-placement fixture. It does not install itself or start the game. Build it against the installed game assemblies, placing all build outputs outside the repository:
 
 ```powershell
-dotnet build Tests/NativeObservation/NativeObservation.csproj -p:GameManaged='<Railroader_Data/Managed>' -p:BaseIntermediateOutputPath=C:/TMP/Issue39ObservationBuild/obj/ -p:OutputPath=C:/TMP/Issue39ObservationBuild/bin/
+dotnet build Tools/NativeObservation/NativeObservation.csproj -p:GameManaged='<Railroader_Data/Managed>' -p:BaseIntermediateOutputPath=C:/TMP/Issue39ObservationBuild/obj/ -p:OutputPath=C:/TMP/Issue39ObservationBuild/bin/
 ```
 
 A later authorized test must install `NativeObservation.dll` and `Info.json` in `C:/TMP/RailroaderMapResearch/RuntimeHome/Mods/Issue39Observation`. The observer checks the sole `-homedir` argument and its mod directory before recording or exposing controls. It writes `Evidence/<loadId>/observations.jsonl` under that mod directory on any map in the isolated home, with the `world-ready` event and the attempt traces. Each row's `mapId` names the loaded map; `world-ready` also records `fixtureMap` and the patcher's `engineRuntimeId`, which `Tests/FixedPlacementJourney/Summarize-Attempts.ps1` takes as its `-EngineRuntimeId`. Snapshots, tile events, focus, replay and the trace-stage snapshots need active map `crankyant/fixed-placement-fixture-map`; on another map they record nothing, and a click on their buttons records an error. The observer creates a fresh load ID for each world load. Preserve the complete evidence directory with the corresponding build and fixture provenance.

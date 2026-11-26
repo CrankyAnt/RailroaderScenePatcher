@@ -89,7 +89,7 @@ if($Action -eq 'Install') {
     # The observation reads the patcher's attempt traces, which the patcher writes only with its debug option on.
     $sourceFiles['Mods/Issue39ScenePatcher/settings.json']=[IO.Path]::GetFullPath("$PSScriptRoot/DebugSettings.json")
     $sourceFiles['Mods/Issue39Observation/NativeObservation.dll']=$ObserverDll
-    $sourceFiles['Mods/Issue39Observation/Info.json']=[IO.Path]::GetFullPath("$PSScriptRoot/../NativeObservation/Info.json")
+    $sourceFiles['Mods/Issue39Observation/Info.json']=[IO.Path]::GetFullPath("$PSScriptRoot/../../Tools/NativeObservation/Info.json")
     foreach($name in @('Info.json','Definitions.json','Data/Map.json','Data/scene-patches.json')) {$sourceFiles['ModDev/Issue39FixedPlacement/'+$name]=Join-Path $FixtureSource $name}
     foreach($relative in $sourceFiles.Keys) {
         $source=$sourceFiles[$relative];if(![IO.Path]::IsPathFullyQualified($source) -or !(Test-Path -LiteralPath $source -PathType Leaf)){throw "Missing absolute source $source"};Plain $source

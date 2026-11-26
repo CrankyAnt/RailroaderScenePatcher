@@ -5,9 +5,9 @@ updates:
       - /Src/RailroaderScenePatcher.Core
       - /Src/RailroaderScenePatcher
       - /Tests/RailroaderScenePatcher.Core.Tests
-      - /Tests/NativeObservation
+      - /Tools/NativeObservation
       - /Tests/FaultInjection
-      - /Tests/TerrainHeightReadout
+      - /Tools/TerrainHeightReadout
     schedule:
       interval: weekly
     cooldown:
