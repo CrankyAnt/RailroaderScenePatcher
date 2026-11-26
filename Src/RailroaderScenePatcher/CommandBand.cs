@@ -950,6 +950,24 @@ namespace RailroaderScenePatcher {
             family == StarterPlacements.Family || family == "Track marker" || family == "Crossing pad marker" || family == "Milepost";
         // The label of a track location registered under a marker's ID, as the inventory lists it.
         internal const string ListedTrackLocation = "Named location:";
+        // The binding line of a track location registered under a marker's ID: the location in the one shown form
+        // (TrackLocation.Display), without a full stop, then each note as a sentence of its own: the segment it is
+        // registered under when that is not its own, and an owner other than the marker. No location reads "none".
+        internal static string NamedLocationLine(string segment, string end, double? distance, string registeredUnder, bool own) {
+            if (segment == null && end == null && distance == null) return ListedTrackLocation + " none";
+            var line = ListedTrackLocation + " " + new TrackLocation(segment ?? "no segment", end, distance ?? Double.NaN).Display;
+            if (registeredUnder != null && registeredUnder != segment) line += ". Registered under segment " + registeredUnder + ".";
+            if (!own) line += (line.EndsWith(".", StringComparison.Ordinal) ? " " : ". ") + "This location belongs to another object.";
+            return line;
+        }
+        // A named location line as the window shows it: the location as the row's value, and each note as a line of its own.
+        internal static (string Value, string[] Notes) NamedLocationRow(string line) {
+            var text = line.StartsWith(ListedTrackLocation, StringComparison.Ordinal) ? line.Substring(ListedTrackLocation.Length).TrimStart() : line;
+            var stop = text.IndexOf(". ", StringComparison.Ordinal);
+            if (stop < 0) return (text, Array.Empty<string>());
+            var notes = text.Substring(stop + 2).Split(new[] { ". " }, StringSplitOptions.RemoveEmptyEntries).Select(n => n.EndsWith(".", StringComparison.Ordinal) ? n : n + ".").ToArray();
+            return (text.Substring(0, stop), notes);
+        }
         // The binding lines of an inventory entry that the Track binding section shows as its current binding.
         internal static string[] CurrentBindings(SceneObservation entry) =>
             (entry?.Bindings ?? (IReadOnlyList<string>)Array.Empty<string>()).Where(b => b.StartsWith("Marker", StringComparison.Ordinal) || b.StartsWith(ListedTrackLocation, StringComparison.Ordinal)).ToArray();
