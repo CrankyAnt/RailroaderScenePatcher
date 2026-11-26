@@ -90,6 +90,10 @@ These are project terms for editing and applying scene patches, not additional R
 **Scene object**:
 An object in a Unity scene loaded for the map that may have physical placement, activity, logical bindings, or dependent state. A top scene object is the scene object at the top of a complex; a child object is a scene object below it.
 
+**Mod object**:
+An added object that a mod created with Duplicate from a supported scene object and rebuilds at each load from a source in the scene; its identity, placement and state are its own. Unlike a modded object, it is not an existing target.
+_Avoid_: Copy, duplicate (for the object), user object
+
 **Location sign**:
 A board scene object whose physical placement is independent of any logical binding to a track. The scene names these signs with "Loc:".
 
