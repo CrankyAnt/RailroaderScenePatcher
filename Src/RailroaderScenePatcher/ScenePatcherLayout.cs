@@ -1948,7 +1948,7 @@ namespace RailroaderScenePatcher {
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ObjectTab] = new HelpText { Title = "Object", Intro = "Check the object's state, problems, and dependencies before choosing an edit.",
                 Terms = new[] {
-                    new[] { "Supported edits", "The edits that the Placement, Object, and Connections tabs offer for this object. Each edit that is not available is listed with the reason its control gives. That reason is not a problem." },
+                    new[] { "Supported edits", "Lists the edits offered for this object on the Placement, Object, and Connections tabs. Unavailable edits show the same reason as their disabled controls. These reasons aren't listed under Detected problems." },
                     new[] { "Detected problems", "Defects you can repair with the patcher, each with its repair. On a crossing controller, these include a detection span with an end outside its track segment, or with no track route between its ends: the game detects no train on such a span." },
                     new[] { "Information", "What the inspection found that the patcher cannot repair on this object, such as the detection findings of a crossing controller that cannot be edited. Each names the reason." },
                     new[] { "Inspection notes", "What the inspection could not read or check. Nothing here can be repaired with the patcher, so it is not listed as a problem." },

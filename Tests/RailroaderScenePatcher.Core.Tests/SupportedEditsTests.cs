@@ -42,8 +42,8 @@ static class SupportedEditsTests {
         Check(Shown(board, new SupportedEdits.Live { DisableProblem = GameSwitchActivity.UnsharedRefusal }).Contains("Unavailable: Disable. " + CommandBand.Sentence(GameSwitchActivity.UnsharedRefusal))
             && Shown(board, new SupportedEdits.Live { Enabled = false, DisableProblem = GameSwitchActivity.UnsharedRefusal }).Contains("and Enable."), "a disable that the game would undo holds back Disable only");
         var starter = Entry(StarterPlacements.Family, StarterPlacementScene.Structure, StarterPlacements.Operations, bindings: new[] { StarterPlacements.ReaderPrefix + "Kitchen: 3 cars" });
-        Check(Shown(starter).StartsWith("Available: Set track location and Choose Start derailed.", StringComparison.Ordinal), "a marker that one car placement reads offers Start derailed: " + Shown(starter));
-        Check(Shown(starter, new SupportedEdits.Live { StartersError = "the setups are missing" }).EndsWith("Unavailable: Choose Start derailed. " + CommandBand.WreckReason("the setups are missing", new string[0]), StringComparison.Ordinal), "unreadable setups hold back Start derailed");
+        Check(Shown(starter).StartsWith("Available: Set track location and Set Start derailed.", StringComparison.Ordinal), "a marker that one car placement reads offers Start derailed: " + Shown(starter));
+        Check(Shown(starter, new SupportedEdits.Live { StartersError = "the setups are missing" }).EndsWith("Unavailable: Set Start derailed. " + CommandBand.WreckReason("the setups are missing", new string[0]), StringComparison.Ordinal), "unreadable setups hold back Start derailed");
         var marker = Entry("Track marker", TrackMarkerScene.Structure, CommandBand.MarkerOperations);
         Check(Shown(marker, new SupportedEdits.Live { MarkerIdReason = "Only this marker holds marker ID 7, so it doesn't need a replacement ID." })
             == "Available: Move, Rotate, Follow a track, Disable, and Set track binding. | Unavailable: Set marker ID. Only this marker holds marker ID 7, so it doesn't need a replacement ID.", "a marker whose ID no other marker holds takes no replacement ID");
@@ -113,10 +113,10 @@ static class SupportedEditsTests {
         ["milepost"] = "Available: Move, Rotate, Disable, and Set track binding. | Unavailable: Follow a track. Mileposts use fixed placement. Set the track binding under Connections. | " + NoReplacementId + "Milepost family.",
         ["mast"] = "Available: Move, Rotate, and Disable. | " + NoFollowEquipment,
         ["bell"] = "Available: Move and Disable. | Unavailable: Rotate. A bell's sound has no direction, so rotation does not apply to it. You can still set its position. | " + NoFollowEquipment,
-        ["crossing controller"] = "Available: Edit crossing coverage. | " + Placed + "You cannot move, rotate, enable, or disable a crossing controller.",
+        ["crossing controller"] = "Available: Edit crossing coverage. | " + Placed + "The patcher only edits this controller's crossing coverage and equipment.",
         ["construction controller"] = "Available: Set construction segments. | Unavailable: Move, Rotate, and Follow a track. A construction controller switches the bridge's parts on or off regardless of its own position. Moving it has no effect in the game. Move the bridge or its parts instead. | Unavailable: Disable. This controller switches the bridge's parts on or off as construction progresses. Disabling it would stop the game from doing this. Disable the bridge or its parts instead.",
         ["starter"] = "Available: Set track location. | " + Placed + "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; place the marker on the track under Connections. | "
-            + NoReplacementId + "Starter placement family. | Unavailable: Choose Start derailed. No new-game car placement in an active setup reads this marker, so it is not a starter placement marker.",
+            + NoReplacementId + "Starter placement family. | Unavailable: Set Start derailed. No new-game car placement in an active setup reads this marker, so it is not a starter placement marker.",
         ["shared board"] = Placed + SharedBlock,
         ["detection span"] = Placed + "A span's track locations determine its position, so you cannot set its placement. To change which tracks the crossing detects, use its controller's Connections tab.",
         ["sign group"] = Placed + "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Track marker family.",
@@ -225,7 +225,7 @@ static class SupportedEditsTests {
     static void CrossingControllerOffersOnlyItsConnections() {
         var controller = Entry("Crossing controller", CrossingCoverageScene.Structure, "Set which tracks each circuit detects.", component: CrossingCoverageScene.ComponentType);
         var edits = SupportedEdits.Of(controller);
-        const string reason = "You cannot move, rotate, enable, or disable a crossing controller.";
+        const string reason = "The patcher only edits this controller's crossing coverage and equipment.";
         Check(Shown(controller) == "Available: Edit crossing coverage. | Unavailable: Move, Rotate, Follow a track, and Disable. " + reason,
             "a crossing controller: " + Shown(controller));
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
