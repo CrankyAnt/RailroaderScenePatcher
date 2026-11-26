@@ -34,8 +34,6 @@ namespace RailroaderScenePatcher {
             internal string ActivitySwitched { get; set; }
             // Why the game would not keep the object disabled, such as a progression that cannot be read.
             internal string DisableProblem { get; set; }
-            // Why the marker adapter refuses an object of another family that holds a track marker.
-            internal string MarkerRefusal { get; set; }
             // Why a generic track marker takes no replacement ID now, as its Marker ID section reads it.
             internal string MarkerIdReason { get; set; }
             // Why the setups that read a starter placement marker could not be read.
@@ -51,6 +49,10 @@ namespace RailroaderScenePatcher {
         static readonly HashSet<string> MarkerStructures = new HashSet<string>(StringComparer.Ordinal) { CrossingPadScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure };
         // Whether the object's track binding is edited through its track marker: a crossing pad, a generic track marker or a milepost.
         internal static bool EditsBinding(string structure) => structure != null && MarkerStructures.Contains(structure);
+        // Whether the object holds a track binding: a track marker or a milepost, whose binding is optional, or a crossing
+        // pad, whose binding is required. Only these have the track binding edit and the Track binding section, also
+        // when the patcher refuses them; every other object has neither.
+        internal static bool HoldsBinding(string family) => family == "Track marker" || family == "Milepost" || family == "Crossing pad marker";
         // Whether the object's activity follows its track group, by its binding lines.
         internal static bool FollowsGroup(SceneObservation entry) => entry != null && entry.Bindings.Any(b => b.IndexOf("follows track group", StringComparison.OrdinalIgnoreCase) >= 0 || b.IndexOf("targetActiveFollowsTrackGroup=True", StringComparison.OrdinalIgnoreCase) >= 0);
         // Whether the object holds the construction-segment relationship: the Ela construction controller, or a rail
@@ -88,18 +90,11 @@ namespace RailroaderScenePatcher {
             }
             if (HoldsSegments(entry, live)) { edits.Add(new Edit(Segments, Segments, null)); return edits; }
             if (coverage) edits.Add(new Edit(Coverage, Coverage, null));
-            edits.Add(new Edit(Binding, Binding, BindingReason(entry, live)));
+            // An object that holds a track binding: its own reason when the patcher does not edit it, as for every other edit.
+            if (HoldsBinding(entry.Family)) edits.Add(new Edit(Binding, Binding, editable && EditsBinding(structure) ? null : own ?? CommandBand.EditReason(entry.Operations)));
             if (EditsBinding(structure))
-                edits.Add(new Edit(MarkerId, MarkerId, structure == TrackMarkerScene.Structure ? live?.MarkerIdReason : ReplacementMarkerIds.NotSupportedFor(entry.Family)));
+                edits.Add(new Edit(MarkerId, MarkerId, own ?? (structure == TrackMarkerScene.Structure ? live?.MarkerIdReason : ReplacementMarkerIds.NotSupportedFor(entry.Family))));
             return edits;
-        }
-        // Why the object has no editable track binding, or null: its own refusal when it holds a marker that the adapter
-        // refuses, otherwise that track bindings belong to markers, mileposts and pads, or to a detection span's controller.
-        static string BindingReason(SceneObservation entry, Live live) {
-            if (EditsBinding(entry.Identity.Structure)) return null;
-            if (CommandBand.HoldsMarker(entry.Family) && CommandBand.Refusal(entry.Operations) is string reason) return CommandBand.Sentence(reason);
-            if (live?.MarkerRefusal != null) return CommandBand.Sentence(live.MarkerRefusal);
-            return CommandBand.NoBindingReason(entry);
         }
         // The reason of one edit, or null when it is available or not offered.
         internal static string ReasonOf(IEnumerable<Edit> edits, string key) => edits?.FirstOrDefault(edit => edit.Key == key)?.Reason;

@@ -844,7 +844,7 @@ namespace RailroaderScenePatcher {
             var editable = Editable;
             var live = new SupportedEdits.Live {
                 Present = selected.Handle is GameObject, Enabled = OwnActivity(selected), Bridge = InspectedBridge, HoldsConstructionSegments = HoldsConstructionSegments,
-                StartersError = NativeInventory.StartersError, MarkerRefusal = IsStarter || SupportedEdits.EditsBinding(selected.Identity.Structure) ? null : MarkerAdapterRefusal(),
+                StartersError = NativeInventory.StartersError,
             };
             if (editable && target != null) {
                 live.ActivitySwitched = selected.GroupPath != null || selected.Family == BakedSceneryRules.Family ? GroupWorld.ActivityProblem(target) : IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
@@ -1160,18 +1160,13 @@ namespace RailroaderScenePatcher {
             return AddedWrapper(item, copies)?.DisplayName
                 ?? (entry.Built == null ? InventoryPresentationState.UnbuiltEquipmentName(item, candidates) : InventoryPresentationState.EquipmentSourceName(item.Source, candidates));
         }
-        // Why the inspected object has no editable track binding: its own detected reason when it holds a marker the
-        // adapter refuses, or that the operation is for markers, mileposts and pads. It is one plain sentence
-        // (CommandBand.Sentence): the tooltip's Unavailable: and the section it stands in name what is unavailable.
+        // Why the inspected object's track binding cannot be set: for a track marker, milepost or crossing pad the patcher
+        // refuses, its own reason, as Supported edits names it. An object that holds no track binding has no Track
+        // binding section; only the guided task list, which keeps every task, still asks, and is told whose binding
+        // the patcher edits. It is one plain sentence (CommandBand.Sentence).
         string BindingUnavailable() => EditUnavailable(SupportedEdits.Binding) ?? CommandBand.NoBindingReason(selected);
-        // Why the marker adapter refuses the inspected object when it holds a track marker, or null.
-        string MarkerAdapterRefusal() {
-            try {
-                if (selected?.Handle is GameObject target && target != null && target.GetComponents<Component>().Any(c => c != null && c.GetType().FullName == TrackMarkerWorld.MarkerType))
-                    return TrackMarkerWorld.Problem(target, NativeInventory.LastReferrers, null);
-            } catch { }
-            return null;
-        }
+        // Whether the inspected object holds a track binding, and so has the Track binding section and its row.
+        bool HoldsBinding => SupportedEdits.HoldsBinding(selected?.Family);
         // Why a role's Segment button cannot start a world choice now, or null.
         string CoveragePickBlock => ChoiceBlock ?? EditBlock() ?? (selection == null ? "World selection is unavailable." : null);
         // The Segment button of one end of a role of the open coverage form: a world choice that fills that end's
@@ -1200,15 +1195,18 @@ namespace RailroaderScenePatcher {
             var marker = pad || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure;
             var block = marker ? EditBlock() : BindingUnavailable();
             if (coverage && coverageCircuit == null && equipmentSource != null) DrawEquipmentForm(builder);
-            Section(builder, "Replacement targets");
-            // A starter placement marker gives its own reason: its track location belongs to the starter placement workflow.
-            ReplacementRow(builder);
+            // Replacement targets serve a track binding or a crossing's coverage: an object with neither has no such
+            // section, as it has no Track binding section. Its observed bindings stay below.
+            if (HoldsBinding || coverage) {
+                Section(builder, "Replacement targets");
+                ReplacementRow(builder);
+            }
             if (coverage) { DrawCoverage(builder); DrawEquipment(builder); }
-            Section(builder, pad ? "Crossing pad binding" : "Track binding");
-            var current = CommandBand.CurrentBindings(selected);
-            // An object without a track binding, such as a detection span, says why in one line rather than with empty fields.
-            if (!CommandBand.ShowsBindingFields(selected, marker)) PlainLabel(builder, block);
-            else {
+            var current = HoldsBinding ? CommandBand.CurrentBindings(selected) : new string[0];
+            // Only a track marker, milepost or crossing pad holds a track binding; one that the patcher refuses keeps its
+            // fields, disabled with its own reason.
+            if (HoldsBinding) {
+                Section(builder, pad ? "Crossing pad binding" : "Track binding");
                 ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, (pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move." : "The track location this marker is registered at. A binding edit does not move the object.") + " End is a or b.", column => column == 2);
                 FieldLabel(builder, "Current binding");
                 if (current.Length == 0) Line(builder, "None", null, null);
@@ -1236,7 +1234,7 @@ namespace RailroaderScenePatcher {
             var marker = selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure;
             // A starter placement marker gives its own reason: its track location belongs to the starter placement workflow.
             var reason = selected.Family == StarterPlacements.Family ? CommandBand.EditReason(selected.Operations)
-                : !marker && !coverage ? "Replacement targets serve a track binding or a crossing's coverage." : selection == null ? "World selection is unavailable." : ChoiceBlock;
+                : !marker && !coverage ? (HoldsBinding ? BindingUnavailable() : "Replacement targets serve a track binding or a crossing's coverage.") : selection == null ? "World selection is unavailable." : ChoiceBlock;
             var acts = new List<Act> { Slot("Object", "Choose a replacement object in the world and confirm its identity.", reason, () => BeginSelection(SelectionKind.SceneObject, selected), "Replacement object") };
             if (!coverage) acts.Add(Slot("Segment", "Choose a track segment in the world and confirm its identity.", reason, () => BeginSelection(SelectionKind.TrackSegment, selected, bindingSlot: marker), "Replacement segment"));
             acts.Add(Slot("Node", "Choose a track node in the world and confirm its identity.", reason, () => BeginSelection(SelectionKind.TrackNode, selected), "Replacement node"));
@@ -1708,6 +1706,8 @@ namespace RailroaderScenePatcher {
                             Slot(CommandBand.ClearCircuit, "Preview clearing this mod's value for the circuit; it returns to its underlying coverage.", none, () => PrepareCoverage(session, identity, circuitKey, null, null), null, 1, 112),
                             Slot("Apply", "Apply the previewed coverage.", none ?? (prepared == null ? "Click Preview first." : null), apply, null, 1, 62) };
                     }
+                    // An object that holds no track binding has no track location row.
+                    if (!IsStarter && !HoldsConstructionSegments && !HoldsBinding) return new Act[0];
                     var row = TrackLocationActs(block);
                     return new[] { row.Set, row.Detach, row.Clear, row.Pick };
                 }

@@ -936,13 +936,8 @@ namespace RailroaderScenePatcher {
         // The binding lines of an inventory entry that the Track binding section shows as its current binding.
         internal static string[] CurrentBindings(SceneObservation entry) =>
             (entry?.Bindings ?? (IReadOnlyList<string>)Array.Empty<string>()).Where(b => b.StartsWith("Marker", StringComparison.Ordinal) || b.StartsWith(ListedTrackLocation, StringComparison.Ordinal)).ToArray();
-        // Whether the Track binding section shows location fields: for an object the marker adapter edits, an object of
-        // a family that holds a marker, or one that reports a current binding. Another object shows the reason it has
-        // no binding as one line instead, so the section stays visible with its reason and is never an empty block of
-        // fields and a current binding of None.
-        internal static bool ShowsBindingFields(SceneObservation entry, bool editableMarker) =>
-            editableMarker || HoldsMarker(entry?.Family) || CurrentBindings(entry).Length > 0;
-        // Why an object that holds no marker has no editable track binding. A detection span, the one object a crossing
+        // Why an object that holds no marker has no editable track binding, for the guided task list, which keeps every
+        // task; the inspector shows such an object no Track binding section. A detection span, the one object a crossing
         // controller holds (its inventory entry names that holder), takes its tracks from the controller's crossing
         // coverage; any other object names the families whose binding the patcher edits.
         internal const string DetectionSpanNoBinding = "A detection span's tracks come from its controller's crossing coverage. To change which tracks it detects, edit the coverage on its controller's Connections tab.";

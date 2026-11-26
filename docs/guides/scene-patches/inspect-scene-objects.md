@@ -108,7 +108,7 @@ An inactive object's name is italic and followed by `inactive`. A row's tooltip 
 
 - **Object** shows its scene, component, structure, and path, whether it is **Enabled**, its supported edits, detected problems, and dependencies.
 - **Placement**, in **Numeric** mode, shows its position in map coordinates and rotation in degrees. Editable objects have six fields. Other objects have two lines of text.
-- **Connections** shows its track binding and observed bindings.
+- **Connections** shows its track binding and observed bindings. Only a track marker, a milepost, or a crossing pad has a track binding; for other objects the tab has no track binding section.
 
 **Copy ID** in the command band copies JSON values from the observation. The footer's message slots then name the object whose identity was copied, and with **Debug logging** on, so does the Player log. Copying an identity doesn't establish that the object can be edited.
 

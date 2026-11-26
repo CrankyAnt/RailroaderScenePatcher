@@ -30,14 +30,14 @@ static class SupportedEditsTests {
     // The loaded world's facts that the entry does not hold change the edits and their reasons as they change the controls.
     static void WhatTheWorldAddsChangesTheList() {
         var board = Entry("Independent board", IndependentBoards.Structure, "Edits of this family");
-        Check(Shown(board, new SupportedEdits.Live { Enabled = false }) == "Available: Move, Rotate, Follow a track, and Enable. | " + NoBinding, "an inactive object offers Enable: " + Shown(board, new SupportedEdits.Live { Enabled = false }));
+        Check(Shown(board, new SupportedEdits.Live { Enabled = false }) == "Available: Move, Rotate, Follow a track, and Enable.", "an inactive object offers Enable: " + Shown(board, new SupportedEdits.Live { Enabled = false }));
         var follower = Entry("Track marker", TrackMarkerScene.Structure, "Edits of this family", bindings: new[] { "Activity follows track group G1" }, active: false);
         Check(Shown(follower) == "Available: Move, Rotate, Follow a track, Set track binding, and Set marker ID. | Unavailable: Enable. The track group controls this object's activity. Use Clear activity to let the object follow its group again.",
             "an inactive object that follows its track group cannot be enabled: " + Shown(follower));
         Check(Shown(Entry("Track marker", TrackMarkerScene.Structure, "x", bindings: new[] { "Activity follows track group G1" })).StartsWith("Available: Move, Rotate, Follow a track, Disable,", StringComparison.Ordinal), "it can still be disabled");
         var mast = Entry(ExistingEquipmentScene.MastFamily, ExistingEquipmentScene.MastStructure, CommandBand.MastOperations);
         Check(Shown(mast, new SupportedEdits.Live { ActivitySwitched = CommandBand.EquipmentSwitched }) == "Available: Move and Rotate. | " + NoFollowEquipment
-            + " | Unavailable: Disable. The game's culler enables and disables this object based on camera distance. It would override a saved Enabled setting, so the patcher cannot keep that setting applied. | " + NoBinding,
+            + " | Unavailable: Disable. The game's culler enables and disables this object based on camera distance. It would override a saved Enabled setting, so the patcher cannot keep that setting applied.",
             "equipment that a culler switches takes no Enabled setting: " + Shown(mast, new SupportedEdits.Live { ActivitySwitched = CommandBand.EquipmentSwitched }));
         Check(Shown(board, new SupportedEdits.Live { DisableProblem = GameSwitchActivity.UnsharedRefusal }).Contains("Unavailable: Disable. " + CommandBand.Sentence(GameSwitchActivity.UnsharedRefusal))
             && Shown(board, new SupportedEdits.Live { Enabled = false, DisableProblem = GameSwitchActivity.UnsharedRefusal }).Contains("and Enable."), "a disable that the game would undo holds back Disable only");
@@ -47,18 +47,26 @@ static class SupportedEditsTests {
         var marker = Entry("Track marker", TrackMarkerScene.Structure, CommandBand.MarkerOperations);
         Check(Shown(marker, new SupportedEdits.Live { MarkerIdReason = "Only this marker holds marker ID 7, so it doesn't need a replacement ID." })
             == "Available: Move, Rotate, Follow a track, Disable, and Set track binding. | Unavailable: Set marker ID. Only this marker holds marker ID 7, so it doesn't need a replacement ID.", "a marker whose ID no other marker holds takes no replacement ID");
-        Check(Shown(marker, new SupportedEdits.Live { Present = false }) == "Available: Set track binding and Set marker ID. | Unavailable: Move, Rotate, Follow a track, and Disable. This object cannot be edited here.",
+        Check(Shown(marker, new SupportedEdits.Live { Present = false }) == "Unavailable: Move, Rotate, Follow a track, Disable, Set track binding, and Set marker ID. This object cannot be edited here.",
             "an object that no longer stands takes no placement or Enabled setting: " + Shown(marker, new SupportedEdits.Live { Present = false }));
         var added = Entry(SceneFamilies.AddedEquipment, null, CommandBand.AddedEquipmentOperations("Signal 1 (added)"));
-        Check(Shown(added) == Placed + CommandBand.AddedEquipmentReason + " | " + NoBinding, "added equipment names its crossing's Connections tab: " + Shown(added));
+        Check(Shown(added) == Placed + CommandBand.AddedEquipmentReason, "added equipment names its crossing's Connections tab: " + Shown(added));
         var swing = Entry(BakedSceneryRules.Family, null, null, only: CommandBand.NotYetSupported("baked scenery groups that hold a spawn point"));
-        Check(Shown(swing) == Placed + "Baked scenery groups that hold a spawn point cannot be edited. | " + NoBinding, "an inspection-only object offers no edit: " + Shown(swing));
+        Check(Shown(swing) == Placed + "Baked scenery groups that hold a spawn point cannot be edited.", "an inspection-only object offers no edit: " + Shown(swing));
         var refusedPad = Entry("Crossing pad marker", null, CommandBand.NotEditable("the pad is part of a crossing"));
         Check(Shown(refusedPad) == "Unavailable: Move, Rotate, Follow a track, Disable, and Set track binding. The pad is part of a crossing.", "a refused pad names its refusal once: " + Shown(refusedPad));
         var part = Entry(BakedSceneryRules.Family, BakedSceneryParts.Structure, CommandBand.PartOperations, groupPath: "World/G");
         Check(Shown(part, new SupportedEdits.Live { Bridge = BridgeKind.Rail }) == Expected["rail bridge"], "a part of a rail bridge does not follow a track");
-        var adapter = Entry("Independent board", IndependentBoards.Structure, "x");
-        Check(Shown(adapter, new SupportedEdits.Live { MarkerRefusal = "the marker has no track location" }).EndsWith("Unavailable: Set track binding. The marker has no track location.", StringComparison.Ordinal), "the marker adapter's refusal names why the binding cannot be set");
+        // An object that holds no track binding lists no track binding edit; a track marker, milepost or crossing pad
+        // lists it, and when the patcher does not edit one, the edit gives that object's own reason.
+        var signGroup = Entry(BakedSceneryRules.Family, BakedSceneryGroups.Structure, CommandBand.GroupOperations, bindings: new[] { "Marker segment: Abc" });
+        Check(!Shown(signGroup).Contains(SupportedEdits.Binding), "an object of another family, even one whose binding lines name a marker segment, lists no track binding edit: " + Shown(signGroup));
+        var siding = Entry("Track marker", null, null, only: CommandBand.NotYetSupported("track markers of type Siding"));
+        Check(Shown(siding) == "Unavailable: Move, Rotate, Follow a track, Disable, and Set track binding. Track markers of type Siding cannot be edited.", "an inspection-only marker gives its own reason for its binding: " + Shown(siding));
+        foreach (var family in new[] { "Track marker", "Milepost", "Crossing pad marker" }) {
+            var refused = Entry(family, null, CommandBand.NotEditable("the marker has no track location"));
+            Check(SupportedEdits.ReasonOf(SupportedEdits.Of(refused), SupportedEdits.Binding) == "The marker has no track location.", "a refused " + family + " gives its own reason for its binding");
+        }
     }
 
     // For every edit that is not available, the reason Supported edits names is what its control's tooltip gives after
@@ -70,6 +78,11 @@ static class SupportedEditsTests {
             var (entry, live, _, _) = Listed(map, o, verdicts);
             var edits = SupportedEdits.Of(entry, live);
             var lines = SupportedEdits.Lines(edits);
+            // Supported edits holds only its Available and Unavailable lines.
+            Check(lines.Count != 0 && lines.All(line => line.StartsWith("Available: ", StringComparison.Ordinal) || line.StartsWith("Unavailable: ", StringComparison.Ordinal)), o.Path + ": only Available and Unavailable lines");
+            // Only a track marker, milepost or crossing pad has the track binding edit.
+            Check(edits.Any(e => e.Key == SupportedEdits.Binding) == (o.Family == "Track marker" || o.Family == "Milepost" || o.Family == "Crossing pad marker")
+                && lines.Any(line => line.Contains(SupportedEdits.Binding)) == edits.Any(e => e.Key == SupportedEdits.Binding), o.Path + " (" + o.Family + "): the track binding edit only for an object that holds a track binding");
             foreach (var edit in edits.Where(e => e.Reason != null)) {
                 var tooltip = CommandBand.Tooltip("What the control does.", edit.Reason);
                 Check(tooltip.StartsWith("Unavailable: ", StringComparison.Ordinal) && lines.Any(line => line.StartsWith("Unavailable: ", StringComparison.Ordinal) && line.Contains(edit.Name)
@@ -85,34 +98,33 @@ static class SupportedEditsTests {
     }
 
     // The explicit expected Supported edits of each kind of object, in the window's words.
-    const string NoBinding = "Unavailable: Set track binding. Only track markers, mileposts, and crossing pads have editable track bindings.";
     const string SharedBlock = "This object can't be edited while another object has the same hierarchy path.";
     const string Placed = "Unavailable: Move, Rotate, Follow a track, and Disable. ";
     const string NoReplacementId = "Unavailable: Set marker ID. Only objects in the Track marker family can have a replacement ID. This object is in the ";
     const string NoFollowEquipment = "Unavailable: Follow a track. Existing crossing masts and bells use fixed placement. Track-following placement does not apply to them.";
     const string RailNoFollow = "Unavailable: Follow a track. Rail bridges use fixed placement. They don't support track-following placement. Move the track in the native map editor, then move the bridge onto it.";
     static readonly Dictionary<string, string> Expected = new Dictionary<string, string> {
-        ["scenery"] = "Available: Move, Rotate, Follow a track, and Disable. | " + NoBinding,
-        ["rail bridge"] = "Available: Move, Rotate, and Disable. | " + RailNoFollow + " | " + NoBinding,
-        ["road bridge"] = "Available: Move, Rotate, and Disable. | Unavailable: Follow a track. Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it. | " + NoBinding,
+        ["scenery"] = "Available: Move, Rotate, Follow a track, and Disable.",
+        ["rail bridge"] = "Available: Move, Rotate, and Disable. | " + RailNoFollow,
+        ["road bridge"] = "Available: Move, Rotate, and Disable. | Unavailable: Follow a track. Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it.",
         ["construction root"] = "Available: Move, Rotate, Disable, and Set construction segments. | " + RailNoFollow,
         ["marker"] = "Available: Move, Rotate, Follow a track, Disable, Set track binding, and Set marker ID.",
         ["pad"] = "Available: Disable and Set track binding. | Unavailable: Move, Rotate, and Follow a track. A crossing pad follows its track: its geometry is generated along its track binding. Bind it to another track under Connections. | " + NoReplacementId + "Crossing pad marker family.",
         ["milepost"] = "Available: Move, Rotate, Disable, and Set track binding. | Unavailable: Follow a track. Mileposts use fixed placement. Set the track binding under Connections. | " + NoReplacementId + "Milepost family.",
-        ["mast"] = "Available: Move, Rotate, and Disable. | " + NoFollowEquipment + " | " + NoBinding,
-        ["bell"] = "Available: Move and Disable. | Unavailable: Rotate. A bell's sound has no direction, so rotation does not apply to it. You can still set its position. | " + NoFollowEquipment + " | " + NoBinding,
-        ["crossing controller"] = "Available: Edit crossing coverage. | " + Placed + "You cannot move, rotate, enable, or disable a crossing controller. | " + NoBinding,
+        ["mast"] = "Available: Move, Rotate, and Disable. | " + NoFollowEquipment,
+        ["bell"] = "Available: Move and Disable. | Unavailable: Rotate. A bell's sound has no direction, so rotation does not apply to it. You can still set its position. | " + NoFollowEquipment,
+        ["crossing controller"] = "Available: Edit crossing coverage. | " + Placed + "You cannot move, rotate, enable, or disable a crossing controller.",
         ["construction controller"] = "Available: Set construction segments. | Unavailable: Move, Rotate, and Follow a track. A construction controller switches the bridge's parts on or off regardless of its own position. Moving it has no effect in the game. Move the bridge or its parts instead. | Unavailable: Disable. This controller switches the bridge's parts on or off as construction progresses. Disabling it would stop the game from doing this. Disable the bridge or its parts instead.",
         ["starter"] = "Available: Set track location. | " + Placed + "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; place the marker on the track under Connections. | "
             + NoReplacementId + "Starter placement family. | Unavailable: Choose Start derailed. No new-game car placement in an active setup reads this marker, so it is not a starter placement marker.",
-        ["shared board"] = Placed + SharedBlock + " | " + NoBinding,
-        ["detection span"] = Placed + "A span's track locations determine its position, so you cannot set its placement. To change which tracks the crossing detects, use its controller's Connections tab. | Unavailable: Set track binding. A detection span's tracks come from its controller's crossing coverage. To change which tracks it detects, edit the coverage on its controller's Connections tab.",
-        ["sign group"] = Placed + "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Track marker family. | " + NoBinding,
+        ["shared board"] = Placed + SharedBlock,
+        ["detection span"] = Placed + "A span's track locations determine its position, so you cannot set its placement. To change which tracks the crossing detects, use its controller's Connections tab.",
+        ["sign group"] = Placed + "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Track marker family.",
         // A refused marker: the fixture does not record why the adapter refused it, so it stands in for that reason.
         ["refused marker"] = "Unavailable: Move, Rotate, Follow a track, Disable, and Set track binding. The marker adapter refused this marker.",
     };
-    // A marker or pad that shares its path: its track binding names the refusal of the shared path.
-    static string SharedMarker(int holders) => Placed + SharedBlock + " | Unavailable: Set track binding. " + holders + " objects have this hierarchy path, and a scene patch file names an object by its path.";
+    // A marker or pad that shares its path: its track binding meets the object's own reason, as every other edit does.
+    static string SharedMarker(int holders) => "Unavailable: Move, Rotate, Follow a track, Disable, and Set track binding. " + SharedBlock;
 
     // A base-map fixture object as the inventory lists it: its family and structure, the refusal of an object that
     // shares its path, a detection span's controller, a group's bridge kind and a rail bridge's construction segments.
@@ -214,8 +226,8 @@ static class SupportedEditsTests {
         var controller = Entry("Crossing controller", CrossingCoverageScene.Structure, "Set which tracks each circuit detects.", component: CrossingCoverageScene.ComponentType);
         var edits = SupportedEdits.Of(controller);
         const string reason = "You cannot move, rotate, enable, or disable a crossing controller.";
-        Check(Shown(controller) == "Available: Edit crossing coverage. | Unavailable: Move, Rotate, Follow a track, and Disable. " + reason
-            + " | Unavailable: Set track binding. Only track markers, mileposts, and crossing pads have editable track bindings.", "a crossing controller: " + Shown(controller));
+        Check(Shown(controller) == "Available: Edit crossing coverage. | Unavailable: Move, Rotate, Follow a track, and Disable. " + reason,
+            "a crossing controller: " + Shown(controller));
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
             Check(SupportedEdits.ModeReason(edits, mode) == reason, "placement mode " + mode + " of a crossing controller is refused with its reason: " + SupportedEdits.ModeReason(edits, mode));
         Check(CommandBand.Tooltip("Disable this object.", SupportedEdits.ReasonOf(edits, SupportedEdits.Activity)) == "Unavailable: " + reason, "its Disable tooltip gives the same reason");

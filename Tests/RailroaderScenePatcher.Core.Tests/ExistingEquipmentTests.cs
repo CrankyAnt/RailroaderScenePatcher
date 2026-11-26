@@ -465,19 +465,19 @@ static class ExistingEquipmentTests {
         var bell = Row(BellPath, ExistingEquipmentScene.BellFamily, operations: CommandBand.BellOperations);
         var board = Row("World/Board", "Board");
         foreach (var row in new[] { span, looseSpan, controller, mast, bell, board })
-            Assert(!CommandBand.ShowsBindingFields(row, false) && CommandBand.CurrentBindings(row).Length == 0, "A " + row.Family + " without a marker gets no empty location fields");
+            Assert(!SupportedEdits.HoldsBinding(row.Family) && CommandBand.CurrentBindings(row).Length == 0, "A " + row.Family + " without a marker has no Track binding section");
         // The span's own track locations are observed bindings, not a current binding.
         Assert(CommandBand.CurrentBindings(span).Length == 0, "A detection span's track locations stay out of Current binding");
         var refusedMarker = Row("World/Marker", "Track marker", operations: CommandBand.NotEditable("type Siding"));
         var refusedPad = Row("World/Pad", "Crossing pad marker", operations: CommandBand.NotEditable("refused"));
         var refusedMilepost = Row("World/Milepost", "Milepost", operations: CommandBand.NotEditable("refused"));
         foreach (var row in new[] { refusedMarker, refusedPad, refusedMilepost })
-            Assert(CommandBand.ShowsBindingFields(row, false), "A refused " + row.Family + " keeps its binding fields, disabled with its own reason");
-        Assert(CommandBand.ShowsBindingFields(board, true), "An object the marker adapter edits keeps its fields");
+            Assert(SupportedEdits.HoldsBinding(row.Family) && SupportedEdits.ReasonOf(SupportedEdits.Of(row), SupportedEdits.Binding) == CommandBand.EditReason(row.Operations),
+                "A refused " + row.Family + " keeps its binding fields, disabled with its own reason");
         var carrier = Row("World/Carrier", "Station", bindings: new[] { "Marker segment: Abc", "Other: x" });
         var named = Row("World/Named", "Station", bindings: new[] { CommandBand.ListedTrackLocation + " Abc a 1.0" });
-        Assert(CommandBand.ShowsBindingFields(carrier, false) && CommandBand.CurrentBindings(carrier).Length == 1 && CommandBand.ShowsBindingFields(named, false),
-            "An object that reports a current binding keeps its fields, and only its marker lines are its current binding");
+        Assert(!SupportedEdits.HoldsBinding(carrier.Family) && CommandBand.CurrentBindings(carrier).Length == 1 && !SupportedEdits.HoldsBinding(named.Family),
+            "Only a track marker, milepost or crossing pad has a Track binding section, and only marker lines are a current binding");
         Assert(CommandBand.NoBindingReason(span) == CommandBand.DetectionSpanNoBinding && CommandBand.DetectionSpanNoBinding.Contains("crossing coverage")
             && CommandBand.DetectionSpanNoBinding.Contains("controller's Connections tab"), "A detection span says where its tracks are set: " + CommandBand.NoBindingReason(span));
         // A span whose operations text differs still gets the span reason; a span no controller holds does not.
