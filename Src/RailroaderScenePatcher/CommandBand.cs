@@ -644,6 +644,9 @@ namespace RailroaderScenePatcher {
         // inspected marker, or null when it is offered: only a generic track marker whose native id another scene marker
         // shares takes one, and a marker that already has one keeps the row to change or clear it.
         internal const string SetMarkerId = "Set replacement ID", ClearMarkerId = "Clear replacement ID", RepairDuplicateId = "Repair duplicate ID";
+        // Generate at the right end of the Replacement ID caption fills the field with a generated ID, which stays editable.
+        internal const string GenerateMarkerId = "Generate";
+        internal const string GenerateMarkerIdTip = "Fill the field with a random ID of letters and digits that nothing in the world uses yet. You can still edit it.";
         // The Inspector route of the same repair, beside Repair duplicate ID: the Replacement marker ID section of the Connections tab.
         internal const string SetIdOnConnections = "Set replacement ID on the Connections tab";
         internal const string SetIdOnConnectionsTip = "Open the Connections tab. In its Replacement marker ID section, enter a replacement ID and click Set replacement ID.";
@@ -688,7 +691,7 @@ namespace RailroaderScenePatcher {
         }
         // What to enter in a Replacement ID field, on the Connections tab and in the guided task, shown as text beside the
         // field: a new ID that the modder makes up, which is neither an existing marker ID nor a segment ID.
-        internal const string ReplacementIdInstruction = "Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.";
+        internal const string ReplacementIdInstruction = "Click Generate, or make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.";
         // The tooltip of a Replacement ID field: what the ID does, beside the instruction that stands below the field.
         internal const string ReplacementIdTip = "The game registers this marker's track location under this ID. A replacement ID repairs a duplicate marker ID. The patcher doesn't check Lua scripts or other mods that look up markers by ID.";
         internal static string MarkerIdUnavailable(string family, bool generic, string underlying, int sharers, bool hasValue) =>

@@ -90,7 +90,77 @@ static class ReplacementMarkerIdTests {
         SpacesAtEitherEndAreRefused();
         ReviewChecksTheIdAgainstTheWorld();
         ClearBindingStatesWhenThereIsNothingToClear();
+        GenerateDrawsLettersAndDigitsFromTheInjectedSource();
+        GenerateSkipsEveryIdTheWorldAndTheFileUse();
+        GenerateEndsAtARefusalAnotherDrawWouldMeet();
+        AGeneratedIdRepairsAsATypedIdDoes();
         Console.WriteLine("PASS: a replacement ID repairs a duplicate marker ID and every other holder keeps its registration");
+    }
+    // A random source that draws the given IDs in turn, one character per call, for the generator's character set.
+    static Func<int, int> Draws(params string[] ids) {
+        var indices = new Queue<int>(String.Concat(ids).Select(c => ReplacementMarkerIds.GeneratedCharacters.IndexOf(c)));
+        return n => {
+            if (n != ReplacementMarkerIds.GeneratedCharacters.Length) throw new Exception("The generator draws from its character set: " + n);
+            if (indices.Count == 0) throw new Exception("The generator drew more IDs than scripted");
+            return indices.Dequeue();
+        };
+    }
+    static void GenerateDrawsLettersAndDigitsFromTheInjectedSource() {
+        var w = new World(); var yard = Marker(YardPath); var before = w.Registrations(); var text = w.Session.ScenePatchFileText;
+        foreach (var seed in Enumerable.Range(1, 200)) {
+            var id = w.Session.GenerateMarkerId(yard, new Random(seed).Next, out var reason);
+            Assert(id != null && reason == null && id.Length == ReplacementMarkerIds.GeneratedLength && id.All(c => c < 128 && Char.IsLetterOrDigit(c)), "Seed " + seed + " generates letters and digits only: " + id + " / " + reason);
+            Assert(ReplacementMarkerIds.Problem(id) == null && w.Session.MarkerIdRefusal(yard, id) == null, "The generated ID meets the replacement marker ID rules: " + id);
+            Assert(w.Session.GenerateMarkerId(yard, new Random(seed).Next, out _) == id, "The same source draws the same ID: " + id);
+        }
+        Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.ScenePatchFileText == text && !w.MapEditor.IsDirty && !w.MapEditor.CanUndo, "Generate changes nothing");
+    }
+    // Draws that another scene marker, a foreign registration, a map object of the map context, another modification's
+    // replacement ID or the marker's own underlying ID already use are skipped; the next free draw is the ID.
+    static void GenerateSkipsEveryIdTheWorldAndTheFileUse() {
+        var w = new World();
+        w.Markers.MapObjects.Add("Mapobject1");
+        w.Markers.Buckets["Sps"]["Foreignreg"] = ("a", 1, new object());
+        var other = new FakeMarker { Id = "Scenemark1", Segment = "Sa", End = "b", Distance = 30, Position = new double[] { 90, 1, 2 } };
+        w.Markers.Objects["World/Large Scenery/Signs/Other"] = new List<object> { other }; w.Markers.Load(other); w.Markers.Relative(other);
+        Assert(w.Session.SetMarkerId(Marker(SpeedPath), "Fileuses01", null).Applied, "The speed sign's modification holds a replacement ID");
+        w.Speed.Id = "Mg6m";  // The file still names Fileuses01; the world no longer shows it, so only the file check can skip it.
+        var yard = Marker(YardPath);
+        var used = new[] { "Mapobject1", "Foreignreg", "Scenemark1", "Fileuses01" };
+        foreach (var id in used) Assert(ReplacementMarkerIds.Problem(id) == null && id.Length == ReplacementMarkerIds.GeneratedLength, "The scripted draw " + id + " is a well-formed ID");
+        var generated = w.Session.GenerateMarkerId(yard, Draws(used.Concat(new[] { "Freeid0001" }).ToArray()), out var reason);
+        Assert(generated == "Freeid0001" && reason == null, "Every used draw is skipped and the first unused one is the ID: " + generated + " / " + reason);
+        var underlying = new World(); underlying.Yard.Id = "Underlyin1";  // Only the inactive Yard Limit holds it, without a registration.
+        var own = underlying.Session.GenerateMarkerId(yard, Draws("Underlyin1", "Freeid0002"), out _);
+        Assert(own == "Freeid0002", "The marker's own underlying ID is not generated: " + own);
+    }
+    // A refusal that every draw would meet ends the search with its reason: unread map objects, an object that takes no
+    // replacement ID; a world in which every draw is used ends after the attempts with an instruction.
+    static void GenerateEndsAtARefusalAnotherDrawWouldMeet() {
+        var unread = new World(); unread.Markers.MapObjects = null;
+        Assert(unread.Session.GenerateMarkerId(Marker(YardPath), Draws("Freeid0001"), out var reason) == null && reason == ReplacementMarkerIds.GeneratedMapObjectsUnknown, "Unread map objects end the search after one draw: " + reason);
+        var missing = new World();
+        Assert(missing.Session.GenerateMarkerId(new TargetIdentity(Scene, "World/Missing", "Track.TrackMarker", TrackMarkerScene.Structure), Draws("Freeid0001"), out reason) == null && reason != null && !reason.Contains("Freeid0001"),
+            "A target that can't be resolved ends the search after one draw with its reason: " + reason);
+        var full = new World(); full.Markers.MapObjects.Add("Mapobject1");
+        Assert(full.Session.GenerateMarkerId(Marker(YardPath), Draws(Enumerable.Repeat("Mapobject1", ReplacementMarkerIds.GenerationAttempts).ToArray()), out reason) == null && reason == ReplacementMarkerIds.NoUnusedId,
+            "Used draws end after the attempts with the instruction: " + reason);
+        Assert(ReplacementMarkerIds.Generate(Draws("Freeid0001"), id => ReplacementMarkerIds.NotSupported, out reason) == null && reason == ReplacementMarkerIds.NotSupported, "An object that takes no replacement ID ends the search with its reason");
+    }
+    // Set replacement ID with a generated ID repairs the duplicate as a typed ID does: the pair and a group of three,
+    // every other holder keeps its registration, and the repaired holder's edits apply.
+    static void AGeneratedIdRepairsAsATypedIdDoes() {
+        var w = new World(); var yard = Marker(YardPath);
+        var id = w.Session.GenerateMarkerId(yard, new Random(7).Next, out _);
+        Assert(w.Session.SetMarkerId(yard, id, null).Applied && w.Yard.Id == id, "The Yard Limit takes the generated ID " + id);
+        Assert(w.Own(w.Speed) == "Sjdl|a|10" && w.Speed.Id == "Mg6m", "The speed sign keeps its registration under Mg6m: " + w.Registrations());
+        Assert(w.Session.RepairedMarkerId(yard) == "Mg6m" && w.Session.MarkerIdUsers(yard, id).Count == 0, "The duplicate Mg6m reads as repaired and no other holder shares the generated ID");
+        Assert(w.Session.Edit(yard, null, true).Applied && w.Own(w.Yard) == "S9sc|b|20", "Enable now applies under the generated ID: " + w.Registrations());
+        var g = new World(); var others = new[] { g.Own(g.Whistles[0]), g.Own(g.Whistles[1]) };
+        var whistle = Marker(WhistlePaths[2]);
+        var gid = g.Session.GenerateMarkerId(whistle, new Random(11).Next, out _);
+        Assert(g.Session.SetMarkerId(whistle, gid, null).Applied && g.Session.Edit(whistle, null, false).Applied, "A whistle sign takes the generated ID " + gid + " and is disabled");
+        Assert(g.Own(g.Whistles[0]) == others[0] && g.Own(g.Whistles[1]) == others[1] && g.Whistles[0].Id == "Mkft" && g.Whistles[1].Id == "Mkft", "The other whistle signs keep their registrations: " + g.Registrations());
     }
     static string Doc(string items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + items + "}}";
     static string Item(string key, string path, string body) => "\"" + key + "\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + path + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"}," + body + ",\"dependsOn\":[]}";

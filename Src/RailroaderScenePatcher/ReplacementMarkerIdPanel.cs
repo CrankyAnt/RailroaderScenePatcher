@@ -63,7 +63,7 @@ namespace RailroaderScenePatcher {
             var current = CurrentMarkerId();
             Section(builder, "Replacement marker ID");
             ValueRow(builder, "Replacement ID", null, new[] { "ID" }, markerIdFields, 0, block,
-                CommandBand.ReplacementIdTip, column => false, freeText: true);
+                CommandBand.ReplacementIdTip, column => false, GenerateMarkerIdButton(markerIdFields, block, () => identity), freeText: true);
             // The instruction stands below the field while the field can be edited, here and in the guided task.
             if (block == null) PlainLabel(builder, CommandBand.ReplacementIdInstruction);
             builder.HStack(row => {
@@ -108,6 +108,20 @@ namespace RailroaderScenePatcher {
             CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm();
             selected = inventoryPresentation.CurrentSelection(inventory, entry); ReadPlacement();
             inspectorTab.Value = ConnectionsTab;
+        }
+        // The random source of Generate.
+        readonly System.Random markerIdRandom = new System.Random();
+        // Generate at the right end of the Replacement ID caption, as the native Move button stands beside the Position
+        // caption: it fills the field with a generated ID that the field keeps editable. Unavailable with the field.
+        Action<UIPanelBuilder> GenerateMarkerIdButton(string[] fields, string block, Func<TargetIdentity> target) => row =>
+            Button(row, CommandBand.GenerateMarkerId, () => GenerateMarkerId(fields, target())).Inactive(block != null)
+                .Tooltip("Generate replacement ID", CommandBand.Tooltip(CommandBand.GenerateMarkerIdTip, block));
+        void GenerateMarkerId(string[] fields, TargetIdentity target) {
+            string reason = "no object is inspected. " + WindowGuidance.RefreshInventoryAndInspect, id = null;
+            if (attachment != null && target != null) id = attachment.Session.GenerateMarkerId(target, markerIdRandom.Next, out reason);
+            if (id == null) { feedback.Refuse(MarkerIdPlace, "Generate replacement ID", reason); return; }
+            fields[0] = id;
+            FieldsChanged();
         }
         void ApplyMarkerId() {
             var identity = selected.Identity;

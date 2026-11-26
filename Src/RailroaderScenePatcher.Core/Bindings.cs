@@ -390,6 +390,32 @@ namespace RailroaderScenePatcher.Core {
         // Clearing the replacement ID would return a duplicate marker ID while the modification still changes the
         // marker's activity, binding or track-following placement.
         public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also held by " + user + ", so this marker's activity, binding, and track-following settings need its replacement ID. " + WindowGuidance.ClearSettingsFirst;
+
+        // A generated replacement ID: letters and digits only, so it passes Problem, in GeneratedLength characters. With
+        // 62^10 possible IDs a draw that is already used is rare, and the next draw follows; the attempts end the search.
+        public const string GeneratedCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        public const int GeneratedLength = 10, GenerationAttempts = 64;
+        public const string NoUnusedId = "No unused ID was found. " + WindowGuidance.GenerateAgain;
+        public const string GeneratedMapObjectsUnknown = "The game hasn't loaded the map objects in the map context, so a generated ID couldn't be checked against them. " + WindowGuidance.TryAfterMapLoaded;
+        // A random ID that refusal passes, drawn with next, which returns a number from 0 up to but not including its
+        // argument; or null with the reason. A refusal that does not name the drawn ID, such as an object that takes no
+        // replacement ID or a target that cannot be resolved, and unread map objects end the search at once: another
+        // draw would meet the same refusal.
+        public static string Generate(Func<int, int> next, Func<string, string> refusal, out string reason) {
+            if (next == null) throw new ArgumentNullException(nameof(next));
+            if (refusal == null) throw new ArgumentNullException(nameof(refusal));
+            for (var attempt = 0; attempt < GenerationAttempts; attempt++) {
+                var characters = new char[GeneratedLength];
+                for (var i = 0; i < characters.Length; i++) characters[i] = GeneratedCharacters[next(GeneratedCharacters.Length)];
+                var id = new string(characters);
+                var refused = refusal(id);
+                if (refused == null) { reason = null; return id; }
+                if (refused == MapObjectsUnknown(id)) { reason = GeneratedMapObjectsUnknown; return null; }
+                if (!refused.Contains(id)) { reason = refused; return null; }
+            }
+            reason = NoUnusedId;
+            return null;
+        }
     }
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:

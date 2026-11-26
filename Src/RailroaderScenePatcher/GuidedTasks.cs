@@ -213,7 +213,8 @@ namespace RailroaderScenePatcher {
                     break;
                 case GuidedTaskKind.MarkerId:
                     // The same field as the Connections tab's: free text, with the instruction below it while it can be edited.
-                    ValueRow(builder, "Replacement ID", null, new[] { "ID" }, guidedFields, 0, ChoiceBlock, CommandBand.ReplacementIdTip, column => false, freeText: true);
+                    ValueRow(builder, "Replacement ID", null, new[] { "ID" }, guidedFields, 0, ChoiceBlock, CommandBand.ReplacementIdTip, column => false,
+                        GenerateMarkerIdButton(guidedFields, ChoiceBlock, () => guided.Target?.Identity), freeText: true);
                     if (ChoiceBlock == null) PlainLabel(builder, CommandBand.ReplacementIdInstruction);
                     break;
                 default:

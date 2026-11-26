@@ -27,6 +27,7 @@ namespace RailroaderScenePatcher.Core {
         public const string ChooseIdNoMarkerUses = "Choose an ID that no other scene marker uses.";
         public const string ChooseAnotherId = "Choose another ID.";
         public const string TryAfterMapLoaded = "Try again after the map has loaded.";
+        public const string GenerateAgain = "Click Generate again, or enter an ID.";
         public const string ChangeDependentFirst = "Change or remove that modification first.";
         public const string ChangeDependentsFirst = "Change or remove those modifications first.";
         public const string ClearSettingsFirst = "Clear those settings first, or click Remove modification.";

@@ -727,6 +727,21 @@ namespace RailroaderScenePatcher.Core {
                 return id == engine.Underlying(resolved)?.MarkerId ? null : markers.MarkerIdRefusal(resolved, id);
             } catch (Exception e) { return e.GetBaseException().Message; }
         }
+        // A random replacement ID for the object that Set replacement ID would take now, or null with the reason: letters
+        // and digits only, unused by every scene marker, registration and map object of the world, by the replacement ID
+        // of another modification in the scene patch file, and other than the object's underlying ID. next draws a number
+        // from 0 up to but not including its argument. Nothing changes.
+        public string GenerateMarkerId(TargetIdentity target, Func<int, int> next, out string reason) {
+            string underlying = null;
+            try { underlying = engine.Underlying(engine.ResolveUnique(target))?.MarkerId; } catch (Exception) { }
+            var file = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in scenePatchFile?.Items ?? Enumerable.Empty<JObject>())
+                if (item[ReplacementMarkerIds.Member]?.Type == JTokenType.String) file.Add((string)item[ReplacementMarkerIds.Member]);
+            return ReplacementMarkerIds.Generate(next, id =>
+                id == underlying ? ReplacementMarkerIds.UsedBy(id, id)
+                : file.Contains(id) ? ReplacementMarkerIds.Shared(id)
+                : MarkerIdRefusal(target, id), out reason);
+        }
         // Sets or replaces this mod's construction segments of a rail bridge construction with exactly the selected
         // segments. Null ids clear the mod's value: the construction returns to its effective underlying segments. detach
         // writes an explicit detach, which every capability refuses with its reason. Placement and activity keep their mod

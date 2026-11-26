@@ -10,7 +10,7 @@ You can also start from a detected problem on the **Object** tab. For a track bi
 2. In **Values**, enter your changes for the chosen task:
    - For a snap, click **Track** or **Node** in the footer, click in the world, and click **Confirm**.
    - For a binding or starter placement, enter the segment, end, and distance. You can also click **Segment** in the footer, click a track, confirm it, and click **Picked**. For either task, this fills in the segment, end, and distance from your click.
-   - For a replacement ID, make up a new ID that nothing in the world uses yet. Don't use another marker's ID or a segment ID.
+   - For a replacement ID, click **Generate** for a random unused ID, or make up a new ID that nothing in the world uses yet. Don't use another marker's ID or a segment ID.
    - For **Start derailed**, click **Yes** or **No**. Choosing the setting the starting cars have without this mod removes the mod value.
 3. Click **Next** to open **Review**. It shows the inspected values beside your proposed changes and lists the settings the task will leave unchanged. If you try to select another object during **Values** or **Review**, a message explains why you cannot. The target and your draft stay in place.
 4. Click **Apply** in the footer. Guided tasks use the same operations as **Inspector**, with the same requirements and reasons for refusing an edit. Starter placement checks the whole car cut. Changing a crossing pad's binding regenerates the pad along the track at its marker's new location.
