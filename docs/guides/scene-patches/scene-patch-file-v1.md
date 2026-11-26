@@ -206,7 +206,7 @@ The value is an object keyed by equipment ID, with at least one entry. Each key 
 | Field | Type | Requirement |
 | --- | --- | --- |
 | `pattern` | string | Required. The source must meet the requirements of this supported source pattern. Version 1 supports `crossing-light-gate-v1` for a light or gate and `crossing-bell-v1` for a bell. |
-| `source` | object | Required. For `crossing-light-gate-v1`, use `scene` and `path` to name the Unity scene and hierarchy path of a device loaded in the map. Both must be non-empty strings. For `crossing-bell-v1`, use only `definition`, a non-empty string identifying a bell definition in the content library. |
+| `source` | object | Required. For `crossing-light-gate-v1`, use `scene` and `path` to name the Unity scene and hierarchy path of a device loaded in the map. Both must be non-empty strings. For `crossing-bell-v1`, use only `definition`, a non-empty string identifying a bell definition that the game uses at grade crossings, such as `rr/bell-uss-teardrop-crossing-rh`. |
 | `placement` | object | Required. The fixed placement of the copy's root or the bell, with `mode` set to `fixed`, and `position` and `rotation` in map coordinates. See Placement. |
 
 Applying a scene patch file leaves unlisted additions untouched, including those of other mods. When you edit or remove an addition in the edited mod's scene patch file, the patcher removes any addition that file no longer lists. The next load does not rebuild it. Repeated application keeps one copy or bell per scoped ID, updates its placement if needed, and rebuilds it if its `source` or `pattern` changes. Each bell keeps one player, one observer of the bell key, and one loaded audio reference.
@@ -230,7 +230,7 @@ Before changing anything, the engine checks every addition in the modification. 
 - The source has at least one lamp or gate. It has no crossing controller, key-value object, track span, culler, bell player, or missing script.
 - The source is in the destination controller's Unity scene. The destination controller has exactly one key-value object and at most one culler.
 
-`crossing-bell-v1` requires a bell definition of kind `Bell` in the content library. Its audio asset must resolve in that library, its volume must be a number greater than 0, and its audio indexes must be times greater than 0 in ascending order. The destination controller must have exactly one key-value object and be active.
+`crossing-bell-v1` requires a bell definition of kind `Bell` in the content library that the game uses at grade crossings. In the base game, that's `rr/bell-uss-teardrop-crossing-rh` only; locomotive bells and bell definitions that other mods add are refused. Its audio asset must resolve in that library, its volume must be a number greater than 0, and its audio indexes must be times greater than 0 in ascending order. The destination controller must have exactly one key-value object and be active.
 
 Audio loads after the modification has been applied. Once it loads, the indexes must divide the clip into parts of at least one sample each. If loading fails or the indexes do not fit the clip, the bell remains built but silent. The game's log shows one warning under the supplying mod's scene patch file, with the bell's scope, ID, controller, and reason. The bell then fails its check. The patcher refuses edits that keep it, but you can still remove or replace it.
 

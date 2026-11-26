@@ -1098,9 +1098,9 @@ namespace RailroaderScenePatcher {
             var deviceGuide = CommandBand.RejectionGuide(candidates);
             if (deviceGuide != null)
                 Button(builder, deviceGuide[0], () => Application.OpenURL(GuideRoot + deviceGuide[1])).Tooltip(deviceGuide[0], "Open in your browser the guide's reasons why a source isn't eligible.");
-            // Bells: every bell definition of the content library, with the bell pattern's reason for an ineligible one.
+            // Bells: the bell definitions the game uses at grade crossings, with the bell pattern's reason for an ineligible one.
             Section(builder, "Add a bell");
-            Line(builder, bells.Count(c => c.Eligible) + " eligible and " + bells.Count(c => !c.Eligible) + " ineligible bell definitions in the content library", null, null);
+            Line(builder, bells.Count(c => c.Eligible) + " eligible and " + bells.Count(c => !c.Eligible) + " ineligible crossing bells", null, null);
             foreach (var candidate in bells) {
                 var source = candidate;
                 var name = InventoryPresentationState.EquipmentSourceName(source);
@@ -1961,7 +1961,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Crossing coverage", "Each circuit has an approach A, an island, and an approach B. Select the tracks a circuit covers, or detach it. A track is never covered only because it's near the crossing. Preview shows the result for every circuit before Apply." },
                     new[] { "Detection addition", "Makes the crossing detect an extra track: a circuit of its own with three spans on tracks you select, under an ID you give it. Delete removes it again." },
                     new[] { "Lights and gates", "Adds a copy of a light or gate already loaded in the crossing's scene. The crossing controller drives it and shows or hides it with its own equipment. A device that isn't eligible shows why." },
-                    new[] { "Bells", "Adds a bell with sound from a bell definition in the content library. It rings when the crossing controller rings its own bell. A bell definition that isn't eligible shows why." },
+                    new[] { "Bells", "Adds a bell with the sound of a bell the game uses at grade crossings. It rings when the crossing controller rings its own bell. A bell that isn't eligible shows why." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it rebuilds the pad along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
                     new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },
                     new[] { "Marker ID", "The game registers a marker's track location under this ID. When scene markers share an ID, changing one removes all their registrations. The patcher therefore refuses changes to Enabled, the binding, and Follow. Click Set ID to give one marker a replacement ID. The others keep their registrations. Click Clear ID to restore the underlying ID." },

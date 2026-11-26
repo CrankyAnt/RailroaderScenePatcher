@@ -226,6 +226,8 @@ namespace RailroaderScenePatcher.Core {
     public sealed class BellFacts {
         // The definition's kind, such as Bell or Horn.
         public string Kind = "Bell";
+        // The game uses the definition at grade crossings: its crossing controllers load it for their own bell.
+        public bool CrossingBell = true;
         // The definition names an audio asset, and that asset resolves in the content library without loading anything.
         public bool AudioNamed = true, AudioResolves = true;
         public string Audio = "";
@@ -236,13 +238,32 @@ namespace RailroaderScenePatcher.Core {
     // The crossing-bell-v1 pattern: a separate bell player beneath the crossing controller that observes the bell key the
     // controller publishes on its key-value object, and plays the audio of a bell definition the content library holds,
     // loaded through the library and configured with the definition's indexes and volume, as the game's own crossing bell and
-    // locomotive bells do. The sound does not matter; the definition and loading mechanism do.
+    // locomotive bells do. The sound does not matter; the definition and loading mechanism do. Its sources are only the bell
+    // definitions the game uses at grade crossings; locomotive bells and bells other mods add are none.
     public static class BellPattern {
+        public const string NotACrossingBell = "it is not a bell the game uses at grade crossings";
+        // Why the list offers no bell when the game's crossing bell definition is missing from the content library.
+        public static string CrossingBellMissing(string identifier) => "the game's crossing bell definition " + identifier + " isn't in the content library, so no bell can be added";
+        // The bell source list for a crossing controller: the definitions under the identifiers of the game's crossing bells,
+        // each eligible or with its reason. Other bell definitions of the library are not listed. A crossing bell missing from
+        // the library leaves one rejected row with why, and the list never falls back to other bell definitions.
+        public static IReadOnlyList<SourceCandidate> Sources<T>(IEnumerable<string> crossingBells, IEnumerable<T> library, Func<T, string> identifier, Func<T, string> name, Func<T, string> problem) {
+            var definitions = library.ToList();
+            var result = new List<SourceCandidate>();
+            foreach (var bell in crossingBells.Distinct().OrderBy(b => b, StringComparer.Ordinal)) {
+                var found = definitions.Where(d => identifier(d) == bell).ToList();
+                if (found.Count == 0) result.Add(SourceCandidate.UnavailableBells(CrossingBellMissing(bell)));
+                result.AddRange(found.Select(d => SourceCandidate.Bell(bell, name(d), problem(d))));
+            }
+            if (result.Count == 0) result.Add(SourceCandidate.UnavailableBells(EquipmentAddition.BellsUnavailable));
+            return result;
+        }
         // Why a bell from the definition beneath the destination controller would not work, or null.
         public static string Problem(BellFacts b) {
             if (b == null) throw new ArgumentNullException(nameof(b));
             if (b.DestinationKeyValueObjects != 1) return "the destination crossing controller has " + (b.DestinationKeyValueObjects == 0 ? "no" : "several") + " key-value objects, so it cannot address the bell";
             if (b.Kind != "Bell") return "it is " + (String.IsNullOrEmpty(b.Kind) ? "a definition of unknown kind" : "a " + b.Kind + " definition") + ", not a bell definition";
+            if (!b.CrossingBell) return NotACrossingBell;
             if (!b.AudioNamed) return "its definition does not specify an audio asset";
             if (!b.AudioResolves) return "its audio asset " + b.Audio + " cannot be found in the content library";
             if (Double.IsNaN(b.Volume) || Double.IsInfinity(b.Volume) || b.Volume <= 0) return "its volume " + b.Volume.ToString(CultureInfo.InvariantCulture) + " must be a finite number greater than 0";
