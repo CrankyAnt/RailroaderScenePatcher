@@ -176,9 +176,14 @@ namespace RailroaderScenePatcher.Core {
         // metadata: the industry and load names resolve once the game has read its operations data, so the name is no
         // part of what an inspection pins. The pile's bindings hold the ids its storage is read by.
         public string Storage { get; }
+        // For an object whose hierarchy path and component another loaded object shares, its map x/z as the game placed
+        // it, before this mod moved it; null for every other object. Presentation metadata: the outliner numbers the
+        // objects of one path by it (SharedPathSequence), so a move does not renumber them.
+        public IReadOnlyList<double> GamePosition { get; }
         public SceneObservation(object handle, TargetIdentity identity, string family, bool active, IEnumerable<double> position,
             IEnumerable<double> rotation, IEnumerable<string> bindings, IEnumerable<string> dependencies, IEnumerable<string> problems, string operations,
-            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null, string category = null, string subcategory = null, string holderPath = null, string storage = null, BridgeKind bridge = BridgeKind.None, IEnumerable<string> information = null) {
+            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null, string category = null, string subcategory = null, string holderPath = null, string storage = null, BridgeKind bridge = BridgeKind.None, IEnumerable<string> information = null, IEnumerable<double> gamePosition = null) {
+            GamePosition = gamePosition == null ? null : Array.AsReadOnly(gamePosition.ToArray());
             Enabled = enabled ?? active; HolderPath = holderPath; Storage = storage; GroupPath = groupPath; Category = category; Subcategory = subcategory; Bridge = bridge;
             Information = Array.AsReadOnly((information ?? Array.Empty<string>()).ToArray());
             InspectionOnly = inspectionOnly;

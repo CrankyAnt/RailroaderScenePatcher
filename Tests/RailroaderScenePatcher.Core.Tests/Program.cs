@@ -328,6 +328,7 @@ class Program {
         EmptyListReasonTests.Run();
         ChildObjectTests.Run();
         CrossbuckTests.Run();
+        SharedPathTargetTests.Run();
         SupportedEditsTests.Run();
         IndustryObjectTests.Run();
         LakeSurfaceTests.Run();

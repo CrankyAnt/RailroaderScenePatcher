@@ -796,6 +796,11 @@ namespace RailroaderScenePatcher {
             if (selected.Identity.PadMarkerId != null)
                 Field(builder, "Pad marker ID", selected.Identity.PadMarkerId)
                     .Tooltip("Pad marker ID", "The marker ID of this crossing's pad. Other crossbucks share this path, so the scene patch file names this crossbuck by its path and this ID.");
+            // An object whose path and component another object shares is named by its key beside the path.
+            if (selected.Identity.MarkerId != null)
+                Field(builder, CommandBand.KeyMarkerIdField, selected.Identity.MarkerId).Tooltip(CommandBand.KeyMarkerIdField, CommandBand.KeyMarkerIdTooltip);
+            if (selected.Identity.MapPosition != null)
+                Field(builder, CommandBand.KeyPositionField, CommandBand.KeyPosition(selected.Identity.MapPosition)).Tooltip(CommandBand.KeyPositionField, CommandBand.KeyPositionTooltip);
             // Each section shows its short form, paths relative to this object and grouped per object, until its
             // triangle switches it to the long form.
             DisclosureSection(builder, "Dependencies", dependenciesLong, () => dependenciesLong = !dependenciesLong);

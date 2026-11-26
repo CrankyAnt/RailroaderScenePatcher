@@ -730,14 +730,35 @@ namespace RailroaderScenePatcher {
             if (topObject && verdict?.Crossbuck == true) Read(() => { padMarkerId = GroupWorld.TargetPadMarkerId(go); displayName = SceneObjectRules.CrossbuckName(verdict.Path, padMarkerId, GroupWorld.SharedCrossingNames()); });
             if ((mast || ownBell) && controller != null) Read(() => displayName = go.name + " at " + CrossingEquipment.Place(controller.gameObject.name, Ancestors(controller.transform)));
             string sharedPath = null;
-            // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
-            // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
-            if (only == null && structure != null) Read(() => {
+            // A patch names its target by scene, path and component. Where another loaded object holds those too, the
+            // target adds a key (TargetKeys): the marker ID where the object holds a track marker, else its map position,
+            // both as the game gave them (TargetKeyCache). The outliner numbers such objects by that position. Where the
+            // key names more than one of them too, an edit would be refused as not resolving uniquely: the object says
+            // so under Supported edits and offers none.
+            TargetIdentity keyed = null;
+            double[] gamePosition = null;
+            Read(() => {
+                var path = BoardScene.PathOf(go.transform);
                 // A crossbuck that a pad marker ID identifies counts the crossbucks at its path that hold that id.
-                var holders = padMarkerId != null ? GroupWorld.Crossbucks(go.scene.name, BoardScene.PathOf(go.transform)).Count(pair => pair.Value == padMarkerId)
-                    : BoardScene.LoadedAt(go.scene.name, BoardScene.PathOf(go.transform)).Count(held => held != null && Get(held, TypeName(c)) != null);
-                var shared = CommandBand.SharedPath(holders);
-                if (shared != null) { structure = null; operations = CommandBand.NotEditable(shared); sharedPath = shared; }
+                if (padMarkerId != null) {
+                    if (only == null && structure != null) {
+                        var crossbucks = GroupWorld.Crossbucks(go.scene.name, path).Count(pair => pair.Value == padMarkerId);
+                        var refused = CommandBand.SharedPath(crossbucks);
+                        if (refused != null) { structure = null; operations = CommandBand.NotEditable(refused); sharedPath = refused; }
+                    }
+                    var own = TargetKeyCache.Of(go);
+                    if (own?.MapPosition != null) gamePosition = own.MapPosition;
+                    return;
+                }
+                var holders = BoardScene.LoadedAt(go.scene.name, path).Where(held => held != null && Get(held, TypeName(c)) != null).ToArray();
+                if (holders.Length < 2) return;
+                var key = TargetKeyCache.Of(go);
+                if (key?.MapPosition != null) gamePosition = key.MapPosition;
+                if (only != null || structure == null) return;
+                keyed = TargetKeys.For(go.scene.name, path, TypeName(c), key?.MarkerId, key?.MapPosition, holders.Length, structure);
+                var named = key == null ? holders.Length : holders.Count(held => TargetKeys.Matches(keyed, TargetKeyCache.Of(held)));
+                var shared = CommandBand.SharedPath(named);
+                if (shared != null) { structure = null; operations = CommandBand.NotEditable(shared); sharedPath = shared; keyed = null; }
             });
             // What the inspection could not read or check is a note, whatever the object's activity. Of the rest, a
             // disabled object keeps only what the game reads anyway.
@@ -769,11 +790,11 @@ namespace RailroaderScenePatcher {
             });
             var notes = problems.Where(BindingRules.IsNote).ToArray();
             var defects = BindingRules.Problems(enabled, problems.Where(line => !BindingRules.IsNote(line)), anyway.Where(line => !BindingRules.IsNote(line)));
-            return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure, padMarkerId), family,
+            return new SceneObservation(go, keyed ?? new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure, padMarkerId), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
                 bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: displayName, groupPath: groupPath,
                 category: topObject ? verdict?.Category : null, subcategory: topObject ? verdict?.Subcategory : null, bridge: topObject && verdict != null ? verdict.Bridge : BridgeKind.None,
-                holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform), storage: storageName, information: information);
+                holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform), storage: storageName, information: information, gamePosition: gamePosition);
         }
         // The names of the objects that enclose a transform, from its parent upwards.
         static IReadOnlyList<string> Ancestors(Transform t) { var names = new List<string>(); for (var p = t.parent; p != null; p = p.parent) names.Add(p.name); return names; }

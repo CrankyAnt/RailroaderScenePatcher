@@ -96,7 +96,21 @@ namespace RailroaderScenePatcher {
         // A row shows the game's own name of its object. A part is named with its group, and an object the patcher
         // added has no scene name of the game: both keep the name the inventory gives them.
         static string OwnName(SceneObservation row) =>
-            row.GroupPath != null || CommandBand.IsAddedFamily(row.Family) || row.Identity.Path.StartsWith(InventoryPresentationState.CoverageRoot, StringComparison.Ordinal) ? InventoryPresentationState.Name(row) : Last(row.Identity.Path);
+            row.GroupPath != null || CommandBand.IsAddedFamily(row.Family) || row.Identity.Path.StartsWith(InventoryPresentationState.CoverageRoot, StringComparison.Ordinal) ? InventoryPresentationState.Name(row)
+            : InventoryPresentationState.SharedPathNames.TryGetValue(row, out var numbered) ? numbered : Last(row.Identity.Path);
+        // The objects that share their scene, hierarchy path and component with another listed object get the game's name
+        // with a sequence number (SharedPathSequence), numbered by where the game placed them.
+        static void NumberSharedPaths(IReadOnlyList<SceneObservation> entries) {
+            var names = new Dictionary<SceneObservation, string>();
+            foreach (var group in entries.Where(e => e.GroupPath == null && !CommandBand.IsAddedFamily(e.Family)).GroupBy(e => e.Identity.Scene + "|" + e.Identity.Path + "|" + e.Identity.Component).Where(g => g.Count() > 1)) {
+                var rows = group.ToArray();
+                var points = rows.Select(r => r.GamePosition != null && r.GamePosition.Count >= 2 ? new[] { r.GamePosition[0], r.GamePosition[1] }
+                    : HasPosition(r) ? new[] { r.Position[0], r.Position[2] } : new[] { 0.0, 0.0 }).ToArray();
+                var numbers = SharedPathSequence.Numbers(points, places);
+                for (var i = 0; i < rows.Length; i++) names[rows[i]] = InventoryPresentationState.Numbered(Last(rows[i].Identity.Path), numbers[i]);
+            }
+            InventoryPresentationState.SharedPathNames = names;
+        }
         static string Parent(string path) { var at = path.LastIndexOf('/'); return at < 0 ? null : path.Substring(0, at); }
         static string Round(double v) => Math.Round(v).ToString(CultureInfo.InvariantCulture);
 
@@ -196,6 +210,7 @@ namespace RailroaderScenePatcher {
             var hasEntries = entries.Count > 0;
             if (places != null && cachedWorldKey == worldKey && (placesBuiltWithEntries || !hasEntries)) {
                 preparedEntries = entries;
+                NumberSharedPaths(entries);
                 TrimObservationCaches(entries);
                 return;
             }
@@ -212,6 +227,7 @@ namespace RailroaderScenePatcher {
             // What the listed objects name by their path and name: place folders, Roads folders, station map icons, Loc: boards.
             foreach (var e in entries.Where(e => e.GroupPath == null && e.HolderPath == null)) sources.AddRange(ScenePlaces.SourcesOf(e.Identity.Path, Measure(e, trackPoint)));
             places = ScenePlaces.From(sources);
+            NumberSharedPaths(entries);
             placesLine = String.Join(" | ", places.All.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).Select(p =>
                 p.Name + " [" + p.From + "] {" + String.Join("; ", p.Names) + "} " + String.Join(" ", p.Points.Select(at => "@" + Round(at[0]) + "," + Round(at[1])))))
                 + (notes.Count == 0 ? "" : " Problems reading places: " + String.Join("; ", notes));

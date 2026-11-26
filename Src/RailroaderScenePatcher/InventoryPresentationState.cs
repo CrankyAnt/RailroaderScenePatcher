@@ -100,7 +100,13 @@ namespace RailroaderScenePatcher {
             return (entries ?? Enumerable.Empty<SceneObservation>()).Where(e => e != null && !ReferenceEquals(e.Handle, self) && MarkerIdOf(e) is string id && ids.Contains(id)).ToArray();
         }
         // Child objects include their group; other objects use their observed visible name.
-        internal static string Name(SceneObservation entry) => entry.GroupPath != null ? SceneObjectRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
+        internal static string Name(SceneObservation entry) => entry.GroupPath != null ? SceneObjectRules.PartName(entry.GroupPath, entry.Identity.Path)
+            : entry.DisplayName == Last(entry.Identity.Path) && SharedPathNames.TryGetValue(entry, out var numbered) ? numbered : entry.DisplayName;
+        // The shown names of the objects that share their hierarchy path and component with another listed object, with
+        // their sequence numbers, as the outliner last numbered them (OutlinerGrouping). Only the shown name changes.
+        internal static IReadOnlyDictionary<SceneObservation, string> SharedPathNames = new Dictionary<SceneObservation, string>();
+        internal static string Numbered(string name, int number) => name + " (" + number + ")";
+        static string Last(string path) => path.Substring(path.LastIndexOf('/') + 1);
 
         // The suffix of an added name (AddedEquipmentName); an Equipment ID holds no parenthesis.
         static readonly Regex AddedSuffix = new Regex(@" \(added(?:: [^()]+)?\)\z");

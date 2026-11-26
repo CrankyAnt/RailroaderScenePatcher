@@ -26,24 +26,93 @@ namespace RailroaderScenePatcher.Core {
         // stands beside the path, which stays the raw hierarchy path.
         public string PadMarkerId { get; internal set; }
         public const string PadMarkerMember = "padMarkerId";
+        // The key of an object whose hierarchy path and component another loaded object shares (TargetKeys): the
+        // game's marker ID where the object has one, else its map x/z as the game placed it. Both are null for a
+        // target whose path and component are unique, and for a crossbuck that its pad marker ID names.
+        public string MarkerId { get; set; }
+        public double[] MapPosition { get; set; }
+        public const string MarkerIdMember = "markerId", MapPositionMember = "mapPosition";
+        // A map position matches an object whose x and z each lie within this distance, in metres. The game keeps
+        // positions in single precision and the key is written to the centimetre; objects that share a path stand
+        // metres apart, so no other object falls within it. It is never a search radius: no nearest object is taken.
+        public const double MapPositionTolerance = 0.05;
+        public bool Keyed => MarkerId != null || MapPosition != null;
         // Why a scene refuses a target with a pad marker ID, when it names no crossbuck at a shared path.
         public const string PadMarkerNotAccepted = "The target doesn't accept padMarkerId because it isn't a crossbuck at an unprotected crossing with a shared path. " + WindowGuidance.RemovePadMarkerId;
-        // Whether a target object of a scene patch file names this identity's object: the same scene, path, component
-        // and pad marker ID. The structure is compared by the caller.
-        internal static bool SameObject(JObject target, TargetIdentity identity) =>
-            target != null && identity != null && (string)target["scene"] == identity.Scene && (string)target["path"] == identity.Path && (string)target["component"] == identity.Component
-            && (target[PadMarkerMember]?.Type == JTokenType.String ? (string)target[PadMarkerMember] : null) == identity.PadMarkerId;
-        // The identity for a message: scene and path, the pad marker ID where it has one, and the component.
-        public string Label => Scene + "/" + Path + (PadMarkerId == null ? "" : " (pad marker " + PadMarkerId + ")") + " [" + Component + "]";
+        // Whether a target object of a scene patch file names this identity's object: the same scene, path, component,
+        // pad marker ID and key. The structure is compared by the caller.
+        internal static bool SameObject(JObject target, TargetIdentity identity) {
+            if (target == null || identity == null || (string)target["scene"] != identity.Scene || (string)target["path"] != identity.Path || (string)target["component"] != identity.Component
+                || (target[PadMarkerMember]?.Type == JTokenType.String ? (string)target[PadMarkerMember] : null) != identity.PadMarkerId) return false;
+            TargetIdentity other;
+            try { other = PatchEngine.ParseTarget(target); } catch (InvalidOperationException) { return false; }
+            return SameKey(other, identity);
+        }
+        // The identity for a message: scene and path, the pad marker ID or key where it has one, and the component.
+        public string Label => Scene + "/" + Path + (PadMarkerId == null ? "" : " (pad marker " + PadMarkerId + ")") + (MarkerId == null ? "" : " (marker " + MarkerId + ")")
+            + (MapPosition == null ? "" : " (at " + TargetKeys.Number(MapPosition[0]) + ", " + TargetKeys.Number(MapPosition[1]) + ")") + " [" + Component + "]";
         public static bool SameObject(TargetIdentity a, TargetIdentity b) =>
-            a != null && b != null && a.Scene == b.Scene && a.Path == b.Path && a.Component == b.Component && a.PadMarkerId == b.PadMarkerId;
+            a != null && b != null && a.Scene == b.Scene && a.Path == b.Path && a.Component == b.Component && a.PadMarkerId == b.PadMarkerId && SameKey(a, b);
+        static bool SameKey(TargetIdentity a, TargetIdentity b) =>
+            a.MarkerId == b.MarkerId && (a.MapPosition == null) == (b.MapPosition == null) && (a.MapPosition == null || TargetKeys.Matches(a.MapPosition, b.MapPosition));
+        // A text that tells identities apart, for a dictionary key: equal identities give the same text.
+        internal string Text => Scene + "|" + Path + "|" + Component + "|" + Structure + "|" + PadMarkerId + "|" + MarkerId + "|"
+            + (MapPosition == null ? "" : TargetKeys.Number(MapPosition[0]) + "," + TargetKeys.Number(MapPosition[1]));
+        // The same identity without its key: the objects at its path and component.
+        internal TargetIdentity Unkeyed() => new TargetIdentity(Scene, Path, Component, Structure, PadMarkerId);
         // The target object of a scene patch file for this identity.
         internal JObject ToJson() {
             var value = new JObject { ["scene"] = Scene, ["path"] = Path, ["component"] = Component };
             if (Structure != null) value["structure"] = Structure;
             if (PadMarkerId != null) value[PadMarkerMember] = PadMarkerId;
+            if (MarkerId != null) value[MarkerIdMember] = MarkerId;
+            if (MapPosition != null) value[MapPositionMember] = new JArray(MapPosition[0], MapPosition[1]);
             return value;
         }
+    }
+    // An object's key as the game gave it, before this mod changed it: its marker ID, or null, and its map x/z.
+    public sealed class TargetKey {
+        public TargetKey(string markerId, double[] mapPosition) { MarkerId = markerId; MapPosition = mapPosition; }
+        // Matches every key: an object that stands for a refusal of its own rather than for a scene object.
+        public static readonly TargetKey Any = new TargetKey(null, null);
+        public string MarkerId { get; }
+        public double[] MapPosition { get; }
+    }
+    // A scene that supplies the key of a resolved object. A scene without it matches no keyed target.
+    public interface ITargetKeyScene {
+        // The object's marker ID and map x/z as the game gave them, unchanged by any modification since; null when
+        // they cannot be read.
+        TargetKey KeyOf(object target);
+    }
+    // The key of a target whose hierarchy path and component another loaded object shares.
+    public enum TargetKeyKind { MarkerId, PadMarkerId, MapPosition }
+    public static class TargetKeys {
+        public const string RequiredVersion = "0.5.0";
+        public const string MarkerComponent = "Track.TrackMarker";
+        // Which key names an object at a shared path: a crossbuck keeps its crossing's pad marker ID, an object with a
+        // track marker its marker ID, every other object its map position.
+        public static TargetKeyKind KindOf(IEnumerable<string> components, bool crossbuck) =>
+            crossbuck ? TargetKeyKind.PadMarkerId : components != null && components.Contains(MarkerComponent) ? TargetKeyKind.MarkerId : TargetKeyKind.MapPosition;
+        // The key that editing writes: none when one loaded object holds the path and component, else the game's marker
+        // ID where the object has one, else its map x/z rounded to the centimetre.
+        public static TargetIdentity For(string scene, string path, string component, string markerId, double[] mapPosition, int holders, string structure = null) {
+            var identity = new TargetIdentity(scene, path, component, structure);
+            if (holders < 2) return identity;
+            if (!String.IsNullOrEmpty(markerId)) identity.MarkerId = markerId;
+            else if (mapPosition != null && mapPosition.Length >= 2) identity.MapPosition = new[] { Math.Round(mapPosition[0], 2), Math.Round(mapPosition[1], 2) };
+            return identity;
+        }
+        // Whether two map positions match within the tolerance on x and on z.
+        public static bool Matches(double[] a, double[] b) =>
+            a != null && b != null && a.Length >= 2 && b.Length >= 2 && Math.Abs(a[0] - b[0]) <= TargetIdentity.MapPositionTolerance && Math.Abs(a[1] - b[1]) <= TargetIdentity.MapPositionTolerance;
+        // Whether an object's key matches the identity's key. An object whose key cannot be read matches none.
+        public static bool Matches(TargetIdentity identity, TargetKey key) {
+            if (key == null) return false;
+            if (ReferenceEquals(key, TargetKey.Any)) return true;
+            if (identity.MarkerId != null) return key.MarkerId == identity.MarkerId;
+            return identity.MapPosition == null || Matches(identity.MapPosition, key.MapPosition);
+        }
+        internal static string Number(double value) => ShownNumber.Text(value);
     }
     // A scene that accepts a pad marker ID beside a target's path: it says why it refuses the identity, or null.
     public interface IPadMarkerIdentityScene {
@@ -525,7 +594,10 @@ namespace RailroaderScenePatcher.Core {
                 var refusal = scene is IPadMarkerIdentityScene accepting ? accepting.PadMarkerRefusal(identity) : TargetIdentity.PadMarkerNotAccepted;
                 if (refusal != null) throw new InvalidOperationException(refusal);
             }
-            return scene.Resolve(identity);
+            if (!identity.Keyed) return scene.Resolve(identity);
+            // A key picks among the objects at the path and component: exactly, never the nearest.
+            var keys = scene as ITargetKeyScene;
+            return (scene.Resolve(identity.Unkeyed()) ?? Array.Empty<object>()).Where(o => o != null && keys != null && TargetKeys.Matches(identity, keys.KeyOf(o))).ToArray();
         }
         // The refusals of a target that does not match exactly one object of the loaded scene.
         public const string TargetMissing = "This target doesn't match any object in the loaded map.";
@@ -730,9 +802,21 @@ namespace RailroaderScenePatcher.Core {
             } catch (InvalidOperationException e) { return e.Message; }
         }
         internal static TargetIdentity ParseTarget(JObject target) {
-            if (target == null || !Only(target, "scene", "path", "component", "structure", TargetIdentity.PadMarkerMember) || !RequiredString(target,"scene") || !RequiredString(target,"path") || !RequiredString(target,"component") || (target["structure"] != null && target["structure"].Type != JTokenType.String)
-                || (target[TargetIdentity.PadMarkerMember] != null && !RequiredString(target, TargetIdentity.PadMarkerMember))) throw new InvalidOperationException("Invalid or unsupported target");
-            return new TargetIdentity { Scene=(string)target["scene"], Path=(string)target["path"], Component=(string)target["component"], Structure=(string)target["structure"], PadMarkerId=(string)target[TargetIdentity.PadMarkerMember] };
+            if (target == null || !Only(target, "scene", "path", "component", "structure", TargetIdentity.PadMarkerMember, TargetIdentity.MarkerIdMember, TargetIdentity.MapPositionMember) || !RequiredString(target,"scene") || !RequiredString(target,"path") || !RequiredString(target,"component") || (target["structure"] != null && target["structure"].Type != JTokenType.String)
+                || (target[TargetIdentity.PadMarkerMember] != null && !RequiredString(target, TargetIdentity.PadMarkerMember))
+                || (target[TargetIdentity.MarkerIdMember] != null && !RequiredString(target, TargetIdentity.MarkerIdMember))) throw new InvalidOperationException("Invalid or unsupported target");
+            double[] position = null;
+            if (target[TargetIdentity.MapPositionMember] != null) {
+                var values = target[TargetIdentity.MapPositionMember] as JArray;
+                if (values == null || values.Count != 2 || values.Any(v => v.Type != JTokenType.Integer && v.Type != JTokenType.Float)) throw new InvalidOperationException("Invalid or unsupported target");
+                position = values.Select(v => (double)v).ToArray();
+                if (position.Any(v => Double.IsNaN(v) || Double.IsInfinity(v))) throw new InvalidOperationException("Invalid or unsupported target");
+            }
+            // One key at most: a marker ID or a map position, and neither beside a crossbuck's pad marker ID.
+            var keys = (target[TargetIdentity.PadMarkerMember] != null ? 1 : 0) + (target[TargetIdentity.MarkerIdMember] != null ? 1 : 0) + (position != null ? 1 : 0);
+            if (keys > 1) throw new InvalidOperationException("Invalid or unsupported target");
+            return new TargetIdentity { Scene=(string)target["scene"], Path=(string)target["path"], Component=(string)target["component"], Structure=(string)target["structure"], PadMarkerId=(string)target[TargetIdentity.PadMarkerMember],
+                MarkerId=(string)target[TargetIdentity.MarkerIdMember], MapPosition=position };
         }
         internal static Placement CheckPlacement(double[] position, double[] rotation) {
             if (position == null || rotation == null || position.Length != 3 || rotation.Length != 4) throw new InvalidOperationException("Invalid placement coordinates");

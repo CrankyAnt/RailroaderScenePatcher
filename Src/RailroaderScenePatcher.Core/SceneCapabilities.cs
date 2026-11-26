@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IDisposable {
+    public sealed class SceneCapabilities : ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IDisposable {
         // Supplied by the host: the map patches in the map context, which only the native map editor's context holds.
         public Func<IEnumerable<string>> MapPatches { get; set; }
         public IEnumerable<string> MapPatchIds => MapPatches?.Invoke() ?? Enumerable.Empty<string>();
@@ -26,6 +26,11 @@ namespace RailroaderScenePatcher.Core {
         // Supplied by the host: whether the object still exists at the identity's scene and path.
         public Func<object, TargetIdentity, bool> Live { get; set; }
         public bool IsLive(object target, TargetIdentity identity) { return Live != null && target != null && Live(target, identity); }
+        // Supplied by the host: an object's key as the game gave it (ITargetKeyScene). Without it no keyed target matches.
+        public Func<object, TargetKey> Keys { get; set; }
+        // The placeholder of a capability whose game functions are missing matches any key, so a keyed target of it
+        // fails with that reason, as an unkeyed one does.
+        public TargetKey KeyOf(object target) => target is Unavailable ? TargetKey.Any : Keys == null || target == null ? null : Keys(target);
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) { return ReferenceEquals(a, b); }
             public int GetHashCode(object value) { return RuntimeHelpers.GetHashCode(value); }

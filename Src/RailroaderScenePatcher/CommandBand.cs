@@ -169,12 +169,18 @@ namespace RailroaderScenePatcher {
         // The supported-edits text of an object the patcher cannot edit, with the reason that was found. It promises
         // no correction.
         internal static string NotEditable(string reason) => NotEditablePrefix + reason;
-        // Why an object whose hierarchy path and component more than one loaded object holds cannot be edited, or null:
-        // a scene patch file names its target by them, so it cannot name one of the holders. Supported edits says this
+        // Why an object whose hierarchy path and component more than one loaded object holds cannot be edited, or null.
+        // A key names one of them (TargetKeys); this reason remains for holders that the key does not tell apart, such
+        // as two holders of one marker ID at one path, and for a key that cannot be read. Supported edits says this
         // about the object; the footer says what it means for an edit now (SharedPathBlock).
         const string SharedPathTail = " objects have this hierarchy path, and a scene patch file names an object by its path";
         internal static string SharedPath(int holders) => holders > 1 ? holders + SharedPathTail : null;
         internal const string SharedPathBlock = "Another object shares its hierarchy path";
+        // The Identity fields of the key of an object whose hierarchy path and component another object shares.
+        internal const string KeyMarkerIdField = "Target marker ID", KeyPositionField = "Target map position";
+        internal const string KeyMarkerIdTooltip = "The game's marker ID of this object. Other objects share this path, so the scene patch file names this object by its path and this ID.";
+        internal const string KeyPositionTooltip = "Where the game placed this object, as map x and z. Other objects share this path, so the scene patch file names this object by its path and this position.";
+        internal static string KeyPosition(double[] at) => "x " + Number(at[0]) + ", z " + Number(at[1]);
         // The Track group line of the Object tab. An object without edits is told what its activity follows, not what
         // Disable and Clear activity would do.
         internal static string TrackGroup(bool editable) => editable

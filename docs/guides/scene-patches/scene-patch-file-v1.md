@@ -49,7 +49,7 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 
 | Field | Type | Requirement |
 | --- | --- | --- |
-| `target` | object | Required. Must contain `scene`, `path`, and `component`. Optional `structure` is a string. Optional `padMarkerId` is a non-empty string that names a crossbuck whose path other crossbucks share; see [Group](#scene-object). |
+| `target` | object | Required. Must contain `scene`, `path`, and `component`. Optional `structure` is a string. Optional `padMarkerId` is a non-empty string that names a crossbuck whose path other crossbucks share; see [Group](#scene-object). Optional `markerId` or `mapPosition` names an object whose path and component another loaded object shares; see [Objects that share a hierarchy path](#objects-that-share-a-hierarchy-path). |
 | `markerId` | string | Optional. The replacement ID of a generic track marker. Requires patcher 0.5.0 or later; see Replacement ID below. |
 | `placement` | object | Optional. A fixed placement contains `mode`, `position`, and `rotation`; a track-following placement contains `mode`, `track`, `offset`, and `rotation`. See Placement below. |
 | `active` | boolean | Optional. `false` disables the object, `true` enables it. Generic activity requires patcher 0.2.0 or later; track-marker activity requires 0.5.0 or later. |
@@ -57,7 +57,28 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 | `starterPlacement` | object | Optional. Sets a starter placement marker's track location, whether its starting cars are a wreck, or both. See Starter placement below. Requires patcher 0.5.0 or later. |
 | `dependsOn` | array of strings | Required. Each value names another modification in the same scene patch file. |
 
-The `target` object accepts only `scene`, `path`, `component`, and the optional members `structure` and `padMarkerId`. All required target strings must be non-empty, as must `padMarkerId` when present. `path` is always the object's hierarchy path. Use `padMarkerId` alongside it only for a crossbuck that shares its path with other crossbucks. For every other target, the patcher refuses `padMarkerId` before changing anything and gives the reason. The scene adapter must resolve the identity to exactly one object. If it finds no match or multiple matches, the modification fails. With no match, the Log window row reads `This target doesn't match any object in the loaded map. Inspect the intended object in the Scene Patcher. On the Object tab, compare its Identity fields with the target's scene, path, and component in the scene patch file. Correct the target or remove this modification from the file.` With multiple matches, it reads `This target matches more than one object in the loaded map. Use a more specific path or component so the target matches only one object.`
+The `target` object accepts only `scene`, `path`, `component`, and the optional members `structure`, `padMarkerId`, `markerId`, and `mapPosition`. All required target strings must be non-empty, as must `padMarkerId` and `markerId` when present. A target holds at most one of `padMarkerId`, `markerId`, and `mapPosition`; a target with more than one fails as an invalid target. `path` is always the object's hierarchy path. Use `padMarkerId` alongside it only for a crossbuck that shares its path with other crossbucks. For every other target, the patcher refuses `padMarkerId` before changing anything and gives the reason. The scene adapter must resolve the identity to exactly one object. If it finds no match or multiple matches, the modification fails. With no match, the Log window row reads `This target doesn't match any object in the loaded map. Inspect the intended object in the Scene Patcher. On the Object tab, compare its Identity fields with the target's scene, path, and component in the scene patch file. Correct the target or remove this modification from the file.` With multiple matches, it reads `This target matches more than one object in the loaded map. Use a more specific path or component so the target matches only one object.`
+
+### Objects that share a hierarchy path
+
+Some objects share their hierarchy path and component with another object in the loaded map. The map places the same sign twice on purpose, such as a `Loc:` board at each end of a place, or the two `World/Signs/Speed - Alarka Branch` signs. A target for such an object adds a key beside its path:
+
+- `markerId`: the object's marker ID in the game, for an object that holds a track marker, such as a Generic track marker or a crossing pad. This is the marker ID the game gave the object. A replacement ID that a modification sets doesn't change it.
+- `mapPosition`: for every other object, where the game placed the object, as an array of map x and z in metres, such as `[-30354.46, -20284.0]`. The key matches an object whose x and z each lie within 0.05 m of these values. The patcher never takes the nearest object instead.
+
+A crossbuck at a shared path keeps its `padMarkerId` instead; see [Group](#scene-object). A target whose path and component are unique holds no key, and the native map editor writes none.
+
+A key that matches no object at the path fails the modification with `This target doesn't match any object in the loaded map.`, and a key that matches more than one fails it with `This target matches more than one object in the loaded map.` Without a key, a shared path matches every object at it, and the modification fails as ambiguous. If a game update moves an object that its map position names, the modification fails in the same way. The other modifications still apply.
+
+```json
+"target": {
+  "scene": "<scene from the inspected identity>",
+  "path": "World/Signs/Loc: Andrews",
+  "component": "Helpers.Culling.RendererCuller",
+  "structure": "location-sign-v1",
+  "mapPosition": [-30354.46, -20284.0]
+}
+```
 
 The structure IDs `scene-object-v1`, `child-object-v1` and `location-sign-v1` replace `baked-scenery-group-v1`, `baked-scenery-part-v1` and `independent-board-v1`. The old IDs are not read. A modification whose target carries an old ID matches no object and fails with the Log row `This target doesn't match any object in the loaded map.`; the other modifications of the file apply, and the file is not rewritten.
 
@@ -675,7 +696,7 @@ When Save writes the scene patch file, it uses this order:
 - `sourceMap`: `mapId`, then unknown members.
 - The keys of `modifications`, `circuits`, `additions`, and `crossingEquipment` are in ordinal order.
 - A modification: `target`, `markerId`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
-- `target`: `scene`, `path`, `component`, `structure`, `padMarkerId`.
+- `target`: `scene`, `path`, `component`, `structure`, `padMarkerId`, `markerId`, `mapPosition`.
 - `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`, `constructionSegments`.
 - `constructionSegments`: `segments`, `detach`. The values of `segments` are in ordinal order when it is an array of strings.
 - `crossingCoverage`: `circuits`, `additions`.
@@ -716,6 +737,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | Any modification with `starterPlacement`, or whose target `structure` is `starter-placement-v1` | `0.5.0` |
 | Any modification whose target `structure` is `scene-object-v1` | `0.5.0` |
 | Any modification whose target has `padMarkerId` | `0.5.0` |
+| Any modification whose target has `markerId` or `mapPosition` | `0.5.0` |
 | A modification whose target `structure` is `child-object-v1` | `0.5.0` |
 | A modification whose target `structure` is `spawn-point-v1`, or whose target has `Character.SpawnPoint` as its component and no `structure` | `0.5.0` |
 | A modification with `UI.Map.MapIcon` as its target component or `station-map-icon-v1` as its target `structure` | `0.5.0` |

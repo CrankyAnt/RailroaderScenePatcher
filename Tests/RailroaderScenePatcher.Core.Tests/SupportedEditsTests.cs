@@ -292,7 +292,6 @@ static class SupportedEditsTests {
     }
 
     // The explicit expected Supported edits of each kind of object, in the window's words.
-    const string SharedBlock = "Another object shares its hierarchy path";
     const string Placed = "Move, Rotate, Follow a track, Disable";
     const string NoReplacementId = "• Only the Generic track marker family: Set replacement marker ID";
     const string NoFollowEquipment = "• Uses fixed placement: Follow a track";
@@ -311,19 +310,19 @@ static class SupportedEditsTests {
         ["construction controller"] = "Available: Set construction segments | Unavailable: | • Its placement has no effect in the game: Move, Rotate, Follow a track | • The game needs it to show bridge parts: Disable",
         ["starter"] = "Available: Set track location | Unavailable: | • Has no effect on where cars start: " + Placed
             + " | " + NoReplacementId + " | • No new-game car placement uses it: Set Start derailed",
-        ["shared board"] = "Unavailable: | • " + SharedBlock + ": " + Placed,
         ["detection span"] = "Unavailable: | • Edit it on its crossing controller: " + Placed,
         ["sign group"] = "Unavailable: | • Edit its track markers one by one: " + Placed,
         ["refused marker"] = "Unavailable: | • Its structure isn't supported: " + Placed + ", Set track binding",
     };
-    static string SharedMarker(int holders) => "Unavailable: | • " + SharedBlock + ": " + Placed + ", Set track binding";
 
-    // A base-map fixture object as the inventory lists it: its family and structure, the refusal of an object that
-    // shares its path, a detection span's controller, a group's bridge kind and a rail bridge's construction segments.
+    // A base-map fixture object as the inventory lists it: its family and structure, which an object that shares its
+    // path gets as any other object of its family since a key names it, a detection span's controller, a group's bridge kind and a rail bridge's construction segments.
     // The class names the expected list it is checked against.
     static (SceneObservation Entry, SupportedEdits.Live Live, string Expected, string Class) Listed(BaseMapFixture map, BaseMapObject o, IReadOnlyDictionary<string, SceneObjectVerdict> verdicts) {
         var parent = o.Path.Substring(0, o.Path.LastIndexOf('/'));
         var holders = map.Objects.Count(other => other.Listed && other.Path == o.Path && other.Family == o.Family);
+        // The inventory dump refused the objects that share a path; a key now names each of them.
+        if (holders > 1) Accepted(o);
         var bindings = new List<string>();
         string operations = "Edits of this family", only = null, holder = null, cls;
         var bridge = BridgeKind.None;
@@ -337,9 +336,6 @@ static class SupportedEditsTests {
         } else if (o.Family == "Track span") {
             holder = map.Objects.Any(c => c.Listed && c.Path == parent && c.Structure == CrossingCoverageScene.Structure) ? parent : null;
             operations = holder != null ? CommandBand.DetectionSpanOperations : null; only = holder == null ? CommandBand.SpanInspectionOnly(false) : null; cls = holder != null ? "detection span" : "track span";
-        } else if (o.Structure == null && holders > 1) {
-            operations = CommandBand.NotEditable(CommandBand.SharedPath(holders));
-            cls = CommandBand.HoldsMarker(o.Family) ? "shared marker" : "shared board";
         } else if (o.Structure == null && CommandBand.HoldsMarker(o.Family)) {
             operations = CommandBand.NotEditable("the marker adapter refused this marker"); cls = "refused marker";
         } else cls = o.Structure == TrackMarkerScene.Structure ? "marker" : o.Structure == CrossingPadScene.Structure ? "pad" : o.Structure == MilepostScene.Structure ? "milepost"
@@ -347,7 +343,7 @@ static class SupportedEditsTests {
             : o.Structure == ConstructionSceneryScene.Structure ? "construction controller" : o.Structure == StarterPlacementScene.Structure ? "starter"
             : o.Structure == LocationSigns.Structure || o.Structure == BridgeScene.Structure || o.Structure == StationMapIconRules.Structure || o.Structure == SpawnPoints.Structure ? "scenery" : "unknown " + o.Family + " " + o.Structure;
         var entry = Entry(o.Family, o.Structure, operations, o.Path, bindings: bindings, groupPath: o.ChildObject ? parent : null, holderPath: holder, bridge: o.TopSceneObject ? bridge : BridgeKind.None, only: only);
-        var expected = cls == "shared marker" ? SharedMarker(holders) : Expected.TryGetValue(cls, out var text) ? text : null;
+        var expected = Expected.TryGetValue(cls, out var text) ? text : null;
         return (entry, o.ChildObject ? new SupportedEdits.Live { Bridge = bridge } : null, expected, cls);
     }
     static List<string> Mismatches(BaseMapFixture map, IEnumerable<BaseMapObject> objects, Dictionary<string, int> classes) {
@@ -369,7 +365,7 @@ static class SupportedEditsTests {
         var wrong = Mismatches(map, map.Objects, classes);
         Check(wrong.Count == 0, wrong.Count + " base-map objects list other edits than expected: " + String.Join(" || ", wrong.Take(6)));
         Check(classes.Keys.All(cls => !cls.StartsWith("unknown", StringComparison.Ordinal)), "every base-map object has an expected list: " + String.Join(", ", classes.Keys));
-        foreach (var cls in new[] { "scenery", "rail bridge", "road bridge", "marker", "pad", "milepost", "mast", "bell", "crossing controller", "construction controller", "starter", "shared marker", "shared board", "detection span", "sign group", "refused marker" })
+        foreach (var cls in new[] { "scenery", "rail bridge", "road bridge", "marker", "pad", "milepost", "mast", "bell", "crossing controller", "construction controller", "starter", "detection span", "sign group", "refused marker" })
             Check(classes.ContainsKey(cls), "the base map holds a " + cls + ": " + String.Join(", ", classes.Select(pair => pair.Key + " " + pair.Value)));
     }
 

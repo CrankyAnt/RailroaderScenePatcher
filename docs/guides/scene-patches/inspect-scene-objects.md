@@ -112,6 +112,12 @@ An inactive object's name is italic and followed by `inactive`. A row's tooltip 
 
 **Copy ID** in the command band copies JSON values from the observation. The footer's message slots then name the object whose identity was copied, and with **Debug logging** on, so does the Player log. Copying an identity doesn't establish that the object can be edited.
 
+### Objects that share a hierarchy path
+
+The map can hold the same object twice at one hierarchy path, such as a `Loc:` board at each end of a place, or the two `Speed - Alarka Branch` signs. The outliner names each of them with the game's name and a sequence number, such as `Loc: Andrews (1)` and `Loc: Andrews (2)`. The numbers run west to east along the main line, from Andrews towards Sylva. On the Alarka branch, they run from the Alarka end towards Alarka Jct. The number follows where the game placed the object, so moving it doesn't change the number. The object's own name and path in the game stay the same.
+
+A scene patch file names such an object by its path and a key. On the **Object** tab, **Identity** shows the key below the path: **Target marker ID** for an object that holds a track marker, else **Target map position**, where the game placed the object. **Copy ID** copies the key as `markerId` or `mapPosition` beside the path. See [objects that share a hierarchy path](scene-patch-file-v1.md#objects-that-share-a-hierarchy-path).
+
 A location sign has no invented track binding. A missing or empty segment reference appears as a problem. The construction segments of a rail bridge are listed on the **Connections** tab, and one that no longer exists keeps its ID with the remark `no longer exists`. It is a problem of the construction, which you repair on its **Connections** tab, and the parts of the construction show the remark without a problem; see [repair the construction segments of a rail bridge](repairing-construction-segments.md). A reference to an existing segment can still name the wrong track. The patcher cannot decide whether a valid binding or physical placement matches the map author's intention. Compare the displayed identifiers and placement with the world.
 
 Supplied definitions remain visible under **Supplied definitions** in the session details when their target is missing or ambiguous, their modification dependency is missing, or their scene patch file cannot be read. Such a target cannot be selected. The referring definition identifies the problem. Inspection does not rewrite an unreadable or newer-format scene patch file.

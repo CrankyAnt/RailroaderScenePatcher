@@ -278,6 +278,8 @@ namespace RailroaderScenePatcher.Core {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
                     // A crossbuck that its crossing's pad marker ID names needs the crossbuck identity.
                     if ((item["target"] as JObject)?[TargetIdentity.PadMarkerMember] != null) minimum = Max(minimum, SceneObjects.RequiredVersion);
+                    // A target that a marker ID or map position names among objects that share its path needs the key.
+                    if ((item["target"] as JObject)?[TargetIdentity.MarkerIdMember] != null || (item["target"] as JObject)?[TargetIdentity.MapPositionMember] != null) minimum = Max(minimum, TargetKeys.RequiredVersion);
                     // Activity of a track-marker object may be the explicit disable of a group follower, which needs the group capability.
                     if (item["active"] != null && (item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) minimum = Max(minimum, TrackFollowingVersion);
                     // Track-following placement needs its capability whether or not it is available on this build.
@@ -506,7 +508,7 @@ namespace RailroaderScenePatcher.Core {
         const int ReconcileResolveInterval = 40;
         int reconciliations;
         object ReconcileTarget(TargetIdentity identity) {
-            var key = identity.Scene + "|" + identity.Path + "|" + identity.Component + "|" + identity.Structure + "|" + identity.PadMarkerId;
+            var key = identity.Text;
             if (scene is ITargetLiveness liveness && reconciled.TryGetValue(key, out var known) && reconciliations - known.Value < ReconcileResolveInterval && liveness.IsLive(known.Key, identity)) return known.Key;
             reconciled.Remove(key);
             var resolved = engine.ResolveFresh(identity);
@@ -624,7 +626,8 @@ namespace RailroaderScenePatcher.Core {
         void FollowUpdate(object target, ObjectState state) { if (scene is IFollowUpdateScene follow) follow.ApplyFollowUpdate(target, state); else scene.Apply(target, state); }
         static string TargetKey(JObject item) {
             var target = item["target"] as JObject;
-            return target == null ? null : (string)target["scene"] + "\n" + (string)target["path"] + "\n" + (string)target["component"] + "\n" + (string)target[TargetIdentity.PadMarkerMember];
+            return target == null ? null : (string)target["scene"] + "\n" + (string)target["path"] + "\n" + (string)target["component"] + "\n" + (string)target[TargetIdentity.PadMarkerMember]
+                + "\n" + target[TargetIdentity.MarkerIdMember]?.ToString(Newtonsoft.Json.Formatting.None) + "\n" + target[TargetIdentity.MapPositionMember]?.ToString(Newtonsoft.Json.Formatting.None);
         }
         // Sets, replaces or detaches this mod's track-marker relationship of the object. Placement and activity keep their mod values.
         // A null binding clears the mod's relationship: the object returns to its effective underlying relationship.
