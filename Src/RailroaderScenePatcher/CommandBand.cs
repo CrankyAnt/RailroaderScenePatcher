@@ -634,21 +634,21 @@ namespace RailroaderScenePatcher {
         }
         internal const string SegmentDetachReason = "The construction needs track segments. Select the segments of the bridge's track instead.";
         internal static string ClearSegmentsReason(bool hasValue) => hasValue ? null : "This mod sets no construction segments for this object, so there is nothing to clear.";
-        // The Marker ID row of a track marker's Connections tab. Why the replacement ID is unavailable for the
+        // The Replacement marker ID row of a track marker's Connections tab. Why the replacement ID is unavailable for the
         // inspected marker, or null when it is offered: only a generic track marker whose native id another scene marker
         // shares takes one, and a marker that already has one keeps the row to change or clear it.
-        internal const string SetMarkerId = "Set ID", ClearMarkerId = "Clear ID", RepairDuplicateId = "Repair duplicate ID";
-        // The Inspector route of the same repair, beside Repair duplicate ID: the Marker ID section of the Connections tab.
-        internal const string SetIdOnConnections = "Set ID on the Connections tab";
-        internal const string SetIdOnConnectionsTip = "Open the Connections tab. In its Marker ID section, enter a replacement ID and click Set ID.";
-        // Whether the Object tab shows Repair duplicate ID and Set ID on the Connections tab: on a generic track marker
+        internal const string SetMarkerId = "Set replacement ID", ClearMarkerId = "Clear replacement ID", RepairDuplicateId = "Repair duplicate ID";
+        // The Inspector route of the same repair, beside Repair duplicate ID: the Replacement marker ID section of the Connections tab.
+        internal const string SetIdOnConnections = "Set replacement ID on the Connections tab";
+        internal const string SetIdOnConnectionsTip = "Open the Connections tab. In its Replacement marker ID section, enter a replacement ID and click Set replacement ID.";
+        // Whether the Object tab shows Repair duplicate ID and Set replacement ID on the Connections tab: on a generic track marker
         // that holds a duplicate marker ID (offersRepair), or that has this mod's replacement ID, the repaired state, where
         // they stay visible with their reasons. A marker that never shared its ID shows neither.
         internal static bool ShowsDuplicateRepairs(string structure, bool offersRepair, bool hasReplacementId) =>
             structure == TrackMarkerScene.Structure && (offersRepair || hasReplacementId);
         // Why Repair duplicate ID is unavailable, or null. With a duplicate marker ID it follows replacementIdReason, the
         // reason the replacement ID can't be set now. Without one the marker already has its replacement ID, named when
-        // it could be read. Set ID on the Connections tab follows the Marker ID section's own reason instead.
+        // it could be read. Set replacement ID on the Connections tab follows the Replacement marker ID section's own reason instead.
         internal static string DuplicateRepairReason(bool offersRepair, string replacementIdReason, string currentId) =>
             offersRepair ? replacementIdReason
             : String.IsNullOrWhiteSpace(currentId) ? "This marker already has a replacement ID." : "This marker already has replacement ID " + currentId + ".";
@@ -690,7 +690,7 @@ namespace RailroaderScenePatcher {
             : hasValue ? null
             : underlying == null ? "The marker ID could not be read."
             : sharers == 0 ? "Only this marker holds marker ID " + underlying + ", so it doesn't need a replacement ID." : null;
-        // Why Set ID is unavailable: the general reason first, then an empty field, a reserved prefix, a space at either end
+        // Why Set replacement ID is unavailable: the general reason first, then an empty field, a reserved prefix, a space at either end
         // or the marker's current ID.
         internal static string MarkerIdSetReason(string block, string text, string current) {
             if (block != null) return block;
@@ -699,7 +699,7 @@ namespace RailroaderScenePatcher {
             return text == current ? "The field already contains the marker's current ID." : null;
         }
         internal static string ClearMarkerIdReason(bool hasValue) => hasValue ? null : "This mod sets no replacement ID for this marker, so there is nothing to clear.";
-        // Why Clear ID is unavailable: the general reason first, then nothing to clear.
+        // Why Clear replacement ID is unavailable: the general reason first, then nothing to clear.
         internal static string ClearMarkerIdReason(string block, bool hasValue) => block ?? ClearMarkerIdReason(hasValue);
         // The caption above the other holders of the marker's underlying ID: while the marker still holds that ID it
         // shares it with them; after a replacement it no longer does.

@@ -32,7 +32,7 @@ static class SupportedEditsTests {
         var board = Entry("Independent board", IndependentBoards.Structure, "Edits of this family");
         Check(Shown(board, new SupportedEdits.Live { Enabled = false }) == "Available: Move, Rotate, Follow a track, and Enable.", "an inactive object offers Enable: " + Shown(board, new SupportedEdits.Live { Enabled = false }));
         var follower = Entry("Track marker", TrackMarkerScene.Structure, "Edits of this family", bindings: new[] { "Activity follows track group G1" }, active: false);
-        Check(Shown(follower) == "Available: Move, Rotate, Follow a track, Set track binding, and Set marker ID. | Unavailable: Enable. The track group controls this object's activity. Use Clear activity to let the object follow its group again.",
+        Check(Shown(follower) == "Available: Move, Rotate, Follow a track, Set track binding, and Set replacement marker ID. | Unavailable: Enable. The track group controls this object's activity. Use Clear activity to let the object follow its group again.",
             "an inactive object that follows its track group cannot be enabled: " + Shown(follower));
         Check(Shown(Entry("Track marker", TrackMarkerScene.Structure, "x", bindings: new[] { "Activity follows track group G1" })).StartsWith("Available: Move, Rotate, Follow a track, Disable,", StringComparison.Ordinal), "it can still be disabled");
         var mast = Entry(ExistingEquipmentScene.MastFamily, ExistingEquipmentScene.MastStructure, CommandBand.MastOperations);
@@ -46,8 +46,8 @@ static class SupportedEditsTests {
         Check(Shown(starter, new SupportedEdits.Live { StartersError = "the setups are missing" }).EndsWith("Unavailable: Set Start derailed. " + CommandBand.WreckReason("the setups are missing", new string[0]), StringComparison.Ordinal), "unreadable setups hold back Start derailed");
         var marker = Entry("Track marker", TrackMarkerScene.Structure, CommandBand.MarkerOperations);
         Check(Shown(marker, new SupportedEdits.Live { MarkerIdReason = "Only this marker holds marker ID 7, so it doesn't need a replacement ID." })
-            == "Available: Move, Rotate, Follow a track, Disable, and Set track binding. | Unavailable: Set marker ID. Only this marker holds marker ID 7, so it doesn't need a replacement ID.", "a marker whose ID no other marker holds takes no replacement ID");
-        Check(Shown(marker, new SupportedEdits.Live { Present = false }) == "Unavailable: Move, Rotate, Follow a track, Disable, Set track binding, and Set marker ID. This object cannot be edited here.",
+            == "Available: Move, Rotate, Follow a track, Disable, and Set track binding. | Unavailable: Set replacement marker ID. Only this marker holds marker ID 7, so it doesn't need a replacement ID.", "a marker whose ID no other marker holds takes no replacement ID");
+        Check(Shown(marker, new SupportedEdits.Live { Present = false }) == "Unavailable: Move, Rotate, Follow a track, Disable, Set track binding, and Set replacement marker ID. This object cannot be edited here.",
             "an object that no longer stands takes no placement or Enabled setting: " + Shown(marker, new SupportedEdits.Live { Present = false }));
         var added = Entry(SceneFamilies.AddedEquipment, null, CommandBand.AddedEquipmentOperations("Signal 1 (added)"));
         Check(Shown(added) == Placed + CommandBand.AddedEquipmentReason, "added equipment names its crossing's Connections tab: " + Shown(added));
@@ -100,7 +100,7 @@ static class SupportedEditsTests {
     // The explicit expected Supported edits of each kind of object, in the window's words.
     const string SharedBlock = "This object can't be edited while another object has the same hierarchy path.";
     const string Placed = "Unavailable: Move, Rotate, Follow a track, and Disable. ";
-    const string NoReplacementId = "Unavailable: Set marker ID. Only objects in the Track marker family can have a replacement ID. This object is in the ";
+    const string NoReplacementId = "Unavailable: Set replacement marker ID. Only objects in the Track marker family can have a replacement ID. This object is in the ";
     const string NoFollowEquipment = "Unavailable: Follow a track. Existing crossing masts and bells use fixed placement. Track-following placement does not apply to them.";
     const string RailNoFollow = "Unavailable: Follow a track. Rail bridges use fixed placement. They don't support track-following placement. Move the track in the native map editor, then move the bridge onto it.";
     static readonly Dictionary<string, string> Expected = new Dictionary<string, string> {
@@ -108,7 +108,7 @@ static class SupportedEditsTests {
         ["rail bridge"] = "Available: Move, Rotate, and Disable. | " + RailNoFollow,
         ["road bridge"] = "Available: Move, Rotate, and Disable. | Unavailable: Follow a track. Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it.",
         ["construction root"] = "Available: Move, Rotate, Disable, and Set construction segments. | " + RailNoFollow,
-        ["marker"] = "Available: Move, Rotate, Follow a track, Disable, Set track binding, and Set marker ID.",
+        ["marker"] = "Available: Move, Rotate, Follow a track, Disable, Set track binding, and Set replacement marker ID.",
         ["pad"] = "Available: Disable and Set track binding. | Unavailable: Move, Rotate, and Follow a track. A crossing pad follows its track: its geometry is generated along its track binding. Bind it to another track under Connections. | " + NoReplacementId + "Crossing pad marker family.",
         ["milepost"] = "Available: Move, Rotate, Disable, and Set track binding. | Unavailable: Follow a track. Mileposts use fixed placement. Set the track binding under Connections. | " + NoReplacementId + "Milepost family.",
         ["mast"] = "Available: Move, Rotate, and Disable. | " + NoFollowEquipment,

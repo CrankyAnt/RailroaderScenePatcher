@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher {
     internal static class SupportedEdits {
         // The edits, in the order Supported edits names them. Activity is named by its button: Disable or Enable.
         internal const string Move = "Move", Rotate = "Rotate", Follow = "Follow a track", Activity = "Activity", Binding = "Set track binding",
-            MarkerId = "Set marker ID", Coverage = "Edit crossing coverage", Equipment = "Edit crossing equipment", Segments = "Set construction segments", TrackLocation = "Set track location", Wreck = "Set Start derailed";
+            MarkerId = "Set replacement marker ID", Coverage = "Edit crossing coverage", Equipment = "Edit crossing equipment", Segments = "Set construction segments", TrackLocation = "Set track location", Wreck = "Set Start derailed";
         internal sealed class Edit {
             internal Edit(string key, string name, string reason) { Key = key; Name = name; Reason = reason; }
             // The edit's constant above.
@@ -36,7 +36,7 @@ namespace RailroaderScenePatcher {
             internal string DisableProblem { get; set; }
             // Why the crossing's lights, gates and bells cannot be read now, so that none can be added, edited or removed.
             internal string EquipmentReason { get; set; }
-            // Why a generic track marker takes no replacement ID now, as its Marker ID section reads it.
+            // Why a generic track marker takes no replacement ID now, as its Replacement marker ID section reads it.
             internal string MarkerIdReason { get; set; }
             // Why the setups that read a starter placement marker could not be read.
             internal string StartersError { get; set; }
