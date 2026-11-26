@@ -1129,7 +1129,7 @@ namespace RailroaderScenePatcher {
                 Button(builder, deviceGuide[0], () => Application.OpenURL(GuideRoot + deviceGuide[1])).Tooltip(deviceGuide[0], "Open in your browser the guide's reasons why a source isn't eligible.");
             // Bells: the bell definitions the game uses at grade crossings, with the bell pattern's reason for an ineligible one.
             Section(builder, "Add a bell");
-            Line(builder, bells.Count(c => c.Eligible) + " eligible and " + bells.Count(c => !c.Eligible) + " ineligible crossing bells", null, null);
+            Line(builder, "Crossing bells: " + bells.Count(c => c.Eligible) + " eligible, " + bells.Count(c => !c.Eligible) + " ineligible", null, null);
             foreach (var candidate in bells) {
                 var source = candidate;
                 var name = InventoryPresentationState.EquipmentSourceName(source);
@@ -1933,7 +1933,7 @@ namespace RailroaderScenePatcher {
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
                     new[] { "Search", "Matches names, paths, families, binding IDs, dependencies, and problems, and each object's category, kind, place, and crossing." },
-                    new[] { "By category", "The first view icon. Lists objects by what they are: category, then kind, then place. A category shows kinds when its objects share them, such as Rail bridges and Road bridges under Bridge, or Speed signs and Whistle signs under Sign." },
+                    new[] { "By category", "The first view icon. Lists objects by category, then kind, then place. A category shows kinds when its objects share them, such as Rail bridges and Road bridges under Bridge, or Speed signs and Whistle signs under Sign." },
                     new[] { "By place", "The second view icon. Lists objects by the place they stand at, with the same categories and kinds under each place. Without a search or filter, every place the game names is listed, also one without objects." },
                     new[] { "Place", "The place an object's name or hierarchy path names, or else the nearest place the game names." },
                     new[] { "Changed", "Objects this mod changes, marked *. An object whose modification is refused is marked × instead. Its Changes tab gives the reason." },
@@ -1967,11 +1967,11 @@ namespace RailroaderScenePatcher {
                     new[] { "Gizmo", "The native map editor's gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the placement and follow the drag." },
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
-                    new[] { "Bridges and location signs", "A bridge moves as a whole, and the scenery of its track stays in place. The terrain output of a location sign or a ground mask regenerates after the move." },
+                    new[] { "Bridges and location signs", "Moving a bridge moves the whole bridge. Its track scenery stays in place. Moving a location sign or an object that holds a scene ground mask regenerates its terrain output." },
                     new[] { "Groups and parts", "Moving a group also moves its parts. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
                     new[] { "Spawn points", "The game reads a spawn point's current location each time a player starts, is rescued, or teleports. A disabled spawn point isn't offered, except by a start setup that names it." } },
                 Guides = new[] { new[] { "Fixed placement", RecoveryGuidance.NumericPlacementGuide }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
-                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Location signs", "moving-location-signs.md" }, new[] { "Scene objects", "moving-scene-objects.md" }, new[] { "Spawn points", "moving-spawn-points.md" },
+                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Location signs", "moving-location-signs.md" }, new[] { "Groups and parts", "moving-scene-objects.md" }, new[] { "Spawn points", "moving-spawn-points.md" },
                     new[] { "Station map icons", "moving-station-map-icons.md" }, new[] { "Existing crossing equipment", "moving-crossing-equipment.md" } } },
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Check what the object is connected to, and change the connections it supports.",
                 Terms = new[] {
@@ -1981,7 +1981,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Crossing coverage", "Each circuit has an approach A, an island, and an approach B. Select the tracks a circuit covers, or detach it. A track is never covered only because it's near the crossing. Preview shows the result for every circuit before Apply." },
                     new[] { "Detection addition", "Makes the crossing detect an extra track: a circuit of its own with three spans on tracks you select, under an ID you give it. Delete removes it again." },
                     new[] { "Lights and gates", "Adds a copy of a light or gate already loaded in the crossing's scene. The crossing controller drives it and shows or hides it with its own equipment. A device that isn't eligible shows why." },
-                    new[] { "Bells", "Adds a bell with the sound of a bell the game uses at grade crossings. It rings when the crossing controller rings its own bell. A bell that isn't eligible shows why." },
+                    new[] { "Bells", "Adds a bell that sounds like one the game uses at grade crossings. It rings when the crossing controller rings its own bell. If a bell isn't eligible, the list explains why." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it rebuilds the pad along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
                     new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },
                     new[] { "Replacement marker ID", "The game registers a marker's track location under this ID. When scene markers share an ID, changing one removes all their registrations. The patcher therefore refuses changes to Enabled, the binding, and Follow. Click Set replacement ID to give one marker a replacement ID. The others keep their registrations. Click Clear replacement ID to restore the underlying ID." },

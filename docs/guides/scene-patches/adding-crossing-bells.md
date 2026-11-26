@@ -8,7 +8,7 @@ Adding a bell doesn't create a crossing, change the crossing's own bell, or edit
 
 ## Which bell definitions qualify
 
-You can choose only the bell definitions that the game uses at grade crossings. In the base game, that's one bell: US&S Teardrop Crossing Bell (`rr/bell-uss-teardrop-crossing-rh`), the bell that the game's crossing controllers load. Other bell definitions, such as the locomotive bells EMD Bronze Bell and CN Brass Rope Bell, or a bell definition that another mod adds, can't be chosen, even if they meet the requirements below. The editor doesn't list them.
+You can choose only bells that the game uses at grade crossings. In the base game, the crossing controllers load one bell: US&S Teardrop Crossing Bell (`rr/bell-uss-teardrop-crossing-rh`). The editor doesn't list other bell definitions, such as EMD Bronze Bell, CN Brass Rope Bell, or a bell added by another mod, even if they meet the requirements below.
 
 A crossing bell definition qualifies for the `crossing-bell-v1` pattern only if the patcher can use the game's mechanism for creating crossing bells with that definition. It must meet these requirements:
 
@@ -20,26 +20,26 @@ A crossing bell definition qualifies for the `crossing-bell-v1` pattern only if 
 
 The player splits the audio clip at its indexes. Each part must contain at least one sample. The audio loads after you apply the bell, so the patcher can check the parts only then. If the clip doesn't fit its indexes or the audio fails to load, the bell exists but stays silent. Its state explains why. The game's log records one warning for the bell, attributed to your mod's `Data/scene-patches.json`. The warning names the bell's ID, crossing controller, and reason. Remove the bell or replace its definition.
 
-If the game's crossing bell definition is missing from the content library or doesn't meet these requirements, **Add a bell** offers no bell and shows why. The patcher doesn't fall back to another bell definition.
+If the game's crossing bell definition is missing from the content library or doesn't meet these requirements, **Add a bell** explains why it can't be used. The patcher won't offer another bell instead.
 
 The definition must already be in the content library. The patcher doesn't load a scene or another mod to find it. If the named definition is missing, it doesn't substitute another sound.
 
 ### Ineligible bell definitions
 
-The editor lists the bell definitions that the game uses at grade crossings and explains why any are ineligible. These reasons can also appear when you apply a bell. The last rows apply only during application or after the audio loads:
+The editor lists the bell definitions that the game uses at grade crossings and explains why any are ineligible. Some reasons appear only when you apply a bell or after its audio loads:
 
 | Reason | Meaning |
 | --- | --- |
-| The game's crossing bell definition ... isn't in the content library, so no bell can be added. | The bell definition that the game's crossing controllers load is missing, so the editor has no bell to offer. The patcher doesn't offer another bell definition instead. |
+| The content library has no definition for the game's crossing bell ..., so you can't add a bell. | The definition that the game's crossing controllers load is missing. The patcher won't offer another bell instead. |
 | it is a ... definition, not a bell definition | The identifier names another kind of definition, such as a horn. |
-| it is not a bell the game uses at grade crossings | The scene patch file names another bell definition, such as a locomotive bell or a bell that another mod adds. Edit this addition on the crossing's Connections tab to select a listed bell, or remove the addition. |
+| the game doesn't use this bell at grade crossings | The scene patch file names another bell definition, such as a locomotive bell or one added by another mod. On the crossing's **Connections** tab, edit the addition to select a listed bell, or remove it. |
 | its definition does not specify an audio asset | There is no sound to load. |
 | its audio asset ... cannot be found in the content library | The content that supplies the sound is not available. |
 | its volume ... must be a finite number greater than 0 | The bell would be silent or unusable. |
 | its audio indexes must be finite times greater than 0, in strictly increasing order | The player could not split the clip. |
 | the destination crossing controller has ... key-value objects, so it cannot address the bell | The controller has no key-value object or more than one, so the bell could not be addressed unambiguously. |
 | the destination crossing controller is inactive, so an added bell would not start | A bell beneath it would not start, and its audio could not be released when the scene unloads. |
-| Crossing bells are unavailable in this version of the game. | This version of the game lacks something the bell pattern needs; lights and gates stay available. The editor shows this reason in **Add a bell**. With **Debug logging** on, the Player log has the technical details. |
+| Crossing bells are unavailable in this version of the game. | This game version lacks something the bell pattern needs. Lights and gates stay available. The editor shows this reason in **Add a bell**. With **Debug logging** on, the Player log has the technical details. |
 | The patcher couldn't read the bell definitions from the game's content library, so it can't list bells. Report this to the patcher maintainer and include the Player log. | The Player log has a warning. With **Debug logging** on, it also has the technical details for a report to the patcher maintainer. |
 | bell definition ... is unavailable in the content library | The named definition is missing from the content library. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition. The patcher does not choose a replacement. |
 | is ambiguous; ... bell definitions share its identifier | More than one bell definition matches the identifier. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition. |
@@ -59,12 +59,12 @@ The editor lists the bell definitions that the game uses at grade crossings and 
 ## Add a bell in the native map editor
 
 1. Open the Scene Patcher window and inspect the crossing controller. Find it under **Grade crossing** in the outliner or select it in the world.
-2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a bell** lists the bell definitions that the game uses at grade crossings, with a reason for each one that does not qualify. In the base game, that's **US&S Teardrop Crossing Bell** only. **Why a bell definition isn't eligible** opens the table above.
+2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. Under **Add a bell**, choose from the definitions the game uses at grade crossings. In the base game, only **US&S Teardrop Crossing Bell** is listed. The editor explains why a listed definition isn't eligible. **Why a bell definition isn't eligible** opens the table above.
 3. Click **Use** for an eligible definition. Each button shows its display name, such as **Use US&S Teardrop Crossing Bell**. A form opens at the top of the tab with an unused **Equipment ID** and a position five meters beside the inspected crossing. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab.
 
-To move a bell, click **Edit** under its name, change the fields, preview, and apply. When **Add a bell** lists more than one definition, you can change a bell's sound: click **Use** for another definition, enter the bell's ID, and apply. The patcher rebuilds the bell with the new definition. To remove a bell, click **Edit**, then **Remove** at the bottom of the tab and apply.
+To move a bell, click **Edit** under its name, change the fields, preview, and apply. If **Add a bell** lists more than one definition, you can change the sound. Click **Use** for another definition, enter the bell's ID, and apply. The patcher rebuilds the bell with that definition. To remove a bell, click **Edit**, then **Remove** at the bottom of the tab and apply.
 
 **Remove modification** in the footer removes all of your mod's coverage, detection additions, lights, gates, and bells for this crossing. Native Undo and Redo reverse and repeat each applied change, including rebuilding a removed bell with its audio.
 
@@ -107,7 +107,7 @@ Target the crossing controller as for coverage, and key the bell by its ID under
 }
 ```
 
-The scene, path, and coordinates are placeholders. Use the values the editor shows for your crossing. `source.definition` is the identifier of a bell definition that the game uses at grade crossings. A scene patch file that names another bell definition has that bell refused. The bell observes the bell key of the controller targeted by its modification. See the [scene patch file v1 reference](scene-patch-file-v1.md#crossing-equipment) for the field rules.
+The scene, path, and coordinates are placeholders. Use the values the editor shows for your crossing. Set `source.definition` to the identifier of a bell definition that the game uses at grade crossings. The patcher refuses a bell that names another definition. The bell observes the bell key of the controller targeted by its modification. See the [scene patch file v1 reference](scene-patch-file-v1.md#crossing-equipment) for the field rules.
 
 ## Multiplayer, later joins and reconnects
 
@@ -122,4 +122,4 @@ These statements are based on the patcher's automated tests and the code of Rail
 - Bells have a fixed map placement. Track-following placement, the transform gizmo, and snapping are not available for bells.
 - The crossing's own bell is not edited, moved, or silenced.
 - In Railroader 0.6.3, an added bell has the same audio priority as the crossing's own bell.
-- The pattern and its checks come from Railroader 0.6.2 build 26335745, where the crossing controller's own bell and the locomotive bell load their definitions through the same route. The bell sources come from Railroader 0.6.3, where the crossing controller loads `rr/bell-uss-teardrop-crossing-rh`.
+- The pattern and its checks come from Railroader 0.6.2 build 26335745. In that build, the crossing controller's bell and the locomotive bell load their definitions through the same route. The bell sources come from Railroader 0.6.3, where the crossing controller loads `rr/bell-uss-teardrop-crossing-rh`.

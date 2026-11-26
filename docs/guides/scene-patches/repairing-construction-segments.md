@@ -16,11 +16,11 @@ A plate girder bridge has no construction controller and no construction segment
 
 The game code shows that splitting a segment removes it and adds two segments with new IDs. Replacing a segment also removes its ID. The construction controller still refers to the old ID.
 
-In Railroader, deleting a construction segment of `Bridge 1` at Bryson left the bridge's child objects visible and caused an error when the world loaded. After a split, the game reported `Error during DidRestore of Bridge 1 (Game.Mow.TrackConstructionScenery)` at every world load until the repair.
+In Railroader, deleting a construction segment of `Bridge 1` at Bryson left the bridge's parts visible and caused an error when the world loaded. After a split, the game reported `Error during DidRestore of Bridge 1 (Game.Mow.TrackConstructionScenery)` at every world load until the repair.
 
 The game normally runs the controller's update before scene patch files apply. If a native segment is missing and the patcher finds a replacement set on the loaded track, it can defer the update. It checks settings in load order and uses the last one that passes the segment check. A setting that restores the native set also passes that check and can leave the native error in place. The game runs a deferred update on the next frame after the patcher applies the files. In Railroader 0.6.3, repairing Bryson Bridge 1 eliminated its `DidRestore` error in a new game, a loaded save, and the editor. A valid-looking repair blocked by `dependsOn` still produced the native error after the patcher reported the failed load. A repair with a missing replacement segment produced the native error before the patcher refused it.
 
-The **Connections** tab lists each construction segment under **Observed bindings**, such as `Construction segment: <segment ID>`. A segment that no longer exists shows its ID followed by `no longer exists`. The construction then shows a problem on its **Object** tab under **Detected problems**, such as `Construction segment <segment ID> no longer exists`, and is marked **!** in the outliner. A construction segment without an ID is a problem too. Click **Repair construction segments** below the problem to open the **Connections** tab. The problem disappears after the repair. A child object of `Bridge 1` or the `Almond Bridge` shows the remark on its **Connections** tab without a problem; repair the construction on its top scene object.
+The **Connections** tab lists each construction segment under **Observed bindings**, such as `Construction segment: <segment ID>`. A segment that no longer exists shows its ID followed by `no longer exists`. The construction then shows a problem on its **Object** tab under **Detected problems**, such as `Construction segment <segment ID> no longer exists`, and is marked **!** in the outliner. A construction segment without an ID is a problem too. Click **Repair construction segments** below the problem to open the **Connections** tab. The problem disappears after the repair. A part of `Bridge 1` or the `Almond Bridge` shows the remark on its **Connections** tab without a problem; repair the construction on its top scene object.
 
 ## Set the construction segments in the native map editor
 
@@ -36,7 +36,7 @@ The **Connections** tab lists each construction segment under **Observed binding
 
 The patcher checks every segment before changing anything. It refuses the edit if a segment is missing from the loaded track or more than one loaded segment has its ID. The refusal names that ID. The patcher never substitutes another segment. It accepts the construction's segments without this mod as they are, even if one no longer exists.
 
-After checking the segments, the patcher writes their IDs to the controller. If the controller is enabled and the segments exist, it updates which construction child objects are visible. In Railroader 0.6.3, changing a replacement segment of Bryson Bridge 1 from Complete to Not Started hid the relevant bridge child objects. Restoring Complete showed them again.
+After checking the segments, the patcher writes their IDs to the controller. If the controller is enabled and the segments exist, it updates which construction parts are visible. In Railroader 0.6.3, changing a replacement segment of Bryson Bridge 1 from Complete to Not Started hid the relevant bridge parts. Restoring Complete showed them again.
 
 ## Detach and clear
 
@@ -44,11 +44,11 @@ You can't detach construction segments because a construction without segments h
 
 **Clear segments** removes this mod's value: the construction returns to the segments it has without this mod. **Remove modification** on the **Changes** tab does the same and also removes this mod's placement and activity of the object. Native **Undo** returns the segments from before the edit, and **Redo** sets them again.
 
-If **Clear segments**, **Remove modification**, or **Undo** restores a segment that no longer exists, such as the old ID of a split segment, the patcher writes the segments back but prevents the controller from using them to set construction visibility. The bridge's child objects keep the visibility set by the repair until the world reloads.
+If **Clear segments**, **Remove modification**, or **Undo** restores a segment that no longer exists, such as the old ID of a split segment, the patcher writes the segments back but prevents the controller from using them to set construction visibility. The bridge's parts keep the visibility set by the repair until the world reloads.
 
 ## Ela Bridge Scenery
 
-You can edit only the construction segments of `Ela Bridge Scenery`. Placement is unavailable because the controller's position has no effect in the game. It switches the bridge's child objects wherever it stands. **Enable** and **Disable** are unavailable because the controller manages the bridge's construction visibility. Move or disable `Ela Bridge` instead.
+You can edit only the construction segments of `Ela Bridge Scenery`. Placement is unavailable because the controller's position has no effect in the game. It switches the bridge's parts wherever it stands. **Enable** and **Disable** are unavailable because the controller manages the bridge's construction visibility. Move or disable `Ela Bridge` instead.
 
 ## Write the relationship by hand
 

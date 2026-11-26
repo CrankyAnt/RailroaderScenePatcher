@@ -15,7 +15,7 @@ Moving native map data doesn't move the corresponding scene objects, or vice ver
 3. In **Scene Patcher**, move the station map icon to the station's new place, as described in the next section.
 4. Save again.
 
-If the station's building group is a scene object, move it as a group, as described in [move scene objects](moving-scene-objects.md).
+If the station's building group is a scene object, move it as a group, as described in [groups and parts](moving-scene-objects.md).
 
 ## Move the icon in the native map editor
 

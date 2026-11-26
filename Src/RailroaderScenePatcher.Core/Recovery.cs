@@ -197,7 +197,7 @@ namespace RailroaderScenePatcher.Core {
             if (structure == ExistingEquipmentScene.MastStructure || structure == ExistingEquipmentScene.BellStructure)
                 return Pair("Existing crossing equipment", "moving-crossing-equipment.md");
             if (structure == SceneObjects.Structure || structure == ChildObjects.Structure)
-                return Pair("Scene objects", "moving-scene-objects.md");
+                return Pair("Groups and parts", "moving-scene-objects.md");
             return Pair("Editing in the Map Editor", EditingGuide);
         }
         static KeyValuePair<string, string> Pair(string title, string file) => new KeyValuePair<string, string>(title, file);

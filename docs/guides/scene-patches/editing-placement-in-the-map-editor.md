@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Edit and save fixed placement in the native map editor
 
-Use the native map editor to move, rotate, disable, or restore a supported scene object. This guide also explains how Save, Undo, and Redo handle those edits. You can currently edit [location signs](moving-location-signs.md), [the Ela bridge](placing-bridges.md), [scene objects and their child objects](moving-scene-objects.md), and [player spawn points](moving-spawn-points.md).
+Use the native map editor to move, rotate, disable, or restore a supported scene object. This guide also explains how Save, Undo, and Redo handle those edits. You can currently edit [location signs](moving-location-signs.md), [the Ela bridge](placing-bridges.md), [groups and their parts](moving-scene-objects.md), and [player spawn points](moving-spawn-points.md).
 
 For other operations, see the [modder manual](modder-manual.md). To make changes in a text editor, see [Write a scene patch file](writing-scene-patch-files.md).
 

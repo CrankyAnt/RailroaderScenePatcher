@@ -63,7 +63,7 @@ static class BellTests {
     static void UnavailableBellRowsUseShortReasons() {
         foreach (var (problem, expected) in new[] {
             (EquipmentAddition.BellsUnavailable, "Crossing bells are unavailable in this version of the game."),
-            (BellPattern.CrossingBellMissing(CrossingBell), "The game's crossing bell definition " + CrossingBell + " isn't in the content library, so no bell can be added."),
+            (BellPattern.CrossingBellMissing(CrossingBell), "The content library has no definition for the game's crossing bell " + CrossingBell + ", so you can't add a bell."),
             (EquipmentAddition.BellDefinitionsUnreadable, "The patcher couldn't read the bell definitions from the game's content library, so it can't list bells. Report this to the patcher maintainer and include the Player log.") }) {
             var row = SourceCandidate.UnavailableBells(problem);
             Assert(!row.Eligible && RailroaderScenePatcher.CommandBand.Sentence(row.Problem) == expected,

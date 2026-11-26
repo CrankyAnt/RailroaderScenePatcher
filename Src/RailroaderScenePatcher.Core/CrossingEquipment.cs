@@ -241,9 +241,9 @@ namespace RailroaderScenePatcher.Core {
     // locomotive bells do. The sound does not matter; the definition and loading mechanism do. Its sources are only the bell
     // definitions the game uses at grade crossings; locomotive bells and bells other mods add are none.
     public static class BellPattern {
-        public const string NotACrossingBell = "it is not a bell the game uses at grade crossings";
+        public const string NotACrossingBell = "the game doesn't use this bell at grade crossings";
         // Why the list offers no bell when the game's crossing bell definition is missing from the content library.
-        public static string CrossingBellMissing(string identifier) => "the game's crossing bell definition " + identifier + " isn't in the content library, so no bell can be added";
+        public static string CrossingBellMissing(string identifier) => "the content library has no definition for the game's crossing bell " + identifier + ", so you can't add a bell";
         // The bell source list for a crossing controller: the definitions under the identifiers of the game's crossing bells,
         // each eligible or with its reason. Other bell definitions of the library are not listed. A crossing bell missing from
         // the library leaves one rejected row with why, and the list never falls back to other bell definitions.

@@ -884,7 +884,7 @@ namespace RailroaderScenePatcher {
         internal static string GroupLine(bool trackSide) => "Group of scene objects" + (trackSide ? ", not a track group" : "");
         // The label a group's square marker shows under the pointer: the group's name and what the group is.
         internal static string GroupMarkerText(string name, bool trackSide) => (String.IsNullOrEmpty(name) ? "" : name + "\n") + GroupLine(trackSide);
-        internal const string SelectGroupTip = "Inspect the group of scene objects that this part belongs to.";
+        internal const string SelectGroupTip = "Inspect this part's group of scene objects.";
         // A scene object's label as a world choice offers it: "Family: path", with "[inactive]" for an inactive object.
         internal static string CandidateLabel(SceneObservation entry) =>
             ShownFamily(entry) + ": " + entry.Identity.Path + (entry.Active ? "" : " [inactive]");
