@@ -32,7 +32,7 @@ namespace RailroaderScenePatcher {
         static readonly Hook[] Hooks = {
             // Game.Mow.TrackConstructionScenery.OnEnableWithProperties calls UpdateVisibility, which dereferences each
             // segment that segmentIds names on the track graph; a saved id a native split removed throws there.
-            new Hook { TypeName = BakedSceneryRules.ConstructionController, Defer = DeferConstruction },
+            new Hook { TypeName = SceneObjectRules.ConstructionController, Defer = DeferConstruction },
         };
         sealed class Skipped { internal Component Instance; internal Hook Hook; }
         static Harmony harmony;
@@ -86,7 +86,7 @@ namespace RailroaderScenePatcher {
         static bool DeferConstruction(Component controller, RestoreTargets loaded) {
             var go = controller.gameObject;
             if (!go.scene.IsValid()) return false;
-            var settings = loaded.ConstructionSegments(go.scene.name, BoardScene.PathOf(go.transform), new[] { BakedSceneryGroups.ComponentType, ConstructionSceneryScene.ComponentType });
+            var settings = loaded.ConstructionSegments(go.scene.name, BoardScene.PathOf(go.transform), new[] { SceneObjects.ComponentType, ConstructionSceneryScene.ComponentType });
             if (settings.Count == 0) return false;
             var graph = Track.Graph.Shared;
             if (graph == null) return false;

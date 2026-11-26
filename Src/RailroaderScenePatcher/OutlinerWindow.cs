@@ -86,7 +86,7 @@ namespace RailroaderScenePatcher {
         // Each level of the outliner's tree below the first indents a row by this much.
         const float OutlineIndent = 16f;
 
-        // The crossing node the outliner has selected, while no object is inspected: a game-defined group without a
+        // The crossing node the outliner has selected, while no object is inspected: a complex without a
         // row of its own. Focus goes to the middle of its members.
         string crossingNodeKey;
         OutlinerGrouping.GroupNode crossingNode;

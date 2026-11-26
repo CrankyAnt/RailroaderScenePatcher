@@ -20,7 +20,7 @@ static class FaultInjectionTests {
         Console.WriteLine("PASS: fault build arms each injected failure once and handles it as a real failure, and logs an unreadable group and unreadable parts once");
 #else
         Assert(typeof(PatchEngine).Assembly.GetType("RailroaderScenePatcher.Core.FaultInjection") == null, "The normal build has no fault injection switch");
-        Assert(new GroupSkips(_ => { }).Read(() => "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Coal Dealer", () => "read") == "read", "The normal build reads every group root");
+        Assert(new GroupSkips(_ => { }).Read(() => "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Coal Dealer", () => "read") == "read", "The normal build reads every top scene object");
         Console.WriteLine("PASS: the normal build has no fault injection switch");
 #endif
     }
@@ -50,7 +50,7 @@ static class FaultInjectionTests {
         var recheck = session.Recheck(new TargetIdentity("s", "p", "c"));
         Assert(recheck.Applied && p.X == 4 && !session.CleanupUnverified(new TargetIdentity("s", "p", "c")), "Recheck returns the object to the scene patch file and ends the guard: " + recheck.Error);
     }
-    // The unreadable-parts point makes the family read the parts of one chosen group root as unreadable, each time it
+    // The unreadable-parts point makes the family read the parts of one chosen top scene object as unreadable, each time it
     // decides its groups, until it is disarmed; it is a point of its own beside the unreadable-group point, and the
     // skipped family logs exactly one line for its root.
     static void UnreadablePartsAreSkippedOnce() {
@@ -77,10 +77,10 @@ static class FaultInjectionTests {
         foreach (var empty in new[] { null, "", " " }) {
             var refused = false;
             try { FaultInjection.ArmUnreadableParts(empty); } catch (ArgumentException) { refused = true; }
-            Assert(refused && FaultInjection.UnreadableParts == null, "The point needs a group root that is not only white space");
+            Assert(refused && FaultInjection.UnreadableParts == null, "The point needs a top scene object that is not only white space");
         }
     }
-    // The unreadable-group point makes world marking read one chosen group root as unreadable, each time it decides
+    // The unreadable-group point makes world marking read one chosen top scene object as unreadable, each time it decides
     // its groups, until it is disarmed; the skipped group logs one line per root and reason.
     static void UnreadableGroupIsSkippedOnce() {
         const string root = "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Coal Dealer", other = "s/World/Other";
@@ -106,14 +106,14 @@ static class FaultInjectionTests {
         skips.Skip(root, "none of its objects has a usable position");
         skips.Skip(root, "none of its objects has a usable position");
         Assert(lines.SequenceEqual(new[] { "The patcher couldn't finish preparing a group of scene objects at " + root + ": its objects could not be read: Injected unreadable group", "The patcher couldn't finish preparing a group of scene objects at " + root + ": none of its objects has a usable position" }),
-            "One line per group root and reason: " + String.Join(" | ", lines));
+            "One line per top scene object and reason: " + String.Join(" | ", lines));
         Assert(FaultInjection.LastTrip.StartsWith("Tripped unreadable-group for " + root + " at ", StringComparison.Ordinal), "Last names the tripped root: " + FaultInjection.LastTrip);
         FaultInjection.Disarm();
         Assert(FaultInjection.UnreadableGroup == null && skips.Read(() => root, () => "read") == "read" && lines.Count == 2, "Disarm ends the point");
         foreach (var empty in new[] { null, "", " ", " \t " }) {
             var refused = false;
             try { FaultInjection.ArmUnreadableGroup(empty); } catch (ArgumentException) { refused = true; }
-            Assert(refused && FaultInjection.UnreadableGroup == null, "The point needs a group root that is not only white space");
+            Assert(refused && FaultInjection.UnreadableGroup == null, "The point needs a top scene object that is not only white space");
         }
         // The root is kept as typed: a scene object's name may begin or end with a space.
         const string spaced = "s/World/ Spaced root ";

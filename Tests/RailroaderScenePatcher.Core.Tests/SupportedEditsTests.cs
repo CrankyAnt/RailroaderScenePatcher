@@ -29,7 +29,7 @@ static class SupportedEditsTests {
 
     // The loaded world's facts that the entry does not hold change the edits and their reasons as they change the controls.
     static void WhatTheWorldAddsChangesTheList() {
-        var board = Entry("Independent board", IndependentBoards.Structure, "Edits of this family");
+        var board = Entry("Location sign", LocationSigns.Structure, "Edits of this family");
         Check(Shown(board, new SupportedEdits.Live { Enabled = false }) == "Available: Move, Rotate, Follow a track, and Enable.", "an inactive object offers Enable: " + Shown(board, new SupportedEdits.Live { Enabled = false }));
         var follower = Entry("Track marker", TrackMarkerScene.Structure, "Edits of this family", bindings: new[] { "Activity follows track group G1" }, active: false);
         Check(Shown(follower) == "Available: Move, Rotate, Follow a track, Set track binding, and Set replacement marker ID. | Unavailable: Enable. The track group controls this object's activity. Use Clear activity to let the object follow its group again.",
@@ -51,15 +51,15 @@ static class SupportedEditsTests {
             "an object that no longer stands takes no placement or Enabled setting: " + Shown(marker, new SupportedEdits.Live { Present = false }));
         var added = Entry(SceneFamilies.AddedEquipment, null, CommandBand.AddedEquipmentOperations("Signal 1 (added)"));
         Check(Shown(added) == Placed + CommandBand.AddedEquipmentReason, "added equipment names its crossing's Connections tab: " + Shown(added));
-        var swing = Entry(BakedSceneryRules.Family, null, null, only: CommandBand.NotYetSupported("baked scenery groups that hold a spawn point"));
-        Check(Shown(swing) == Placed + "Baked scenery groups that hold a spawn point cannot be edited.", "an inspection-only object offers no edit: " + Shown(swing));
+        var swing = Entry(SceneObjectRules.Family, null, null, only: CommandBand.NotYetSupported("groups that hold a spawn point"));
+        Check(Shown(swing) == Placed + "Groups that hold a spawn point cannot be edited.", "an inspection-only object offers no edit: " + Shown(swing));
         var refusedPad = Entry("Crossing pad marker", null, CommandBand.NotEditable("the pad is part of a crossing"));
         Check(Shown(refusedPad) == "Unavailable: Move, Rotate, Follow a track, Disable, and Set track binding. The pad is part of a crossing.", "a refused pad names its refusal once: " + Shown(refusedPad));
-        var part = Entry(BakedSceneryRules.Family, BakedSceneryParts.Structure, CommandBand.PartOperations, groupPath: "World/G");
+        var part = Entry(SceneObjectRules.ChildFamily, ChildObjects.Structure, CommandBand.PartOperations, groupPath: "World/G");
         Check(Shown(part, new SupportedEdits.Live { Bridge = BridgeKind.Rail }) == Expected["rail bridge"], "a part of a rail bridge does not follow a track");
         // An object that holds no track binding lists no track binding edit; a track marker, milepost or crossing pad
         // lists it, and when the patcher does not edit one, the edit gives that object's own reason.
-        var signGroup = Entry(BakedSceneryRules.Family, BakedSceneryGroups.Structure, CommandBand.GroupOperations, bindings: new[] { "Marker segment: Abc" });
+        var signGroup = Entry(SceneObjectRules.Family, SceneObjects.Structure, CommandBand.GroupOperations, bindings: new[] { "Marker segment: Abc" });
         Check(!Shown(signGroup).Contains(SupportedEdits.Binding), "an object of another family, even one whose binding lines name a marker segment, lists no track binding edit: " + Shown(signGroup));
         var siding = Entry("Track marker", null, null, only: CommandBand.NotYetSupported("track markers of type Siding"));
         Check(Shown(siding) == "Unavailable: Move, Rotate, Follow a track, Disable, and Set track binding. Track markers of type Siding cannot be edited.", "an inspection-only marker gives its own reason for its binding: " + Shown(siding));
@@ -116,7 +116,7 @@ static class SupportedEditsTests {
         ["crossing controller"] = "Available: Edit crossing coverage and Edit crossing equipment. | " + Placed + "The patcher edits only this controller's crossing coverage and crossing equipment.",
         ["construction controller"] = "Available: Set construction segments. | Unavailable: Move, Rotate, and Follow a track. A construction controller switches the bridge's parts on or off regardless of its own position. Moving it has no effect in the game. Move the bridge or its parts instead. | Unavailable: Disable. This controller switches the bridge's parts on or off as construction progresses. Disabling it would stop the game from doing this. Disable the bridge or its parts instead.",
         ["starter"] = "Available: Set track location. | " + Placed + "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; place the marker on the track under Connections. | "
-            + NoReplacementId + "Starter placement family. | Unavailable: Set Start derailed. No new-game car placement in an active setup reads this marker, so it is not a starter placement marker.",
+            + NoReplacementId + "Starter placement marker family. | Unavailable: Set Start derailed. No new-game car placement in an active setup reads this marker, so it is not a starter placement marker.",
         ["shared board"] = Placed + SharedBlock,
         ["detection span"] = Placed + "A span's track locations determine its position, so you cannot set its placement. To change which tracks the crossing detects, use its controller's Connections tab.",
         ["sign group"] = Placed + "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Track marker family.",
@@ -129,18 +129,18 @@ static class SupportedEditsTests {
     // A base-map fixture object as the inventory lists it: its family and structure, the refusal of an object that
     // shares its path, a detection span's controller, a group's bridge kind and a rail bridge's construction segments.
     // The class names the expected list it is checked against.
-    static (SceneObservation Entry, SupportedEdits.Live Live, string Expected, string Class) Listed(BaseMapFixture map, BaseMapObject o, IReadOnlyDictionary<string, GroupRootVerdict> verdicts) {
+    static (SceneObservation Entry, SupportedEdits.Live Live, string Expected, string Class) Listed(BaseMapFixture map, BaseMapObject o, IReadOnlyDictionary<string, SceneObjectVerdict> verdicts) {
         var parent = o.Path.Substring(0, o.Path.LastIndexOf('/'));
         var holders = map.Objects.Count(other => other.Listed && other.Path == o.Path && other.Family == o.Family);
         var bindings = new List<string>();
         string operations = "Edits of this family", only = null, holder = null, cls;
         var bridge = BridgeKind.None;
-        if (o.BakedRoot || o.BakedPart) {
-            var root = o.BakedRoot ? o.Path : map.Objects.Where(r => r.BakedRoot && o.Path.StartsWith(r.Path + "/", StringComparison.Ordinal)).OrderByDescending(r => r.Path.Length).FirstOrDefault()?.Path;
+        if (o.TopSceneObject || o.ChildObject) {
+            var root = o.TopSceneObject ? o.Path : map.Objects.Where(r => r.TopSceneObject && o.Path.StartsWith(r.Path + "/", StringComparison.Ordinal)).OrderByDescending(r => r.Path.Length).FirstOrDefault()?.Path;
             verdicts.TryGetValue(root ?? "", out var verdict);
             bridge = verdict?.Bridge ?? BridgeKind.None;
-            if (o.BakedRoot && o.Structure == null) { only = CommandBand.GroupInspectionOnly(verdict, o.Family); cls = "sign group"; }
-            else if (o.BakedRoot && o.Components.Contains(BakedSceneryRules.ConstructionController)) { bindings.Add(CommandBand.SegmentBinding("s1", true)); cls = "construction root"; }
+            if (o.TopSceneObject && o.Structure == null) { only = CommandBand.GroupInspectionOnly(verdict, o.Family); cls = "sign group"; }
+            else if (o.TopSceneObject && o.Components.Contains(SceneObjectRules.ConstructionController)) { bindings.Add(CommandBand.SegmentBinding("s1", true)); cls = "construction root"; }
             else cls = bridge == BridgeKind.Rail ? "rail bridge" : bridge == BridgeKind.Road ? "road bridge" : "scenery";
         } else if (o.Family == "Track span") {
             holder = map.Objects.Any(c => c.Listed && c.Path == parent && c.Structure == CrossingCoverageScene.Structure) ? parent : null;
@@ -153,10 +153,10 @@ static class SupportedEditsTests {
         } else cls = o.Structure == TrackMarkerScene.Structure ? "marker" : o.Structure == CrossingPadScene.Structure ? "pad" : o.Structure == MilepostScene.Structure ? "milepost"
             : o.Structure == ExistingEquipmentScene.MastStructure ? "mast" : o.Structure == ExistingEquipmentScene.BellStructure ? "bell" : o.Structure == CrossingCoverageScene.Structure ? "crossing controller"
             : o.Structure == ConstructionSceneryScene.Structure ? "construction controller" : o.Structure == StarterPlacementScene.Structure ? "starter"
-            : o.Structure == IndependentBoards.Structure || o.Structure == BridgeScene.Structure || o.Structure == StationMapIconRules.Structure || o.Structure == SpawnPoints.Structure ? "scenery" : "unknown " + o.Family + " " + o.Structure;
-        var entry = Entry(o.Family, o.Structure, operations, o.Path, bindings: bindings, groupPath: o.BakedPart ? parent : null, holderPath: holder, bridge: o.BakedRoot ? bridge : BridgeKind.None, only: only);
+            : o.Structure == LocationSigns.Structure || o.Structure == BridgeScene.Structure || o.Structure == StationMapIconRules.Structure || o.Structure == SpawnPoints.Structure ? "scenery" : "unknown " + o.Family + " " + o.Structure;
+        var entry = Entry(o.Family, o.Structure, operations, o.Path, bindings: bindings, groupPath: o.ChildObject ? parent : null, holderPath: holder, bridge: o.TopSceneObject ? bridge : BridgeKind.None, only: only);
         var expected = cls == "shared marker" ? SharedMarker(holders) : Expected.TryGetValue(cls, out var text) ? text : null;
-        return (entry, o.BakedPart ? new SupportedEdits.Live { Bridge = bridge } : null, expected, cls);
+        return (entry, o.ChildObject ? new SupportedEdits.Live { Bridge = bridge } : null, expected, cls);
     }
     static List<string> Mismatches(BaseMapFixture map, IEnumerable<BaseMapObject> objects, Dictionary<string, int> classes) {
         var verdicts = map.Verdicts.GroupBy(v => v.Path, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
@@ -170,7 +170,7 @@ static class SupportedEditsTests {
         return wrong;
     }
 
-    // Every listed object of the base map, the parts of its baked scenery groups included, against the expected list of its kind.
+    // Every listed object of the base map, the parts of its scene objects with child objects included, against the expected list of its kind.
     static void EveryBaseMapObjectListsItsEdits() {
         var map = new BaseMapFixture();
         var classes = new Dictionary<string, int>();
@@ -184,8 +184,8 @@ static class SupportedEditsTests {
     // The structure the inventory gives an object of a supported family that it accepts, for the fictional objects,
     // which are built the game's way.
     static readonly Dictionary<string, string> Structures = new Dictionary<string, string> {
-        ["Track marker"] = TrackMarkerScene.Structure, ["Independent board"] = IndependentBoards.Structure, ["Milepost"] = MilepostScene.Structure, ["Crossing pad marker"] = CrossingPadScene.Structure,
-        ["Crossing controller"] = CrossingCoverageScene.Structure, ["Crossing mast"] = ExistingEquipmentScene.MastStructure, ["Crossing bell"] = ExistingEquipmentScene.BellStructure,
+        ["Track marker"] = TrackMarkerScene.Structure, ["Location sign"] = LocationSigns.Structure, ["Milepost"] = MilepostScene.Structure, ["Crossing pad marker"] = CrossingPadScene.Structure,
+        ["Grade crossing controller"] = CrossingCoverageScene.Structure, ["Crossing mast"] = ExistingEquipmentScene.MastStructure, ["Crossing bell"] = ExistingEquipmentScene.BellStructure,
         ["Spawn point"] = SpawnPoints.Structure, ["Station map icon"] = StationMapIconRules.Structure, ["Bridge"] = BridgeScene.Structure,
     };
     static BaseMapObject Accepted(BaseMapObject o) { if (o.Structure == null && o.Family != null && Structures.TryGetValue(o.Family, out var structure)) o.Structure = structure; return o; }
@@ -211,7 +211,7 @@ static class SupportedEditsTests {
             var o = fiction.First(f => f.Path == path);
             var (entry, live, expected, cls) = Listed(map, o, verdicts);
             var masked = Entry(entry.Family, entry.Identity.Structure, entry.Operations, entry.Identity.Path, bindings: entry.Bindings, groupPath: entry.GroupPath, holderPath: entry.HolderPath, bridge: entry.Bridge,
-                dependencies: new[] { CommandBand.GroundMaskDependency(true, new[] { o.Name }, true, o.BakedRoot || o.BakedPart, o.BakedRoot) });
+                dependencies: new[] { CommandBand.GroundMaskDependency(true, new[] { o.Name }, true, o.TopSceneObject || o.ChildObject, o.TopSceneObject) });
             Check(CommandBand.HoldsGroundMask(masked.Dependencies) && Shown(masked, live) == expected, path + " (" + cls + ") with a flattening ground mask lists what its controls offer: " + Shown(masked, live));
         }
         // The crossbuck lists Move.
@@ -223,7 +223,7 @@ static class SupportedEditsTests {
     // A crossing controller's placement and activity are refused by its capability, so no Placement mode and no Enabled
     // control is offered; its crossing coverage is.
     static void CrossingControllerOffersOnlyItsConnections() {
-        var controller = Entry("Crossing controller", CrossingCoverageScene.Structure, "Set which tracks each circuit detects.", component: CrossingCoverageScene.ComponentType);
+        var controller = Entry("Grade crossing controller", CrossingCoverageScene.Structure, "Set which tracks each circuit detects.", component: CrossingCoverageScene.ComponentType);
         var edits = SupportedEdits.Of(controller);
         const string reason = "The patcher edits only this controller's crossing coverage and crossing equipment.";
         Check(Shown(controller) == "Available: Edit crossing coverage and Edit crossing equipment. | Unavailable: Move, Rotate, Follow a track, and Disable. " + reason,

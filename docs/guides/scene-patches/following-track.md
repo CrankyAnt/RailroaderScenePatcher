@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Follow a track or endpoint
 
-Make a scene object move with a track or endpoint you select in the native map editor. Supported objects are independent boards, the Ela bridge, and Generic track markers. This guide also explains how to keep a marker disabled when its activity follows a track group.
+Make a scene object move with a track or endpoint you select in the native map editor. Supported objects are location signs, the Ela bridge, and Generic track markers. This guide also explains how to keep a marker disabled when its activity follows a track group.
 
 Track following stores the object's position and orientation relative to the track. When the track moves, the object moves with it and keeps that relationship. A [snap](snapping-to-track.md) moves the object once and stores a fixed map position.
 

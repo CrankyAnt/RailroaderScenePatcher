@@ -13,8 +13,8 @@ static class DeferredRestoreTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception("Deferred restore: " + message); }
     const string SceneName = "BushnellWhittier-MapManager", Bryson = "World/Large Scenery/Bryson/Bridge 1", Ela = "World/Large Scenery/Ela/Ela Bridge Scenery";
     static readonly string[] Maps = { "map", "layer" };
-    static readonly string[] Components = { BakedSceneryGroups.ComponentType, ConstructionSceneryScene.ComponentType };
-    static string Target(string path, string scene = SceneName, string component = BakedSceneryGroups.ComponentType, string structure = BakedSceneryGroups.Structure) =>
+    static readonly string[] Components = { SceneObjects.ComponentType, ConstructionSceneryScene.ComponentType };
+    static string Target(string path, string scene = SceneName, string component = SceneObjects.ComponentType, string structure = SceneObjects.Structure) =>
         "\"target\":{\"scene\":\"" + scene + "\",\"path\":\"" + path + "\",\"component\":\"" + component + "\",\"structure\":\"" + structure + "\"}";
     static string Doc(string map, params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + String.Join(",", items) + "}}";
     static string Segments(string id, string target, string relationship) => "\"" + id + "\":{" + target + ",\"relationships\":{\"constructionSegments\":" + relationship + "},\"dependsOn\":[]}";

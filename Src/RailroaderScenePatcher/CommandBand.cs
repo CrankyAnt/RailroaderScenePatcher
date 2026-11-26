@@ -369,7 +369,7 @@ namespace RailroaderScenePatcher {
             : gizmo ? EscapeStep.CancelGizmo
             : snap ? EscapeStep.CancelSnap
             : EscapeStep.None;
-        // The supported edits of a group root of the Baked scenery group family.
+        // The supported edits of a top scene object of the Scene object family.
         internal const string GroupOperations = "Move, rotate, enable, or disable the whole group. Its parts move with it.";
         internal const string Decorative = "Decorative. Moving or disabling this group changes no game function.";
         // The supported edits of a crossbuck of an unprotected crossing, a group of its own under Grade crossing, and
@@ -377,20 +377,20 @@ namespace RailroaderScenePatcher {
         // Crossing-type pad marker, which keeps its own family.
         internal const string CrossbuckOperations = "Move, rotate, enable, or disable this crossbuck. The crossing pad, the whistle signs, and the other crossbuck stay in place.";
         internal const string CrossbuckUse = "Decorative. This crossbuck marks the crossing for road users, and the game doesn't read it. The auto engineer sounds the horn at the crossing's pad marker, which stays in place. Moving or disabling the crossbuck doesn't affect game functions.";
-        // The supported edits of a part of a listed baked scenery group.
+        // The supported edits of a child object of a listed scene object.
         internal const string PartOperations = "Move, rotate, enable, or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves.";
         internal const string PartDecorative = "Decorative. Moving or disabling this part does not affect game functions.";
-        // What the Object tab says under Use in the game for a group root or part of the Baked scenery group family.
+        // What the Object tab says under Use in the game for a top scene object or child object.
         // category is the category of the group, also for a part. storage names what a storage pile shows, null for
         // every object that is no pile. An industry loads and unloads on the track spans of the native map data, so
         // its decorative buildings and its storage display move without changing that; a pile shows its industry's
         // storage by the ids the game reads, wherever it stands.
-        // holdsPiles: the group root or part holds storage piles below it.
+        // holdsPiles: the top scene object or part holds storage piles below it.
         internal static string UseInGame(bool part, string category, string storage, bool holdsPiles) {
             if (storage != null) return "This pile shows the " + storage + ". Moving or disabling the pile doesn't change the storage. The industry keeps working on its native track spans.";
             // Only crossbucks stand under Grade crossing in the family.
-            if (!part && category == BakedSceneryCategories.GradeCrossing) return CrossbuckUse;
-            if (category != BakedSceneryCategories.IndustryBuilding && category != BakedSceneryCategories.StorageDisplay) return part ? PartDecorative : Decorative;
+            if (!part && category == SceneObjectCategories.GradeCrossing) return CrossbuckUse;
+            if (category != SceneObjectCategories.IndustryBuilding && category != SceneObjectCategories.StorageDisplay) return part ? PartDecorative : Decorative;
             return "Decorative. The industry loads and unloads on its native track spans, so moving or disabling this " + (part ? "part" : "group") + " doesn't affect loading or unloading." +
                 (holdsPiles ? " Its piles keep showing the industry's storage." : "");
         }
@@ -415,7 +415,7 @@ namespace RailroaderScenePatcher {
         // What a toggle switches, from the components on its own object.
         internal static string ToggleKind(IEnumerable<string> components) {
             var types = (components ?? Enumerable.Empty<string>()).ToArray();
-            return types.Contains(LanternControl) ? LanternSwitch : BakedSceneryRules.Animates(types) ? DoorToggle : PlainToggle;
+            return types.Contains(LanternControl) ? LanternSwitch : SceneObjectRules.Animates(types) ? DoorToggle : PlainToggle;
         }
         // One toggle on the object, by its kind and the key the game keeps its state by, as one binding line.
         const string TogglePrefix = "Toggle=", KeySeparator = ", key ";
@@ -468,8 +468,8 @@ namespace RailroaderScenePatcher {
             else if (below != null) said.Add("Its " + below + " toggles keep their states by their keys, independently of their positions, and work at their new locations.");
             return said.Count == 0 ? null : String.Join(" ", said);
         }
-        // The Use in the game text for an entry of the Baked scenery group family: for a part, its group's entry gives
-        // the category; group is null for a group root or a part whose group is not in the inventory.
+        // The Use in the game text for an entry of the Scene object or Child object family: for a part, its group's entry gives
+        // the category; group is null for a top scene object or a part whose group is not in the inventory.
         internal static string UseInGame(SceneObservation selected, SceneObservation group) {
             var isPart = selected.GroupPath != null;
             var use = UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings);
@@ -481,7 +481,7 @@ namespace RailroaderScenePatcher {
         // An object with a scene ground mask at or below it is not only decorative: the mask shapes the terrain where it
         // stands. The part that holds the mask says what the mask does; an object above it adds that to its own text.
         internal const string GroundMaskHolderUse = "Ground mask: it shapes the ground and the vegetation where this part stands. Moving or disabling this part changes the terrain there.";
-        // roadBridge: the object is a road bridge or a part of one; the group root then names the bridge
+        // roadBridge: the object is a road bridge or a part of one; the top scene object then names the bridge
         // and its native road.
         internal static string GroundMaskUse(string use, bool part, IEnumerable<string> dependencies, bool roadBridge = false) {
             var line = dependencies?.FirstOrDefault(dependency => dependency != null && dependency.StartsWith(GroundMaskPrefix, StringComparison.Ordinal));
@@ -494,14 +494,14 @@ namespace RailroaderScenePatcher {
             var shaping = MaskOwner(line) + " so moving or disabling this " + (part ? "part" : "group") + " changes the terrain there.";
             return use == Decorative || use == PartDecorative ? "The building is decorative. " + shaping : use + " " + shaping;
         }
-        // Whose mask shapes the terrain, as the dependency line names its holders: the object's own when the group root
+        // Whose mask shapes the terrain, as the dependency line names its holders: the object's own when the top scene object
         // holds it, otherwise the part or parts below that hold it, by name, as Dependencies names them.
         static string MaskOwner(string line) {
             var who = line.Substring(GroundMaskPrefix.Length);
             const string one = " holds the scene ground mask", several = " hold scene ground masks";
             var single = who.IndexOf(one, StringComparison.Ordinal);
             var plural = who.IndexOf(several, StringComparison.Ordinal);
-            if (!who.StartsWith(GroupRootHolds, StringComparison.Ordinal) && who.StartsWith("the ", StringComparison.Ordinal)) {
+            if (!who.StartsWith(TopObjectHolds, StringComparison.Ordinal) && who.StartsWith("the ", StringComparison.Ordinal)) {
                 if (plural > 0) return "The ground masks of its " + who.Substring(4, plural - 4) + " shape the ground and the vegetation where they stand,";
                 if (single > 0) return "The ground mask of its " + who.Substring(4, single - 4) + " shapes the ground and the vegetation where it stands,";
             }
@@ -510,11 +510,11 @@ namespace RailroaderScenePatcher {
         // The ids by which a pile's or log pond's storage synchronizer reads the storage it shows, as one binding line.
         const string StoragePrefix = "Industry storage=";
         internal static string StorageBinding(string industryComponentId, string loadId) => StoragePrefix + industryComponentId + ", load " + loadId;
-        // How many storage piles stand at or below a group root or part, as one binding line.
+        // How many storage piles stand at or below a top scene object or part, as one binding line.
         const string PilesPrefix = "Storage piles=";
         internal static string PilesBinding(int count) => PilesPrefix + count.ToString(System.Globalization.CultureInfo.InvariantCulture);
         internal static bool HoldsPiles(IEnumerable<string> bindings) => bindings?.Any(line => line != null && line.StartsWith(PilesPrefix, StringComparison.Ordinal)) == true;
-        // The binding lines of a log pond (Scenery.LogPond) and of a group root or part above one. self: the object is
+        // The binding lines of a log pond (Scenery.LogPond) and of a top scene object or part above one. self: the object is
         // the log pond; below: how many log ponds stand below it; storage: the log pond's storage binding, or null when
         // no loaded synchronizer names it. The log pond carries a fixed line of its own and, as a pile does, its storage
         // binding only while the storage is known; an object above it carries only the count. Every line stays the
@@ -526,7 +526,7 @@ namespace RailroaderScenePatcher {
             else if (below > 0) lines.Add(LogPondsBelowPrefix + below.ToString(System.Globalization.CultureInfo.InvariantCulture));
             return lines;
         }
-        // What the Object tab says under Use in the game for a group root or part of the Baked scenery group family,
+        // What the Object tab says under Use in the game for a top scene object or child object,
         // chosen from its bindings alone: the log pond itself, an object above a log pond, and otherwise the text of
         // UseInGame above, with piles as #98 has them. storage names what the pile or log pond shows, or null.
         internal static string UseInGame(bool part, string category, string storage, IEnumerable<string> bindings) {
@@ -545,9 +545,9 @@ namespace RailroaderScenePatcher {
         }
         // A rail bridge's construction controller (Game.Mow.TrackConstructionScenery) shows or hides parts of the bridge by
         // the construction state of the track segments it names by id, wherever the bridge stands. Each segment is one
-        // binding line of the group root and of every part below the controller, for the Connections tab. A segment that
-        // no longer exists in the track graph keeps its id with a remark. Since #96 the Connections tab of the group root
-        // repairs it, so the group root also reports it as a problem (ConstructionSegmentProblems), as the Ela controller
+        // binding line of the top scene object and of every part below the controller, for the Connections tab. A segment that
+        // no longer exists in the track graph keeps its id with a remark. Since #96 the Connections tab of the top scene object
+        // repairs it, so the top scene object also reports it as a problem (ConstructionSegmentProblems), as the Ela controller
         // does. exists is null when the track graph could not be read.
         const string SegmentPrefix = "Construction segment=", MissingSegment = "; no longer exists";
         internal static string SegmentBinding(string id, bool? exists) => SegmentPrefix + (id ?? "") + (exists == false ? MissingSegment : "");
@@ -576,8 +576,8 @@ namespace RailroaderScenePatcher {
             return found;
         }
         // A construction segment that no longer exists, or an empty segment ID, is a defect the modder repairs on the
-        // Connections tab of the construction (#96): one problem per such segment, worded alike for a rail bridge group
-        // root and the Ela controller; a segment the controller lists twice is one problem. known is null when the track
+        // Connections tab of the construction (#96): one problem per such segment, worded alike for the top scene object of a rail
+        // bridge and the Ela controller; a segment the controller lists twice is one problem. known is null when the track
         // graph could not be read: then the segments that could not be checked give one inspection note
         // (BindingRules.IsNote), and an empty segment ID stays a problem. ids is null without a controller.
         const string ConstructionRecovery = " On the Connections tab, select the segments of the bridge's track and click Set.";
@@ -588,11 +588,11 @@ namespace RailroaderScenePatcher {
                 .Select(id => (String.IsNullOrWhiteSpace(id) ? "A construction segment has no ID." : "Construction segment " + id + " no longer exists.") + ConstructionRecovery);
             return (known == null ? problems.Concat(new[] { "Construction segment validity unknown: " + graphError }) : problems).Distinct(StringComparer.Ordinal).ToArray();
         }
-        // The construction segment problems of an inventory entry, only where the patcher can repair them: the group root
+        // The construction segment problems of an inventory entry, only where the patcher can repair them: the top scene object
         // of an editable rail bridge group and the editable Ela controller, by the structure the entry is observed with. A
         // part, a refused object or one that shares its path (no structure) shows the remark without a problem.
         internal static IReadOnlyList<string> RepairableConstructionProblems(string structure, IEnumerable<string> ids, ICollection<string> known, string graphError) =>
-            structure == BakedSceneryGroups.Structure || structure == ConstructionSceneryScene.Structure ? ConstructionSegmentProblems(ids, known, graphError) : Array.Empty<string>();
+            structure == SceneObjects.Structure || structure == ConstructionSceneryScene.Structure ? ConstructionSegmentProblems(ids, known, graphError) : Array.Empty<string>();
         // The repair a problem offers on the Object tab: a construction segment problem opens the Connections tab of the
         // construction, where its segments are set; no guided task sets construction segments. Another problem that
         // concerns a segment, a binding or a track location offers the guided track binding task.
@@ -718,16 +718,16 @@ namespace RailroaderScenePatcher {
         // The dependency an object with a scene ground mask names. self: the object holds the one mask itself; otherwise
         // holders names the parts at or below it that hold a mask. A mask that also flattens the terrain height moves
         // the same way, and the line says so.
-        const string GroupRootHolds = "the root of this group holds the scene ground mask";
+        const string TopObjectHolds = "the root of this group holds the scene ground mask";
         const string GroundMaskPrefix = "Ground mask: ";
         // parts: the holders are parts of the object's family; below a marker object, and for an object of another
         // family that holds the mask itself, such as a milepost or a spawn point, they are plain objects.
-        // group: the object that holds the mask itself is a group root, as a road bridge is, not a part.
+        // group: the object that holds the mask itself is a top scene object, as a road bridge is, not a part.
         internal static string GroundMaskDependency(bool self, IEnumerable<string> holders, bool flattens, bool parts = true, bool group = false) {
             var names = (holders ?? Enumerable.Empty<string>()).ToArray();
             var several = !self && names.Length > 1;
             var kind = parts ? "part" : "object";
-            var who = self ? (group ? GroupRootHolds : "this " + kind + " holds the scene ground mask") : several ? "the " + kind + "s " + Prose.Join(names) + " hold scene ground masks" : "the " + kind + " " + names.FirstOrDefault() + " holds the scene ground mask";
+            var who = self ? (group ? TopObjectHolds : "this " + kind + " holds the scene ground mask") : several ? "the " + kind + "s " + Prose.Join(names) + " hold scene ground masks" : "the " + kind + " " + names.FirstOrDefault() + " holds the scene ground mask";
             if (flattens) who += several ? ". At least one mask also flattens the ground" : ". The mask also flattens the ground";
             return GroundMaskPrefix + who + ". Moving " + (!self ? (group ? "this group" : "this " + kind) + " moves " + (several ? "those " + kind + "s, their masks" : "that " + kind + ", its mask") + ", and the terrain effects" : group ? "the group moves the mask and its effects on the terrain" : "this " + kind + " moves the mask and its effects on the terrain") +
                 ". The patcher asks the game to rebuild terrain and vegetation at both positions.";
@@ -745,8 +745,8 @@ namespace RailroaderScenePatcher {
         // starter placement marker's, which has its own workflow. The Ela construction controller counts: its construction
         // segments are its edit, and its placement and activity give their own reasons.
         static readonly HashSet<string> EditableStructures = new HashSet<string>(StringComparer.Ordinal) {
-            IndependentBoards.Structure, BridgeScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure, CrossingCoverageScene.Structure, CrossingPadScene.Structure,
-            BakedSceneryGroups.Structure, BakedSceneryParts.Structure, StationMapIconRules.Structure, SpawnPoints.Structure,
+            LocationSigns.Structure, BridgeScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure, CrossingCoverageScene.Structure, CrossingPadScene.Structure,
+            SceneObjects.Structure, ChildObjects.Structure, StationMapIconRules.Structure, SpawnPoints.Structure,
             ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure, ConstructionSceneryScene.Structure };
         internal static bool EditableStructure(string structure) => structure != null && EditableStructures.Contains(structure);
         // Whether the Connections tab offers crossing coverage for an object: its Crossing coverage section with Edit
@@ -769,10 +769,10 @@ namespace RailroaderScenePatcher {
         static string Lower(string word) => word.Length > 1 && Char.IsUpper(word[1]) ? word : Char.ToLowerInvariant(word[0]) + word.Substring(1);
         // The reason an object is inspection only: its kind has no edit yet. kind names it, such as "the Milepost family".
         internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + kind + " cannot be edited";
-        // Why a baked scenery group root is inspection only, or null for a listed group. A group left out under a
+        // Why a top scene object is inspection only, or null for a listed group. A group left out under a
         // settled rule, whose reason is a whole sentence, such as a group that holds track markers, is not editable as a
         // group and promises nothing later; a group whose reason names a kind waits for support.
-        internal static string GroupInspectionOnly(GroupRootVerdict verdict, string family) {
+        internal static string GroupInspectionOnly(SceneObjectVerdict verdict, string family) {
             if (verdict?.Disposition == GroupDisposition.Group) return null;
             if (verdict?.ReasonIsSentence == true) return NotEditableAsGroupPrefix + verdict.Reason;
             return NotYetSupported(verdict?.Reason ?? "this " + family.ToLowerInvariant());
@@ -867,8 +867,8 @@ namespace RailroaderScenePatcher {
         // it is for one, and the confirmed candidate's full label.
         internal static string ChoiceConfirmedLog(string forObject, string label) =>
             LogLine("World choice", forObject, "Confirmed choice: " + label + ".");
-        // The family the panel shows for an object. A part of a baked scenery group is a Part, as the glossary and the
-        // Object tab's "Part of" line name it; its observed family stays Baked scenery group for every rule.
+        // The family the panel shows for an object. A child object is a Part, as the glossary and the
+        // Object tab's "Part of" line name it; its observed family is Child object.
         internal const string PartFamily = "Part";
         internal static string ShownFamily(SceneObservation entry) => entry == null ? null : entry.GroupPath != null ? PartFamily : entry.Family;
         // A scene object's label as a world choice offers it: "Family: path", with "[inactive]" for an inactive object.
@@ -908,9 +908,9 @@ namespace RailroaderScenePatcher {
         // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
         internal static string RoleCaption(string role) => CircuitCoverage.RoleCaption(role);
         // A road bridge does not follow track: move the road natively, then the bridge onto it.
-        internal const string RoadBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RoadBridgeNoFollowing + " Move the road in the native map editor, then move the bridge onto it.";
+        internal const string RoadBridgeNoFollow = RailroaderScenePatcher.Core.SceneObjectRules.RoadBridgeNoFollowing + " Move the road in the native map editor, then move the bridge onto it.";
         // A rail bridge uses fixed placement. Move the track in the native map editor, then move the bridge onto it.
-        internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RailBridgeNoFollowing + " Move the track in the native map editor, then move the bridge onto it.";
+        internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.SceneObjectRules.RailBridgeNoFollowing + " Move the track in the native map editor, then move the bridge onto it.";
         // Why Follow is inactive for an existing crossing mast or bell: the capability covers fixed placement and activity.
         internal const string EquipmentNoFollow = ExistingEquipmentScene.NoFollowing + ".";
         // Why the rotation of an existing crossing bell cannot be set, or null for any other object: the bell is a

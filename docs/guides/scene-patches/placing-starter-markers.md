@@ -21,7 +21,7 @@ The game's placement rule checks the front of the cut, then points at 1.5-meter 
 
 Every checked point must be on available track, with no car from an earlier cut within 0.75 meters. The track must continue to the back of the cut, with no switch lined against it.
 
-Both during editing and when the file loads, the check uses the other cuts' locations from the same scene patch file. If another starter placement moves a cut, the check uses its new location. Two cuts can therefore swap places. In the native map editor, first move one cut out of the way, then move the other into its old place.
+Both during editing and when the file loads, the check uses the other cuts' locations from the same scene patch file. If another starter placement marker moves a cut, the check uses its new location. Two cuts can therefore swap places. In the native map editor, first move one cut out of the way, then move the other into its old place.
 
 An unrelated failure in another placement, such as a marker on a missing segment, does not block this edit. Fix that marker separately.
 
@@ -70,7 +70,7 @@ Click **Save** in the native map editor to write the modification to `Data/scene
 
 When a player starts a new company game, the patcher applies the scene patch file during world load, before the setup places its cars. The cut starts at the patched track location, derailed if the file sets it as a wreck. The same checks run at load. If a location fails, the scene patch file doesn't apply. The marker keeps the map's location, and a patcher warning explains why. Loading an existing save doesn't run the setup, so these settings place no cars in that case.
 
-## Write the starter placement by hand
+## Write the starter placement marker by hand
 
 Click **Copy ID** in the command band to copy the identity. Add a modification under a key of your choice, as described in [scene patch file v1](scene-patch-file-v1.md#starter-placement):
 

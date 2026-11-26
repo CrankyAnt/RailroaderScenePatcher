@@ -8,10 +8,10 @@ using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
-// Whole scene patch file tests for single parts of baked scenery groups against a controlled group with nested parts and
+// Whole scene patch file tests for single child objects against a controlled group with nested parts and
 // cullers: part identity and ambiguity, part-only edits, the fixed placement of a part through a later group move and
 // a group gizmo preview, ordering, removal, repeated application, refusal and restoration.
-static class BakedPartTests {
+static class ChildObjectTests {
     const string SceneName = "BushnellWhittier-MapManager", Mill = "World/Large Scenery/Whittier/Whittier Saw Mill";
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     static string N(IEnumerable<double> values) => String.Join(",", values.Select(v => v.ToString("R", CultureInfo.InvariantCulture)));
@@ -20,17 +20,17 @@ static class BakedPartTests {
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
         (position == null ? "" : ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + N(position) + "],\"rotation\":[" + N(rotation ?? Identity) + "]}") +
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
-    static string Part(string id, string name, double[] position = null, double[] rotation = null, bool? active = null) => Mod(id, Mill + "/" + name, BakedSceneryParts.Structure, position, rotation, active);
-    static string Group(string id, double[] position, double[] rotation) => Mod(id, Mill, BakedSceneryGroups.Structure, position, rotation);
+    static string Part(string id, string name, double[] position = null, double[] rotation = null, bool? active = null) => Mod(id, Mill + "/" + name, ChildObjects.Structure, position, rotation, active);
+    static string Group(string id, double[] position, double[] rotation) => Mod(id, Mill, SceneObjects.Structure, position, rotation);
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
-    static TargetIdentity PartId(string name) => new TargetIdentity(SceneName, Mill + "/" + name, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure);
-    static readonly TargetIdentity GroupId = new TargetIdentity(SceneName, Mill, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
+    static TargetIdentity PartId(string name) => new TargetIdentity(SceneName, Mill + "/" + name, ChildObjects.ComponentType, ChildObjects.Structure);
+    static readonly TargetIdentity GroupId = new TargetIdentity(SceneName, Mill, SceneObjects.ComponentType, SceneObjects.Structure);
     static readonly double[] JettyTarget = { 1130, 10, 30 }, GroupTarget = { 1110, 10, 20 };
     static readonly double[] JettyTurn = Turn.Yaw(30), GroupTurn = Turn.Yaw(15);
 
     // A saw mill group: a platform, a ramp, a culled lamp, and a jetty with a post below it; a renderer culler stands on
     // the jetty and a simple culler on the root.
-    // As an inspection scene it observes what belongs with an edited group root or part: the object and every part
+    // As an inspection scene it observes what belongs with an edited top scene object or part: the object and every part
     // below it, as the native inventory does. ObjectOnly observes the object alone, as the native inventory did before.
     internal sealed class Fixture : IRelatedInspectionScene {
         public bool ObjectOnly;
@@ -39,7 +39,7 @@ static class BakedPartTests {
         public readonly FakePart Platform, Ramp, Lamp, Jetty, Post;
         public readonly PartHolds Holds = new PartHolds();
         public readonly SceneCapabilities Scene;
-        public readonly BakedSceneryParts Parts;
+        public readonly ChildObjects Parts;
         public readonly PatchEngine Engine;
         public Fixture() {
             Platform = Group.Parts[0]; Ramp = Group.Parts[1]; Lamp = Group.Parts[2];
@@ -50,7 +50,7 @@ static class BakedPartTests {
             foreach (var (name, part) in new[] { ("Platform", Platform), ("Ramp", Ramp), ("Lamp", Lamp), ("Jetty", Jetty), ("Jetty/Post", Post) }) World.PartsAt[Mill + "/" + name] = new List<object> { part };
             World.SetActive(Group, true); World.Mutations = 0;
             Scene = new SceneCapabilities(() => World.Maps, this);
-            Scene.Add(new BakedSceneryGroups(World, holds: Holds)); Scene.Add(Parts = new BakedSceneryParts(World, Holds));
+            Scene.Add(new SceneObjects(World, holds: Holds)); Scene.Add(Parts = new ChildObjects(World, Holds));
             Engine = new PatchEngine(Scene);
         }
         public IEnumerable<string> MapIds => World.Maps;
@@ -64,11 +64,11 @@ static class BakedPartTests {
             var observed = World.Observe(Group);
             if (handle == Group) {
                 var root = observed.Root;
-                return new SceneObservation(Group, GroupId, BakedSceneryRules.Family, root.Active == true, root.Placement.Position, root.Placement.Rotation, new string[0], new string[0], new string[0], "group");
+                return new SceneObservation(Group, GroupId, SceneObjectRules.Family, root.Active == true, root.Placement.Position, root.Placement.Rotation, new string[0], new string[0], new string[0], "group");
             }
             var part = (FakePart)handle; var state = World.ObservePart(part).Part; var path = World.PartsAt.Single(p => p.Value.Contains(part)).Key;
             var active = observed.Root.Active == true; for (var p = part; p != null; p = p.Parent) active &= observed.Parts.Single(o => ReferenceEquals(o.Handle, p)).ActiveSelf;
-            return new SceneObservation(part, new TargetIdentity(SceneName, path, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure), BakedSceneryRules.Family,
+            return new SceneObservation(part, new TargetIdentity(SceneName, path, ChildObjects.ComponentType, ChildObjects.Structure), SceneObjectRules.ChildFamily,
                 active, state.Placement.Position, state.Placement.Rotation, new string[0], new string[0], new string[0], "part", groupPath: Mill);
         }
         public SceneObservation Observe(object handle, TargetIdentity identity) => Of(handle);
@@ -110,13 +110,13 @@ static class BakedPartTests {
         SearchMatchesThePartNameAsShown();
         RefreshClearsTheStaleRefusal();
         PartsTheGameAnimatesDoNotMakeTheInventoryStale();
-        CullingContainersAreNoPartsButTheirPartsAre();
-        CullingContainerPathFailsBeforeMutation();
-        ContainerAndGroupRootPathsFailBeforeMutation();
-        Console.WriteLine("PASS: baked scenery parts: part rule, part-only edits, fixed placement through group moves and previews, ordering, removal, culling, refusal, restoration and scene patch editing");
+        CullerOnlyChildrenAreNoPartsButTheirChildrenAre();
+        CullerOnlyChildPathFailsBeforeMutation();
+        GroupHolderAndTopObjectPathsFailBeforeMutation();
+        Console.WriteLine("PASS: child objects: part rule, part-only edits, fixed placement through group moves and previews, ordering, removal, culling, refusal, restoration and scene patch editing");
     }
 
-    // A part is one scene object at any depth below a listed group root. Sibling objects that share a path, levels of a
+    // A part is one scene object at any depth below a listed top scene object. Sibling objects that share a path, levels of a
     // LOD group, objects without physical presence, runtime objects and objects of another family are no parts, and an
     // inspection-only group has no part entries at all.
     static void PartRuleListsSceneObjectsOfListedGroups() {
@@ -130,75 +130,75 @@ static class BakedPartTests {
                     new Node("Lamp", new Node("LOD0").Solid().Lod(), new Node("LOD1").Solid().Lod()).With("UnityEngine.LODGroup"),
                     new Node("Anchor"), spawned, new Node("Sign").Solid().Family())),
             new Node("Bryson", new Node("Bryson Depot", new Node("Agent").With("Model.StationAgent"), new Node("Bench").Solid()))));
-        var verdicts = BakedSceneryRules.Classify(world);
-        var parts = BakedSceneryRules.Parts(verdicts);
+        var verdicts = SceneObjectRules.Classify(world);
+        var parts = SceneObjectRules.Parts(verdicts);
         PartVerdict At(string name) => parts.SingleOrDefault(v => v.Path == Mill + "/" + name);
         var listed = parts.Where(v => v.Disposition == PartDisposition.Part).Select(v => v.Path.Substring(Mill.Length + 1)).OrderBy(p => p, StringComparer.Ordinal).ToArray();
         Assert(listed.SequenceEqual(new[] { "Jetty", "Jetty/Piece", "Jetty/Piece (1)", "Lamp", "Platform" }), "Each scene object with physical presence at any depth is a part: " + String.Join(", ", listed));
-        Assert(parts.All(v => v.GroupPath == Mill), "Every part names its group root");
-        Assert(parts.Count(v => v.Path.StartsWith(Mill + "/Board", StringComparison.Ordinal)) == 4 && parts.Where(v => v.Path.StartsWith(Mill + "/Board", StringComparison.Ordinal)).All(v => v.Disposition == PartDisposition.NotListed && v.Reason == BakedSceneryRules.AmbiguousParts),
+        Assert(parts.All(v => v.GroupPath == Mill), "Every part names its top scene object");
+        Assert(parts.Count(v => v.Path.StartsWith(Mill + "/Board", StringComparison.Ordinal)) == 4 && parts.Where(v => v.Path.StartsWith(Mill + "/Board", StringComparison.Ordinal)).All(v => v.Disposition == PartDisposition.NotListed && v.Reason == SceneObjectRules.AmbiguousParts),
             "Siblings that share one path, and the objects below them, are no parts");
-        Assert(At("Lamp/LOD0")?.Reason == BakedSceneryRules.LodLevels && At("Lamp/LOD1")?.Reason == BakedSceneryRules.LodLevels, "A level of a LOD group belongs to the object that holds the LOD group");
-        Assert(At("Anchor")?.Reason == BakedSceneryRules.NoPhysicalPresence && At("Spawned Sawdust")?.Reason == BakedSceneryRules.RuntimeObject && At("Sign")?.Disposition == PartDisposition.ExistingFamily,
+        Assert(At("Lamp/LOD0")?.Reason == SceneObjectRules.LodLevels && At("Lamp/LOD1")?.Reason == SceneObjectRules.LodLevels, "A level of a LOD group belongs to the object that holds the LOD group");
+        Assert(At("Anchor")?.Reason == SceneObjectRules.NoPhysicalPresence && At("Spawned Sawdust")?.Reason == SceneObjectRules.RuntimeObject && At("Sign")?.Disposition == PartDisposition.ExistingFamily,
             "Objects without physical presence, runtime objects and objects of another family are no parts");
         Assert(!parts.Any(v => v.Path.StartsWith("World/Large Scenery/Bryson/", StringComparison.Ordinal)), "An inspection-only group has no part entries");
     }
 
-    // A culling container, such as Bryson House Track/Culled, holds parts for a culler and has no renderer, collider or
+    // A child object that only carries a simple culler, such as Bryson House Track/Culled, holds parts for a culler and has no renderer, collider or
     // light of its own: it is no part, and its parts stay listed under their group, named with it in their path. A
-    // group root that carries the culler itself, such as Sylva Culled, stays the group root with its models as parts.
+    // top scene object that carries the culler itself, such as Sylva Culled, stays the top scene object with its models as parts.
     // An object with a culler and a renderer of its own is an ordinary part.
-    static void CullingContainersAreNoPartsButTheirPartsAre() {
+    static void CullerOnlyChildrenAreNoPartsButTheirChildrenAre() {
         const string House = "World/Large Scenery/Bryson/Bryson House Track", Sylva = "World/Large Scenery/Sylva/Sylva Culled";
         var world = new Node("World", new Node("Large Scenery",
             new Node("Bryson", new Node("Bryson House Track",
                 new Node("Culled", new Node("Wood Platform 2 x 2").Solid(), new Node("Wood Platform 2 x 2 (1)").Solid(),
-                    new Node("Culling Container", new Node("Ramp").Solid()).With(BakedSceneryRules.SimpleCuller)).With(BakedSceneryRules.SimpleCuller),
-                new Node("Lamp").Solid().With(BakedSceneryRules.RendererCuller),
+                    new Node("Culled Ramp", new Node("Ramp").Solid()).With(SceneObjectRules.SimpleCuller)).With(SceneObjectRules.SimpleCuller),
+                new Node("Lamp").Solid().With(SceneObjectRules.RendererCuller),
                 // A lamp post prefab culls its own children with a renderer culler on its root: it is a part.
-                new Node("Tall Post Shade (5)", new Node("Bulb").Solid(), new Node("Tall Post Shade").Solid(), new Node("Spotlight Outdoor").Solid()).With(BakedSceneryRules.RendererCuller),
+                new Node("Tall Post Shade (5)", new Node("Bulb").Solid(), new Node("Tall Post Shade").Solid(), new Node("Spotlight Outdoor").Solid()).With(SceneObjectRules.RendererCuller),
                 // A simple culler on an object with a renderer of its own: an ordinary part.
-                new Node("Stenzel Mfg", new Node("Sign").Solid()).Solid().With(BakedSceneryRules.SimpleCuller),
+                new Node("Stenzel Mfg", new Node("Sign").Solid()).Solid().With(SceneObjectRules.SimpleCuller),
                 // Another family and a level of a LOD group keep their rule, whatever culler they carry.
-                new Node("Pad", new Node("Mesh").Solid()).With(BakedSceneryRules.SimpleCuller).Family(),
-                new Node("Shed", new Node("LOD0", new Node("Mesh").Solid()).With(BakedSceneryRules.SimpleCuller).Lod()).With("UnityEngine.LODGroup").Solid())),
-            new Node("Sylva", new Node("Sylva Culled", new Node("Depot Model").Solid(), new Node("Shed Model").Solid()).With(BakedSceneryRules.SimpleCuller))));
-        var verdicts = BakedSceneryRules.Classify(world);
-        Assert(verdicts.Single(v => v.Path == House).Disposition == GroupDisposition.Group && verdicts.Single(v => v.Path == Sylva).Disposition == GroupDisposition.Group, "Both groups are listed group roots");
-        var parts = BakedSceneryRules.Parts(verdicts);
+                new Node("Pad", new Node("Mesh").Solid()).With(SceneObjectRules.SimpleCuller).Family(),
+                new Node("Shed", new Node("LOD0", new Node("Mesh").Solid()).With(SceneObjectRules.SimpleCuller).Lod()).With("UnityEngine.LODGroup").Solid())),
+            new Node("Sylva", new Node("Sylva Culled", new Node("Depot Model").Solid(), new Node("Shed Model").Solid()).With(SceneObjectRules.SimpleCuller))));
+        var verdicts = SceneObjectRules.Classify(world);
+        Assert(verdicts.Single(v => v.Path == House).Disposition == GroupDisposition.Group && verdicts.Single(v => v.Path == Sylva).Disposition == GroupDisposition.Group, "Both groups are listed top scene objects");
+        var parts = SceneObjectRules.Parts(verdicts);
         var listed = parts.Where(v => v.Disposition == PartDisposition.Part).Select(v => v.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
-        Assert(listed.SequenceEqual(new[] { House + "/Culled/Culling Container/Ramp", House + "/Culled/Wood Platform 2 x 2", House + "/Culled/Wood Platform 2 x 2 (1)", House + "/Lamp", House + "/Shed",
+        Assert(listed.SequenceEqual(new[] { House + "/Culled/Culled Ramp/Ramp", House + "/Culled/Wood Platform 2 x 2", House + "/Culled/Wood Platform 2 x 2 (1)", House + "/Lamp", House + "/Shed",
                 House + "/Stenzel Mfg", House + "/Stenzel Mfg/Sign", House + "/Tall Post Shade (5)", House + "/Tall Post Shade (5)/Bulb", House + "/Tall Post Shade (5)/Spotlight Outdoor", House + "/Tall Post Shade (5)/Tall Post Shade",
                 Sylva + "/Depot Model", Sylva + "/Shed Model" }),
-            "The parts in culling containers stay listed under their group, and a group root with the culler lists its models: " + String.Join(", ", listed));
-        var containers = parts.Where(v => v.Reason == BakedSceneryRules.CullingContainers).Select(v => v.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
-        Assert(containers.SequenceEqual(new[] { House + "/Culled", House + "/Culled/Culling Container" }) && parts.Where(v => containers.Contains(v.Path)).All(v => v.Disposition == PartDisposition.NotListed && v.GroupPath == House),
-            "A culling container is no part, at any depth: " + String.Join(", ", containers));
-        Assert(parts.Single(v => v.Path == House + "/Pad").Disposition == PartDisposition.ExistingFamily && parts.Single(v => v.Path == House + "/Shed/LOD0").Reason == BakedSceneryRules.LodLevels,
+            "The parts in child objects that only carry a simple culler stay listed under their group, and a top scene object with the culler lists its models: " + String.Join(", ", listed));
+        var containers = parts.Where(v => v.Reason == SceneObjectRules.CullerOnlyChildren).Select(v => v.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
+        Assert(containers.SequenceEqual(new[] { House + "/Culled", House + "/Culled/Culled Ramp" }) && parts.Where(v => containers.Contains(v.Path)).All(v => v.Disposition == PartDisposition.NotListed && v.GroupPath == House),
+            "A child object that only carries a simple culler is no part, at any depth: " + String.Join(", ", containers));
+        Assert(parts.Single(v => v.Path == House + "/Pad").Disposition == PartDisposition.ExistingFamily && parts.Single(v => v.Path == House + "/Shed/LOD0").Reason == SceneObjectRules.LodLevels,
             "An object of another family and a level of a LOD group keep their own rule, also with a simple culler");
-        Assert(BakedSceneryRules.PartName(House, House + "/Culled/Wood Platform 2 x 2") == "Bryson House Track / Culled / Wood Platform 2 x 2", "A part in a culling container is named with its group and its path");
-        Assert(BakedSceneryRules.PartRefusal(parts.Single(v => v.Path == House + "/Culled")) == BakedSceneryRules.CullingContainerRefusal && BakedSceneryRules.PartRefusal(parts.Single(v => v.Path == House + "/Lamp")) == null,
-            "The part rule refuses a culling container with its reason and refuses no part");
+        Assert(SceneObjectRules.PartName(House, House + "/Culled/Wood Platform 2 x 2") == "Bryson House Track / Culled / Wood Platform 2 x 2", "A part in a child object that only carries a simple culler is named with its group and its path");
+        Assert(SceneObjectRules.PartRefusal(parts.Single(v => v.Path == House + "/Culled")) == SceneObjectRules.CullerOnlyRefusal && SceneObjectRules.PartRefusal(parts.Single(v => v.Path == House + "/Lamp")) == null,
+            "The part rule refuses a child object that only carries a simple culler with its reason and refuses no part");
     }
 
-    // A modification that names a container object as a group, such as Bryson Yard, or a group root as a part, such as one of
+    // A modification that names a holder as a group, such as Bryson Yard, or a top scene object as a part, such as one of
     // its lamp posts, fails before mutation with its own reason, and the file's other modifications still apply.
-    static void ContainerAndGroupRootPathsFailBeforeMutation() {
+    static void GroupHolderAndTopObjectPathsFailBeforeMutation() {
         const string Yard = "World/Large Scenery/Bryson/Bryson Yard", Post = Yard + "/Tall Post Shade";
         var f = new Fixture();
-        var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Bulb").Solid()).With("Helpers.Culling.RendererCuller"))))));
+        var verdicts = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Bulb").Solid()).With("Helpers.Culling.RendererCuller"))))));
         var yardVerdict = verdicts.Single(v => v.Path == Yard);
         var lamp = verdicts.Single(v => v.Path == Post);
-        Assert(yardVerdict.Disposition == GroupDisposition.ContainerObject && BakedSceneryRules.GroupRefusal(yardVerdict) == "This path names a container object, which isn't a scenery group. Edit the groups it holds." && BakedSceneryRules.GroupRefusal(lamp) == null && BakedSceneryRules.GroupRefusal(null) == null, "Only a container object is refused with the container object message");
-        Assert(BakedSceneryRules.PartRefusal(null, lamp) == BakedSceneryRules.GroupRootRefusal && BakedSceneryRules.PartRefusal(null, null) == null, "A group root is refused as a part with its own reason");
-        Assert(BakedSceneryRules.ResolvesGroup(yardVerdict) && BakedSceneryRules.ResolvesGroup(lamp) && !BakedSceneryRules.ResolvesGroup(null), "A container object resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
+        Assert(yardVerdict.Disposition == GroupDisposition.GroupHolder && SceneObjectRules.GroupRefusal(yardVerdict) == "This path names an object that only holds other groups, which isn't a group itself. Edit the groups it holds." && SceneObjectRules.GroupRefusal(lamp) == null && SceneObjectRules.GroupRefusal(null) == null, "Only a scene object that only holds other groups is refused with the scene object that only holds other groups message");
+        Assert(SceneObjectRules.PartRefusal(null, lamp) == SceneObjectRules.TopObjectRefusal && SceneObjectRules.PartRefusal(null, null) == null, "A top scene object is refused as a part with its own reason");
+        Assert(SceneObjectRules.ResolvesGroup(yardVerdict) && SceneObjectRules.ResolvesGroup(lamp) && !SceneObjectRules.ResolvesGroup(null), "A scene object that only holds other groups resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
         f.World.GroupVerdicts = verdicts.ToDictionary(v => v.Path);
-        f.World.GroupVerdicts[Mill] = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Saw Mill", new Node("Platform").Solid()))))).Single();
+        f.World.GroupVerdicts[Mill] = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Saw Mill", new Node("Platform").Solid()))))).Single();
         var post = new FakeGroup();
         f.World.Objects[Yard] = new List<object> { new FakeGroup() }; f.World.Objects[Post] = new List<object> { post };
         var before = f.World.Mutations;
-        var json = Doc(Mod("yard", Yard, BakedSceneryGroups.Structure, active: false),
-            Mod("post-as-part", Post, BakedSceneryParts.Structure, GroupTarget, null), Part("move-jetty", "Jetty", JettyTarget, JettyTurn));
+        var json = Doc(Mod("yard", Yard, SceneObjects.Structure, active: false),
+            Mod("post-as-part", Post, ChildObjects.Structure, GroupTarget, null), Part("move-jetty", "Jetty", JettyTarget, JettyTurn));
         var diagnostics = new Diagnostics();
         var runtime = new PatchRuntime(f.Engine, diagnostics, "0.5.0", "0.6.3");
         var mod = new LoadedMod(new PatchSource("example/map", "Example Map", "1.0.0", "Example author"), json, null, editTarget: true);
@@ -206,37 +206,37 @@ static class BakedPartTests {
         var warning = diagnostics.Failures.Single(failure => failure.Operation == "yard");
         const string expectedWarning = "Example Map [example/map; version 1.0.0]. Definition Data/scene-patches.json; operation yard; object " +
             "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Yard [UnityEngine.Transform]. " +
-            "This path names a container object, which isn't a scenery group. Edit the groups it holds. " +
+            "This path names an object that only holds other groups, which isn't a group itself. Edit the groups it holds. " +
             "Patcher 0.5.0; game 0.6.3. Report this to the mod author: Example author.";
         Assert(warning.Message == expectedWarning, "The native warning gives the author the reason to correct the file entry: " + warning.Message);
         Assert(warning.Cause == FailureCause.InvalidDefinition, "The container path is an invalid definition.");
         var yard = result.Outcomes["yard"]; var part = result.Outcomes["post-as-part"];
-        Assert(!yard.Applied && (yard.Error ?? "").Contains(BakedSceneryRules.ContainerRefusal), "A group modification that names a container object fails with the container object's reason: " + yard.Error);
-        Assert(!part.Applied && (part.Error ?? "").Contains(BakedSceneryRules.GroupRootRefusal), "A part modification that names a group root fails with the group root's reason: " + part.Error);
+        Assert(!yard.Applied && (yard.Error ?? "").Contains(SceneObjectRules.GroupHolderRefusal), "A group modification that names a scene object that only holds other groups fails with the scene object that only holds other groups's reason: " + yard.Error);
+        Assert(!part.Applied && (part.Error ?? "").Contains(SceneObjectRules.TopObjectRefusal), "A part modification that names a top scene object fails with the top scene object's reason: " + part.Error);
         Assert(result.Outcomes["move-jetty"].Applied && f.World.Mutations == before + 1 && Near(f.MapOf(f.Jetty).Position, JettyTarget), "The other modification still applies, and the refused ones mutate nothing");
-        // An identity without a structure names the group root once: the part capability claims a group root only
+        // An identity without a structure names the top scene object once: the part capability claims a top scene object only
         // for an identity that asks for a part.
-        Assert(f.Scene.Resolve(new TargetIdentity(SceneName, Post, BakedSceneryGroups.ComponentType)).Count == 1 && ReferenceEquals(f.Scene.Resolve(new TargetIdentity(SceneName, Post, BakedSceneryGroups.ComponentType))[0], post),
-            "A group root named without a structure resolves to the group alone");
-        Assert(f.Engine.Apply(Doc(Mod("post", Post, BakedSceneryGroups.Structure, GroupTarget, null))).Outcomes["post"].Applied, "The lamp post still takes a group modification");
+        Assert(f.Scene.Resolve(new TargetIdentity(SceneName, Post, SceneObjects.ComponentType)).Count == 1 && ReferenceEquals(f.Scene.Resolve(new TargetIdentity(SceneName, Post, SceneObjects.ComponentType))[0], post),
+            "A top scene object named without a structure resolves to the group alone");
+        Assert(f.Engine.Apply(Doc(Mod("post", Post, SceneObjects.Structure, GroupTarget, null))).Outcomes["post"].Applied, "The lamp post still takes a group modification");
     }
 
-    // A modification whose path names a culling container fails before mutation with the container's reason, and the
+    // A modification whose path names a child object that only carries a simple culler fails before mutation with the container's reason, and the
     // other modifications of the scene patch file still apply.
-    static void CullingContainerPathFailsBeforeMutation() {
+    static void CullerOnlyChildPathFailsBeforeMutation() {
         var f = new Fixture();
-        // The saw mill as the part rule reads it: its listed parts, and a culling container with a piece in it. The
+        // The saw mill as the part rule reads it: its listed parts, and a child object that only carries a simple culler with a piece in it. The
         // world resolves and refuses paths by those verdicts, as GroupWorld does.
         var mill = new Node("Whittier Saw Mill", new Node("Platform").Solid(), new Node("Ramp").Solid(), new Node("Lamp").Solid(), new Node("Jetty", new Node("Post").Solid()).Solid(),
-            new Node("Culled", new Node("Piece").Solid()).With(BakedSceneryRules.SimpleCuller));
-        f.World.Verdicts = BakedSceneryRules.Parts(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Whittier", mill))))).ToDictionary(v => v.Path);
+            new Node("Culled", new Node("Piece").Solid()).With(SceneObjectRules.SimpleCuller));
+        f.World.Verdicts = SceneObjectRules.Parts(SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Whittier", mill))))).ToDictionary(v => v.Path);
         f.World.PartsAt[Mill + "/Culled"] = new List<object> { f.Group.Add(new FakePart { Id = "Culled#8", Offset = new[] { 4.0, 0, 4 } }) };
         f.World.PartsAt[Mill + "/Culled/Piece"] = new List<object> { f.Group.Add(new FakePart { Id = "Culled/Piece#9", Offset = new[] { 4.0, 0, 5 } }) };
-        Assert(f.World.FindParts(SceneName, Mill + "/Culled").Count == 1 && f.World.FindParts(SceneName, Mill + "/Culled/Piece").Count == 1, "A culling container and the part in it resolve");
+        Assert(f.World.FindParts(SceneName, Mill + "/Culled").Count == 1 && f.World.FindParts(SceneName, Mill + "/Culled/Piece").Count == 1, "A child object that only carries a simple culler and the part in it resolve");
         var before = f.World.Mutations;
         var result = f.Engine.Apply(Doc(Part("container", "Culled", JettyTarget), Part("move-jetty", "Jetty", JettyTarget, JettyTurn)));
         var failure = result.Outcomes["container"];
-        Assert(!failure.Applied && (failure.Error ?? "").Contains("This path names a culling container, which isn't an editable scenery part."), "A path that names a culling container fails that modification with the reason: " + failure.Error);
+        Assert(!failure.Applied && (failure.Error ?? "").Contains("This path names an object that only carries a simple culler, which isn't an editable part."), "A path that names a child object that only carries a simple culler fails that modification with the reason: " + failure.Error);
         Assert(result.Outcomes["move-jetty"].Applied && f.World.Mutations == before + 1 && Near(f.MapOf(f.Jetty).Position, JettyTarget), "The other modification still applies, and the refused one mutates nothing");
     }
 
@@ -248,7 +248,7 @@ static class BakedPartTests {
         Assert(Near(f.MapOf(f.Jetty).Position, JettyTarget) && SameTurn(f.MapOf(f.Jetty).Rotation, JettyTurn), "The part takes its map placement: " + Where(f));
         Assert(Near(f.MapOf(f.Post).Position, Plus(JettyTarget, Turn.Rotate(JettyTurn, new[] { 1.0, 0, 0 }))), "The object below the part moves with it: " + Where(f));
         var now = f.World.Observe(f.Group).Root;
-        Assert(Near(now.Placement.Position, root.Position) && now.Active == true && new[] { f.Platform, f.Ramp, f.Lamp }.Select(p => p.Offset).Zip(others, (a, b) => Near(a, b)).All(x => x), "The group root and the other parts keep their placement");
+        Assert(Near(now.Placement.Position, root.Position) && now.Active == true && new[] { f.Platform, f.Ramp, f.Lamp }.Select(p => p.Offset).Zip(others, (a, b) => Near(a, b)).All(x => x), "The top scene object and the other parts keep their placement");
         outcome = f.Engine.Apply(Doc(Part("hide-platform", "Platform", active: false))).Outcomes["hide-platform"];
         Assert(outcome.Applied && !f.Platform.Active && f.Ramp.Active && f.Jetty.Active && f.Post.Active && f.Group.Active, "Disabling a part disables only that part: " + outcome.Error);
         Assert(Near(f.MapOf(f.Jetty).Position, JettyTarget), "An activity edit leaves the placement");
@@ -329,7 +329,7 @@ static class BakedPartTests {
         var result = f.Engine.Apply(Doc(Part("missing", "Shed", JettyTarget), Part("twin", "Twin", JettyTarget), Part("move-jetty", "Jetty", JettyTarget, JettyTurn)));
         Assert(!result.Outcomes["missing"].Applied && !result.Outcomes["twin"].Applied && result.Outcomes["twin"].ResolvedTarget == null, "A part path that matches no part or several parts fails that modification");
         Assert(result.Outcomes["move-jetty"].Applied && f.World.Mutations == 1 && Near(f.MapOf(f.Jetty).Position, JettyTarget), "The other modification still applies, and the failed ones mutate nothing");
-        Assert(!f.Engine.Apply(Doc(Part("group-path", "Jetty").Replace(BakedSceneryParts.Structure, BakedSceneryGroups.Structure).Replace("\"dependsOn\"", "\"active\":false,\"dependsOn\""))).Outcomes["group-path"].Applied, "A part path does not resolve as a group");
+        Assert(!f.Engine.Apply(Doc(Part("group-path", "Jetty").Replace(ChildObjects.Structure, SceneObjects.Structure).Replace("\"dependsOn\"", "\"active\":false,\"dependsOn\""))).Outcomes["group-path"].Applied, "A part path does not resolve as a group");
     }
 
     static void RepeatedApplicationAccumulatesNoOffset() {
@@ -411,7 +411,7 @@ static class BakedPartTests {
         Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0") && (int)JObject.Parse(store.Patch)["formatVersion"] == 1, "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
         Persistence(false, new string[0], "After Save");
         var item = (JObject)JObject.Parse(store.Patch)["modifications"].Children<JProperty>().Single(p => ((string)p.Value["target"]["path"]).EndsWith("/Jetty", StringComparison.Ordinal)).Value;
-        Assert((string)item["target"]["structure"] == BakedSceneryParts.Structure && (string)item["target"]["component"] == "UnityEngine.Transform", "The scene patch file records the part target");
+        Assert((string)item["target"]["structure"] == ChildObjects.Structure && (string)item["target"]["component"] == "UnityEngine.Transform", "The scene patch file records the part target");
         var fresh = new Fixture();
         var reload = fresh.Engine.Apply(store.Patch);
         Assert(reload.Outcomes.Values.All(o => o.Applied) && Near(fresh.MapOf(fresh.Jetty).Position, JettyTarget) && !fresh.Platform.Active && fresh.Group.Parts.Count == 5, "A reloaded world reproduces the part edits without duplicated state");
@@ -420,7 +420,7 @@ static class BakedPartTests {
         Assert(kept.Edit(PartId("Jetty"), new Placement(JettyTarget, JettyTurn), null).Applied && strictEditor.Save() == null && strict.Info.Contains(">=0.9.0") && !strict.Info.Contains(">=0.5.0"), "A stricter existing constraint is retained: " + strict.Info);
         var bare = new Store { Patch = Doc(Part("move-jetty", "Jetty", JettyTarget)) }; var bareEditor = new NativeMapEditor();
         var without = new PatchEditingSession(new PatchEngine(new Scene { Maps = new[] { "map" } }), bareEditor, bare); bareEditor.Session = without;
-        Assert(without.MinimumPatcherVersion == BakedSceneryParts.RequiredVersion, "A part scene patch file requires the part capability version whether or not this build offers it: " + without.MinimumPatcherVersion);
+        Assert(without.MinimumPatcherVersion == ChildObjects.RequiredVersion, "A part scene patch file requires the part capability version whether or not this build offers it: " + without.MinimumPatcherVersion);
     }
 
     // A part without a fixed placement stands in the object directly above it: a part below a held part keeps its place
@@ -468,7 +468,7 @@ static class BakedPartTests {
         Assert(reloaded.Engine.Apply(store.Patch).Outcomes.Values.Single().Applied && !reloaded.Lamp.Active && Near(reloaded.MapOf(reloaded.Lamp).Position, new[] { 1094.0, 12, 20 }), "A reload places the lamp and leaves it as its culler switched it: " + Where(reloaded));
     }
 
-    // The edit of a part moves and switches the parts below it, and the edit of a group root every part: those entries
+    // The edit of a part moves and switches the parts below it, and the edit of a top scene object every part: those entries
     // take their new observations with the edited object, so a completed edit leaves the inventory current. Observing
     // the object alone, as the game test showed, leaves the child's old observation and marks the inventory stale.
     static void EditOfAPartWithAChildLeavesTheInventoryCurrent() {
@@ -498,10 +498,10 @@ static class BakedPartTests {
         var world = new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Saw Mill",
             new Node("Ramp").Solid(),
             new Node("Clock", new Node("Minutes", new Node("Hand", new Node("Tip").Solid()).Solid().Driven())).Solid()))));
-        var parts = BakedSceneryRules.Parts(BakedSceneryRules.Classify(world));
+        var parts = SceneObjectRules.Parts(SceneObjectRules.Classify(world));
         PartVerdict At(string name) => parts.SingleOrDefault(v => v.Path == Mill + "/" + name);
-        Assert(At("Clock/Minutes/Hand")?.Disposition == PartDisposition.NotListed && At("Clock/Minutes/Hand")?.Reason == BakedSceneryRules.AnimatedParts
-            && At("Clock/Minutes/Hand/Tip")?.Reason == BakedSceneryRules.AnimatedParts, "A transform the game animates, and what moves with it, is no part");
+        Assert(At("Clock/Minutes/Hand")?.Disposition == PartDisposition.NotListed && At("Clock/Minutes/Hand")?.Reason == SceneObjectRules.AnimatedParts
+            && At("Clock/Minutes/Hand/Tip")?.Reason == SceneObjectRules.AnimatedParts, "A transform the game animates, and what moves with it, is no part");
         Assert(At("Clock")?.Disposition == PartDisposition.Part && At("Ramp")?.Disposition == PartDisposition.Part, "Its still siblings and ancestors stay parts");
 
         // The fixture lists the parts the rule lists; the hand stands in the group without an entry.
@@ -517,7 +517,7 @@ static class BakedPartTests {
         Assert(inventory.ReobserveRelated(inventory.Entries.Single(e => ReferenceEquals(e.Handle, f.Group))) != null, "The moved group is observed again");
         inventory.CheckFreshness();
         Assert(!inventory.IsStale, "After the group moves the inventory stays current: " + inventory.StaleReason);
-        var groups = new BakedSceneryGroups(f.World, holds: f.Holds);
+        var groups = new SceneObjects(f.World, holds: f.Holds);
         var captured = groups.Capture(f.Group);
         hand.Rotation = Turn.Yaw(270);
         Assert(groups.Restore(f.Group, captured), "A group restores to a snapshot taken before the hand turned");

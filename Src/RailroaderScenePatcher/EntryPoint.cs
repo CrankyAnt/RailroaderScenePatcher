@@ -143,8 +143,8 @@ namespace RailroaderScenePatcher {
     public sealed partial class PatcherBehaviour : MonoBehaviour {
         IModContext context;
         BoardScene world;
-        IndependentBoards scene;
-        // The scene ground masks of baked scenery groups and of marker objects, with their terrain output.
+        LocationSigns scene;
+        // The scene ground masks of scene objects with child objects and of marker objects, with their terrain output.
         GroundMasks groundMasks;
         GroundMaskWorld groundMaskWorld;
         NativeInventory native;
@@ -266,10 +266,10 @@ namespace RailroaderScenePatcher {
                 inMapEditor = ModScenePatchFiles.IsMapEditor;
                 try {
                     world = new BoardScene();
-                    scene = new IndependentBoards(world, () => native.Discover());
+                    scene = new LocationSigns(world, () => native.Discover());
                 } catch (Exception e) {
                     world?.Dispose(); world = null;
-                    status = "The patcher couldn't prepare to change independent boards: " + e.GetBaseException().Message;
+                    status = "The patcher couldn't prepare to change location signs: " + e.GetBaseException().Message;
                     Report("capability", status + ". Report this to the patcher maintainer.");
                 }
                 // Ground masks register in the terrain system the board world reaches; without it, a group that holds
@@ -307,7 +307,7 @@ namespace RailroaderScenePatcher {
                 capabilities.Live = (target, identity) => target is GameObject live && live != null && live.scene.IsValid() && live.scene.isLoaded &&
                     live.scene.name == identity.Scene && BoardScene.PathOf(live.transform) == identity.Path;
                 if (scene != null) capabilities.Add(scene);
-                else capabilities.AddUnavailable(IndependentBoards.Structure, status);
+                else capabilities.AddUnavailable(LocationSigns.Structure, status);
                 try { capabilities.Add(new BridgeScene(new BridgeWorld(), Capability.Unchecked, groundMasks)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
@@ -317,12 +317,12 @@ namespace RailroaderScenePatcher {
                 GroupWorld groupWorld = null;
                 try {
                     groupWorld = new GroupWorld(); var holds = new PartHolds();
-                    capabilities.Add(new BakedSceneryGroups(groupWorld, Capability.Unchecked, holds, groundMasks));
-                    capabilities.Add(new BakedSceneryParts(groupWorld, holds, masks: groundMasks));
+                    capabilities.Add(new SceneObjects(groupWorld, Capability.Unchecked, holds, groundMasks));
+                    capabilities.Add(new ChildObjects(groupWorld, holds, masks: groundMasks));
                 } catch (Exception e) {
-                    capabilities.AddUnavailable(BakedSceneryGroups.Structure, e.GetBaseException().Message);
-                    capabilities.AddUnavailable(BakedSceneryParts.Structure, e.GetBaseException().Message);
-                    PatcherLog.Debug("The patcher couldn't prepare to change baked scenery groups: " + e.GetBaseException().Message);
+                    capabilities.AddUnavailable(SceneObjects.Structure, e.GetBaseException().Message);
+                    capabilities.AddUnavailable(ChildObjects.Structure, e.GetBaseException().Message);
+                    PatcherLog.Debug("The patcher couldn't prepare to change groups and parts: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Add(new ConstructionSceneryScene(new ConstructionSceneryWorld())); }
                 catch (Exception e) {
@@ -380,7 +380,7 @@ namespace RailroaderScenePatcher {
         internal void PrepareRuntime(IModContext value) {
             if (engine != null) return;
             context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
-            native = new NativeInventory(g => scene == null ? "Independent board editing is unavailable" : scene.Refusal(g));
+            native = new NativeInventory(g => scene == null ? "Location sign editing is unavailable" : scene.Refusal(g));
             OutlinerGrouping.Scene = new OutlinerScene();
             capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds };
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
@@ -427,7 +427,7 @@ namespace RailroaderScenePatcher {
             if (engine == null) return;
             if (world != null) {
                 try { world.Rebind(); }
-                catch (Exception e) { Report("terrain-rebind", "Terrain rebinding failed for independent boards during this load: " + e.GetBaseException().Message + ". " + WindowGuidance.ReloadMap + " Report this to the patcher maintainer."); }
+                catch (Exception e) { Report("terrain-rebind", "Terrain rebinding failed for location signs during this load: " + e.GetBaseException().Message + ". " + WindowGuidance.ReloadMap + " Report this to the patcher maintainer."); }
             }
             IReadOnlyList<LoadedScenePatchFile> scenePatchFiles;
             try { scenePatchFiles = runtime.ApplyLoaded(ModScenePatchFiles.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
@@ -1409,7 +1409,7 @@ namespace RailroaderScenePatcher {
         // Whether the inspected object holds the construction-segment relationship: a rail bridge construction root that
         // carries its construction controller, or a construction controller on an object of its own.
         bool HoldsConstructionSegments => selected != null && (selected.Identity.Structure == ConstructionSceneryScene.Structure
-            || (selected.Identity.Structure == BakedSceneryGroups.Structure && selected.Handle is GameObject root && ConstructionSegmentNative.On(root) != null));
+            || (selected.Identity.Structure == SceneObjects.Structure && selected.Handle is GameObject root && ConstructionSegmentNative.On(root) != null));
         // The construction segments the inspected object's controller names now; empty when it holds none.
         IReadOnlyList<string> CurrentSegments() {
             if (!HoldsConstructionSegments || attachment == null) return Array.Empty<string>();
@@ -1660,16 +1660,16 @@ namespace RailroaderScenePatcher {
         // A crossing pad's geometry is generated along its track binding: a placement moves the pad object and nothing
         // the player sees, and its result says so.
         bool IsPad => selected != null && selected.Identity.Structure == CrossingPadScene.Structure;
-        // The baked scenery rule's verdicts, a debug summary once per load attempt for the evidence of the listed and
-        // unlisted group roots: a count per verdict, with the objects of a verdict that has few.
+        // The scene object rule's verdicts, a debug summary once per load attempt for the evidence of the listed and
+        // unlisted top scene objects: a count per verdict, with the objects of a verdict that has few.
         string loggedVerdicts;
         void LogGroupVerdicts() {
             if (loggedVerdicts == loadId) return;
             loggedVerdicts = loadId;
             if (!PatcherLog.DebugEnabled) return;
             try {
-                foreach (var line in BakedSceneryChecks.Summary(GroupWorld.Report())) PatcherLog.Debug(LoadAttempt.Label + ": " + line);
-            } catch (Exception e) { PatcherLog.Debug(LoadAttempt.Label + ": The patcher couldn't report the baked scenery checks: " + e.GetBaseException().Message); }
+                foreach (var line in SceneObjectChecks.Summary(GroupWorld.Report())) PatcherLog.Debug(LoadAttempt.Label + ": " + line);
+            } catch (Exception e) { PatcherLog.Debug(LoadAttempt.Label + ": The patcher couldn't report the scene object checks: " + e.GetBaseException().Message); }
         }
         void Inspect() {
             feedback.Refreshed();

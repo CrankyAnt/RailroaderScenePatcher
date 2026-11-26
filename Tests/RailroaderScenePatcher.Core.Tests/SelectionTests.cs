@@ -269,14 +269,14 @@ static class SelectionTests {
         mapEditor.Redo();
         Check(board.X == 12, "The prior placement is still redoable after cancellation");
 
-        // The choice list of a game-defined group. Beyond 125 metres a grade-crossing setup shows one square marker;
+        // The choice list of a complex. Beyond 125 metres a grade-crossing setup shows one square marker;
         // the click rule picks the group there, and its objects are the offers of the list.
         var parts = new[] { "controller", "light", "gate" }.Select(name => new Box { X = 40 }).ToArray();
         var members = parts.Select((part, index) => new SelectionCandidate(part, SelectionIdentity.SceneObject(new TargetIdentity("s", "crossing/" + index, "c")), "Crossing part " + index)).ToArray();
         candidates.Items.AddRange(members);
         var offered = new[] { source }.Concat(members).ToArray();
         var marker = new PickTarget(300, 300, true, false);
-        var crossing = new PickGroup(marker, new[] { 1, 2, 3 }, kind: GameDefinedGroupKind.GradeCrossingSetup);
+        var crossing = new PickGroup(marker, new[] { 1, 2, 3 }, kind: ComplexKind.GradeCrossingSetup);
         var picked = WorldPick.Resolve(301, 299, new[] { new PickTarget(900, 300, true, false), marker, marker, marker }, new[] { crossing });
         undo = mapEditor.UndoGroups.ToArray(); redo = mapEditor.RedoGroups.ToArray(); scenePatchFile = editing.ScenePatchFileText; saved = store.Patch; dirty = mapEditor.IsDirty; writes = store.PatchWrites;
         var mutations = scene.MutationCalls;
@@ -301,11 +301,11 @@ static class SelectionTests {
         choices.Pending.Offer(mixed.Objects.Select(index => offered[index]), mixed.IsCrossingSetup);
         Check(choices.Pending.OfferCountText == "4 objects." && choices.Pending.OfferListInstruction == PendingSelection.SeveralOffers,
             "An overlapping marker can add an unrelated object to the crossing list, giving it a generic footer");
-        var station = new PickGroup(marker, new[] { 1, 2, 3 }, kind: GameDefinedGroupKind.BakedSceneryGroup);
+        var station = new PickGroup(marker, new[] { 1, 2, 3 }, kind: ComplexKind.SceneObject);
         var otherGroup = WorldPick.Resolve(301, 299, new[] { new PickTarget(900, 300, true, false), marker, marker, marker }, new[] { station });
         choices.Pending.Offer(otherGroup.Objects.Select(index => offered[index]), otherGroup.IsCrossingSetup);
         Check(choices.Pending.OfferCountText == "3 objects." && choices.Pending.OfferListInstruction == PendingSelection.SeveralOffers,
-            "Other game-defined groups have a generic footer even when they are picked on their own");
+            "Other complexes have a generic footer even when they are picked on their own");
         choices.Pending.Offer(picked.Objects.Select(index => offered[index]), picked.IsCrossingSetup);
         Check(!choices.Confirm() && choices.Pending.ListOpen, "A group's open choice list cannot be confirmed without a choice");
         choices.Pending.Choose(members[2]);

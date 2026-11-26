@@ -122,7 +122,7 @@ static class ObjectMarkingGeometryTests {
     // whistle signs and its invisible detection spans stand below the same root but are no box of that frame. Every
     // other member of the setup keeps its own frame.
     static void CrossingControllerFramesItsSetup() {
-        Check(ObjectMarkingGeometry.FramesWhole("Crossing controller") && !ObjectMarkingGeometry.FramesWhole("Crossing mast") && !ObjectMarkingGeometry.FramesWhole("Crossing bell") &&
+        Check(ObjectMarkingGeometry.FramesWhole("Grade crossing controller") && !ObjectMarkingGeometry.FramesWhole("Crossing mast") && !ObjectMarkingGeometry.FramesWhole("Crossing bell") &&
             !ObjectMarkingGeometry.FramesWhole("Crossing pad marker") && !ObjectMarkingGeometry.FramesWhole("Track marker"),
             "a crossing controller is framed whole; the other members of its setup by the piece at their marker");
         // Gov Island: the controller's root holds two masts with their gates 12 m apart, a bell, a pad, a whistle sign
@@ -138,10 +138,10 @@ static class ObjectMarkingGeometryTests {
             new { Part = Box("whistle sign", 300, 1.5, 100, .3, 1.5, .1), Families = new[] { "Track marker" } },
             new { Part = Box("detection span", -150, .1, 100, 150, .1, .1), Families = new[] { "Track span" } },
         };
-        var counted = renderers.Where(r => ObjectMarkingGeometry.WholeCounts("Crossing controller", r.Families)).Select(r => r.Part).ToArray();
+        var counted = renderers.Where(r => ObjectMarkingGeometry.WholeCounts("Grade crossing controller", r.Families)).Select(r => r.Part).ToArray();
         Check(counted.Select(p => p.Name).SequenceEqual(new[] { "mast 1", "gate 1", "mast 2", "bell", "pad", "pad mesh" }),
             "the controller's frame counts its masts, gates, bell and pad, and leaves its whistle sign and detection span out: " + String.Join(", ", counted.Select(p => p.Name)));
-        var whole = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, counted, Camera, View, null, ObjectMarkingGeometry.FrameDistance, null, ObjectMarkingGeometry.FramesWhole("Crossing controller"));
+        var whole = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, counted, Camera, View, null, ObjectMarkingGeometry.FrameDistance, null, ObjectMarkingGeometry.FramesWhole("Grade crossing controller"));
         Check(whole.Bounds.HasValue && whole.Bounds.Value.Min.X <= -.29 && whole.Bounds.Value.Max.X >= 12.29 && whole.Bounds.Value.Max.X < 20 && whole.Bounds.Value.Max.Y >= 6.19,
             "the controller's frame encloses both masts, the gate, the bell and the pad and stops short of the whistle sign: " + whole.Bounds);
         Check(whole.Marker.HasValue && Math.Abs(whole.Marker.Value.X - (whole.Bounds.Value.Min.X + whole.Bounds.Value.Max.X) / 2) < 1e-6,
@@ -149,9 +149,9 @@ static class ObjectMarkingGeometryTests {
         // Framed by the piece at its marker, as before, the frame stopped at the mast next to the marker.
         var piece = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, counted, Camera, View, null);
         Check(piece.Bounds.HasValue && piece.Bounds.Value.Max.X < 12, "framed by the piece at its marker, one mast is framed: " + piece.Bounds);
-        // Nothing else framed whole leaves anything out: a baked scenery group root keeps the track markers below it.
-        Check(ObjectMarkingGeometry.WholeCounts("Baked scenery group", new[] { "Track marker" }) && ObjectMarkingGeometry.WholeCounts("Baked scenery group", new[] { "Track span" }),
-            "a baked scenery group root's frame keeps every object below it");
+        // Nothing else framed whole leaves anything out: a top scene object keeps the track markers below it.
+        Check(ObjectMarkingGeometry.WholeCounts("Scene object", new[] { "Track marker" }) && ObjectMarkingGeometry.WholeCounts("Scene object", new[] { "Track span" }),
+            "a top scene object's frame keeps every object below it");
     }
 
     // A renderer outlines its object whether or not the game's distance culling shows it now: on, or off only through
@@ -702,7 +702,7 @@ static class ObjectMarkingGeometryTests {
         var single = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, new[] { slabs[0] }, slant, View, null, ObjectMarkingGeometry.FrameDistance, WorldBasis.World);
         var alone = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, new[] { slabs[0] }, slant, View, null);
         Check(Math.Abs(Shoelace(single.Outline) - Shoelace(alone.Outline)) < 1e-9, "the frame uses the orientation of the single box");
-        // A baked scenery group is one inventory object for everything below its root. Andrews Depot: the root
+        // A scene object with child objects is one inventory object for everything below its root. Andrews Depot: the root
         // stands at the east end of the building, where a lamp half a metre wide is the nearest box. The hall is
         // 40 m long and the platform 44 m: far larger than the lamp, and the far end of the platform is apart from
         // it. Framed as an object whose marker belongs to one of its boxes, only the lamp is framed.
@@ -726,10 +726,10 @@ static class ObjectMarkingGeometryTests {
             Check(all.Contains(expected), "framed whole, decision recorded: " + expected + " in " + String.Join("; ", all));
         Check(Math.Abs(depot.Distance - 95) < 1e-9 && depot.Bounds.Value.Min.X == -60.5 && depot.Bounds.Value.Max.X == 22, "its distance runs to the bounds of all its boxes");
         Check(depot.Frame.Value.Width > 10 * lampOnly.Frame.Value.Width, "the whole frame is the building's, not the lamp's");
-        // Which inventory objects stand for everything below them: the root of a baked scenery group, and a crossing
+        // Which inventory objects stand for everything below them: a top scene object, and a crossing
         // controller, which stands for its grade-crossing setup (CrossingControllerFramesItsSetup).
-        Check(ObjectMarkingGeometry.FramesWhole("Baked scenery group") && ObjectMarkingGeometry.FramesWhole("Crossing controller") && !ObjectMarkingGeometry.FramesWhole("Track marker") && !ObjectMarkingGeometry.FramesWhole(null),
-            "a baked scenery group and a crossing controller are framed whole; an object of another family by the piece at its marker");
+        Check(ObjectMarkingGeometry.FramesWhole("Scene object") && ObjectMarkingGeometry.FramesWhole("Grade crossing controller") && !ObjectMarkingGeometry.FramesWhole("Track marker") && !ObjectMarkingGeometry.FramesWhole(null),
+            "a scene object with child objects and a crossing controller are framed whole; an object of another family by the piece at its marker");
         Console.WriteLine("PASS: one enclosing frame in the object's orientation, cut at the ground");
     }
 }

@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
-// One scene ground mask of the controlled world: the object that holds it, the group root when On is null, the turn of
+// One scene ground mask of the controlled world: the object that holds it, the top scene object when On is null, the turn of
 // its shape against its holder, and the keys of the registrations it holds in the terrain system.
 class FakeMask {
     public string Id, Holder;
@@ -147,7 +147,7 @@ sealed class HeldMaskTerrain : IGroundMaskWorld {
 }
 
 // Baked buildings with their own scene ground masks: the flag-stop stations and depots of the base-game map join the
-// Baked scenery group family, and a move of the object that holds a mask, or of its group, takes the mask's
+// Scene object and Child object families, and a move of the object that holds a mask, or of its group, takes the mask's
 // registration along, with the terrain output at the old and the new place tracked to completion.
 static class GroundMaskTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception("Ground masks: " + message); }
@@ -173,7 +173,7 @@ static class GroundMaskTests {
             Terrain.BuildTiles();
             var holds = new PartHolds();
             var scene = new SceneCapabilities(() => World.Maps, null);
-            scene.Add(new BakedSceneryGroups(World, holds: holds, masks: Masks)); scene.Add(new BakedSceneryParts(World, holds, masks: Masks));
+            scene.Add(new SceneObjects(World, holds: holds, masks: Masks)); scene.Add(new ChildObjects(World, holds, masks: Masks));
             Engine = new PatchEngine(scene);
         }
         public double[] At(object handle) => (handle is FakeGroup group ? World.Observe(group).Root.Placement : World.ObservePart(handle).Part.Placement).Position.ToArray();
@@ -189,11 +189,11 @@ static class GroundMaskTests {
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
         (position == null ? "" : ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + N(position) + "],\"rotation\":[" + String.Join(",", Turn.Yaw(yaw).Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "]}") +
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
-    static string GroupMod(string id, double[] position = null, bool? active = null, double yaw = 0) => Mod(id, Station, BakedSceneryGroups.Structure, position, active, yaw);
-    static string PartMod(string id, string path, double[] position = null, bool? active = null, double yaw = 0) => Mod(id, path, BakedSceneryParts.Structure, position, active, yaw);
+    static string GroupMod(string id, double[] position = null, bool? active = null, double yaw = 0) => Mod(id, Station, SceneObjects.Structure, position, active, yaw);
+    static string PartMod(string id, string path, double[] position = null, bool? active = null, double yaw = 0) => Mod(id, path, ChildObjects.Structure, position, active, yaw);
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
-    static readonly TargetIdentity StationId = new TargetIdentity(SceneName, Station, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
-    static readonly TargetIdentity FoundationId = new TargetIdentity(SceneName, Foundation, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure);
+    static readonly TargetIdentity StationId = new TargetIdentity(SceneName, Station, SceneObjects.ComponentType, SceneObjects.Structure);
+    static readonly TargetIdentity FoundationId = new TargetIdentity(SceneName, Foundation, ChildObjects.ComponentType, ChildObjects.Structure);
 
     // A map context change in one session, such as the editor's default map and then a mod's map: the earlier host is
     // released, the next host checks the game's ground mask members, and only then does Unity destroy the earlier host,
@@ -239,7 +239,7 @@ static class GroundMaskTests {
         Console.WriteLine("PASS: ground masks");
     }
 
-    // The mask on the group root follows a move and a turn of the group: one registration, at the new centre, with
+    // The mask on the top scene object follows a move and a turn of the group: one registration, at the new centre, with
     // the shape's direction turned with the group. The terrain at the old and the new place is outstanding until the
     // game rebuilds it.
     static void GroupMoveCarriesTheMaskOfItsRoot() {
@@ -398,7 +398,7 @@ static class GroundMaskTests {
     }
     static SceneCapabilities Scene(Stop f) {
         var holds = new PartHolds(); var scene = new SceneCapabilities(() => f.World.Maps, null);
-        scene.Add(new BakedSceneryGroups(f.World, holds: holds, masks: f.Masks)); scene.Add(new BakedSceneryParts(f.World, holds, masks: f.Masks));
+        scene.Add(new SceneObjects(f.World, holds: holds, masks: f.Masks)); scene.Add(new ChildObjects(f.World, holds, masks: f.Masks));
         return scene;
     }
 
@@ -502,27 +502,27 @@ static class GroundMaskTests {
     static void InventoryListsTheStationsAndDepotsWithTheirParts() {
         var hemingway = SmallStation("Hemingway flagstopstation").With("Track.TrackMarker", "Track.TrackRelativePosition").Family();
         var towns = Stations.Select(s => new Node(s[0], SmallStation(s[1]))).Concat(Depots.Select(d => new Node(d[0], Depot(d[1])))).Concat(new[] { new Node("Hemingway", hemingway) }).ToArray();
-        var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", towns)));
-        var parts = BakedSceneryRules.Parts(verdicts).ToDictionary(p => p.Path, p => p);
+        var verdicts = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", towns)));
+        var parts = SceneObjectRules.Parts(verdicts).ToDictionary(p => p.Path, p => p);
         foreach (var item in Stations.Concat(Depots)) {
             var path = "World/Large Scenery/" + item[0] + "/" + item[1];
             var verdict = verdicts.SingleOrDefault(v => v.Path == path);
-            Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Category == BakedSceneryCategories.StationBuilding && verdict.Ticket == null, path + " is a listed group under Station building: " + verdict?.Disposition + " " + verdict?.Reason);
+            Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Category == SceneObjectCategories.StationBuilding && verdict.Ticket == null, path + " is a listed group under Station building: " + verdict?.Disposition + " " + verdict?.Reason);
             Assert(parts[path + "/Mask"].Disposition == PartDisposition.Part, "The object that holds the ground mask is a part of " + path);
         }
         var rhodo = "World/Large Scenery/Rhodo/Rhodo Station/";
         var listed = parts.Values.Where(p => p.Disposition == PartDisposition.Part && p.Path.StartsWith(rhodo, StringComparison.Ordinal)).Select(p => p.Path.Substring(rhodo.Length)).ToArray();
         Assert(listed.SequenceEqual(new[] { "Spotlight Outdoor (3)", "Mask", "Sign-Station Synchronized", "Sign-Station Synchronized/Text", "Sign-Station Synchronized/Sign-Station", "Sign-Station Synchronized (1)", "Sign-Station Synchronized (1)/Text", "Sign-Station Synchronized (1)/Sign-Station" }),
             "The parts of a flag-stop station: " + String.Join(", ", listed));
-        Assert(parts[rhodo + "Station"].Disposition == PartDisposition.NotListed && parts[rhodo + "Station"].Reason == BakedSceneryRules.NoPhysicalPresence, "The prop instance has no saved renderer and is no part");
+        Assert(parts[rhodo + "Station"].Disposition == PartDisposition.NotListed && parts[rhodo + "Station"].Reason == SceneObjectRules.NoPhysicalPresence, "The prop instance has no saved renderer and is no part");
         var marker = verdicts.SingleOrDefault(v => v.Path == "World/Large Scenery/Hemingway/Hemingway flagstopstation");
         Assert(marker?.Disposition == GroupDisposition.ExistingFamily, "Hemingway, whose track marker stands on its root, keeps its marker family: " + marker?.Disposition);
-        Assert(!BakedSceneryRules.Exclusions.Any(e => e.Component.StartsWith(BakedSceneryRules.GroundMasks, StringComparison.Ordinal)), "No exclusion names a scene ground mask");
-        Assert(BakedSceneryRules.HoldsGroundMask(new[] { "UnityEngine.Transform", "Map.Runtime.MaskComponents.CircleMapMask" }) && !BakedSceneryRules.HoldsGroundMask(new[] { "UnityEngine.Light" }) && !BakedSceneryRules.HoldsGroundMask(null), "Every component in Map.Runtime.MaskComponents is a scene ground mask");
+        Assert(!SceneObjectRules.Exclusions.Any(e => e.Component.StartsWith(SceneObjectRules.GroundMasks, StringComparison.Ordinal)), "No exclusion names a scene ground mask");
+        Assert(SceneObjectRules.HoldsGroundMask(new[] { "UnityEngine.Transform", "Map.Runtime.MaskComponents.CircleMapMask" }) && !SceneObjectRules.HoldsGroundMask(new[] { "UnityEngine.Light" }) && !SceneObjectRules.HoldsGroundMask(null), "Every component in Map.Runtime.MaskComponents is a scene ground mask");
     }
 
     // The Object tab names the part that holds the ground mask and says that moving it moves the terrain shaping; the
-    // group root and a part above the mask name the part that holds it. The Changes tab shows terrain output for them.
+    // top scene object and a part above the mask name the part that holds it. The Changes tab shows terrain output for them.
     static void ObjectTabNamesTheMaskHolder() {
         Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false) == "Ground mask: this part holds the scene ground mask. Moving this part moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The holder's line: " + CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false));
@@ -551,11 +551,11 @@ static class GroundMaskTests {
             "The use of a flattening holder names the move");
         Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) }) == "The building is decorative. The ground mask of its part Mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
             "The use of a group above a flattening mask names its holder and the move, as Wilmot Station's");
-        // Several holders are named together; the group root's own mask stays "Its ground mask".
+        // Several holders are named together; the top scene object's own mask stays "Its ground mask".
         Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask", "Pad" }, false) }) == "The building is decorative. The ground masks of its parts Mask and Pad shape the ground and the vegetation where they stand, so moving or disabling this group changes the terrain there.",
             "Several holders: " + CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask", "Pad" }, false) }));
         Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(true, new[] { "Root" }, false, group: true) }).StartsWith("The building is decorative. Its ground mask shapes", StringComparison.Ordinal),
-            "A mask on the group root is the group's own");
+            "A mask on the top scene object is the group's own");
         // Below a marker object the holder is no part of a family: the line calls it an object.
         Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false) == "Ground mask: the object Mask holds the scene ground mask. The mask also flattens the ground. Moving this object moves that object, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of a marker object above the holder: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false));
@@ -642,7 +642,7 @@ static class GroundMaskTests {
         Assert(GroundMasks.MovedByEdit(true, new[] { "UnityEngine.Transform", "Track.TrackMarker", "Map.Runtime.MaskComponents.RectangleMapMask" }) && GroundMasks.MovedByEdit(false, new[] { "Map.Runtime.MaskComponents.RectangleMapMask" }),
             "Any other mask moves with the edit of its holder or of an object above it");
     }
-    // A mask whose holder is an independent board, a renderer culler with a circle mask such as a Loc: location sign:
+    // A mask whose holder is a location sign, a renderer culler with a circle mask such as a Loc: location sign:
     // the board family moves it when the board is the edited target.
     static void BoardMaskStaysWithTheBoardFamily() {
         Assert(GroundMasks.HeldByBoard(new[] { "UnityEngine.Transform", "Helpers.Culling.RendererCuller", "Map.Runtime.MaskComponents.CircleMapMask", "Helpers.TextSynchronizer" }),

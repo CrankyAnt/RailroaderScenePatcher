@@ -12,11 +12,11 @@ using UnityEngine;
 namespace RailroaderScenePatcher {
     // Reads serialized bindings and direct references, never binding/cache getters or TryApply.
     internal sealed class NativeInventory : ISteppedInspectionScene, IRelatedInspectionScene, IOwnedObjectScene, ICheckedObjectsScene {
-        // The baked scenery rule's checks, for the window's reason on a map where it lists nothing. A failed read reports
+        // The scene object rule's checks, for the window's reason on a map where it lists nothing. A failed read reports
         // no checks, so the window keeps its list.
         public IEnumerable<string> CheckedObjects() {
             try { return GroupWorld.Checks(); }
-            catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Debug("The patcher couldn't read the baked scenery checks for the object list: " + e.GetBaseException().Message); return Array.Empty<string>(); }
+            catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Debug("The patcher couldn't read the scene object checks for the object list: " + e.GetBaseException().Message); return Array.Empty<string>(); }
         }
         // Observes one component with what the last discovery learned about the rest of the scene: who references what,
         // the graph's segments and the setup holders. A discovery sets it when that knowledge is complete.
@@ -47,15 +47,15 @@ namespace RailroaderScenePatcher {
             CrossingDeviceWorld.InvalidateHolders();
             var roots = new List<GameObject> { target };
             var found = new List<SceneObservation>();
-            // A group root or a part is observed through its transform; the families below it through their own components.
+            // A top scene object or a part is observed through its transform; the families below it through their own components.
             var group = GroupWorld.FamilyOf(target);
             if (group != null) {
                 found.Add(observer(target.transform, group));
-                // An edit of a group root or a part moves or switches every part below it with it: those parts are
+                // An edit of a top scene object or a part moves or switches every part below it with it: those parts are
                 // entries of their own, and they take their new observations too, so the edit's own consequence never
                 // reads as a change by another hand.
                 foreach (var below in target.GetComponentsInChildren<Transform>(true))
-                    if (below != target.transform && GroupWorld.IsPart(below.gameObject)) found.Add(observer(below, BakedSceneryRules.Family));
+                    if (below != target.transform && GroupWorld.IsPart(below.gameObject)) found.Add(observer(below, SceneObjectRules.ChildFamily));
             }
             if (Get(target, Crossing) != null)
                 roots.AddRange(target.scene.GetRootGameObjects().Where(root => root != null && root.name == CrossingCoverageWorld.RootName));
@@ -95,7 +95,7 @@ namespace RailroaderScenePatcher {
         const string MastFamily = ExistingEquipmentScene.MastFamily, BellFamily = ExistingEquipmentScene.BellFamily;
         const string Marker = "Track.TrackMarker", Span = "Track.TrackSpan", Relative = "Track.TrackRelativePosition";
         const string Crossing = "Track.Crossings.GradeCrossingController", Milepost = "Helpers.MilePost";
-        const string ConstructionScenery = "Game.Mow.TrackConstructionScenery", Pile = "Scenery.Pile", LogPond = BakedSceneryRules.LogPond, LakeSurface = BakedSceneryRules.LakeSurface;
+        const string ConstructionScenery = "Game.Mow.TrackConstructionScenery", Pile = "Scenery.Pile", LogPond = SceneObjectRules.LogPond, LakeSurface = SceneObjectRules.LakeSurface;
         public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
         // Why a board candidate cannot be edited, from the board capability; null when that capability is unavailable.
         readonly Func<GameObject, string> boardRefusal;
@@ -140,7 +140,7 @@ namespace RailroaderScenePatcher {
                     foreach (var item in filled) if (item is Component scenery && scenery != null && !found.ContainsKey(scenery.gameObject)) found[scenery.gameObject] = storage.gameObject;
             return found;
         }
-        // The game logic a group root or part of a building with pickable toggles owns, as bindings in the order the
+        // The game logic a top scene object or part of a building with pickable toggles owns, as bindings in the order the
         // scene lists it: its own object and the objects below it down to the next part. A toggle in a part below is
         // only counted, and so is a key-value object there. A group without a toggle adds nothing.
         static void InteractiveBindings(GameObject go, GameObject root, List<string> bindings, List<string> dependencies) {
@@ -220,7 +220,7 @@ namespace RailroaderScenePatcher {
             } catch { }
             return photoMarkers = found;
         }
-        // The family of a component that is not a transform, for the baked scenery rule's check of existing families.
+        // The family of a component that is not a transform, for the scene object rule's check of existing families.
         internal static string FamilyOf(Component c) => c is Transform ? null : Family(c);
         // The car placements of the loaded setups as the last discovery read them. A single object observed later is
         // classified by them, as it takes the reference scan of that discovery. Setups that could not be read classify
@@ -242,8 +242,8 @@ namespace RailroaderScenePatcher {
             var type = TypeName(c); var go = c.gameObject;
             // Every object below a scene root that holds signals, CTC and interlocking, game logic, native operations data or
             // editor helpers stays out; a starter placement marker below Setups keeps its family.
-            if (!BakedSceneryRules.ListedBelow(c.transform.root.name, type == Marker)) return null;
-            // A group root of the baked scenery rule, and a part of a listed group, is listed through its transform.
+            if (!SceneObjectRules.ListedBelow(c.transform.root.name, type == Marker)) return null;
+            // A top scene object of the scene object rule, and a part of a listed group, is listed through its transform.
             if (c is Transform) return GroupWorld.FamilyOf(go);
             if (type == Milepost) return "Milepost";
             if (SpawnPoints.FamilyOf(type, c.transform.root.name) is string spawnFamily) return spawnFamily;
@@ -258,8 +258,8 @@ namespace RailroaderScenePatcher {
             if (type == Relative && Get(go, Marker) == null) return "Track-relative scene object";
             // A span the game builds from the map's operations data is not serialized and stays with the native map
             // editor; the spans this patcher adds for a crossing are listed.
-            if (type == Span) return BakedSceneryRules.SpanListed(!Transient(c.transform, null), c.transform.root.name == CrossingCoverageWorld.RootName) ? "Track span" : null;
-            if (type == Crossing) return "Crossing controller";
+            if (type == Span) return SceneObjectRules.SpanListed(!Transient(c.transform, null), c.transform.root.name == CrossingCoverageWorld.RootName) ? "Track span" : null;
+            if (type == Crossing) return "Grade crossing controller";
             // A crossing mast is one entry: its light object. The gate on a child of that object is a part of the
             // entry and gets no row. A gate that stands on no light object stays visible as a mast that does not
             // conform, with its reason.
@@ -268,12 +268,12 @@ namespace RailroaderScenePatcher {
                 return type == ExistingEquipmentScene.GateComponent && CrossingDeviceWorld.OnLightObject(c.transform) ? null : MastFamily;
             }
             if (type == BoardScene.CullerType && BridgeWorld.SupportedPaths.Contains(BoardScene.PathOf(c.transform))) return "Bridge";
-            if (type == BoardScene.CullerType && Get(go, BoardScene.MaskType) != null && Get(go, Marker) == null) return "Independent board";
+            if (type == BoardScene.CullerType && Get(go, BoardScene.MaskType) != null && Get(go, Marker) == null) return "Location sign";
             if (type == ConstructionScenery && BoardScene.PathOf(c.transform) == ConstructionSceneryWorld.ElaPath) return CommandBand.ConstructionSceneryFamily;
             if (type == StationMapIconRules.Component && StationMapIconRules.Listed(BoardScene.PathOf(c.transform))) return StationMapIconRules.Family;
             return null;
         }
-        // The families other than the baked scenery group family whose capability moves the scene ground masks at and
+        // The families other than the scene object with child objects family whose capability moves the scene ground masks at and
         // below its object.
         static bool MovesGroundMasks(string family) => family == "Track marker" || family == "Bridge" || family == "Milepost" || family == "Crossing pad marker"
             || family == StationMapIconRules.Family || family == SpawnPoints.Family;
@@ -290,7 +290,7 @@ namespace RailroaderScenePatcher {
         // by its own observations, and single-object observation keeps the last complete scan, so an object observed
         // alone meanwhile is not classified by the incomplete one.
         static IEnumerable<SceneObservation> Steps(Func<GameObject, string> boardRefusal, bool whole) {
-            // A whole discovery reads the group roots again; a stepped pass reuses them while the hierarchy above them stays.
+            // A whole discovery reads the top scene objects again; a stepped pass reuses them while the hierarchy above them stays.
             if (whole) GroupWorld.Invalidate();
             // A whole discovery measures the crossing detection routes afresh; a changed track node clears them anyway.
             if (whole) CrossingDetectionTrack.Invalidate();
@@ -337,8 +337,8 @@ namespace RailroaderScenePatcher {
             HashSet<string> segmentIds = null;
             PhotoMarkers(true);
             string graphError = null;
-            // The components of the scene, and the transforms of the group roots and parts, which may carry no behaviour at all.
-            var steps = DiscoveryWalk.Steps<Component>(() => Resources.FindObjectsOfTypeAll<MonoBehaviour>().Cast<Component>().Concat(GroupRoots()), Loaded,
+            // The components of the scene, and the transforms of the top scene objects and parts, which may carry no behaviour at all.
+            var steps = DiscoveryWalk.Steps<Component>(() => Resources.FindObjectsOfTypeAll<MonoBehaviour>().Cast<Component>().Concat(TopObjects()), Loaded,
                 owner => {
                     if (!(owner is MonoBehaviour)) return true;
                     try { walk.Add(owner); return true; }
@@ -387,9 +387,9 @@ namespace RailroaderScenePatcher {
                 component => CopyPart(component));
             foreach (var step in steps) yield return step;
         }
-        // The transforms of the group roots the baked scenery rule lists, in the family or as inspection only, and of the
+        // The transforms of the top scene objects the scene object rule lists, in the family or as inspection only, and of the
         // parts of the listed groups.
-        static IEnumerable<Component> GroupRoots() =>
+        static IEnumerable<Component> TopObjects() =>
             GroupWorld.Verdicts().Where(pair => pair.Key != null && GroupWorld.FamilyOf(pair.Key) != null).Select(pair => (Component)pair.Key.transform)
                 .Concat(GroupWorld.Parts().Select(part => (Component)part.transform)).ToArray();
         static bool Transient(Transform child, Transform root) {
@@ -401,9 +401,9 @@ namespace RailroaderScenePatcher {
             var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>(); var duplicate = new List<string>();
             // The segment ids of the construction controller this entry names, for its construction segment problems.
             string[] constructionIds = null;
-            // A transform stands for a group root or a part of a listed group.
+            // A transform stands for a top scene object or a part of a listed group.
             var part = c is Transform && GroupWorld.IsPart(go);
-            var groupRoot = c is Transform && !part;
+            var topObject = c is Transform && !part;
             // The object's own active flag. What a culler switches off by camera distance is no disabling; an object
             // that is off while its culler shows its objects was switched off by the scene or by a patch.
             var enabled = AuthoredActivity.Enabled(GroupWorld.OwnActivity(go), culled.ContainsKey(go), !hidden.Contains(go));
@@ -540,8 +540,8 @@ namespace RailroaderScenePatcher {
             });
             if (Get(go, BoardScene.CullerType) != null) dependencies.Add("Culling registration and origin-dependent position.");
             if (Get(go, BoardScene.MaskType) != null) dependencies.Add("Terrain mask registration and generated terrain/vegetation output.");
-            if (groupRoot) dependencies.Add("Culling and colliders of every part follow the group root.");
-            if (part) dependencies.Add(BakedSceneryRules.PartCullingDependency);
+            if (topObject) dependencies.Add("Culling and colliders of every part follow the group.");
+            if (part) dependencies.Add(SceneObjectRules.PartCullingDependency);
             // A storage pile shows its industry's storage by the ids its synchronizer reads, wherever the pile stands. The
             // ids are a binding; the storage's name is presentation only.
             string storageName = null;
@@ -549,9 +549,9 @@ namespace RailroaderScenePatcher {
                 var storage = PileStorage(go);
                 if (storage != null) { bindings.Add(storage.Item1); storageName = storage.Item2; dependencies.Add("Industry storage display: the pile rebuilds its logs and collider at its current position."); }
             });
-            // A log pond's logs show their storage as a pile does; a group root or part that holds them names that
+            // A log pond's logs show their storage as a pile does; a top scene object or part that holds them names that
             // storage for the Object tab, as presentation only.
-            if ((groupRoot || part) && Get(go, Pile) == null) Read(() => {
+            if ((topObject || part) && Get(go, Pile) == null) Read(() => {
                 var ponds = components.Where(component => component != null && TypeName(component) == LogPond).ToArray();
                 if (ponds.Length == 0) return;
                 var self = ponds[0].gameObject == go;
@@ -562,18 +562,18 @@ namespace RailroaderScenePatcher {
             });
             // The water mesh of a lake surface moves with its object, unless the game draws it from a static batch; the
             // native lake masks and rivers do not move.
-            if ((groupRoot || part) && components.Any(component => component != null && TypeName(component) == LakeSurface))
+            if ((topObject || part) && components.Any(component => component != null && TypeName(component) == LakeSurface))
                 dependencies.Add(CommandBand.LakeSurfaceDependency(GroupWorld.BatchedLake(go) != null));
-            // A group root or part that holds storage piles below it says so, for the Object tab.
-            if ((groupRoot || part) && Get(go, Pile) == null) Read(() => {
+            // A top scene object or part that holds storage piles below it says so, for the Object tab.
+            if ((topObject || part) && Get(go, Pile) == null) Read(() => {
                 var piles = components.Count(component => component != null && TypeName(component) == Pile);
                 if (piles != 0) bindings.Add(CommandBand.PilesBinding(piles));
             });
             // A rail bridge construction shows or hides its parts by the construction state of the track segments its
-            // controller names, wherever it stands: each segment is a binding of the group root and of every part below the
-            // controller. A segment that no longer exists keeps its id with a remark. On the group root, whose Connections
+            // controller names, wherever it stands: each segment is a binding of the top scene object and of every part below the
+            // controller. A segment that no longer exists keeps its id with a remark. On the top scene object, whose Connections
             // tab repairs the construction segments, it is also a problem, once the group is known to be editable below.
-            if (groupRoot || part) Read(() => {
+            if (topObject || part) Read(() => {
                 var ids = GroupWorld.ConstructionSegmentsOf(go);
                 if (ids == null) return;
                 bindings.AddRange(CommandBand.ConstructionBindings(ids, segmentIds));
@@ -581,16 +581,16 @@ namespace RailroaderScenePatcher {
                 constructionIds = ids;
             });
             // A scene ground mask shapes the terrain where its object stands: the part that holds it says so, and the
-            // group root, a part above it and a marker object above it name that part. A bridge, milepost, crossing pad,
+            // top scene object, a part above it and a marker object above it name that part. A bridge, milepost, crossing pad,
             // station map icon or spawn point moves its masks too.
-            if (groupRoot || part || MovesGroundMasks(family)) Read(() => {
+            if (topObject || part || MovesGroundMasks(family)) Read(() => {
                 var holders = GroundMaskWorld.Holders(go, out var flattens);
-                if (holders.Count != 0) dependencies.Add(CommandBand.GroundMaskDependency(holders.Count == 1 && holders[0] == go, holders.Select(holder => holder.name), flattens, groupRoot || part, groupRoot));
+                if (holders.Count != 0) dependencies.Add(CommandBand.GroundMaskDependency(holders.Count == 1 && holders[0] == go, holders.Select(holder => holder.name), flattens, topObject || part, topObject));
             });
             // A building with pickable toggles: each entry names the toggles, the key-value object and the name text it
             // owns, its own object and those below it outside its parts, and counts the toggles in its parts. Other
             // groups read none of this, so their bindings stay as they were.
-            if (groupRoot || part) Read(() => InteractiveBindings(go, groupRoot ? go : GroupWorld.GroupRootOf(go), bindings, dependencies));
+            if (topObject || part) Read(() => InteractiveBindings(go, topObject ? go : GroupWorld.TopObjectOf(go), bindings, dependencies));
             if (family.StartsWith("Bridge", StringComparison.Ordinal)) dependencies.Add("Colliders and culling. Separate construction scenery has its own placement.");
             var icon = family == StationMapIconRules.Family;
             if (icon) dependencies.Add(StationMapIconRules.Dependency);
@@ -598,10 +598,10 @@ namespace RailroaderScenePatcher {
             // is active in the game changes with every camera jump. Its activity is what the scene authored: every
             // object from it upward that no culler switches is switched on. What the cullers do now is runtime state.
             var active = go.activeInHierarchy;
-            // A simple culler on a group root switches the root itself by camera distance: what it switches is runtime
+            // A simple culler on a top scene object switches the root itself by camera distance: what it switches is runtime
             // state, as for the cullers of crossing equipment.
-            if (groupRoot || part) enabled = GroupWorld.Enabled(go);
-            if (CulledFamilies.Contains(family) || groupRoot || part) {
+            if (topObject || part) enabled = GroupWorld.Enabled(go);
+            if (CulledFamilies.Contains(family) || topObject || part) {
                 var chain = new List<KeyValuePair<bool, bool>>();
                 for (var t = go.transform; t != null; t = t.parent) {
                     var switched = culled.TryGetValue(t.gameObject, out var by);
@@ -624,7 +624,7 @@ namespace RailroaderScenePatcher {
                 if (!coordinatesAvailable) throw new InvalidOperationException("Map coordinates unavailable");
             });
             var rotation = go.transform.rotation;
-            var board = family == "Independent board";
+            var board = family == "Location sign";
             string refusal = board ? "Board editing is unavailable" : null;
             if (board && boardRefusal != null) Read(() => refusal = boardRefusal(go));
             // Why an object of a supported family cannot be edited is no detected problem: it stands under Supported
@@ -652,8 +652,8 @@ namespace RailroaderScenePatcher {
             if (spawnPoint) Read(() => spawnRefusal = SpawnPointWorld.Problem(go));
             string iconRefusal = null;
             if (icon) Read(() => iconRefusal = MapIconWorld.Problem(go));
-            string groupRefusal = null; GroupRootVerdict verdict = null;
-            if (groupRoot) Read(() => { verdict = GroupWorld.VerdictOf(go); groupRefusal = GroupWorld.Problem(go); });
+            string groupRefusal = null; SceneObjectVerdict verdict = null;
+            if (topObject) Read(() => { verdict = GroupWorld.VerdictOf(go); groupRefusal = GroupWorld.Problem(go); });
             string partRefusal = null, groupPath = null;
             if (part) Read(() => { partRefusal = GroupWorld.PartProblem(go); groupPath = GroupWorld.PartVerdictOf(go)?.GroupPath; });
             // An existing mast or bell that conforms to its pattern takes placement, rotation and Enabled; one that
@@ -677,7 +677,7 @@ namespace RailroaderScenePatcher {
             // coverage, on the controller's Connections tab, is its supported edit, and it has no placement of its own.
             GameObject spanHolder = null;
             if (family == "Track span") Read(() => spanHolder = CrossingDeviceWorld.HolderOf(c));
-            var crossing = family == "Crossing controller";
+            var crossing = family == "Grade crossing controller";
             string coverageRefusal = crossing ? "Crossing coverage editing is unavailable" : null;
             if (crossing) Read(() => coverageRefusal = CrossingCoverageWorld.Problem(go));
             var coverageEditable = crossing && coverageRefusal == null;
@@ -694,12 +694,12 @@ namespace RailroaderScenePatcher {
                 if (type != "Generic") only = CommandBand.NotYetSupported("track markers of type " + type);
             });
             else if (part) { }
-            else if (groupRoot) only = CommandBand.GroupInspectionOnly(verdict, family);
+            else if (topObject) only = CommandBand.GroupInspectionOnly(verdict, family);
             else if (family == "Track span") only = CommandBand.SpanInspectionOnly(spanHolder != null);
             else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost || mast || ownBell || icon || spawnPoint);
             if (only != null) markerEditable = false;
-            var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : icon && iconRefusal == null ? StationMapIconRules.Structure : spawnPoint && spawnRefusal == null ? SpawnPoints.Structure : scenery && sceneryRefusal == null ? ConstructionSceneryScene.Structure : null;
-            var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? (verdict?.Crossbuck == true ? CommandBand.CrossbuckOperations : CommandBand.GroupOperations) : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable, or disable this board." : CommandBand.NotEditable(refusal))
+            var structure = only != null ? null : part ? (partRefusal == null ? ChildObjects.Structure : null) : topObject ? (groupRefusal == null ? SceneObjects.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : icon && iconRefusal == null ? StationMapIconRules.Structure : spawnPoint && spawnRefusal == null ? SpawnPoints.Structure : scenery && sceneryRefusal == null ? ConstructionSceneryScene.Structure : null;
+            var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : topObject ? (groupRefusal == null ? (verdict?.Crossbuck == true ? CommandBand.CrossbuckOperations : CommandBand.GroupOperations) : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable, or disable this board." : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Move, rotate, enable, or disable the bridge. Track scenery stays in place." : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? CommandBand.MarkerOperations
                 : marked ? CommandBand.NotEditable(markerRefusal)
@@ -726,7 +726,7 @@ namespace RailroaderScenePatcher {
             // A crossbuck is named with its crossing, and its place where crossings share a name, which tells the 52
             // crossbucks of the base map apart.
             string padMarkerId = null;
-            if (groupRoot && verdict?.Crossbuck == true) Read(() => { padMarkerId = GroupWorld.TargetPadMarkerId(go); displayName = BakedSceneryRules.CrossbuckName(verdict.Path, padMarkerId, GroupWorld.SharedCrossingNames()); });
+            if (topObject && verdict?.Crossbuck == true) Read(() => { padMarkerId = GroupWorld.TargetPadMarkerId(go); displayName = SceneObjectRules.CrossbuckName(verdict.Path, padMarkerId, GroupWorld.SharedCrossingNames()); });
             if ((mast || ownBell) && controller != null) Read(() => displayName = go.name + " at " + CrossingEquipment.Place(controller.gameObject.name, Ancestors(controller.transform)));
             string sharedPath = null;
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
@@ -748,7 +748,7 @@ namespace RailroaderScenePatcher {
                 duplicate.AddRange(markerHolders.Dependencies(go, repairable));
                 if (markerHolders.Problem(go, repairable) is string shared) problems.Add(shared);
             }
-            // A missing construction segment is a problem where the patcher can repair it: on the group root of an
+            // A missing construction segment is a problem where the patcher can repair it: on the top scene object of an
             // editable rail bridge group and on the editable Ela controller. Elsewhere its remark on the Connections tab
             // stays, without a problem. Like any problem it is hidden while the object is switched off itself: the game's
             // controller (a GameBehaviour) runs only while its object is active, so a disabled construction does not fail.
@@ -771,7 +771,7 @@ namespace RailroaderScenePatcher {
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure, padMarkerId), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
                 bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: displayName, groupPath: groupPath,
-                category: groupRoot ? verdict?.Category : null, subcategory: groupRoot ? verdict?.Subcategory : null, bridge: groupRoot && verdict != null ? verdict.Bridge : BridgeKind.None,
+                category: topObject ? verdict?.Category : null, subcategory: topObject ? verdict?.Subcategory : null, bridge: topObject && verdict != null ? verdict.Bridge : BridgeKind.None,
                 holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform), storage: storageName, information: information);
         }
         // The names of the objects that enclose a transform, from its parent upwards.

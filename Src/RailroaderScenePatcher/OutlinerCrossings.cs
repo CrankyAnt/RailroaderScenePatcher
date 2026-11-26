@@ -30,12 +30,12 @@ namespace RailroaderScenePatcher {
             internal readonly List<Unit> Members = new List<Unit>();
         }
 
-        // A Loc: object, whatever family lists it: a track marker, or an independent board (a culler and a mask, no
+        // A Loc: object, whatever family lists it: a track marker, or a location sign (a culler and a mask, no
         // track marker), as the base map's Loc: boards are.
         static bool IsLocObject(SceneObservation r) => Last(r.Identity.Path).StartsWith(SceneClassification.LocPrefix, StringComparison.Ordinal);
-        static bool IsCrossbuck(SceneObservation r) => r.Family == BakedSceneryRules.Family && r.GroupPath == null && r.Category == BakedSceneryCategories.GradeCrossing;
+        static bool IsCrossbuck(SceneObservation r) => SceneObjectRules.InFamilies(r.Family) && r.GroupPath == null && r.Category == SceneObjectCategories.GradeCrossing;
         // A track marker of a crossing, such as Crossing Pad (1): no sign and no Loc: object.
-        static bool IsCrossingTrackMarker(SceneObservation r) => r.Family == TrackMarkerFamily && !IsLocObject(r) && SceneClassification.ByName(Last(r.Identity.Path))?.Category != BakedSceneryCategories.Sign;
+        static bool IsCrossingTrackMarker(SceneObservation r) => r.Family == TrackMarkerFamily && !IsLocObject(r) && SceneClassification.ByName(Last(r.Identity.Path))?.Category != SceneObjectCategories.Sign;
         static bool CanJoinCrossing(SceneObservation r) =>
             r != null && (CrossingEquipmentFamilies.Contains(r.Family) || IsCrossbuck(r) || IsCrossingTrackMarker(r));
 
@@ -155,7 +155,7 @@ namespace RailroaderScenePatcher {
                 var unit = new Unit { Node = node, Members = crossing.Members, CrossingPath = crossing.Crossing.Path };
                 foreach (var m in crossing.Members) { Join(unit, m); joined.Add(m); }
                 SortCrossingChildren(node);
-                unit.Category = BakedSceneryCategories.GradeCrossing;
+                unit.Category = SceneObjectCategories.GradeCrossing;
                 b.Units.Add(unit);
                 if (b.Diagnostics) b.Result.Crossings.Add("unprotected " + node.Label + " (" + crossing.Crossing.Path + (crossing.PadMarkerId == null ? "" : ", pad marker " + crossing.PadMarkerId) + "): "
                     + String.Join(", ", crossing.Members.Select(m => m.Row.Family + " " + m.Node.Label)));

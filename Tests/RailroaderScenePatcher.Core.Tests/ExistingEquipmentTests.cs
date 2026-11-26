@@ -417,7 +417,7 @@ static class ExistingEquipmentTests {
 
     // A detection span is a span that a crossing controller holds in a circuit; it names that controller.
     static void DetectionSpansNameTheirController() {
-        var controller = Entry(Crossing, CrossingCoverageScene.ComponentType, "Crossing controller", structure: CrossingCoverageScene.Structure);
+        var controller = Entry(Crossing, CrossingCoverageScene.ComponentType, "Grade crossing controller", structure: CrossingCoverageScene.Structure);
         var mast = Entry(Mast1Path, ExistingEquipmentScene.MastComponent, ExistingEquipmentScene.MastFamily, CommandBand.MastOperations, displayName: "Signal 1 at Bryson Everett", structure: ExistingEquipmentScene.MastStructure);
         var bell = Entry(BellPath, ExistingEquipmentScene.BellComponent, ExistingEquipmentScene.BellFamily, CommandBand.BellOperations, structure: ExistingEquipmentScene.BellStructure);
         var island = Entry(Crossing + "/Track 1 Island", "Track.TrackSpan", "Track span", CommandBand.DetectionSpanOperations, holder: Crossing);
@@ -460,7 +460,7 @@ static class ExistingEquipmentTests {
             new SceneObservation(new object(), new TargetIdentity(SceneName, path, "C", null), family, true, new double[] { 1, 2, 3 }, Identity, bindings, new string[0], new string[0], operations, holderPath: holder);
         var span = Row(Crossing + "/Track 1 East", "Track span", Crossing, "x", "Span ID: Pcyi", "Lower segment: S8rj", "Upper segment: Sx88");
         var looseSpan = Row("World/Loose Span", "Track span");
-        var controller = Row(Crossing, "Crossing controller");
+        var controller = Row(Crossing, "Grade crossing controller");
         var mast = Row(Mast1Path, ExistingEquipmentScene.MastFamily, operations: CommandBand.MastOperations);
         var bell = Row(BellPath, ExistingEquipmentScene.BellFamily, operations: CommandBand.BellOperations);
         var board = Row("World/Board", "Board");

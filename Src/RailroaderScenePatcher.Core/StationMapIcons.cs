@@ -8,11 +8,11 @@ namespace RailroaderScenePatcher.Core {
     // Which scene objects are station map icons, and the texts of their family.
     public static class StationMapIconRules {
         public const string Family = "Station map icon", Component = "UI.Map.MapIcon", Structure = "station-map-icon-v1", RequiredVersion = "0.5.0";
-        // The container object that holds the station map icons. Each icon in it is an entry of
-        // the family, and the container object itself gets no row.
-        public const string IconsPath = BakedSceneryRules.WorldRoot + "/" + BakedSceneryRules.MapLabels + "/" + BakedSceneryRules.StationIcons;
-        // Whether a map icon at this scene path is a station map icon: one on a direct child of the Station Icons container object,
-        // as BakedSceneryRules.Classify reads that container object. Map icons deeper in the container object, and elsewhere, such as those
+        // The holder that holds the station map icons. Each icon in it is an entry of
+        // the family, and the holder itself gets no row.
+        public const string IconsPath = SceneObjectRules.WorldRoot + "/" + SceneObjectRules.MapLabels + "/" + SceneObjectRules.StationIcons;
+        // Whether a map icon at this scene path is a station map icon: one on a direct child of the Station Icons holder,
+        // as SceneObjectRules.Classify reads that holder. Map icons deeper in the holder, and elsewhere, such as those
         // the game creates for cars and players while it runs, are not.
         public static bool Listed(string path) =>
             path != null && path.Length > IconsPath.Length + 1 && path.StartsWith(IconsPath + "/", StringComparison.Ordinal) && path.IndexOf('/', IconsPath.Length + 1) < 0;

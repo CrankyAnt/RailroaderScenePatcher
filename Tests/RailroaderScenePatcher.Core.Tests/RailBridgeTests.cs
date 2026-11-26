@@ -8,10 +8,10 @@ using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
-// Rail bridges outside Ela: Bryson Bridge 1, the plate girder bridges and the Almond Bridge join the Baked scenery group
+// Rail bridges outside Ela: Bryson Bridge 1, the plate girder bridges and the Almond Bridge join the Scene object
 // family under Bridge / Rail bridges, each construction with its parts. Controlled hierarchies follow the Railroader 0.6.3
 // scene (Records/InventoryLedger level4_mb_rows): Bryson Bridge 1 carries a renderer culler and its track construction
-// controller on its root, above Abutments and Steel; the Almond Bridge group root below World/Large Scenery carries a simple
+// controller on its root, above Abutments and Steel; the Almond Bridge top scene object below World/Large Scenery carries a simple
 // culler and its construction controller above Abutments and Steel; each plate girder bridge is a model of its own
 // without a controller.
 static class RailBridgeTests {
@@ -27,7 +27,7 @@ static class RailBridgeTests {
             new Node("Bryson Depot", new Node("Roof").Solid())),
         new Node("Plate Girder Bridge", GirderNames.Select(name => new Node(name).Solid()).ToArray()),
         new Node("Almond", new Node("Almond Road Bridge", new Node("Deck").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask", RendererCuller))));
-    static GroupRootVerdict At(IReadOnlyList<GroupRootVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
+    static SceneObjectVerdict At(IReadOnlyList<SceneObjectVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
 
     public static void Run() {
         InventoryListsEachConstructionOnceWithItsParts();
@@ -47,7 +47,7 @@ static class RailBridgeTests {
         Console.WriteLine("PASS: rail bridges");
     }
 
-    // A construction's group root and parts carry one binding line per construction segment, which the Connections tab
+    // A construction's top scene object and parts carry one binding line per construction segment, which the Connections tab
     // lists; a segment that no longer exists keeps its id with a remark. The Object tab's Use in the game
     // text names the segments that decide the construction's visibility; a plate girder bridge without a controller is
     // decorative.
@@ -57,13 +57,13 @@ static class RailBridgeTests {
         Assert(CommandBand.SegmentBinding("seg-gone", false) == "Construction segment=seg-gone; no longer exists", "A missing segment keeps its id with a remark: " + CommandBand.SegmentBinding("seg-gone", false));
         var bindings = new[] { "Storage piles=0", CommandBand.SegmentBinding("seg-a", true), CommandBand.SegmentBinding("seg-gone", false) };
         Assert(CommandBand.ConstructionSegments(bindings).SequenceEqual(new[] { "seg-a", "seg-gone" }), "The construction segments are read back from the bindings: " + String.Join(", ", CommandBand.ConstructionSegments(bindings)));
-        var two = CommandBand.UseInGame(false, BakedSceneryCategories.Bridge, null, bindings);
+        var two = CommandBand.UseInGame(false, SceneObjectCategories.Bridge, null, bindings);
         Assert(two == "The construction state of track segments seg-a and seg-gone decides which parts of this bridge the game shows.", "The construction names its segments: " + two);
-        var one = CommandBand.UseInGame(true, BakedSceneryCategories.Bridge, null, new[] { CommandBand.SegmentBinding("seg-a", true) });
+        var one = CommandBand.UseInGame(true, SceneObjectCategories.Bridge, null, new[] { CommandBand.SegmentBinding("seg-a", true) });
         Assert(one == "The construction state of track segment seg-a decides which parts of this bridge the game shows.", "A part names its construction's one segment: " + one);
-        var three = CommandBand.UseInGame(false, BakedSceneryCategories.Bridge, null, new[] { "a", "b", "c" }.Select(id => CommandBand.SegmentBinding(id, true)));
+        var three = CommandBand.UseInGame(false, SceneObjectCategories.Bridge, null, new[] { "a", "b", "c" }.Select(id => CommandBand.SegmentBinding(id, true)));
         Assert(three.StartsWith("The construction state of track segments a, b, and c decides", StringComparison.Ordinal), "Three segments: " + three);
-        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.Bridge, null, new string[0]) == CommandBand.Decorative, "A plate girder bridge without a controller is decorative");
+        Assert(CommandBand.UseInGame(false, SceneObjectCategories.Bridge, null, new string[0]) == CommandBand.Decorative, "A plate girder bridge without a controller is decorative");
         Assert(CommandBand.ConstructionDependency == "Construction: the game shows or hides parts of this bridge by the construction state of its track segments.",
             "The dependency line: " + CommandBand.ConstructionDependency);
         // The inventory's lines for a controller's segments against the track graph's segment ids, or without a graph.
@@ -76,7 +76,7 @@ static class RailBridgeTests {
     }
 
     // A construction segment that no longer exists is a defect the modder repairs on the Connections tab (#96): the
-    // group root of Bryson Bridge 1, the Almond Bridge or any other construction, and the Ela controller, report it as a
+    // top scene object of Bryson Bridge 1, the Almond Bridge or any other construction, and the Ela controller, report it as a
     // problem with the same wording, naming the segment and the repair. The problem leaves once the construction names
     // existing segments, and without the track graph there is one inspection note instead. The Object tab offers the
     // construction segment repair, not the track binding task, for such a problem.
@@ -102,15 +102,15 @@ static class RailBridgeTests {
         // The same missing ID listed twice by one controller is one problem.
         var twice = CommandBand.ConstructionSegmentProblems(new[] { "cjwp8g", "cjwp8g", "", " " }, known, "no graph");
         Assert(twice.Count == 2 && twice.Distinct().Count() == 2, "Each problem line is distinct: " + String.Join(" | ", twice));
-        // Where the patcher can repair the construction segments: the group root of an editable rail bridge group and the
-        // editable Ela controller. A part, a refused group root or controller (no structure) and any other object show
+        // Where the patcher can repair the construction segments: the top scene object of an editable rail bridge group and the
+        // editable Ela controller. A part, a refused top scene object or controller (no structure) and any other object show
         // the remark without a problem; this is the inventory's gate (NativeInventory passes the observation's structure).
         var ids = new[] { "cjwp8g" };
-        Assert(CommandBand.RepairableConstructionProblems(BakedSceneryGroups.Structure, ids, known, "no graph").SequenceEqual(problems), "An editable group root reports the problem");
+        Assert(CommandBand.RepairableConstructionProblems(SceneObjects.Structure, ids, known, "no graph").SequenceEqual(problems), "An editable top scene object reports the problem");
         Assert(CommandBand.RepairableConstructionProblems(ConstructionSceneryScene.Structure, ids, known, "no graph").SequenceEqual(problems), "The editable Ela controller reports the problem with the same wording");
-        Assert(CommandBand.RepairableConstructionProblems(BakedSceneryParts.Structure, ids, known, "no graph").Count == 0, "A part shows the remark without a problem");
-        Assert(CommandBand.RepairableConstructionProblems(null, ids, known, "no graph").Count == 0, "A refused group root or controller, or one that shares its path, has no problem");
-        Assert(CommandBand.RepairableConstructionProblems(BakedSceneryGroups.Structure, null, known, "no graph").Count == 0, "A group without a controller has no problem");
+        Assert(CommandBand.RepairableConstructionProblems(ChildObjects.Structure, ids, known, "no graph").Count == 0, "A part shows the remark without a problem");
+        Assert(CommandBand.RepairableConstructionProblems(null, ids, known, "no graph").Count == 0, "A refused top scene object or controller, or one that shares its path, has no problem");
+        Assert(CommandBand.RepairableConstructionProblems(SceneObjects.Structure, null, known, "no graph").Count == 0, "A group without a controller has no problem");
         Assert(BindingRules.Problems(false, problems, null).Count == 0, "A disabled construction keeps no problem");
         // The repair offered with the problem: the construction segment repair, and not the track binding task.
         Assert(CommandBand.RepairConstructionSegments == "Repair construction segments", "The repair button: " + CommandBand.RepairConstructionSegments);
@@ -146,7 +146,7 @@ static class RailBridgeTests {
         var removed = session.Remove(PartId(Beam));
         Assert(removed.Applied && Near(f.At(f.Beam), new[] { 3540.0, 539, 4429 }), "Remove modification returns the girder to its place in the moved construction: " + removed.Error + " " + f.Where());
         mapEditor.Undo(); Assert(Near(f.At(f.Beam), BeamTarget), "Undo of the removal holds the girder again");
-        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=" + BakedSceneryGroups.RequiredVersion) && (int)JObject.Parse(store.Patch)["formatVersion"] == 1,
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=" + SceneObjects.RequiredVersion) && (int)JObject.Parse(store.Patch)["formatVersion"] == 1,
             "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
         Persistence(false, new string[0], "After Save");
         var fresh = new Bridges();
@@ -169,7 +169,7 @@ static class RailBridgeTests {
         heldEditor.Redo(); Assert(!held.Steel.Active, "Redo holds the steel off again");
         var strict = new Store { Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.9.0\"]}}" };
         var other = new Bridges(); var strictEditor = new NativeMapEditor(); var kept = new PatchEditingSession(other.Engine, strictEditor, strict); strictEditor.Session = kept;
-        Assert(kept.Edit(GroupId(Bryson), new Placement(BridgeTarget, Upright), null).Applied && strictEditor.Save() == null && strict.Info.Contains(">=0.9.0") && !strict.Info.Contains(">=" + BakedSceneryGroups.RequiredVersion),
+        Assert(kept.Edit(GroupId(Bryson), new Placement(BridgeTarget, Upright), null).Applied && strictEditor.Save() == null && strict.Info.Contains(">=0.9.0") && !strict.Info.Contains(">=" + SceneObjects.RequiredVersion),
             "A stricter existing constraint is retained: " + strict.Info);
     }
 
@@ -182,7 +182,7 @@ static class RailBridgeTests {
         public readonly FakeGroup Bridge1 = new FakeGroup { Position = new[] { 2391.0, 532, 4315 }, Parts = new List<FakePart>(), Cullers = new List<FakeCuller>(), RootCulling = null };
         public readonly FakeGroup Plate = new FakeGroup { Position = new[] { 4098.0, 529, 5667 }, Parts = new List<FakePart>(), Cullers = new List<FakeCuller>(), RootCulling = null };
         public readonly FakePart Abutments, Steel, Beam;
-        // The Almond Bridge: the group root carries a simple culler of 200 m and the construction controller, which
+        // The Almond Bridge: the top scene object carries a simple culler of 200 m and the construction controller, which
         // switches its abutments and steel; a bolt stands below the abutments and a truss below the steel.
         public readonly FakeGroup AlmondRoot = new FakeGroup { Position = new[] { -7206.0, 529, 608 }, Parts = new List<FakePart>(), Cullers = new List<FakeCuller>(), RootCulling = true, RailBridge = true };
         public readonly FakePart AlmondAbutments, Bolt, AlmondSteel, Truss;
@@ -197,9 +197,9 @@ static class RailBridgeTests {
             Bridge1.Cullers.Add(BridgeCuller);
             Bridge1.Colliders.Add(new FakeGroupCollider { Id = "Abutments|BoxCollider#11", Shape = "box size=4,6,4" });
             Bridge1.Colliders.Add(new FakeGroupCollider { Id = "Steel|BoxCollider#12", Shape = "box size=3,1,90" });
-            var verdicts = BakedSceneryRules.Classify(RailBridgeTests.World());
+            var verdicts = SceneObjectRules.Classify(RailBridgeTests.World());
             World.GroupVerdicts = verdicts.ToDictionary(v => v.Path, v => v);
-            World.Verdicts = BakedSceneryRules.Parts(verdicts).GroupBy(v => v.Path).ToDictionary(g => g.Key, g => g.First());
+            World.Verdicts = SceneObjectRules.Parts(verdicts).GroupBy(v => v.Path).ToDictionary(g => g.Key, g => g.First());
             World.Objects[Bryson] = new List<object> { Bridge1 }; World.Objects[Girder] = new List<object> { Plate };
             World.PartsAt[Bryson + "/Abutments"] = new List<object> { Abutments }; World.PartsAt[Bryson + "/Steel"] = new List<object> { Steel };
             World.PartsAt[Bryson + "/Steel/Plate Girder E (4)"] = new List<object> { Beam };
@@ -216,7 +216,7 @@ static class RailBridgeTests {
             World.SetActive(Bridge1, true); World.SetActive(Plate, true); World.SetActive(AlmondRoot, true); World.Mutations = 0;
             var holds = new PartHolds();
             var scene = Scene = new SceneCapabilities(() => World.Maps, null);
-            scene.Add(new BakedSceneryGroups(World, holds: holds)); scene.Add(new BakedSceneryParts(World, holds));
+            scene.Add(new SceneObjects(World, holds: holds)); scene.Add(new ChildObjects(World, holds));
             Engine = new PatchEngine(scene);
         }
         public double[] At(FakePart part) => World.ObservePart(part).Part.Placement.Position.ToArray();
@@ -231,11 +231,11 @@ static class RailBridgeTests {
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
         (position == null ? "" : ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", position.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "],\"rotation\":[0,0,0,1]}") +
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
-    static string GroupMod(string id, string path, double[] position = null, bool? active = null) => Mod(id, path, BakedSceneryGroups.Structure, position, active);
-    static string PartMod(string id, string path, double[] position = null, bool? active = null) => Mod(id, path, BakedSceneryParts.Structure, position, active);
+    static string GroupMod(string id, string path, double[] position = null, bool? active = null) => Mod(id, path, SceneObjects.Structure, position, active);
+    static string PartMod(string id, string path, double[] position = null, bool? active = null) => Mod(id, path, ChildObjects.Structure, position, active);
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
-    static TargetIdentity GroupId(string path) => new TargetIdentity(SceneName, path, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
-    static TargetIdentity PartId(string path) => new TargetIdentity(SceneName, path, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure);
+    static TargetIdentity GroupId(string path) => new TargetIdentity(SceneName, path, SceneObjects.ComponentType, SceneObjects.Structure);
+    static TargetIdentity PartId(string path) => new TargetIdentity(SceneName, path, ChildObjects.ComponentType, ChildObjects.Structure);
     static readonly double[] Upright = { 0, 0, 0, 1 }, BridgeTarget = { 3500, 540, 4400 }, PlateTarget = { 5200, 529, 5700 }, BeamTarget = { 3560, 539, 4440 };
     static readonly double[] BridgeAuthored = { 3391, 532, 4315 }, PlateAuthored = { 5098, 529, 5667 }, BeamAuthored = { 3431, 531, 4344 };
 
@@ -286,10 +286,10 @@ static class RailBridgeTests {
         // Placement stays editable for a switched part.
         outcome = f.Engine.Apply(Doc(PartMod("move-steel", Bryson + "/Steel", BeamTarget))).Outcomes["move-steel"];
         Assert(outcome.Applied && Near(f.At(f.Steel), BeamTarget), "A switched part moves: " + outcome.Error);
-        // A group root that a controller switches holds the same way.
+        // A top scene object that a controller switches holds the same way.
         var group = new Bridges(); group.Bridge1.Constructed = true;
         outcome = group.Engine.Apply(Doc(GroupMod("hide-bryson", Bryson, active: false))).Outcomes["hide-bryson"];
-        Assert(outcome.Applied && !group.Bridge1.Active, "Disabling a switched group root applies: " + outcome.Error);
+        Assert(outcome.Applied && !group.Bridge1.Active, "Disabling a switched top scene object applies: " + outcome.Error);
         group.World.Controller(group.Bridge1, true);
         Assert(!group.Bridge1.Active && group.World.Observe(group.Bridge1).Root.Active == false, "The controller does not switch on the disabled root, which reads as disabled");
         var flips = new Bridges(); flips.World.ConstructionFlips = true;
@@ -302,7 +302,7 @@ static class RailBridgeTests {
         Assert(!outcome.Applied && failed.Steel.Active && !failed.World.Constructions.Held(failed.Steel), "A failed disable is restored and the controller switches the steel again: " + outcome.Error);
     }
 
-    // The Almond Bridge's steel moved outside the 200 m sphere of the group root's culler gets a culling sphere of its own.
+    // The Almond Bridge's steel moved outside the 200 m sphere of the top scene object's culler gets a culling sphere of its own.
     // Own culling then shows the controller's current choice while that sphere is in view: the controller hiding the
     // steel after the plan was made hides it at every visibility change, and the controller showing it again shows it
     // while its sphere is in view. The abutments, which stand above a moved bolt, follow the controller the same way.
@@ -311,7 +311,7 @@ static class RailBridgeTests {
         var far = new[] { -6206.0 + 600, 529, 608 + 400 };
         var bolt = new[] { -6206.0 - 450, 532, 608 - 500 };
         var result = f.Engine.Apply(Doc(PartMod("move-steel", Almond + "/Steel", far), PartMod("move-bolt", Almond + "/Abutments/Bridge Abutment", bolt)));
-        Assert(result.Outcomes.Values.All(o => o.Applied), "The steel and the bolt move outside the group root's sphere: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Error)));
+        Assert(result.Outcomes.Values.All(o => o.Applied), "The steel and the bolt move outside the top scene object's sphere: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Error)));
         FakeRegistration Own(FakePart part) => f.World.Native.Registered.SingleOrDefault(r => r.Owner == part);
         Assert(Own(f.AlmondSteel) != null && Own(f.Bolt) != null && f.World.Culling.Desired(f.AlmondSteel) != null && f.World.Culling.Desired(f.AlmondAbutments) != null,
             "The moved steel and bolt have spheres of their own, and own culling switches the steel and the abutments above the bolt");
@@ -335,9 +335,9 @@ static class RailBridgeTests {
         f.World.Controller(f.AlmondSteel, true);
         Assert(!f.AlmondSteel.Active, "The disabled steel stays off although the controller shows it");
         Assert(f.Engine.Apply(Doc(PartMod("show-steel", Almond + "/Steel", far, true))).Outcomes["show-steel"].Applied && f.AlmondSteel.Active, "Enable shows the steel as the controller chose");
-        // Moved back inside the group root's sphere, the steel goes back to its controller.
+        // Moved back inside the top scene object's sphere, the steel goes back to its controller.
         Assert(f.Engine.Apply(Doc(PartMod("back-steel", Almond + "/Steel", new[] { -6206.0, 529, 608 }))).Outcomes["back-steel"].Applied, "The steel moves back");
-        Assert(f.World.Culling.Desired(f.AlmondSteel) == null && !f.World.Diverted(f.AlmondSteel), "The steel back in the group root's sphere has no own culling and goes back to its controller");
+        Assert(f.World.Culling.Desired(f.AlmondSteel) == null && !f.World.Diverted(f.AlmondSteel), "The steel back in the top scene object's sphere has no own culling and goes back to its controller");
         f.World.Controller(f.AlmondSteel, false);
         Assert(!f.AlmondSteel.Active, "The controller switches the steel directly again");
     }
@@ -349,7 +349,7 @@ static class RailBridgeTests {
         var f = new Bridges();
         var far = new[] { -6206.0 + 600, 529, 608 + 400 };
         f.World.HideSpheresOnApply = true;
-        Assert(f.Engine.Apply(Doc(PartMod("move-steel", Almond + "/Steel", far))).Outcomes["move-steel"].Applied, "The steel moves outside the group root's sphere");
+        Assert(f.Engine.Apply(Doc(PartMod("move-steel", Almond + "/Steel", far))).Outcomes["move-steel"].Applied, "The steel moves outside the top scene object's sphere");
         var own = f.World.Native.Registered.Single(r => r.Owner == f.AlmondSteel);
         Assert(!f.AlmondSteel.Active && f.World.Diverted(f.AlmondSteel), "Out of view, own culling holds the steel off and takes the controller's writes");
         f.World.Controller(f.AlmondSteel, false);
@@ -366,10 +366,10 @@ static class RailBridgeTests {
         string Follow(string id, string path, string structure) =>
             "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}," +
             "\"placement\":{\"mode\":\"trackFollowing\",\"track\":{\"segment\":\"S1\",\"end\":\"a\",\"distance\":10},\"offset\":[0,0,0],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
-        var result = f.Engine.Apply(Doc(Follow("follow-bryson", Bryson, BakedSceneryGroups.Structure), Follow("follow-steel", Bryson + "/Steel", BakedSceneryParts.Structure)));
+        var result = f.Engine.Apply(Doc(Follow("follow-bryson", Bryson, SceneObjects.Structure), Follow("follow-steel", Bryson + "/Steel", ChildObjects.Structure)));
         Assert(result.Outcomes.Values.All(o => !o.Applied && o.Failure == FailureKind.Refused && o.Error.Contains("fixed placement")) && f.World.Mutations == 0 && Near(f.At(f.Bridge1), BridgeAuthored),
             "Track-following placement of a rail bridge is refused before mutation: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Failure + " " + o.Error)));
-        var railEdits = SupportedEdits.Of(EditEntries.Of(BakedSceneryRules.Family, BakedSceneryGroups.Structure, CommandBand.GroupOperations, BridgeKind.Rail));
+        var railEdits = SupportedEdits.Of(EditEntries.Of(SceneObjectRules.Family, SceneObjects.Structure, CommandBand.GroupOperations, BridgeKind.Rail));
         Assert(SupportedEdits.ModeBlock(railEdits, CommandBand.FollowMode, true) == CommandBand.RailBridgeNoFollow && CommandBand.RailBridgeNoFollow.Contains("fixed placement")
             && SupportedEdits.ModeBlock(railEdits, CommandBand.NumericMode, true) == null, "Follow is unavailable for a rail bridge with the reason; Numeric stays");
     }
@@ -473,36 +473,36 @@ static class RailBridgeTests {
     }
 
     // Each rail bridge root outside Ela is listed once as a group of the family under Bridge / Rail bridges:
-    // Bryson Bridge 1 and the Almond Bridge, whose group root carries its controller and culler, each with
+    // Bryson Bridge 1 and the Almond Bridge, whose top scene object carries its controller and culler, each with
     // its parts, and every plate girder bridge on its own. Road bridges stand under Road bridges.
     static void InventoryListsEachConstructionOnceWithItsParts() {
-        var verdicts = BakedSceneryRules.Classify(World());
+        var verdicts = SceneObjectRules.Classify(World());
         var roots = new[] { Bryson, Almond }.Concat(GirderNames.Select(name => Girders + name)).ToArray();
         foreach (var path in roots) {
             var found = verdicts.Where(v => v.Path == path).ToArray();
-            Assert(found.Length == 1 && found[0].Disposition == GroupDisposition.Group && found[0].Category == BakedSceneryCategories.Bridge && found[0].Subcategory == BakedSceneryCategories.RailBridges,
+            Assert(found.Length == 1 && found[0].Disposition == GroupDisposition.Group && found[0].Category == SceneObjectCategories.Bridge && found[0].Subcategory == SceneObjectCategories.RailBridges,
                 path + " is listed once as a group under Bridge / Rail bridges: " + String.Join(", ", found.Select(v => v.Disposition + " " + v.Category + "/" + v.Subcategory + " " + v.Reason)));
         }
-        Assert(At(verdicts, Almond + "/Abutments") == null && At(verdicts, Almond + "/Steel") == null, "The Almond Bridge's abutments and steel are no group roots of their own");
-        var parts = BakedSceneryRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
+        Assert(At(verdicts, Almond + "/Abutments") == null && At(verdicts, Almond + "/Steel") == null, "The Almond Bridge's abutments and steel are no top scene objects of their own");
+        var parts = SceneObjectRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
         foreach (var path in new[] { Almond + "/Abutments", Almond + "/Steel", Almond + "/Steel/Truss", Bryson + "/Abutments", Bryson + "/Steel", Bryson + "/Steel/Plate Girder E (4)" })
             Assert(parts.Count(p => p.Path == path) == 1 && parts.Single(p => p.Path == path).GroupPath == (path.StartsWith(Almond, StringComparison.Ordinal) ? Almond : Bryson), path + " is one part of its construction");
         Assert(!parts.Any(p => p.Path == Bryson + "/Steel/Plate Girder W"), "Two girders that share a path are no parts");
         Assert(!parts.Any(p => p.GroupPath.StartsWith(Girders, StringComparison.Ordinal)), "A plate girder bridge is one object without parts");
-        Assert(BakedSceneryRules.PartName(Almond, Almond + "/Steel") == "Almond Bridge / Steel", "A part is named with its construction");
-        Assert(!BakedSceneryRules.Exclusions.Any(e => e.Ticket == "#95"), "No exclusion waits for #95 any more");
+        Assert(SceneObjectRules.PartName(Almond, Almond + "/Steel") == "Almond Bridge / Steel", "A part is named with its construction");
+        Assert(!SceneObjectRules.Exclusions.Any(e => e.Ticket == "#95"), "No exclusion waits for #95 any more");
         // A group that holds a construction controller but is no supported rail bridge stays inspection only.
-        var other = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Tipple Scenery", new Node("Beam").Solid()).With(Controller))))), Large + "Sylva/Tipple Scenery");
-        Assert(other?.Disposition == GroupDisposition.InspectionOnly && other.Reason == BakedSceneryRules.ConstructionOutsideBridge && other.ReasonIsSentence,
+        var other = At(SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Tipple Scenery", new Node("Beam").Solid()).With(Controller))))), Large + "Sylva/Tipple Scenery");
+        Assert(other?.Disposition == GroupDisposition.InspectionOnly && other.Reason == SceneObjectRules.ConstructionOutsideBridge && other.ReasonIsSentence,
             "A controller outside a supported rail bridge keeps its group inspection only: " + other?.Disposition + " " + other?.Reason);
         // A rail bridge that holds another excluded kind stays inspection only under its category.
-        var masked = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Plate Girder Bridge", new Node("Plate Girder Bridge", new Node("Deck").Solid()).With("Character.SpawnPoint"))))), Girders + "Plate Girder Bridge");
-        Assert(masked?.Disposition == GroupDisposition.InspectionOnly && masked.Subcategory == BakedSceneryCategories.RailBridges, "An excluded kind keeps a rail bridge inspection only under Rail bridges");
+        var masked = At(SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Plate Girder Bridge", new Node("Plate Girder Bridge", new Node("Deck").Solid()).With("Character.SpawnPoint"))))), Girders + "Plate Girder Bridge");
+        Assert(masked?.Disposition == GroupDisposition.InspectionOnly && masked.Subcategory == SceneObjectCategories.RailBridges, "An excluded kind keeps a rail bridge inspection only under Rail bridges");
         // Track-owned components belong to the native track: a rail bridge holding one is refused.
-        Assert(BakedSceneryRules.TrackOwnedRefusal(new[] { "UnityEngine.MeshRenderer", Controller }) == null, "A construction controller is no track-owned component");
-        Assert(BakedSceneryRules.TrackOwnedRefusal(new[] { "UnityEngine.MeshRenderer", "AutoTrestle.AutoTrestle" }) == "This rail bridge contains the track-owned component AutoTrestle.AutoTrestle, which belongs to the native track. The bridge can't be moved, enabled, or disabled."
-            && BakedSceneryRules.TrackOwnedRefusal(new[] { "Track.TrackSegment" }) != null, "A generated trestle or a track component refuses the bridge");
+        Assert(SceneObjectRules.TrackOwnedRefusal(new[] { "UnityEngine.MeshRenderer", Controller }) == null, "A construction controller is no track-owned component");
+        Assert(SceneObjectRules.TrackOwnedRefusal(new[] { "UnityEngine.MeshRenderer", "AutoTrestle.AutoTrestle" }) == "This rail bridge contains the track-owned component AutoTrestle.AutoTrestle, which belongs to the native track. The bridge can't be moved, enabled, or disabled."
+            && SceneObjectRules.TrackOwnedRefusal(new[] { "Track.TrackSegment" }) != null, "A generated trestle or a track component refuses the bridge");
         var road = At(verdicts, Large + "Almond/Almond Road Bridge");
-        Assert(road?.Disposition == GroupDisposition.Group && road.Subcategory == BakedSceneryCategories.RoadBridges, "A road bridge is no rail bridge: it stands under Road bridges");
+        Assert(road?.Disposition == GroupDisposition.Group && road.Subcategory == SceneObjectCategories.RoadBridges, "A road bridge is no rail bridge: it stands under Road bridges");
     }
 }

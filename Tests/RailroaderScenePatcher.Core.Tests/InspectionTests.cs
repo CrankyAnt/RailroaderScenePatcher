@@ -19,7 +19,7 @@ static class InspectionTests {
     }
     static void RunWithDebug() {
         var fixture = new Fixture();
-        fixture.Objects.Add(new SceneObservation(new object(), new TargetIdentity("scene", "World/Board", "Culler"), "Independent board", false,
+        fixture.Objects.Add(new SceneObservation(new object(), new TargetIdentity("scene", "World/Board", "Culler"), "Location sign", false,
             new double[] { 12, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new[] { "Culling registration", "Terrain mask" }, new string[0], "Inspection only"));
         fixture.Objects.Add(new SceneObservation(new object(), new TargetIdentity("scene", "World/Sign", "Marker"), "Track marker", true,
             new double[] { 14, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { "Segment missing-segment: missing" }, new[] { "Track-relative placement" }, new[] { "Broken binding" }, "Inspection only"));
@@ -211,7 +211,7 @@ static class InspectionTests {
             scene.Parts.Add(widget = new Part { Name = "Widget" });
             scene.Parts.Add(sign = new Part { Name = "Sign", Family = "Track marker" });
             scene.Parts.Add(holder = new Part { Name = "Holder", Refers = sign });
-            scene.Parts.Add(board = new Part { Name = "Board", Family = "Independent board" });
+            scene.Parts.Add(board = new Part { Name = "Board", Family = "Location sign" });
             inventory = new SceneInventory(scene); inventory.Refresh();
             return scene;
         }
@@ -501,7 +501,7 @@ static class InspectionTests {
         SceneObservation Entry(string path, string family, string displayName = null, params string[] problems) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Component"), family, true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], problems, "Inspection only", displayName: displayName);
         var fixture = new Fixture();
-        fixture.Objects.Add(Entry("World/Board", "Independent board"));
+        fixture.Objects.Add(Entry("World/Board", "Location sign"));
         fixture.Objects.Add(Entry("World/Sign", "Track marker", "Added Alpha", "Broken binding"));
         fixture.Objects.Add(Entry("World/Post", "Track marker", "Added Zulu", "Segment missing"));
         fixture.Objects.Add(Entry("World/Bridges/Ela", "Bridge"));
@@ -512,7 +512,7 @@ static class InspectionTests {
         Check(Paths("", problems).SequenceEqual(new[] { "World/Sign", "World/Post" }), "The Problems filter limits the outliner to objects with detected problems");
         Check(Paths("", modified).SequenceEqual(new[] { "World/Board", "World/Post" }), "The Changed filter limits the outliner to objects this mod modifies");
         Check(Paths("", all).SequenceEqual(new[] { "World/Board", "World/Sign", "World/Post", "World/Bridges/Ela" }), "All shows every inventory entry");
-        Check(Paths("post", problems).SequenceEqual(new[] { "World/Post" }) && Paths("board", problems).Length == 0 && Paths("sign", modified).Length == 0, "Search narrows within a filter");
+        Check(Paths("post", problems).SequenceEqual(new[] { "World/Post" }) && Paths("board", problems).Length == 0 && Paths("alpha", modified).Length == 0, "Search narrows within a filter");
         Check(Paths("marker", all).SequenceEqual(new[] { "World/Sign", "World/Post" }) && Paths("Added Alpha", all).SequenceEqual(new[] { "World/Sign" })
             && Paths("World/Post", all).SequenceEqual(new[] { "World/Post" }), "Search finds visible names while keeping the original identity path searchable");
         Check(inventory.Entries.Count == 4 && !inventory.IsStale, "Filtering changes neither the inventory nor its freshness");
@@ -821,7 +821,7 @@ static class InspectionTests {
         Check(FocusTarget.Point("Track span", origin, new double[0][], out refusal) == null && refusal == "the span's track locations do not resolve",
             "Focus on a track span without a resolved location is refused with its reason");
         var board = new double[] { 5306.8, 529.95, 5737.6 };
-        Check(FocusTarget.Point("Independent board", board, new double[0][], out refusal).SequenceEqual(board) && refusal == null,
+        Check(FocusTarget.Point("Location sign", board, new double[0][], out refusal).SequenceEqual(board) && refusal == null,
             "Focus on any other object lands on its map position");
         Check(FocusTarget.Point("Track span", origin, new[] { new double[] { double.NaN, 0, 0 } }, out refusal) == null && refusal != null,
             "a track location without a finite position does not count");
@@ -885,7 +885,7 @@ static class InspectionTests {
         SceneObservation Of(object handle, string path, string family) => new SceneObservation(handle, new TargetIdentity("scene", path, "Component"), family, true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Inspection only");
         var scene = new OwningScene();
-        scene.Inner.All.AddRange(new[] { Of(crossing, "crossing", "Crossing controller"), Of(lamp, "crossing/Signal 1", "Crossing light") });
+        scene.Inner.All.AddRange(new[] { Of(crossing, "crossing", "Grade crossing controller"), Of(lamp, "crossing/Signal 1", "Crossing light") });
         scene.Inner.Related = handle => scene.Inner.All.ToArray();
         var inventory = new SceneInventory(scene); inventory.Refresh();
         Check(inventory.Entries.Count == 2, "The snapshot holds the crossing and its native light");
@@ -1092,7 +1092,7 @@ static class InspectionTests {
         var fixture = new Fixture();
         fixture.Objects.Add(Entry("World/Sign", "Track marker", new[] { "Marker broken binding: missing segment Sgone" }));
         fixture.Objects.Add(Entry("World/Post 1", "Milepost", new[] { "Marker broken binding: missing segment S9" }, reason));
-        fixture.Objects.Add(Entry("World/Board", "Independent board", none, null, true, new[] { "Direct-reference scan incomplete: 2 unreadable fields" }));
+        fixture.Objects.Add(Entry("World/Board", "Location sign", none, null, true, new[] { "Direct-reference scan incomplete: 2 unreadable fields" }));
         fixture.Objects.Add(Entry("World/Span", "Track span", none, "Not yet supported: the patcher has no edit for the Track span family yet", false));
         fixture.Objects.Add(Entry("World/Refused", "Track marker", none));
         var inventory = new SceneInventory(fixture); inventory.Refresh();

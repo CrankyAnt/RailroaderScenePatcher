@@ -118,7 +118,7 @@ class FakeCrossingInspection : IInspectionScene {
     public IEnumerable<SceneObservation> Discover() => world.Objects.SelectMany(o => o.Value.Select(target => {
         var c = (FakeCrossing)target;
         var bindings = c.Circuits.Select((circuit, i) => "Circuit " + i + " " + String.Join(",", circuit.Spans.Select(s => s.Id))).ToArray();
-        return new SceneObservation(c, new TargetIdentity("BushnellWhittier", o.Key, CrossingCoverageScene.ComponentType, CrossingCoverageScene.Structure), "Crossing controller", true,
+        return new SceneObservation(c, new TargetIdentity("BushnellWhittier", o.Key, CrossingCoverageScene.ComponentType, CrossingCoverageScene.Structure), "Grade crossing controller", true,
             world.Position(c), world.Rotation(c), bindings, Array.Empty<string>(), Array.Empty<string>(), "coverage");
     }));
 }

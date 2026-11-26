@@ -15,7 +15,7 @@ namespace RailroaderScenePatcher {
     // Railroader logs that at world load as an error during DidRestore. DeferredRestores holds that restore-time call back
     // until the world-load apply has written the repair.
     internal static class ConstructionSegmentNative {
-        static readonly Type controller = Native.Type(BakedSceneryRules.ConstructionController), graph = Native.Type("Track.Graph");
+        static readonly Type controller = Native.Type(SceneObjectRules.ConstructionController), graph = Native.Type("Track.Graph");
         static readonly FieldInfo ids = controller?.GetField("segmentIds", Native.Flags), cache = controller?.GetField("_cachedSegments", Native.Flags);
         static readonly MethodInfo update = controller?.GetMethod("UpdateVisibility", Native.Flags, null, Type.EmptyTypes, null);
         // Why the construction segments cannot be read or set on this game build, or null.

@@ -52,11 +52,11 @@ namespace RailroaderScenePatcher.Core {
         public static readonly WorldBasis World = new WorldBasis(new WorldPoint(1, 0, 0), new WorldPoint(0, 1, 0), new WorldPoint(0, 0, 1));
     }
 
-    // How a game-defined group shows from one camera position: the distance to its bounds, what it shows at that
+    // How a complex shows from one camera position: the distance to its bounds, what it shows at that
     // distance, the middle of its bounds, where its square marker stands without a frame, and its one object frame.
     public sealed class GroupMarking {
         internal GroupMarking(double distance, WorldPoint center, ScreenRect? frame, IReadOnlyList<ScreenPoint> outline, WorldPoint? marker = null, bool spread = false) {
-            Distance = distance; Center = center; Frame = frame; Outline = outline; Shows = GameDefinedGroups.Shows(distance); Marker = marker ?? center; Spread = spread;
+            Distance = distance; Center = center; Frame = frame; Outline = outline; Shows = Complexes.Shows(distance); Marker = marker ?? center; Spread = spread;
         }
         // Whether the group's objects stand apart (ObjectMarkingGeometry.Spread): such objects form no group, and each
         // shows on its own.
@@ -194,7 +194,7 @@ namespace RailroaderScenePatcher.Core {
             Func<WorldPoint, ClipPoint> project, ScreenRect view, List<string> decisions) =>
             Frame(anchor, camera, boxes, project, view, decisions, FrameDistance, null);
         // frameDistance is the distance to the object's bounds beyond which it has no frame. An object of a
-        // game-defined group that shows as one gives its outline to the group's frame, whose frame distance counts
+        // complex that shows as one gives its outline to the group's frame, whose frame distance counts
         // from the group's bounds: its own frame is then asked for without a limit.
         //
         // An object frame uses one box. For several source boxes, the frame encloses them in a box that follows them
@@ -204,7 +204,7 @@ namespace RailroaderScenePatcher.Core {
         // Most objects are framed by the piece their marker belongs to: the box at the marker and the boxes next to
         // it, without a box far larger than it or apart from it, since the scene object can hold more than the
         // object. An object that stands for everything below it, whole, is framed by all its boxes: the root of a
-        // baked scenery group, whose marker stands at the root. The box nearest it
+        // scene object with child objects, whose marker stands at the root. The box nearest it
         // can be a lamp beside a station building.
         public static ObjectMarkingFrame Frame(WorldPoint anchor, WorldPoint camera, IReadOnlyList<ObjectMarkingBox> boxes,
             Func<WorldPoint, ClipPoint> project, ScreenRect view, List<string> decisions, double frameDistance, WorldBasis? orientation = null, bool whole = false) {
@@ -483,20 +483,20 @@ namespace RailroaderScenePatcher.Core {
             }
             return Math.Sqrt(rx * rx + ry * ry + rz * rz);
         }
-        // How a game-defined group shows. Its one box surrounds all its objects: the boxes of their pieces, and where
+        // How a complex shows. Its one box surrounds all its objects: the boxes of their pieces, and where
         // an object without boxes of its own stands. The box follows them (BoxAlong), with the given orientation, that
         // of the game component that anchors the group, or the world's, as its fallback. The distance runs from the
         // camera to that box, and its center is the group's center. frames holds the frame of each object, or null for
         // an object without one. While the group shows its marker and frame, its one frame is the outline of that box.
         // Like the box of an object it is cut at the surface the group stands in, and framed whole when it lies wholly
         // under the surface found from above. listed says, per
-        // object, whether it counts for the bounds and the box (GameDefinedGroup.Listed); without it every object does.
+        // object, whether it counts for the bounds and the box (Complex.Listed); without it every object does.
         public static GroupMarking GroupFrame(WorldPoint camera, IReadOnlyList<WorldPoint> anchors, IReadOnlyList<ObjectMarkingFrame> frames,
             WorldBasis? orientation, Func<double, double, double?> ground, Func<WorldPoint, ClipPoint> project, ScreenRect view, IReadOnlyList<bool> listed = null) {
             if (anchors == null) throw new ArgumentNullException(nameof(anchors));
             if (project == null) throw new ArgumentNullException(nameof(project));
             anchors = Listed(anchors, listed); frames = frames == null ? null : Listed(frames, listed);
-            // Where an object stands counts for the box only without boxes of its own: the pivot of a group root can
+            // Where an object stands counts for the box only without boxes of its own: the pivot of a top scene object can
             // stand apart from its building, and would widen the box over ground the group does not cover.
             var held = new List<IReadOnlyList<WorldPoint>>();
             for (int k = 0; k < anchors.Count; k++) {
@@ -512,7 +512,7 @@ namespace RailroaderScenePatcher.Core {
             var center = CenterOf(new List<Piece> { new Piece { Corners = box } }) ?? default;
             // Objects that stand apart form no group: no frame, and its objects show on their own.
             if (held.Count > 1 && Spread(held)) return new GroupMarking(distance, center, null, null, null, true);
-            var shows = GameDefinedGroups.Shows(distance);
+            var shows = Complexes.Shows(distance);
             if (shows == GroupShows.Objects) return new GroupMarking(distance, center, null, null);
             // Beyond the frame distance the group shows only its marker, on the center of its box uncut by the ground.
             if (shows != GroupShows.MarkerAndFrame) return new GroupMarking(distance, center, null, null, center);
@@ -525,7 +525,7 @@ namespace RailroaderScenePatcher.Core {
             return new GroupMarking(distance, center, Rect(points.Min(q => q.X) - Margin, points.Min(q => q.Y) - Margin, points.Max(q => q.X) + Margin, points.Max(q => q.Y) + Margin), Grown(points, Margin), marker);
         }
         // The objects of a group that count for its bounds and its box: those its listed members name
-        // (GameDefinedGroup.Listed), by position; every object without them. The invisible detection spans of a
+        // (Complex.Listed), by position; every object without them. The invisible detection spans of a
         // grade-crossing setup do not count.
         static IReadOnlyList<T> Listed<T>(IReadOnlyList<T> objects, IReadOnlyList<bool> listed) =>
             listed == null ? objects : objects.Where((item, k) => k < listed.Count && listed[k]).ToArray();
@@ -551,14 +551,14 @@ namespace RailroaderScenePatcher.Core {
             return WorldRibbonGeometry.Hull(all);
         }
         // Whether an inventory object of a family stands for everything below it and is framed whole: the root of a
-        // baked scenery group, which the inventory lists as one entry for the whole group, and a crossing controller,
+        // scene object with child objects, which the inventory lists as one entry for the whole group, and a crossing controller,
         // which stands for the whole crossing: its scene object is the root of the grade-crossing setup it controls.
-        public const string WholeFamily = "Baked scenery group", ControllerFamily = "Crossing controller";
-        public static bool FramesWhole(string family) => family == WholeFamily || family == ControllerFamily;
+        public const string ControllerFamily = "Grade crossing controller";
+        public static bool FramesWhole(string family) => SceneObjectRules.InFamilies(family) || family == ControllerFamily;
         // Whether a renderer below an object framed whole counts for its frame. families holds the families of the
         // inventory objects on the renderer's scene object and above it, up to the framed object, nearest first. A
         // crossing controller's frame leaves out its whistle signs, which are no part of its setup
-        // (GameDefinedGroups.Of), and its detection spans, which are invisible; the masts with their gates, the bell
+        // (Complexes.Of), and its detection spans, which are invisible; the masts with their gates, the bell
         // and the pads count. Everything below another object framed whole counts.
         public static bool WholeCounts(string family, IEnumerable<string> families) =>
             family != ControllerFamily || families == null || !families.Any(f => f == "Track marker" || f == "Track span");

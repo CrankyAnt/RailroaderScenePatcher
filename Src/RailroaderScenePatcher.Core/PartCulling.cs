@@ -413,7 +413,7 @@ namespace RailroaderScenePatcher.Core {
         // Reports each such handler once as a debug line: it only passes the game's events on, so it needs no action
         // and is no warning.
         public void Report() {
-            for (; reportedLeftovers < leftovers.Count; reportedLeftovers++) { var leftover = leftovers[reportedLeftovers]; PatcherLog.Debug(() => BakedSceneryRules.LeftoverWrapper(leftover)); }
+            for (; reportedLeftovers < leftovers.Count; reportedLeftovers++) { var leftover = leftovers[reportedLeftovers]; PatcherLog.Debug(() => SceneObjectRules.LeftoverWrapper(leftover)); }
         }
         public int RegionCount => groups.Values.Sum(g => g.Regions.Count);
         // Whether a load-order retry or a failed callback waits for the next Tick.
@@ -456,7 +456,7 @@ namespace RailroaderScenePatcher.Core {
         void UpdateFailed(object group, Exception error) {
             string name = null;
             try { name = GroupName?.Invoke(group); } catch { }
-            updateFailures.Warning((name ?? "") + "\n" + error.GetBaseException().Message, BakedSceneryRules.CullingUpdateFailure(name), error);
+            updateFailures.Warning((name ?? "") + "\n" + error.GetBaseException().Message, SceneObjectRules.CullingUpdateFailure(name), error);
         }
         // The patcher's state ends while the scene stays: every group gives back what own culling took over, as if
         // its plan were empty. While the map unloads there is nothing to give back.

@@ -11,7 +11,7 @@ static class CompositionTests {
     const string Scene = "BushnellWhittier-MapManager", BridgePath = "World/Large Scenery/Ela/Ela Bridge", OtherBoard = "World/Signs/Loc: Whittier";
     static readonly double[] Moved = { 25772.99, 633.4856, 393.795837 };
     static string Num(double v) => v.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-    static string Board(string id, double[] p, string path = IndependentBoards.SylvaPath, string structure = ",\"structure\":\"independent-board-v1\"", string extra = "") =>
+    static string Board(string id, double[] p, string path = LocationSigns.SylvaPath, string structure = ",\"structure\":\"location-sign-v1\"", string extra = "") =>
         "\"" + id + "\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + path + "\",\"component\":\"Helpers.Culling.RendererCuller\"" + structure + "}," +
         "\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", p.Select(Num)) + "],\"rotation\":[0,0,0,1]}" + extra + ",\"dependsOn\":[]}";
     static string Bridge(string id, double x = 1055, string deps = "[]") =>
@@ -21,16 +21,16 @@ static class CompositionTests {
     sealed class World {
         public FakeBoardWorld Boards = new FakeBoardWorld(); public FakeBoard Board;
         public FakeBridgeWorld Bridges = new FakeBridgeWorld(); public FakeBridge Bridge = new FakeBridge();
-        public IndependentBoards BoardCapability; public SceneCapabilities Scene; public PatchEngine Engine;
+        public LocationSigns BoardCapability; public SceneCapabilities Scene; public PatchEngine Engine;
         public World(bool boardAvailable = true, bool bridgeAvailable = true) {
             Board = Boards.Add(); Boards.BuildTiles();
-            // The bridge root carries a culler too, but no circle mask: it is not an independent board.
+            // The bridge root carries a culler too, but no circle mask: it is not a location sign.
             Boards.Add(new FakeBoard { Path = BridgePath, Masks = 0, MaskEnabled = false, Position = new[] { 1050.0, 5.0, 7.0 } });
             Boards.BuildTiles();
             Bridges.Objects[BridgePath] = new List<object> { Bridge };
             Scene = new SceneCapabilities(() => Boards.Maps);
-            if (boardAvailable) Scene.Add(BoardCapability = new IndependentBoards(Boards));
-            else Scene.AddUnavailable(IndependentBoards.Structure, "board functions missing");
+            if (boardAvailable) Scene.Add(BoardCapability = new LocationSigns(Boards));
+            else Scene.AddUnavailable(LocationSigns.Structure, "board functions missing");
             if (bridgeAvailable) Scene.Add(new BridgeScene(Bridges, Capability.Unchecked));
             else Scene.AddUnavailable(BridgeScene.Structure, "bridge functions missing");
             Engine = new PatchEngine(Scene);
@@ -61,7 +61,7 @@ static class CompositionTests {
         var output = w.Scene.Output(w.Board);
         Assert(output.Outstanding.Count == 2 && !output.Settled, "The composite reports the board's outstanding terrain output");
         Assert(w.Scene.Output(w.Bridge).Settled && w.Scene.Output(w.Bridge).Completed.Count == 0, "An adapter without dependent output reports none");
-        w.Boards.PendingTiles.Clear(); w.Boards.Clock = IndependentBoards.OutputTimeout + 1; w.BoardCapability.Poll();
+        w.Boards.PendingTiles.Clear(); w.Boards.Clock = LocationSigns.OutputTimeout + 1; w.BoardCapability.Poll();
         Assert(w.Scene.Output(w.Board).Error != null, "A stopped terrain write is visible through the composite");
         w.Scene.RetryOutput(w.Board);
         Assert(w.Scene.Output(w.Board).Error == null && w.Boards.Invalidated.Count > 0, "Retry reaches the board capability");

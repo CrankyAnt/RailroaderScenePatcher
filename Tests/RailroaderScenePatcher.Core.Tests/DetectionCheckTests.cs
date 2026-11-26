@@ -165,7 +165,7 @@ static class DetectionCheckTests {
     static void InformationIsPartOfTheObservation() {
         var handle = new object();
         SceneObservation Entry(params string[] information) => new SceneObservation(handle, new TargetIdentity("s", "World/Crossing", CrossingCoverageScene.ComponentType),
-            "Crossing controller", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "none", information: information);
+            "Grade crossing controller", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "none", information: information);
         var before = Entry("Circuit PI Approach A span PA has its upper end outside its track segment.");
         var after = Entry("Circuit PI Approach A span PA has no track route between its two ends.");
         Assert(before.Information.SequenceEqual(new[] { "Circuit PI Approach A span PA has its upper end outside its track segment." }) && before.Problems.Count == 0, "The observation keeps its information apart from its problems");

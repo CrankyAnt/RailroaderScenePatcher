@@ -9,7 +9,7 @@ using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // The buildings with game logic: Bryson Section House, the Tower (Bryson Tower Chance Clayton), Bryson Turntable and
-// Roundhouse 3 join the Baked scenery group family with their parts. The controlled hierarchy is the recorded Railroader
+// Roundhouse 3 join the Scene object and Child object families with their parts. The controlled hierarchy is the recorded Railroader
 // 0.6.3 scene (Records/InventoryLedger/level4_mb_rows.json, Records/InventoryCoverage/renderer_coverage.csv): each
 // building holds a key-value object with its global id (RollingStock.Controls.GlobalKeyValueObject), a lantern carries
 // its pickable toggle with its LanternController, and each roundhouse stall carries its pickable toggle on the object
@@ -32,21 +32,21 @@ static class InteractiveBuildingTests {
     static Node Spot(string name) => new Node(name).With("UnityEngine.Light", "Effects.NightLightController", "UnityEngine.Rendering.Universal.UniversalAdditionalLightData").Solid();
     // The part rule finds the stall's animator itself, as the game's adapter does. Flame is the lantern's filament
     // renderer, which its LanternController turns to the camera and scales every frame: the adapter finds it through
-    // BakedSceneryRules.DrivenFields and marks it animated, as the fixture does.
+    // SceneObjectRules.DrivenFields and marks it animated, as the fixture does.
     internal static Node World() => new Node("World", new Node("Large Scenery",
         new Node("Bryson",
             new Node("Bryson Section House", new Node("Common Standard Tool House", Solid("Cylinder"), Solid("Plane"), Solid("Plane.001")), TrainmanLantern()).With(KeyObject, GlobalKeyObject),
             new Node("Bryson Tower Chance Clayton", new Node("Culling Container",
                 new Node("Elevated_Crossing_Tower", Solid("Cube"), Solid("Cube.001")),
                 new Node("Sign-Station", Solid("Sign-Station"), new Node("Text").With(Text).Solid()),
-                TrainmanLantern()).With(BakedSceneryRules.SimpleCuller, KeyObject, GlobalKeyObject)),
+                TrainmanLantern()).With(SceneObjectRules.SimpleCuller, KeyObject, GlobalKeyObject)),
             new Node("Bryson Turntable", new Node("Roundhouse", new[] { Solid("Roundhouse Modular A Floor"), Solid("Roundhouse Modular A Between"), Solid("Roundhouse Modular A Between (1)"),
                 Side("Roundhouse Modular A Side"), Side("Roundhouse Modular A Side (1)"), Stall("Stall"), Stall("Stall (1)"), Stall("Stall (2)"), Stall("Stall (3)"), Stall("Stall (4)"),
-                Spot("Spot Light"), Spot("Spot Light (1)") }).With(BakedSceneryRules.RendererCuller, KeyObject, GlobalKeyObject))),
+                Spot("Spot Light"), Spot("Spot Light (1)") }).With(SceneObjectRules.RendererCuller, KeyObject, GlobalKeyObject))),
         new Node("Dillsboro Turntable",
             new Node("Roundhouse 3", Solid("Roundhouse Modular A Between"), Side("Roundhouse Modular A Side"), Stall("Stall"), Stall("Stall (1)"), Stall("Stall (2)"), Spot("Spot Light (1)"))
-                .With(BakedSceneryRules.RendererCuller, KeyObject, GlobalKeyObject))));
-    static GroupRootVerdict At(IReadOnlyList<GroupRootVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
+                .With(SceneObjectRules.RendererCuller, KeyObject, GlobalKeyObject))));
+    static SceneObjectVerdict At(IReadOnlyList<SceneObjectVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
 
     public static void Run() {
         InventoryListsTheBuildingsWithTheirParts();
@@ -59,16 +59,16 @@ static class InteractiveBuildingTests {
 
     // The four buildings are listed groups under Railroad service building. The lantern is a part with its toggle; a
     // stall is a part, and the object that holds its toggle and animates its doors moves with the stall without a row
-    // of its own; the Tower's culling container is no part, but its lantern and name text are.
+    // of its own; the Tower's child object that only carries a simple culler is no part, but its lantern and name text are.
     static void InventoryListsTheBuildingsWithTheirParts() {
-        var verdicts = BakedSceneryRules.Classify(World());
+        var verdicts = SceneObjectRules.Classify(World());
         foreach (var path in new[] { SectionHouse, Tower, Turntable, Roundhouse3 }) {
             var group = At(verdicts, path);
-            Assert(group?.Disposition == GroupDisposition.Group && group.Category == BakedSceneryCategories.RailroadServiceBuilding && group.Ticket == null,
+            Assert(group?.Disposition == GroupDisposition.Group && group.Category == SceneObjectCategories.RailroadServiceBuilding && group.Ticket == null,
                 path + " is a listed group under Railroad service building: " + group?.Disposition + " " + group?.Reason + " " + group?.Category);
         }
-        Assert(!BakedSceneryRules.Exclusions.Any(e => e.Component == Toggle || e.Ticket == "#91"), "No exclusion names a pickable toggle");
-        var all = BakedSceneryRules.Parts(verdicts);
+        Assert(!SceneObjectRules.Exclusions.Any(e => e.Component == Toggle || e.Ticket == "#91"), "No exclusion names a pickable toggle");
+        var all = SceneObjectRules.Parts(verdicts);
         var parts = all.ToDictionary(p => p.Path, p => p);
         bool Part(string path) => parts.TryGetValue(path, out var verdict) && verdict.Disposition == PartDisposition.Part;
         string Reason(string path) => parts.TryGetValue(path, out var verdict) ? verdict.Reason : "missing";
@@ -78,14 +78,14 @@ static class InteractiveBuildingTests {
             Turntable + "/Roundhouse/Roundhouse Modular A Side/Roundhouse Side Doors/Bone/Roundhouse Side Door", Roundhouse3 + "/Stall (1)", Roundhouse3 + "/Spot Light (1)" })
             Assert(Part(path), path + " is a part: " + Reason(path));
         foreach (var lantern in new[] { SectionHouse + "/TrainmanLantern", Tower + "/Culling Container/TrainmanLantern" })
-            Assert(Reason(lantern + "/Flame") == BakedSceneryRules.AnimatedParts, "The lantern's filament, which the game turns to the camera, is no part: " + Reason(lantern + "/Flame"));
-        var filament = BakedSceneryRules.DrivenFields.SingleOrDefault(d => d.Component == Lantern);
-        Assert(filament != null && filament.Field == "filamentRenderer" && BakedSceneryRules.DrivenFields.Any(d => d.Component == "RollingStock.GaugeNeedle" && d.Field == "needle"),
+            Assert(Reason(lantern + "/Flame") == SceneObjectRules.AnimatedParts, "The lantern's filament, which the game turns to the camera, is no part: " + Reason(lantern + "/Flame"));
+        var filament = SceneObjectRules.DrivenFields.SingleOrDefault(d => d.Component == Lantern);
+        Assert(filament != null && filament.Field == "filamentRenderer" && SceneObjectRules.DrivenFields.Any(d => d.Component == "RollingStock.GaugeNeedle" && d.Field == "needle"),
             "The adapter reads the lantern's filament renderer and the gauge needle as transforms the game drives");
-        Assert(Reason(Tower + "/Culling Container") == BakedSceneryRules.CullingContainers, "The Tower's culling container is no part: " + Reason(Tower + "/Culling Container"));
+        Assert(Reason(Tower + "/Culling Container") == SceneObjectRules.CullerOnlyChildren, "The Tower's child object that only carries a simple culler is no part: " + Reason(Tower + "/Culling Container"));
         foreach (var stall in new[] { Turntable + "/Roundhouse/Stall (2)", Roundhouse3 + "/Stall" }) {
-            Assert(Reason(stall + "/Roundhouse Modular A Stall") == BakedSceneryRules.AnimatedParts, "The animated stall object is no part: " + Reason(stall + "/Roundhouse Modular A Stall"));
-            Assert(Reason(stall + "/Roundhouse Modular A Stall/Roundhouse Stall Doors/Bone.002/Bone/Roundhouse Engine Door Left") == BakedSceneryRules.AnimatedParts, "A stall door moves with its stall");
+            Assert(Reason(stall + "/Roundhouse Modular A Stall") == SceneObjectRules.AnimatedParts, "The animated stall object is no part: " + Reason(stall + "/Roundhouse Modular A Stall"));
+            Assert(Reason(stall + "/Roundhouse Modular A Stall/Roundhouse Stall Doors/Bone.002/Bone/Roundhouse Engine Door Left") == SceneObjectRules.AnimatedParts, "A stall door moves with its stall");
         }
         var stalls = all.Count(p => p.Disposition == PartDisposition.Part && p.Path.EndsWith("/Roundhouse Modular A Floor", StringComparison.Ordinal) && p.Path.Contains("/Stall"));
         Assert(stalls == 8, "Each of the eight stalls lists its floor: " + stalls);
@@ -106,7 +106,7 @@ static class InteractiveBuildingTests {
         Assert(CommandBand.TogglesBelowBinding(5) == "Toggles below=5" && CommandBand.NameTextBinding("Chance Clayton") == "Name text=Chance Clayton" && holderBelow == "Saved states below=1",
             "The counts and the name text are bindings");
 
-        string Use(bool part, params string[] bindings) => CommandBand.UseInGame(part, BakedSceneryCategories.RailroadServiceBuilding, null, bindings);
+        string Use(bool part, params string[] bindings) => CommandBand.UseInGame(part, SceneObjectCategories.RailroadServiceBuilding, null, bindings);
         Assert(Use(true, lantern) == "Lantern switch: click the lantern in the game to switch it on or off. The game keeps its state by its key lantern.0, independently of its position. Moving this part preserves that state. While this part is disabled, you can't click the lantern.",
             "The lantern part names its switch: " + Use(true, lantern));
         Assert(Use(true, door, CommandBand.KeyObjectBinding(null)).StartsWith("Door toggle: click the doors in the game to open or close them. The game keeps its state by its key doors, independently of its position. Moving this part preserves that state. While this part is disabled, you can't click the doors.", StringComparison.Ordinal),
@@ -123,9 +123,9 @@ static class InteractiveBuildingTests {
         Assert(Use(true) == CommandBand.PartDecorative && Use(false) == CommandBand.Decorative, "A part or group without toggles reads the decorative text");
         // The Object tab passes the selected entry's bindings; the group's bindings do not change a part's text.
         SceneObservation Entry(string path, string groupPath, params string[] bindings) =>
-            new SceneObservation(new object(), new TargetIdentity("s", path, BakedSceneryGroups.ComponentType, groupPath == null ? BakedSceneryGroups.Structure : BakedSceneryParts.Structure),
-                BakedSceneryRules.Family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "edit", groupPath: groupPath,
-                category: groupPath == null ? BakedSceneryCategories.RailroadServiceBuilding : null);
+            new SceneObservation(new object(), new TargetIdentity("s", path, SceneObjects.ComponentType, groupPath == null ? SceneObjects.Structure : ChildObjects.Structure),
+                groupPath == null ? SceneObjectRules.Family : SceneObjectRules.ChildFamily, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "edit", groupPath: groupPath,
+                category: groupPath == null ? SceneObjectCategories.RailroadServiceBuilding : null);
         var root = Entry(SectionHouse, null, holder, CommandBand.TogglesBelowBinding(1));
         var shed = Entry(SectionHouse + "/Common Standard Tool House", SectionHouse);
         Assert(CommandBand.UseInGame(Entry(SectionHouse + "/TrainmanLantern", SectionHouse, lantern), root) == Use(true, lantern) && CommandBand.UseInGame(shed, root) == CommandBand.PartDecorative,
@@ -145,7 +145,7 @@ static class InteractiveBuildingTests {
         Assert(missing == 2, "A component without the field fails the readout instead of reading no key");
     }
 
-    // Roundhouse 3 as the group and part capabilities see it: the group root carries the renderer culler, a stall part
+    // Roundhouse 3 as the group and part capabilities see it: the top scene object carries the renderer culler, a stall part
     // stands below it beside the other parts, and the animated stall object below the stall is observed with the group,
     // never resolved. Bryson Turntable holds the same stalls one level deeper, below its Roundhouse part.
     const string SceneName = "BushnellWhittier-MapManager";
@@ -163,9 +163,9 @@ static class InteractiveBuildingTests {
             Doors = Group.Add(new FakePart { Id = "Roundhouse Modular A Stall#3", Offset = new[] { 10.0, -0.33, 9 }, Parent = Stall, Animated = true });
             Spot = Group.Add(new FakePart { Id = "Spot Light (1)#4", Offset = new[] { -6.0, 5, 0 } });
             Group.Cullers.Add(new FakeCuller { Id = "Roundhouse 3|RendererCuller", Simple = false, Radius = 40, Authored = 40 });
-            var verdicts = BakedSceneryRules.Classify(InteractiveBuildingTests.World());
+            var verdicts = SceneObjectRules.Classify(InteractiveBuildingTests.World());
             World.GroupVerdicts = verdicts.ToDictionary(v => v.Path, v => v);
-            World.Verdicts = BakedSceneryRules.Parts(verdicts).ToDictionary(v => v.Path, v => v);
+            World.Verdicts = SceneObjectRules.Parts(verdicts).ToDictionary(v => v.Path, v => v);
             World.Objects[Roundhouse3] = new List<object> { Group };
             World.PartsAt[Roundhouse3 + "/Roundhouse Modular A Between"] = new List<object> { Between };
             World.PartsAt[Roundhouse3 + "/Stall (1)"] = new List<object> { Stall };
@@ -173,7 +173,7 @@ static class InteractiveBuildingTests {
             World.SetActive(Group, true); World.Mutations = 0;
             var holds = new PartHolds();
             var scene = new SceneCapabilities(() => World.Maps, null);
-            scene.Add(new BakedSceneryGroups(World, holds: holds)); scene.Add(new BakedSceneryParts(World, holds));
+            scene.Add(new SceneObjects(World, holds: holds)); scene.Add(new ChildObjects(World, holds));
             Engine = new PatchEngine(scene);
         }
         public double[] Root => World.Observe(Group).Root.Placement.Position.ToArray();
@@ -186,11 +186,11 @@ static class InteractiveBuildingTests {
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
         (position == null ? "" : ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", position.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "],\"rotation\":[0,0,0,1]}") +
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
-    static string GroupMod(string id, double[] position = null, bool? active = null) => Mod(id, Roundhouse3, BakedSceneryGroups.Structure, position, active);
-    static string StallMod(string id, double[] position = null, bool? active = null) => Mod(id, Roundhouse3 + "/Stall (1)", BakedSceneryParts.Structure, position, active);
+    static string GroupMod(string id, double[] position = null, bool? active = null) => Mod(id, Roundhouse3, SceneObjects.Structure, position, active);
+    static string StallMod(string id, double[] position = null, bool? active = null) => Mod(id, Roundhouse3 + "/Stall (1)", ChildObjects.Structure, position, active);
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
-    static readonly TargetIdentity GroupId = new TargetIdentity(SceneName, Roundhouse3, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
-    static readonly TargetIdentity StallId = new TargetIdentity(SceneName, Roundhouse3 + "/Stall (1)", BakedSceneryParts.ComponentType, BakedSceneryParts.Structure);
+    static readonly TargetIdentity GroupId = new TargetIdentity(SceneName, Roundhouse3, SceneObjects.ComponentType, SceneObjects.Structure);
+    static readonly TargetIdentity StallId = new TargetIdentity(SceneName, Roundhouse3 + "/Stall (1)", ChildObjects.ComponentType, ChildObjects.Structure);
 
     // A group move carries the stalls and their doors; a stall move carries its doors and leaves the
     // rest in place; a repeated application and a load at another origin reach the same placements; a refusal mutates
@@ -214,11 +214,11 @@ static class InteractiveBuildingTests {
             && Near(stall.Root, Authored) && Near(stall.At(stall.Between), new[] { 1600.026, 529.0, 1299.409 }),
             "A stall move carries its doors and leaves the other parts in place: " + stall.Where() + " " + String.Join("; ", moved.Outcomes.Values.Select(o => o.Error)));
         var unresolved = new Yard();
-        var wrong = unresolved.Engine.Apply(Doc(Mod("doors", Roundhouse3 + "/Stall (1)/Roundhouse Modular A Stall", BakedSceneryParts.Structure, StallMoved),
-            Mod("door", Roundhouse3 + "/Stall (1)/Roundhouse Modular A Stall/Roundhouse Stall Doors/Bone.002/Bone/Roundhouse Engine Door Left", BakedSceneryParts.Structure, StallMoved),
-            Mod("container", Tower + "/Culling Container", BakedSceneryParts.Structure, StallMoved)));
+        var wrong = unresolved.Engine.Apply(Doc(Mod("doors", Roundhouse3 + "/Stall (1)/Roundhouse Modular A Stall", ChildObjects.Structure, StallMoved),
+            Mod("door", Roundhouse3 + "/Stall (1)/Roundhouse Modular A Stall/Roundhouse Stall Doors/Bone.002/Bone/Roundhouse Engine Door Left", ChildObjects.Structure, StallMoved),
+            Mod("container", Tower + "/Culling Container", ChildObjects.Structure, StallMoved)));
         Assert(wrong.Outcomes.Values.All(o => !o.Applied) && unresolved.World.Mutations == 0 && unresolved.Where() == new Yard().Where(),
-            "The animated stall object, its door and the Tower's culling container fail before any change: " + unresolved.World.Mutations + " mutations; " +
+            "The animated stall object, its door and the Tower's child object that only carries a simple culler fail before any change: " + unresolved.World.Mutations + " mutations; " +
             String.Join("; ", wrong.Outcomes.Select(o => o.Key + " " + o.Value.Applied)));
 
         var refused = new Yard(); refused.World.Refused = "The group's scene is not loaded";

@@ -11,7 +11,7 @@ using UnityEngine;
 namespace RailroaderScenePatcher {
     // The scene ground masks at and below a scene object as the game holds them: the mask components
     // (Map.Runtime.MaskComponents.MaskComponentBase), the keys of their registrations in the terrain system, and that
-    // system's tiles, which the independent-board world already reaches. The rules live in Core's GroundMasks.
+    // system's tiles, which the location sign world already reaches. The rules live in Core's GroundMasks.
     internal sealed class GroundMaskWorld : IGroundMaskWorld {
         const string RectangleType = "Map.Runtime.MaskComponents.RectangleMapMask", ShapedBase = "Map.Runtime.MaskComponents.MapMaskBase";
         static readonly Type maskBase = Native.Type("Map.Runtime.MaskComponents.MaskComponentBase"), shaped = Native.Type(ShapedBase), rectangle = Native.Type(RectangleType);

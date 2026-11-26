@@ -19,8 +19,8 @@ static class ConstructionSegmentTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception("Construction segments: " + message); }
     static string Root([CallerFilePath] string path = "") => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path), "..", ".."));
     const string SceneName = "BushnellWhittier-MapManager", Bryson = "World/Large Scenery/Bryson/Bridge 1", Almond = "World/Large Scenery/Almond Bridge";
-    static TargetIdentity GroupId(string path) => new TargetIdentity(SceneName, path, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
-    static string Target(string path) => "\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"" + BakedSceneryGroups.ComponentType + "\",\"structure\":\"" + BakedSceneryGroups.Structure + "\"}";
+    static TargetIdentity GroupId(string path) => new TargetIdentity(SceneName, path, SceneObjects.ComponentType, SceneObjects.Structure);
+    static string Target(string path) => "\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"" + SceneObjects.ComponentType + "\",\"structure\":\"" + SceneObjects.Structure + "\"}";
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
     static string Segments(string id, string path, string relationship, string extra = "") => "\"" + id + "\":{" + Target(path) + ",\"relationships\":{\"constructionSegments\":" + relationship + "}" + extra + ",\"dependsOn\":[]}";
     static string Ids(IEnumerable<string> ids) => ids == null ? "none" : String.Join(",", ids);
@@ -88,7 +88,7 @@ static class ConstructionSegmentTests {
     static void StaleRefusalLeavesAMissingTargetIncomplete() {
         var f = Split(); var store = new Store(); var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(f.Engine, mapEditor, store); mapEditor.Session = session;
-        var girder = new TargetIdentity(SceneName, "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge (1)", BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
+        var girder = new TargetIdentity(SceneName, "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge (1)", SceneObjects.ComponentType, SceneObjects.Structure);
         // A move of the plate girder bridge and its removal: Undo of the removal restores an entry where the file holds none.
         Assert(session.Edit(girder, new Placement(new[] { 4100.0, 529, 5667 }, new[] { 0.0, 0, 0, 1 }), null).Applied && session.Remove(girder).Applied, "A move of the plate girder bridge and its removal apply");
         // A move the world refuses inside the edit's relationship check, before any mutation.
@@ -338,7 +338,7 @@ static class ConstructionSegmentTests {
     // of the Ela controller's Supported edits, Placement and Enabled.
     static void ConnectionsTabTexts() {
         // While the Connections tab is open the world marks each current binding green and offers none of them as a
-        // candidate. This includes a marker's segment, a span's two segments, and each construction segment of a group root, part,
+        // candidate. This includes a marker's segment, a span's two segments, and each construction segment of a top scene object, part,
         // or the Ela controller. All construction segment lines use the "Construction segment=" prefix.
         var bound = CommandBand.BoundSegments(new[] { "Marker segment=S1; end=a; distance=2", "Lower segment=S2", "Upper segment=S3; end=b",
             CommandBand.SegmentBinding("S4", true), CommandBand.SegmentBinding("S5", false), "Construction segment=S6", "Storage piles=0", "Construction target World/Steel" });
@@ -366,8 +366,8 @@ static class ConstructionSegmentTests {
         var elaPicked = CommandBand.AddSegment(CommandBand.AddSegment("31lvmw", "Six2y7zi0", CommandBand.MissingSegments(elaLines)), "Six2ykbyk", CommandBand.MissingSegments(elaLines));
         Assert(elaPicked == "Six2y7zi0, Six2ykbyk" && CommandBand.SegmentsReason(null, elaPicked, CommandBand.ConstructionSegments(elaLines)) == null,
             "Picked drops the Ela controller's missing segment and Set is offered: " + elaPicked);
-        // The construction scenery controller's own observation reads its segments against the loaded track, as the group
-        // root's does; without that check its binding lines name no missing segment and Picked keeps it.
+        // The construction scenery controller's own observation reads its segments against the loaded track, as the top
+        // scene object's does; without that check its binding lines name no missing segment and Picked keeps it.
         var inventory = File.ReadAllText(Path.Combine(Root(), "Src", "RailroaderScenePatcher", "NativeInventory.cs"));
         var controllerBlock = inventory.Substring(inventory.IndexOf("TypeName(c) == ConstructionScenery", StringComparison.Ordinal));
         controllerBlock = controllerBlock.Substring(0, controllerBlock.IndexOf("constructionIds = ids;", StringComparison.Ordinal));
@@ -383,8 +383,8 @@ static class ConstructionSegmentTests {
         // The Ela controller is an editable object (its construction segments), so the edit block does not fall back to
         // the generic reason: placement and activity then give the controller's own reasons.
         Assert(CommandBand.EditableStructure(ConstructionSceneryScene.Structure), "The Ela controller is editable");
-        foreach (var structure in new[] { IndependentBoards.Structure, BridgeScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure, CrossingCoverageScene.Structure, CrossingPadScene.Structure,
-            BakedSceneryGroups.Structure, BakedSceneryParts.Structure, StationMapIconRules.Structure, SpawnPoints.Structure, ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure })
+        foreach (var structure in new[] { LocationSigns.Structure, BridgeScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure, CrossingCoverageScene.Structure, CrossingPadScene.Structure,
+            SceneObjects.Structure, ChildObjects.Structure, StationMapIconRules.Structure, SpawnPoints.Structure, ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure })
             Assert(CommandBand.EditableStructure(structure), "Still editable: " + structure);
         Assert(!CommandBand.EditableStructure(null) && !CommandBand.EditableStructure(StarterPlacementScene.Structure), "No structure, or a starter placement marker with its own workflow, is not editable here");
         var controllerEdits = SupportedEdits.Of(EditEntries.Of(CommandBand.ConstructionSceneryFamily, ConstructionSceneryScene.Structure, CommandBand.ConstructionSceneryOperations));

@@ -19,9 +19,9 @@ public sealed class FaultSwitch : MonoBehaviour {
     const string TypeName = "RailroaderScenePatcher.Core.FaultInjection";
     static readonly string[] Points = { "after-mutation", "during-restoration", "between-addition-steps" };
     Rect window = new Rect(20, 200, 360, 0);
-    // The group root for the unreadable-group and unreadable-parts points, as the group preparation failure line names it:
+    // The top scene object for the unreadable-group and unreadable-parts points, as the group preparation failure line names it:
     // scene name/path.
-    string groupRoot = "";
+    string topObject = "";
     // Why the last Arm unreadable-group or Arm unreadable-parts failed; the Last line shows it until an arm succeeds or
     // Disarm is clicked.
     string armFailure;
@@ -46,14 +46,14 @@ public sealed class FaultSwitch : MonoBehaviour {
     void Update() { if (Input.GetKeyDown(KeyCode.F9)) visible = !visible; }
     void OnGUI() {
         if (!visible) return;
-        // The window takes the height of its content, so a long group root cannot push Disarm out of view.
+        // The window takes the height of its content, so a long top scene object cannot push Disarm out of view.
         window = GUILayout.Window(0x52FA, window, Draw, "Scene Patcher fault switch (test only, F9 hides)", GUILayout.Width(window.width));
     }
     void ArmGroup(Type type, string method, string point) {
         try {
-            Call(type, method, groupRoot);
+            Call(type, method, topObject);
             armFailure = null;
-            Debug.Log("[SceneFaultSwitch] Armed " + point + " " + groupRoot);
+            Debug.Log("[SceneFaultSwitch] Armed " + point + " " + topObject);
         } catch (Exception e) {
             armFailure = "Arm " + point + " failed: " + e.GetBaseException().Message;
             Debug.LogWarning("[SceneFaultSwitch] " + armFailure);
@@ -70,12 +70,12 @@ public sealed class FaultSwitch : MonoBehaviour {
             foreach (var point in Points) if (GUILayout.Button("Arm " + point)) { Call(type, "Arm", point); Debug.Log("[SceneFaultSwitch] Armed " + point); }
             GUILayout.Label("Unreadable group: " + (Get(type, "UnreadableGroup") ?? "none"));
             GUILayout.Label("Unreadable parts: " + (Get(type, "UnreadableParts") ?? "none"));
-            groupRoot = GUILayout.TextField(groupRoot ?? "");
-            var typed = !String.IsNullOrWhiteSpace(groupRoot);
+            topObject = GUILayout.TextField(topObject ?? "");
+            var typed = !String.IsNullOrWhiteSpace(topObject);
             var enabled = GUI.enabled;
             GUI.enabled = enabled && typed;
-            if (GUILayout.Button(new GUIContent("Arm unreadable-group", typed ? "" : "Unavailable: type a group root"))) ArmGroup(type, "ArmUnreadableGroup", "unreadable-group");
-            if (GUILayout.Button(new GUIContent("Arm unreadable-parts", typed ? "" : "Unavailable: type a group root"))) ArmGroup(type, "ArmUnreadableParts", "unreadable-parts");
+            if (GUILayout.Button(new GUIContent("Arm unreadable-group", typed ? "" : "Unavailable: type a top scene object"))) ArmGroup(type, "ArmUnreadableGroup", "unreadable-group");
+            if (GUILayout.Button(new GUIContent("Arm unreadable-parts", typed ? "" : "Unavailable: type a top scene object"))) ArmGroup(type, "ArmUnreadableParts", "unreadable-parts");
             GUI.enabled = enabled;
             if (GUILayout.Button("Disarm")) { Call(type, "Disarm"); armFailure = null; Debug.Log("[SceneFaultSwitch] Disarmed"); }
             // The tooltip of the control under the pointer, such as the reason a button is unavailable.

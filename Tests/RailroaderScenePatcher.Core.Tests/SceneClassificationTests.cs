@@ -15,7 +15,7 @@ static class SceneClassificationTests {
         // Set to write the reviewed outcomes into the fixture, or to print the readout of every object.
         if (Environment.GetEnvironmentVariable("RSP_FIXTURE_WRITE") == "1") { map.WriteExpected(); map = new BaseMapFixture(); }
         if (Environment.GetEnvironmentVariable("RSP_FIXTURE_READOUT") == "1") Readout(map);
-        GroupRootsAreTheInventorys(map);
+        TopObjectsAreTheInventorys(map);
         EveryListedObjectHasItsExpectedOutcome(map);
         NothingLandsInACatchAll(map);
         ChangesAreTheKnownOnes(map);
@@ -28,46 +28,46 @@ static class SceneClassificationTests {
     static void Readout(BaseMapFixture map) {
         foreach (var place in map.Places.All.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
             Console.WriteLine("PLACE " + place.Name + " [" + place.From + "] names: " + String.Join("; ", place.Names) + " points: " + String.Join(" ", place.Points.Select(p => Math.Round(p[0]) + "," + Math.Round(p[1]))));
-        foreach (var o in map.Objects.Where(o => o.Listed && !o.BakedPart)) {
+        foreach (var o in map.Objects.Where(o => o.Listed && !o.ChildObject)) {
             var named = map.Places.NamedInPath(o.Path).FirstOrDefault(); var nearest = map.Places.Nearest(o.At);
             Console.WriteLine("ROW " + o.Path + " | " + o.Family + " | today " + o.Today + " | " + map.Outcome(o) + " | named " + (named?.Name ?? "-") + " " + Math.Round(map.Places.Distance(named, o.At)) + " nearest " + nearest?.Name + " " + Math.Round(map.Places.Distance(nearest, o.At)));
         }
     }
 
-    // The rules list the same group roots as the inventory of 7962df1 did with its category table: no group lost, none
-    // added, and no part that is a group root.
-    static void GroupRootsAreTheInventorys(BaseMapFixture map) {
-        var expected = map.Objects.Where(o => o.BakedRoot).Select(o => o.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
+    // The rules list the same top scene objects as the inventory of 7962df1 did with its category table: no group lost, none
+    // added, and no part that is a top scene object.
+    static void TopObjectsAreTheInventorys(BaseMapFixture map) {
+        var expected = map.Objects.Where(o => o.TopSceneObject).Select(o => o.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
         var found = map.Verdicts.Where(v => v.Disposition == GroupDisposition.Group || v.Disposition == GroupDisposition.InspectionOnly).Select(v => v.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
         var missing = expected.Except(found).ToArray(); var added = found.Except(expected).ToArray();
         Check(missing.Length == 0 && added.Length == 0 && expected.Length == found.Length,
-            "the rules list the group roots of the inventory (" + expected.Length + "), got " + found.Length + "; missing: " + String.Join(", ", missing) + "; added: " + String.Join(", ", added));
+            "the rules list the top scene objects of the inventory (" + expected.Length + "), got " + found.Length + "; missing: " + String.Join(", ", missing) + "; added: " + String.Join(", ", added));
         var roots = new HashSet<string>(found);
-        foreach (var part in map.Objects.Where(o => o.BakedPart)) {
+        foreach (var part in map.Objects.Where(o => o.ChildObject)) {
             var above = part.Path; var held = false;
             while (!held && above.LastIndexOf('/') > 0) { above = above.Substring(0, above.LastIndexOf('/')); held = roots.Contains(above); }
-            Check(held && !roots.Contains(part.Path), part.Path + " is a part below a group root");
+            Check(held && !roots.Contains(part.Path), part.Path + " is a part below a top scene object");
         }
-        var containers = map.Verdicts.Where(v => v.Disposition == GroupDisposition.ContainerObject).Select(v => v.Path).ToArray();
-        Check(containers.SequenceEqual(new[] { "World/Large Scenery/Bryson/Bryson Yard" }), "Bryson Yard is the one container object of lamp posts (got " + String.Join(", ", containers) + ")");
-        foreach (var o in map.Objects.Where(o => o.BakedRoot)) {
+        var containers = map.Verdicts.Where(v => v.Disposition == GroupDisposition.GroupHolder).Select(v => v.Path).ToArray();
+        Check(containers.SequenceEqual(new[] { "World/Large Scenery/Bryson/Bryson Yard" }), "Bryson Yard is the one scene object that only holds other groups of lamp posts (got " + String.Join(", ", containers) + ")");
+        foreach (var o in map.Objects.Where(o => o.TopSceneObject)) {
             var verdict = map.Verdicts.First(v => v.Path == o.Path);
             Check(verdict.Category == null || verdict.Category == map.ClassOf(o).Category, o.Path + " has one category in the inventory and in the outliner (" + verdict.Category + ", " + map.ClassOf(o).Category + ")");
         }
     }
 
     static void EveryListedObjectHasItsExpectedOutcome(BaseMapFixture map) {
-        var wrong = map.Objects.Where(o => o.Listed && !o.BakedPart && map.Outcome(o) != o.Expected).Select(o => o.Path + ": expected " + o.Expected + ", got " + map.Outcome(o)).ToArray();
+        var wrong = map.Objects.Where(o => o.Listed && !o.ChildObject && map.Outcome(o) != o.Expected).Select(o => o.Path + ": expected " + o.Expected + ", got " + map.Outcome(o)).ToArray();
         Check(wrong.Length == 0, wrong.Length + " listed objects do not have their expected category, kind and place: " + String.Join(" | ", wrong.Take(12)));
     }
 
     static void NothingLandsInACatchAll(BaseMapFixture map) {
-        var lost = map.Objects.Where(o => o.Listed && !o.BakedPart && (!map.ClassOf(o).Recognised || map.Places.Of(o.Path, o.At) == null)).Select(o => o.Path).ToArray();
+        var lost = map.Objects.Where(o => o.Listed && !o.ChildObject && (!map.ClassOf(o).Recognised || map.Places.Of(o.Path, o.At) == null)).Select(o => o.Path).ToArray();
         Check(lost.Length == 0, "no listed object is left without a category or a place: " + String.Join(", ", lost));
     }
 
     // Every listed object whose category differs from the one it had before the generic rules, by the rule that
-    // changes it. Before, a group root took its category from the category table of the 7962df1 inventory, and
+    // changes it. Before, a top scene object took its category from the category table of the 7962df1 inventory, and
     // every other object from its family and name.
     static readonly Dictionary<string, string[]> KnownChanges = new Dictionary<string, string[]> {
         // A loader that fills cars (RollingStock.CarContentSwapper) is an industry building.
@@ -80,7 +80,7 @@ static class SceneClassificationTests {
         ["Track marker -> Station building"] = new[] { "World/Large Scenery/Hemingway/Hemingway flagstopstation" },
     };
     static void ChangesAreTheKnownOnes(BaseMapFixture map) {
-        var changes = map.Objects.Where(o => o.Listed && !o.BakedPart).Select(o => new { o.Path, From = o.Today.Split(new[] { " / " }, StringSplitOptions.None)[0], To = map.ClassOf(o).Category })
+        var changes = map.Objects.Where(o => o.Listed && !o.ChildObject).Select(o => new { o.Path, From = o.Today.Split(new[] { " / " }, StringSplitOptions.None)[0], To = map.ClassOf(o).Category })
             .Where(c => c.From != c.To).GroupBy(c => c.From + " -> " + c.To).ToDictionary(g => g.Key, g => g.Select(c => c.Path).ToArray());
         if (Environment.GetEnvironmentVariable("RSP_FIXTURE_READOUT") == "1") foreach (var change in changes) Console.WriteLine("CHANGE " + change.Key + " (" + change.Value.Length + "): " + String.Join(", ", change.Value));
         var unknown = changes.Where(c => !KnownChanges.TryGetValue(c.Key, out var paths) || !paths.OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(c.Value.OrderBy(p => p, StringComparer.Ordinal))).Select(c => c.Key + " (" + c.Value.Length + "): " + String.Join(", ", c.Value.Take(5))).ToArray();
@@ -92,10 +92,10 @@ static class SceneClassificationTests {
     // object that stands in a place folder and no farther than the rules' own reach from that place.
     static void OutcomesMatchWhatTheNamesSay(BaseMapFixture map) {
         var wrong = new List<string>();
-        foreach (var o in map.Objects.Where(o => o.Listed && !o.BakedPart)) {
+        foreach (var o in map.Objects.Where(o => o.Listed && !o.ChildObject)) {
             var found = map.ClassOf(o); var name = o.Name;
             string kind = null;
-            if (o.BakedRoot && o.Today == "Bridge") kind = name.Contains("Road Bridge") ? "Road bridges" : "Rail bridges";
+            if (o.TopSceneObject && o.Today == "Bridge") kind = name.Contains("Road Bridge") ? "Road bridges" : "Rail bridges";
             else if (name.StartsWith("Loc: ", StringComparison.Ordinal)) kind = "Location signs";
             else if (o.Family == "Milepost") kind = "Mileposts";
             else if (name.StartsWith("Whistle Sign", StringComparison.Ordinal)) kind = "Whistle signs";
@@ -108,7 +108,7 @@ static class SceneClassificationTests {
         // The towns of the map data: an object in a town's folder stands at that town, unless its own name or a folder
         // between names another place, or it stands far from the town.
         var towns = new HashSet<string>(map.MapData.Select(p => p.Name), StringComparer.Ordinal);
-        var misplaced = map.Objects.Where(o => o.Listed && !o.BakedPart && o.Path.StartsWith("World/Large Scenery/", StringComparison.Ordinal)).Select(o => new { o, Parts = o.Path.Split('/') })
+        var misplaced = map.Objects.Where(o => o.Listed && !o.ChildObject && o.Path.StartsWith("World/Large Scenery/", StringComparison.Ordinal)).Select(o => new { o, Parts = o.Path.Split('/') })
             .Where(x => x.Parts.Length == 4 && towns.Contains(x.Parts[2]) && !towns.Any(t => t != x.Parts[2] && x.Parts[3].Contains(t.Split(' ')[0])) && map.Places.Distance(map.Places.Named(x.Parts[2]), x.o.At) <= ScenePlaces.Close)
             .Where(x => map.Places.Of(x.o.Path, x.o.At)?.Name != x.Parts[2]).Select(x => x.o.Path + " @ " + map.Places.Of(x.o.Path, x.o.At)?.Name).ToArray();
         Check(misplaced.Length == 0, "an object directly in a town's folder that stands in that town is listed at that town: " + String.Join(" | ", misplaced.Take(10)));
@@ -133,14 +133,14 @@ static class SceneClassificationTests {
     // Objects the base map does not have, built the way the game and Unity build such objects: the same path forms,
     // components and names. Each takes its category, kind and place from the rules, with no rule written for it.
     static BaseMapObject Fiction(string path, string family, double x, double z, string expected, params string[] components) =>
-        new BaseMapObject { Listed = true, Path = path, Family = family, Structure = family == BakedSceneryRules.Family ? "baked-scenery-group-v1" : null, Components = components, At = new[] { x, z }, Today = "", Expected = expected };
+        new BaseMapObject { Listed = true, Path = path, Family = family, Structure = family == SceneObjectRules.Family ? "scene-object-v1" : null, Components = components, At = new[] { x, z }, Today = "", Expected = expected };
     static BaseMapObject Below(string path, params string[] components) =>
-        new BaseMapObject { Listed = true, Path = path, Family = BakedSceneryRules.Family, Structure = BaseMapObject.Part, Components = components, At = new[] { 0.0, 0 }, Today = "", Expected = "" };
-    const string Baked = BakedSceneryRules.Family, Culler = "Helpers.Culling.RendererCuller", Mesh = "UnityEngine.MeshRenderer", Marker = "Track.TrackMarker", Relative = "Track.TrackRelativePosition";
+        new BaseMapObject { Listed = true, Path = path, Family = SceneObjectRules.ChildFamily, Structure = BaseMapObject.Part, Components = components, At = new[] { 0.0, 0 }, Today = "", Expected = "" };
+    const string Baked = SceneObjectRules.Family, Culler = "Helpers.Culling.RendererCuller", Mesh = "UnityEngine.MeshRenderer", Marker = "Track.TrackMarker", Relative = "Track.TrackRelativePosition";
     static void FictionalObjects() {
         var fiction = Fictions();
         var map = new BaseMapFixture(fiction);
-        var listed = fiction.Where(o => !o.BakedPart).ToArray();
+        var listed = fiction.Where(o => !o.ChildObject).ToArray();
         Check(listed.Length >= 10 && listed.Length <= 30, "the fictional objects are a handful (" + listed.Length + ")");
         CheckFictions(map, listed);
     }
@@ -160,14 +160,14 @@ static class SceneClassificationTests {
             // A new kind of sign in the game's sign container, a sign named after a place, and a location board for a new place.
             Fiction("World/Signs/Whistle Post - Judson", "Track marker", -9050, -3020, "Sign / Whistle signs @ Judson", Marker, Relative, Culler),
             Fiction("World/Signs/Derail Sign Hewitt", "Track marker", -13790, -8200, "Sign / Other signs @ Hewitt", Marker, Relative, Culler),
-            Fiction("World/Signs/Loc: Judson", "Independent board", -9100, -3100, "Sign / Location signs @ Judson", Culler, "Map.Runtime.MaskComponents.CircleMapMask"),
+            Fiction("World/Signs/Loc: Judson", "Location sign", -9100, -3100, "Sign / Location signs @ Judson", Culler, "Map.Runtime.MaskComponents.CircleMapMask"),
             Fiction("World/Signs/Speed - Tunnel Curve", "Track marker", 16400, 2250, "Sign / Speed signs @ Wilmot", Marker, Relative, Culler),
             // A milepost of a new line.
             Fiction("World/Mile Posts/M-12", "Milepost", 2000, -200, "Sign / Mileposts @ Cochran", Culler, Marker, Relative, "Helpers.MilePost"),
             // A new unprotected crossing in a Roads folder of a new place, and a protected one.
             Fiction("World/Roads Judson/Crossing Unprotected - Mill Road/Sign-Crossing0 (1)", Baked, -9010, -3010, "Grade crossing @ Judson", Culler),
             Fiction("World/Roads Judson/Crossing Unprotected - Mill Road/Crossing Pad", "Crossing pad marker", -9010, -3012, "Grade crossing @ Judson", Marker, Relative, "Track.TrackCurveMeshBuilder"),
-            Fiction("World/Roads Hewitt/Grade Crossing - Main St", "Crossing controller", -13810, -8180, "Grade crossing @ Hewitt", "Track.Crossings.GradeCrossingController"),
+            Fiction("World/Roads Hewitt/Grade Crossing - Main St", "Grade crossing controller", -13810, -8180, "Grade crossing @ Hewitt", "Track.Crossings.GradeCrossingController"),
             Fiction("World/Roads Hewitt/Grade Crossing - Main St/Signal 1", "Crossing mast", -13811, -8181, "Grade crossing @ Hewitt", "Track.KeyValueLampMaterialController"),
             // A new storage pile at a new place, and an industry building there.
             Fiction("World/Large Scenery/Judson/Judson Pulpwood", Baked, -9020, -2990, "Storage display / Storage piles @ Judson"),
@@ -192,10 +192,10 @@ static class SceneClassificationTests {
     static void CheckFictions(BaseMapFixture map, BaseMapObject[] listed) {
         var wrong = listed.Where(o => map.Outcome(o) != o.Expected).Select(o => o.Path + ": expected " + o.Expected + ", got " + map.Outcome(o)).ToArray();
         Check(wrong.Length == 0, "a fictional object built the game's way takes its category, kind and place from the rules: " + String.Join(" | ", wrong));
-        // Each fictional group root is a group root for the inventory too, with the same category.
-        foreach (var o in listed.Where(o => o.BakedRoot)) {
+        // Each fictional top scene object is a top scene object for the inventory too, with the same category.
+        foreach (var o in listed.Where(o => o.TopSceneObject)) {
             var verdict = map.Verdicts.FirstOrDefault(v => v.Path == o.Path);
-            Check(verdict != null && verdict.Disposition == GroupDisposition.Group && verdict.Category == map.ClassOf(o).Category, o.Path + " is a listed group root under " + map.ClassOf(o).Category + " (got " + verdict?.Disposition + " " + verdict?.Category + ")");
+            Check(verdict != null && verdict.Disposition == GroupDisposition.Group && verdict.Category == map.ClassOf(o).Category, o.Path + " is a listed top scene object under " + map.ClassOf(o).Category + " (got " + verdict?.Disposition + " " + verdict?.Category + ")");
         }
         if (Environment.GetEnvironmentVariable("RSP_FIXTURE_READOUT") == "1") foreach (var o in listed) Console.WriteLine("FICTION " + o.Path + " | " + map.Outcome(o));
     }

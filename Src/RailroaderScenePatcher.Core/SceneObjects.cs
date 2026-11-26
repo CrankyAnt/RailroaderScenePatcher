@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace RailroaderScenePatcher.Core {
-    // One loaded scene object as the baked scenery rule reads it: its name, the components on it, and its children.
+    // One loaded scene object as the scene object rule reads it: its name, the components on it, and its children.
     public interface IHierarchyNode {
         string Name { get; }
         // Full type names of the components on this object itself.
@@ -28,28 +28,28 @@ namespace RailroaderScenePatcher.Core {
         IReadOnlyList<IHierarchyNode> Children { get; }
     }
     public enum PartDisposition { Part, ExistingFamily, NotListed }
-    // What the part rule decided for one scene object below a listed group root.
+    // What the part rule decided for one scene object below a listed top scene object.
     public sealed class PartVerdict {
         internal PartVerdict(IHierarchyNode node, string path, string groupPath, PartDisposition disposition, string reason) {
             Node = node; Path = path; GroupPath = groupPath; Disposition = disposition; Reason = reason;
         }
         public IHierarchyNode Node { get; }
         public string Path { get; }
-        // The path of the group root the part stands in.
+        // The path of the top scene object the part stands in.
         public string GroupPath { get; }
         public PartDisposition Disposition { get; }
         // Which coverage rule keeps the object out; null for a listed part and for an object an existing family lists.
         public string Reason { get; }
     }
-    // The bridge a group root is for its edits: a rail bridge stands on native track and a road bridge on a native
+    // The bridge a top scene object is for its edits: a rail bridge stands on native track and a road bridge on a native
     // road, so each takes fixed placement only, and a rail bridge may hold its own construction controller. This is
     // the group's technical kind. The outliner's category does not decide it.
     public enum BridgeKind { None, Rail, Road }
-    public enum GroupDisposition { Group, InspectionOnly, ExistingFamily, NotListed, ContainerObject }
-    // What the rule decided for one candidate: a group root of the Baked scenery group family, a group root that a later
+    public enum GroupDisposition { Group, InspectionOnly, ExistingFamily, NotListed, GroupHolder }
+    // What the rule decided for one candidate: a top scene object of the Scene object family, a top scene object that a later
     // ticket covers, an object an existing family lists, or an object a coverage rule keeps out.
-    public sealed class GroupRootVerdict {
-        internal GroupRootVerdict(IHierarchyNode node, string path, GroupDisposition disposition, string reason, string ticket = null, bool sentence = false) {
+    public sealed class SceneObjectVerdict {
+        internal SceneObjectVerdict(IHierarchyNode node, string path, GroupDisposition disposition, string reason, string ticket = null, bool sentence = false) {
             Node = node; Path = path; Disposition = disposition; Reason = reason; Ticket = ticket; ReasonIsSentence = sentence;
         }
         // The reason of an inspection-only group is a whole clause, not the kind of group the patcher has no edit for.
@@ -66,7 +66,7 @@ namespace RailroaderScenePatcher.Core {
         // recognises, and for an object that is no group.
         public string Category { get; internal set; }
         public string Subcategory { get; internal set; }
-        // Whether the group is a rail bridge or a road bridge for its edits (BakedSceneryRules.RailBridge, RoadBridge).
+        // Whether the group is a rail bridge or a road bridge for its edits (SceneObjectRules.RailBridge, RoadBridge).
         public BridgeKind Bridge { get; internal set; }
         // A crossbuck of an unprotected crossing: a group of its own under Grade crossing, whose models are no parts.
         public bool Crossbuck { get; internal set; }
@@ -75,7 +75,7 @@ namespace RailroaderScenePatcher.Core {
     }
     // The categories the outliner lists objects under. Which category an object takes is decided by generic rules
     // from what the object provides (SceneClassification); no table names objects.
-    public static class BakedSceneryCategories {
+    public static class SceneObjectCategories {
         public const string StationBuilding = "Station building", Platform = "Platform", Lights = "Lights", Sign = "Sign", GradeCrossing = "Grade crossing", Bridge = "Bridge",
             IndustryBuilding = "Industry building", StorageDisplay = "Storage display", RailroadServiceBuilding = "Railroad service building", Water = "Water", RoadScenery = "Road scenery",
             // The category of last resort, for a listed group that no rule recognises.
@@ -83,13 +83,15 @@ namespace RailroaderScenePatcher.Core {
         public const string RailBridges = "Rail bridges", RoadBridges = "Road bridges";
         // The families of the bridge and of the construction controller of the Ela rail bridge construction.
         public const string BridgeFamily = "Bridge", ConstructionFamily = "Bridge construction scenery";
-        // The scene objects in a group-root position that have no model or function in the game: an inactive default
+        // The scene objects in a top scene object's position that have no model or function in the game: an inactive default
         // cube and a folder of lights without a model. They are not supported and stay out of the inventory.
         public static readonly IReadOnlyList<string> WithoutFunction = Array.AsReadOnly(new[] { "World/Large Scenery/Almond/Cube", "World/Large Scenery/Bryson/Bryson Appalachian Hardwoods" });
     }
-    // Which scene objects below World are the roots of baked scenery groups.
-    public static class BakedSceneryRules {
-        public const string Family = "Baked scenery group";
+    // Which scene objects below World are the top scene objects.
+    public static class SceneObjectRules {
+        // The families of a top scene object and of its child objects, split by structure id.
+        public const string Family = "Scene object", ChildFamily = "Child object";
+        public static bool InFamilies(string family) => family == Family || family == ChildFamily;
         public const string WorldRoot = "World", LargeScenery = "Large Scenery";
         public const string MapLabels = "Map Labels", StationIcons = "Station Icons", BuilderPhotoSetup = "Builder Photo Setup";
         // The coverage rules that keep a candidate out, by the name of their row in the coverage statement.
@@ -103,28 +105,28 @@ namespace RailroaderScenePatcher.Core {
         public static bool GivesPresence(string type, bool renderer, bool collider, bool light) => collider || light || (renderer && !EffectRenderers.Contains(type));
         // A component the game spawns from Map.json carries; the native map editor edits such an object.
         public const string MapObject = "Game.MapObjectActivation";
-        // Components of a World category container object whose children the game builds while it runs: track geometry with its
+        // Components of a World category holder whose children the game builds while it runs: track geometry with its
         // trestles and pads, objects spawned from map data, and telegraph poles.
         public static readonly IReadOnlyList<string> Generators = Array.AsReadOnly(new[] { "Track.TrackObjectManager", "Game.MapLoader", "TelegraphPoles.TelegraphPoleManager" });
-        // Every candidate below World with what the rule decided for it. A root that is not World holds no group roots.
-        public static IReadOnlyList<GroupRootVerdict> Classify(IHierarchyNode world) {
+        // Every candidate below World with what the rule decided for it. A root that is not World holds no top scene objects.
+        public static IReadOnlyList<SceneObjectVerdict> Classify(IHierarchyNode world) {
             if (world == null) throw new ArgumentNullException(nameof(world));
-            var verdicts = new List<GroupRootVerdict>();
+            var verdicts = new List<SceneObjectVerdict>();
             if (world.Name != WorldRoot) return verdicts;
             foreach (var category in world.Children) {
                 var categoryPath = WorldRoot + "/" + category.Name;
                 string rule = !category.Serialized || category.Components.Any(Generators.Contains) ? RuntimeObject : category.Name == BuilderPhotoSetup ? BuilderPhotoRig : null;
                 foreach (var (town, root, path) in Roots(category, categoryPath)) {
-                    if (rule != null) verdicts.Add(new GroupRootVerdict(root, path, GroupDisposition.NotListed, rule));
-                    else if (category.Name == MapLabels && root.Name != StationIcons) verdicts.Add(new GroupRootVerdict(root, path, GroupDisposition.NotListed, MapLabel));
-                    // The Station Icons container object holds the station map icons. Each gets an entry in its own family.
+                    if (rule != null) verdicts.Add(new SceneObjectVerdict(root, path, GroupDisposition.NotListed, rule));
+                    else if (category.Name == MapLabels && root.Name != StationIcons) verdicts.Add(new SceneObjectVerdict(root, path, GroupDisposition.NotListed, MapLabel));
+                    // The Station Icons holder holds the station map icons. Each gets an entry in its own family.
                     // A direct child with a map icon is a candidate in that family. Other children,
                     // including subgroups, and the map labels beside Station Icons stay out of the inventory.
                     else if (category.Name == MapLabels)
                         foreach (var icon in root.Children) {
                             var at = path + "/" + icon.Name;
                             if (icon.Components.Contains(StationMapIconRules.Component)) Candidate(town, icon, at, verdicts);
-                            else verdicts.Add(new GroupRootVerdict(icon, at, GroupDisposition.NotListed, MapLabel));
+                            else verdicts.Add(new SceneObjectVerdict(icon, at, GroupDisposition.NotListed, MapLabel));
                         }
                     else Candidate(town, root, path, verdicts);
                 }
@@ -135,11 +137,11 @@ namespace RailroaderScenePatcher.Core {
             foreach (var verdict in verdicts) {
                 if (verdict.Category != null || (verdict.Disposition != GroupDisposition.Group && verdict.Disposition != GroupDisposition.InspectionOnly)) continue;
                 var found = ClassOf(verdict.Node, verdict.Path);
-                if (found.Recognised || verdict.Disposition == GroupDisposition.Group) { verdict.Category = found.Category; verdict.Subcategory = found.Category == BakedSceneryCategories.Bridge ? found.Kind : null; }
+                if (found.Recognised || verdict.Disposition == GroupDisposition.Group) { verdict.Category = found.Category; verdict.Subcategory = found.Category == SceneObjectCategories.Bridge ? found.Kind : null; }
             }
             return verdicts;
         }
-        // The category and kind of a group root, from its components, its name and what stands below it.
+        // The category and kind of a top scene object, from its components, its name and what stands below it.
         public static SceneClass ClassOf(IHierarchyNode node, string path, Func<string, string> stripPlaces = null) {
             var types = new HashSet<string>(StringComparer.Ordinal);
             Collect(node, types);
@@ -162,12 +164,12 @@ namespace RailroaderScenePatcher.Core {
         // A span the game builds from the map's operations data is not serialized and not listed; the spans the patcher
         // adds for a crossing are listed.
         public static bool SpanListed(bool serialized, bool patcherOwned) => serialized || patcherOwned;
-        // The objects one level below a category container object, and below World/Large Scenery one level below a scene object there, with
+        // The objects one level below a category holder, and below World/Large Scenery one level below a scene object there, with
         // the name of that scene object below World/Large Scenery.
         static IEnumerable<(string, IHierarchyNode, string)> Roots(IHierarchyNode category, string categoryPath) {
             if (category.Name != LargeScenery) { foreach (var root in category.Children) yield return (null, root, categoryPath + "/" + root.Name); yield break; }
             foreach (var town in category.Children) {
-                // A scene object there that is itself an object of the game, such as Almond Bridge, is the group root.
+                // A scene object there that is itself an object of the game, such as Almond Bridge, is the top scene object.
                 if (GroupItself(town)) { yield return (town.Name, town, categoryPath + "/" + town.Name); continue; }
                 foreach (var root in town.Children) yield return (town.Name, root, categoryPath + "/" + town.Name + "/" + root.Name);
             }
@@ -178,10 +180,10 @@ namespace RailroaderScenePatcher.Core {
         static bool GroupItself(IHierarchyNode town) =>
             !town.HasFamily && (Present(town) || town.Components.Any(type => Cullers.Contains(type) || type == ConstructionController));
         const string TransformType = "UnityEngine.Transform";
-        // A container object: an object without components of its own and without a name that says what it is,
+        // A holder: an object without components of its own and without a name that says what it is,
         // whose children are all prefab roots that cull themselves (a renderer culler on each), such as the yard lamp
-        // posts of Bryson Yard. It is no group: each child is a group root of its own.
-        public static bool ContainerObject(IHierarchyNode node) =>
+        // posts of Bryson Yard. It is no group: each child is a top scene object of its own.
+        public static bool GroupHolder(IHierarchyNode node) =>
             node != null && !node.HasFamily && node.Children.Count != 0 && node.Components.All(type => type == TransformType)
             && node.Children.All(child => !child.HasFamily && child.Components.Contains(RendererCuller)) && SceneClassification.ByName(node.Name) == null;
         // A component anywhere in a group that a later ticket covers, with the kind it stands for and that ticket.
@@ -203,7 +205,7 @@ namespace RailroaderScenePatcher.Core {
             new Exclusion(SpawnPoints.Component, "spawn point", null, reason: SpawnPointReason),
             new Exclusion("UI.Map.MapIcon", "map icon", null, reason: MapIconReason),
         });
-        // Why a group with a map icon is left out. Station map icons, in the Station Icons container object, have their own family;
+        // Why a group with a map icon is left out. Station map icons, in the Station Icons holder, have their own family;
         // a map icon elsewhere is in no family and has no edit. No ticket is needed.
         public const string MapIconReason = "This group contains a map icon, which the patcher can't move with a group.";
         // Why a group with a station click spot is left out: in Railroader 0.6.3 station click spots are native map data,
@@ -245,7 +247,7 @@ namespace RailroaderScenePatcher.Core {
             return owned == null ? null : "This rail bridge contains the track-owned component " + owned + ", which belongs to the native track. The bridge can't be moved, enabled, or disabled.";
         }
         public const string CrossingController = "Track.Crossings.GradeCrossingController", PadBuilder = "Track.TrackCurveMeshBuilder", Marker = "Track.TrackMarker",
-            RendererCuller = CullerTypes.RendererCuller, ContainerRule = "Container objects above group roots";
+            RendererCuller = CullerTypes.RendererCuller, GroupHolderRule = "Objects that only hold other scene objects";
         // Crossbucks at unprotected crossings: each crossbuck is a group of its own under Grade crossing, wherever it
         // stands below World. Its models, the LOD levels below it, belong to its entry and are no parts.
         public const string CrossbuckModels = "A crossbuck's models belong to its entry.";
@@ -293,47 +295,47 @@ namespace RailroaderScenePatcher.Core {
         }
         static bool RoadBridge(IHierarchyNode node) => RoadBridge(node.Name);
         // One or more crossings, or crossings and road bridges.
-        static bool CrossingContainerObject(IHierarchyNode node) =>
+        static bool CrossingGroupHolder(IHierarchyNode node) =>
             !node.HasFamily && node.Children.Any(Crossing) && node.Children.All(child => Crossing(child) || RoadBridge(child));
-        static void Candidate(string town, IHierarchyNode node, string path, List<GroupRootVerdict> verdicts) {
-            if (!node.Serialized) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, RuntimeObject)); return; }
-            if (node.Components.Contains(MapObject)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, NativeMapData)); return; }
-            if (node.HasFamily) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.ExistingFamily, null)); return; }
-            if (BakedSceneryCategories.WithoutFunction.Contains(path)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, NoFunction)); return; }
-            // A container object, such as Bryson Yard, is no group: its children are. It keeps a verdict of its own, so
+        static void Candidate(string town, IHierarchyNode node, string path, List<SceneObjectVerdict> verdicts) {
+            if (!node.Serialized) { verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.NotListed, RuntimeObject)); return; }
+            if (node.Components.Contains(MapObject)) { verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.NotListed, NativeMapData)); return; }
+            if (node.HasFamily) { verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.ExistingFamily, null)); return; }
+            if (SceneObjectCategories.WithoutFunction.Contains(path)) { verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.NotListed, NoFunction)); return; }
+            // A holder, such as Bryson Yard, is no group: its children are. It keeps a verdict of its own, so
             // a modification that names it fails with its reason.
-            var container = ContainerObject(node);
-            if (container) verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.ContainerObject, ContainerRule));
-            if (container || CrossingContainerObject(node)) { foreach (var child in node.Children) Candidate(town, child, path + "/" + child.Name, verdicts); return; }
+            var container = GroupHolder(node);
+            if (container) verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.GroupHolder, GroupHolderRule));
+            if (container || CrossingGroupHolder(node)) { foreach (var child in node.Children) Candidate(town, child, path + "/" + child.Name, verdicts); return; }
             if (Unprotected(node)) {
                 var pad = PadMarkerId(node);
                 foreach (var child in node.Children) {
                     var at = path + "/" + child.Name;
-                    if (!child.Serialized) verdicts.Add(new GroupRootVerdict(child, at, GroupDisposition.NotListed, RuntimeObject));
-                    else if (child.HasFamily) verdicts.Add(new GroupRootVerdict(child, at, GroupDisposition.ExistingFamily, null));
-                    else if (MarkerObject(child)) verdicts.Add(new GroupRootVerdict(child, at, GroupDisposition.NotListed, ContainerRule));
+                    if (!child.Serialized) verdicts.Add(new SceneObjectVerdict(child, at, GroupDisposition.NotListed, RuntimeObject));
+                    else if (child.HasFamily) verdicts.Add(new SceneObjectVerdict(child, at, GroupDisposition.ExistingFamily, null));
+                    else if (MarkerObject(child)) verdicts.Add(new SceneObjectVerdict(child, at, GroupDisposition.NotListed, GroupHolderRule));
                     // Every other child is a crossbuck: a group of its own under Grade crossing, wherever the crossing stands.
-                    else verdicts.Add(new GroupRootVerdict(child, at, GroupDisposition.Group, null) { Category = BakedSceneryCategories.GradeCrossing, Crossbuck = true, PadMarkerId = pad });
+                    else verdicts.Add(new SceneObjectVerdict(child, at, GroupDisposition.Group, null) { Category = SceneObjectCategories.GradeCrossing, Crossbuck = true, PadMarkerId = pad });
                 }
                 return;
             }
             // Physical presence comes first: an object without a renderer, collider or light is not listed, whatever it holds.
-            if (!Physical(node)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, NoPhysicalPresence)); return; }
+            if (!Physical(node)) { verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.NotListed, NoPhysicalPresence)); return; }
             // A bridge is a bridge by this rule wherever it stands, as the road bridges below the World/Roads
-            // container objects are. Its category in the outliner follows from it, not the other way round.
+            // holders are. Its category in the outliner follows from it, not the other way round.
             var road = RoadBridge(node.Name);
             var rail = RailBridge(town, node.Name);
             // A supported rail bridge construction holds its own construction controller; any other group holding one is left out.
             var excluded = FirstExclusion(node, rail ? ConstructionController : null);
             if (road || rail) {
-                var subgroup = road ? BakedSceneryCategories.RoadBridges : BakedSceneryCategories.RailBridges;
+                var subgroup = road ? SceneObjectCategories.RoadBridges : SceneObjectCategories.RailBridges;
                 verdicts.Add(excluded != null
-                    ? new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null) { Category = BakedSceneryCategories.Bridge, Subcategory = subgroup, Bridge = road ? BridgeKind.Road : BridgeKind.Rail }
-                    : new GroupRootVerdict(node, path, GroupDisposition.Group, null) { Category = BakedSceneryCategories.Bridge, Subcategory = subgroup, Bridge = road ? BridgeKind.Road : BridgeKind.Rail });
+                    ? new SceneObjectVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null) { Category = SceneObjectCategories.Bridge, Subcategory = subgroup, Bridge = road ? BridgeKind.Road : BridgeKind.Rail }
+                    : new SceneObjectVerdict(node, path, GroupDisposition.Group, null) { Category = SceneObjectCategories.Bridge, Subcategory = subgroup, Bridge = road ? BridgeKind.Road : BridgeKind.Rail });
                 return;
             }
-            if (excluded != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null)); return; }
-            verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.Group, null));
+            if (excluded != null) { verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null)); return; }
+            verdicts.Add(new SceneObjectVerdict(node, path, GroupDisposition.Group, null));
         }
         // A renderer, collider or light at or below the node, or a storage pile, on an object the scene serializes. What
         // the game builds while it runs does not count: a storage pile builds its collider only while the camera is
@@ -368,44 +370,44 @@ namespace RailroaderScenePatcher.Core {
         // The object itself has physical presence: a renderer, collider or light on it, or it is a storage pile or the
         // logs of a log pond.
         public static bool Present(IHierarchyNode node) => node.Physical || node.Components.Contains(StoragePile) || node.Components.Contains(LogPond);
-        // The coverage rules that keep an object below a listed group root out of the part entries.
-        public const string AmbiguousParts = "Parts with the same name and parent share a path", LodLevels = "LOD levels belong to the object with the LOD group",
-            AnimatedParts = "Parts the game moves while running", CullingContainers = "Culling containers";
+        // The coverage rules that keep an object below a listed top scene object out of the part entries.
+        public const string AmbiguousParts = "Child objects with the same name and parent share a path", LodLevels = "LOD levels belong to the object with the LOD group",
+            AnimatedParts = "Child objects the game moves while running", CullerOnlyChildren = "Child objects that only carry a simple culler";
         // The game's cullers: a simple culler switches its own object, a renderer culler the renderers below it and a
-        // game-object culler the objects on its list. Only a simple culler makes a culling container: a renderer
+        // game-object culler the objects on its list. Only a simple culler makes a child object one that only carries a simple culler: a renderer
         // culler sits on the root of a prefab that culls its own children, such as a lamp post (Tall Post Shade), a
-        // crossbuck or a sign, and that root is the object a modder moves: a part where it stands below a group
-        // root, and a group root where it stands in a group-root position, as the yard lamp posts of Bryson Yard do.
+        // crossbuck or a sign, and that root is the object a modder moves: a child object where it stands below a top
+        // scene object, and a top scene object where it stands in a top scene object's position, as the yard lamp posts of Bryson Yard do.
         public const string SimpleCuller = CullerTypes.SimpleCuller, GameObjectCuller = CullerTypes.GameObjectCuller;
         public static readonly IReadOnlyList<string> Cullers = Array.AsReadOnly(new[] { SimpleCuller, RendererCuller, GameObjectCuller });
-        // A culling container, such as Bryson House Track/Culled, is a scene object below a group root that only holds
+        // A child object that only carries a simple culler, such as Bryson House Track/Culled, is a scene object below a top scene object that only holds
         // other objects for a simple culler: it carries a simple culler, has no renderer, collider or light of its own
-        // and has children. It is no object a modder moves; its parts stay listed under their group. A group root that
-        // carries the culler itself, such as Sylva Culled, stays the group root.
-        public static bool CullingContainer(IHierarchyNode node) =>
+        // and has children. It is no object a modder moves; its parts stay listed under their group. A top scene object that
+        // carries the culler itself, such as Sylva Culled, stays the top scene object.
+        public static bool CullerOnlyChild(IHierarchyNode node) =>
             node != null && !Present(node) && node.Children.Count != 0 && node.Components.Contains(SimpleCuller);
         // Why a modification cannot edit the object at a path the part rule did not list, or null for a listed part.
-        public const string CullingContainerRefusal = "This path names a culling container, which isn't an editable scenery part. " + WindowGuidance.EditCulledParts;
-        // Whether a path resolves to the object the part rule decided this for: a listed part, and a culling container,
+        public const string CullerOnlyRefusal = "This path names an object that only carries a simple culler, which isn't an editable part. " + WindowGuidance.EditCulledParts;
+        // Whether a path resolves to the object the part rule decided this for: a listed part, and a child object that only carries a simple culler,
         // so that its modification fails with the container's reason instead of finding nothing.
         public static bool Resolves(PartVerdict verdict) => verdict?.Disposition == PartDisposition.Part || PartRefusal(verdict) != null;
-        public static string PartRefusal(PartVerdict verdict) => verdict?.Reason == CullingContainers ? CullingContainerRefusal : null;
+        public static string PartRefusal(PartVerdict verdict) => verdict?.Reason == CullerOnlyChildren ? CullerOnlyRefusal : null;
         // Why a modification cannot edit, as a group, the object the group rule did not list, or null: the object is
-        // a container object, such as Bryson Yard.
-        public const string ContainerRefusal = "This path names a container object, which isn't a scenery group. " + WindowGuidance.EditHeldGroups;
-        public static string GroupRefusal(GroupRootVerdict verdict) => verdict?.Disposition == GroupDisposition.ContainerObject ? ContainerRefusal : null;
-        // Whether an object resolves as a group target: a listed group root and a container object, so that a
-        // container object's modification fails with its reason instead of finding nothing.
-        public static bool ResolvesGroup(GroupRootVerdict verdict) => verdict?.Disposition == GroupDisposition.Group || GroupRefusal(verdict) != null;
-        // Why a modification cannot edit, as a part, the object at a path: a listed group root, such as a yard lamp
+        // a holder, such as Bryson Yard.
+        public const string GroupHolderRefusal = "This path names an object that only holds other groups, which isn't a group itself. " + WindowGuidance.EditHeldGroups;
+        public static string GroupRefusal(SceneObjectVerdict verdict) => verdict?.Disposition == GroupDisposition.GroupHolder ? GroupHolderRefusal : null;
+        // Whether an object resolves as a group target: a listed top scene object and a holder, so that a
+        // holder's modification fails with its reason instead of finding nothing.
+        public static bool ResolvesGroup(SceneObjectVerdict verdict) => verdict?.Disposition == GroupDisposition.Group || GroupRefusal(verdict) != null;
+        // Why a modification cannot edit, as a part, the object at a path: a listed top scene object, such as a yard lamp
         // post of Bryson Yard, is edited as a group; otherwise the part rule's own reason, or null for a listed part.
-        public const string GroupRootRefusal = "This path names a group root, not a part. " + WindowGuidance.EditAsGroup;
-        public static string PartRefusal(PartVerdict verdict, GroupRootVerdict group) =>
-            group?.Disposition == GroupDisposition.Group ? GroupRootRefusal : PartRefusal(verdict);
-        public static bool Resolves(PartVerdict verdict, GroupRootVerdict group) => verdict?.Disposition == PartDisposition.Part || PartRefusal(verdict, group) != null;
+        public const string TopObjectRefusal = "This path names a group, not a part. " + WindowGuidance.EditAsGroup;
+        public static string PartRefusal(PartVerdict verdict, SceneObjectVerdict group) =>
+            group?.Disposition == GroupDisposition.Group ? TopObjectRefusal : PartRefusal(verdict);
+        public static bool Resolves(PartVerdict verdict, SceneObjectVerdict group) => verdict?.Disposition == PartDisposition.Part || PartRefusal(verdict, group) != null;
         // Every scene object below the roots of the listed groups, at any depth, with what the part rule decided for it.
         // A part is one scene object, not a renderer or a component. An inspection-only group has no part entries.
-        public static IReadOnlyList<PartVerdict> Parts(IEnumerable<GroupRootVerdict> verdicts) {
+        public static IReadOnlyList<PartVerdict> Parts(IEnumerable<SceneObjectVerdict> verdicts) {
             if (verdicts == null) throw new ArgumentNullException(nameof(verdicts));
             var found = new List<PartVerdict>();
             // A crossbuck is one entry: its models are no parts.
@@ -427,8 +429,8 @@ namespace RailroaderScenePatcher.Core {
                 // A level of a LOD group belongs to the entry of the object that holds the LOD group.
                 if (child.LodLevel) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, LodLevels)); continue; }
                 if (child.HasFamily) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.ExistingFamily, null)); continue; }
-                // A culling container is no part, but the objects in it are: they stay listed under their group.
-                if (CullingContainer(child)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, CullingContainers)); Walk(child, path, groupPath, null, found); continue; }
+                // A child object that only carries a simple culler is no part, but the objects in it are: they stay listed under their group.
+                if (CullerOnlyChild(child)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, CullerOnlyChildren)); Walk(child, path, groupPath, null, found); continue; }
                 // The object that holds a scene ground mask is a part without a renderer, collider or light: moving it
                 // moves the terrain shaping.
                 if (!Physical(child) && !HoldsGroundMask(child.Components)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, NoPhysicalPresence)); continue; }
@@ -454,7 +456,7 @@ namespace RailroaderScenePatcher.Core {
         }
         public static readonly IReadOnlyList<DrivenField> DrivenFields = Array.AsReadOnly(new[] {
             new DrivenField("RollingStock.GaugeNeedle", "needle"), new DrivenField("Effects.LanternController", "filamentRenderer") });
-        // The name of a part entry: the group root's name, then the path from the group root to the part.
+        // The name of a part entry: the top scene object's name, then the path from the top scene object to the part.
         public static string PartName(string groupPath, string path) {
             if (groupPath == null || path == null || !path.StartsWith(groupPath + "/", StringComparison.Ordinal)) return path?.Substring(path.LastIndexOf('/') + 1);
             return groupPath.Substring(groupPath.LastIndexOf('/') + 1) + " / " + path.Substring(groupPath.Length + 1).Replace("/", " / ");
@@ -465,7 +467,7 @@ namespace RailroaderScenePatcher.Core {
         // patcher's handler stays in the chain and only passes the game's events on. Information, not a warning.
         // A failed update of own culling, for the group it names, or for moved parts in general when no group is known.
         public static string CullingUpdateFailure(string group) =>
-            "The patcher couldn't update visibility for " + (String.IsNullOrEmpty(group) ? "moved baked scenery parts" : "moved parts of " + group) + ". Report this to the patcher maintainer";
+            "The patcher couldn't update visibility for " + (String.IsNullOrEmpty(group) ? "moved parts" : "moved parts of " + group) + ". Report this to the patcher maintainer";
         public static string LeftoverWrapper(string culler) => "Released visibility rules for game culler " + culler + "; another component replaced its handler; replacement handler retained";
         // A scene ground mask is a component in this namespace (Map.Runtime.MaskComponents): it registers a shape in
         // the game's terrain system where its object stands, which shapes the ground and the vegetation there. A group
@@ -486,7 +488,7 @@ namespace RailroaderScenePatcher.Core {
         }
     }
 
-    // One scene object below a group root, observed with copied values.
+    // One scene object below a top scene object, observed with copied values.
     public sealed class GroupPart {
         public GroupPart(string id, IEnumerable<double> rootPosition, IEnumerable<double> rootRotation, bool activeSelf, bool cullerSwitched, object handle = null, object parent = null, bool animated = false) {
             Id = id ?? throw new ArgumentNullException(nameof(id)); RootPosition = rootPosition.ToArray(); RootRotation = rootRotation.ToArray();
@@ -496,7 +498,7 @@ namespace RailroaderScenePatcher.Core {
         public bool Animated { get; }
         // Stable for the loaded object: hierarchy path below the root and instance.
         public string Id { get; }
-        // Placement relative to the group root.
+        // Placement relative to the top scene object.
         public IReadOnlyList<double> RootPosition { get; }
         public IReadOnlyList<double> RootRotation { get; }
         // The part's own activity as the scene or the modder set it: for a part that own culling switches, the value
@@ -505,7 +507,7 @@ namespace RailroaderScenePatcher.Core {
         // A culler of the game switches this part by camera distance, so its own activity is no part of the invariant.
         public bool CullerSwitched { get; }
         // The object, as the part capability resolves it, and the handle of the part it stands below, or null directly
-        // below the group root.
+        // below the top scene object.
         public object Handle { get; }
         public object Parent { get; }
     }
@@ -516,7 +518,7 @@ namespace RailroaderScenePatcher.Core {
             Id = id ?? throw new ArgumentNullException(nameof(id)); Registered = registered?.ToArray(); Expected = expected.ToArray(); Radius = radius; Authored = authored;
             Handle = handle; Listed = (listed ?? Enumerable.Empty<object>()).ToArray(); Kind = kind; Culler = culler; Regions = (regions ?? Enumerable.Empty<ObservedRegion>()).ToArray();
         }
-        // The object the culler stands on: the group root or a part. Listed holds the objects a game-object culler
+        // The object the culler stands on: the top scene object or a part. Listed holds the objects a game-object culler
         // switches: those in its list and those own culling took out of it.
         public object Handle { get; }
         public IReadOnlyList<object> Listed { get; }
@@ -560,23 +562,23 @@ namespace RailroaderScenePatcher.Core {
             Part = part ?? throw new ArgumentNullException(nameof(part)); Group = group ?? throw new ArgumentNullException(nameof(group));
             GroupState = groupState ?? throw new ArgumentNullException(nameof(groupState)); Parent = parent; ParentPlacement = parentPlacement;
         }
-        // The map placement of the object the part stands directly below: its group root or the part above it. A part
+        // The map placement of the object the part stands directly below: its top scene object or the part above it. A part
         // without a fixed placement of its own keeps its place relative to this object.
         public Placement ParentPlacement { get; }
         // The part's placement in map coordinates and its own activity as the scene authored it.
         public ObjectState Part { get; }
-        // The group root the part stands in, as the group capability resolves it.
+        // The top scene object the part stands in, as the group capability resolves it.
         public object Group { get; }
         public GroupObservation GroupState { get; }
         // The object the part stands directly below.
         public object Parent { get; }
     }
-    // The game-facing operations of the baked scenery group and part capabilities. Positions are map coordinates.
-    // IDisableRefusal: why `active: false` cannot hold against a switch of the game that names the group root or part, or
+    // The game-facing operations of the scene object with child objects and part capabilities. Positions are map coordinates.
+    // IDisableRefusal: why `active: false` cannot hold against a switch of the game that names the top scene object or part, or
     // null.
     public interface IGroupWorld : IDisableRefusal {
         IEnumerable<string> MapIds { get; }
-        // The loaded group roots of the Baked scenery group family at the scene and path.
+        // The loaded top scene objects of the Scene object family at the scene and path.
         IReadOnlyList<object> Find(string scene, string path);
         // Why the group cannot be edited now, or null.
         string Refusal(object group);
@@ -592,10 +594,10 @@ namespace RailroaderScenePatcher.Core {
         // Why the part's activity cannot be set, or null: a game-object culler switches it by camera distance and would
         // override a stored setting. The patcher then never sets that part's activity.
         string ActivityRefusal(object part);
-        // Why the group root or part takes no track-following placement, or null: a rail or road bridge
+        // Why the top scene object or part takes no track-following placement, or null: a rail or road bridge
         // and its parts use fixed placement. Refused before any mutation.
         string FollowingRefusal(object target);
-        // Why the placement of the group root or part cannot be set, or null: a lake surface at or below it whose water
+        // Why the placement of the top scene object or part cannot be set, or null: a lake surface at or below it whose water
         // mesh is part of a static batch would stay drawn at its old place while every transform check passes. A
         // placement is then refused before any mutation; activity stays editable.
         string PlacementRefusal(object target);
@@ -614,13 +616,13 @@ namespace RailroaderScenePatcher.Core {
         IReadOnlyList<IReadOnlyList<double>> Presence(object part, IReadOnlyList<object> without);
         // The part's position in map coordinates: own culling places the sphere of a moved part without presence there.
         IReadOnlyList<double> Anchor(object part);
-        // Whether the part stands below the object, a group root or another part, and still exists.
+        // Whether the part stands below the object, a top scene object or another part, and still exists.
         bool Below(object part, object above);
-        // Whether the object, a group root or a part, still exists.
+        // Whether the object, a top scene object or a part, still exists.
         bool Alive(object handle);
     }
-    // The fixed placements that hold parts of baked scenery groups in place, by part. A part with a fixed placement keeps
-    // its map placement when the group root or a part above it moves; without one it moves with them. The group and part
+    // The fixed placements that hold child objects in place, by part. A part with a fixed placement keeps
+    // its map placement when the top scene object or a part above it moves; without one it moves with them. The group and part
     // capabilities of one scene share one instance.
     public sealed class PartHolds {
         sealed class ByReference : IEqualityComparer<object> {
@@ -628,7 +630,7 @@ namespace RailroaderScenePatcher.Core {
             public int GetHashCode(object value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
         }
         readonly Dictionary<object, Placement> held = new Dictionary<object, Placement>(new ByReference());
-        // The group root of each held part, so a released part's group can let go of the part's own culling.
+        // The top scene object of each held part, so a released part's group can let go of the part's own culling.
         readonly Dictionary<object, object> groups = new Dictionary<object, object>(new ByReference());
         // Where each held part stood in the object above it before it was held: the placement the scene gives it.
         readonly Dictionary<object, Placement> authored = new Dictionary<object, Placement>(new ByReference());
@@ -714,7 +716,7 @@ namespace RailroaderScenePatcher.Core {
             var inverse = Quaternion.Conjugate(Quaternion.Normalize(frame.RootRotation));
             return (Quaternion.Rotate(inverse, new[] { part.RootPosition[0] - frame.RootPosition[0], part.RootPosition[1] - frame.RootPosition[1], part.RootPosition[2] - frame.RootPosition[2] }), Quaternion.Multiply(inverse, part.RootRotation));
         }
-        // A part's placement in the object directly above it, the group root or another part; null for an unknown part.
+        // A part's placement in the object directly above it, the top scene object or another part; null for an unknown part.
         internal static Placement InParent(GroupObservation observed, object handle) {
             var part = observed.Parts.FirstOrDefault(p => ReferenceEquals(p.Handle, handle));
             if (part == null) return null;
@@ -787,7 +789,7 @@ namespace RailroaderScenePatcher.Core {
         }
         internal static bool Finite(Placement placement) => placement?.Position != null && !placement.Position.Any(v => Double.IsNaN(v) || Double.IsInfinity(v));
     }
-    // Baked scenery groups: places and enables or disables a group root with everything below it. A group move is
+    // Scene objects with child objects: places and enables or disables a top scene object with everything below it. A group move is
     // physical placement only: the activity of the parts stays theirs, and a part with its own fixed placement keeps it.
     // The root of a rail bridge construction that carries its construction controller, such as Bryson Bridge 1 and the
     // Almond Bridge, also holds the construction-segment relationship.
@@ -796,18 +798,18 @@ namespace RailroaderScenePatcher.Core {
     public interface ICrossbuckWorld {
         IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path);
     }
-    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDependentOutputScene, IPadMarkerIdentityScene, IDisposable {
-        public const string Structure = "baked-scenery-group-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
+    public sealed class SceneObjects : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDependentOutputScene, IPadMarkerIdentityScene, IDisposable {
+        public const string Structure = "scene-object-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
-        // The construction controllers on group roots; null in a world without them.
+        // The construction controllers on top scene objects; null in a world without them.
         IConstructionSegmentWorld Segments => world as IConstructionSegmentWorld;
         // The scene ground masks of the groups, or null in a world without them.
         readonly GroundMasks masks;
-        public BakedSceneryGroups(IGroupWorld world, Capability capability = Capability.Unchecked, PartHolds holds = null, GroundMasks masks = null) {
+        public SceneObjects(IGroupWorld world, Capability capability = Capability.Unchecked, PartHolds holds = null, GroundMasks masks = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.holds = holds ?? new PartHolds(); this.masks = masks;
         }
-        // The terrain output that follows a ground mask of the group, by the edited group root.
+        // The terrain output that follows a ground mask of the group, by the edited top scene object.
         public DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;
         public void RetryOutput(object target) => masks?.RetryOutput(target);
         // The capability ends: the world gives back what its own culling of moved parts took over from the game.
@@ -826,11 +828,11 @@ namespace RailroaderScenePatcher.Core {
         public string PadMarkerRefusal(TargetIdentity identity) {
             if (identity.PadMarkerId == null) return null;
             if (identity.Component != ComponentType || (identity.Structure != null && identity.Structure != Structure)) return TargetIdentity.PadMarkerNotAccepted;
-            return BakedSceneryRules.PadMarkerRefusal(Crossbucks(identity).Count);
+            return SceneObjectRules.PadMarkerRefusal(Crossbucks(identity).Count);
         }
         public void Preflight(object target) {
             var refusal = world.Refusal(target);
-            if (refusal == BakedSceneryRules.ContainerRefusal) throw new InvalidPatchDefinitionException(refusal);
+            if (refusal == SceneObjectRules.GroupHolderRefusal) throw new InvalidPatchDefinitionException(refusal);
             if (refusal != null) throw new InvalidOperationException(refusal);
             if (!GroupChecks.Finite(world.Observe(target).Root.Placement)) throw new InvalidOperationException("The group's map coordinates are unavailable");
         }
@@ -851,7 +853,7 @@ namespace RailroaderScenePatcher.Core {
         sealed class Snapshot { internal GroupObservation Observed; internal ConstructionSegments Segments; }
         public object Capture(object target) => new Snapshot { Observed = world.Observe(target), Segments = ConstructionSegmentRule.Read(Segments, target) };
         public ObjectState Read(object target) => world.Observe(target).Root.WithSegments(ConstructionSegmentRule.Read(Segments, target));
-        // The group root's placement applies first; every part with a fixed placement below it is then put back there.
+        // The top scene object's placement applies first; every part with a fixed placement below it is then put back there.
         void Place(object target, Placement placement) {
             world.SetPlacement(target, placement);
             holds.Reassert(world, target);
@@ -903,17 +905,17 @@ namespace RailroaderScenePatcher.Core {
         }
         public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, ComponentType, RequiredVersion);
     }
-    // Parts of baked scenery groups: places and enables or disables one scene object inside a listed group. A part edit
-    // is an ordinary scene-object edit; the group root and the other parts keep their placement and activity. A fixed
+    // Parts of scene objects with child objects: places and enables or disables one scene object inside a listed group. A part edit
+    // is an ordinary scene-object edit; the top scene object and the other parts keep their placement and activity. A fixed
     // placement holds the part in map coordinates when its group moves later; the placement the part has without any
     // modification stays relative to its group.
-    public sealed class BakedSceneryParts : IScene, IVersionedScene, IFramedScene, IRelationshipScene, IRetainedScene, IDependentOutputScene {
-        public const string Structure = "baked-scenery-part-v1", ComponentType = BakedSceneryGroups.ComponentType, RequiredVersion = "0.5.0";
+    public sealed class ChildObjects : IScene, IVersionedScene, IFramedScene, IRelationshipScene, IRetainedScene, IDependentOutputScene {
+        public const string Structure = "child-object-v1", ComponentType = SceneObjects.ComponentType, RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
         // The scene ground masks of the groups, or null in a world without them.
         readonly GroundMasks masks;
-        public BakedSceneryParts(IGroupWorld world, PartHolds holds, Capability capability = Capability.Unchecked, GroundMasks masks = null) {
+        public ChildObjects(IGroupWorld world, PartHolds holds, Capability capability = Capability.Unchecked, GroundMasks masks = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world)); this.holds = holds ?? throw new ArgumentNullException(nameof(holds)); Capability = capability; this.masks = masks;
         }
         // The terrain output that follows a ground mask at or below the part, by the edited part.
@@ -924,17 +926,17 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
             if (identity.Component != ComponentType || (identity.Structure != null && identity.Structure != Structure)) return Array.Empty<object>();
             var found = world.FindParts(identity.Scene, identity.Path) ?? Array.Empty<object>();
-            // A group root resolves as a part only so that a modification that asks for a part fails with the reason.
+            // A top scene object resolves as a part only so that a modification that asks for a part fails with the reason.
             // An identity without a structure names the group, which the group capability resolves.
-            return identity.Structure != null ? found : found.Where(part => world.PartRefusal(part) != BakedSceneryRules.GroupRootRefusal).ToArray();
+            return identity.Structure != null ? found : found.Where(part => world.PartRefusal(part) != SceneObjectRules.TopObjectRefusal).ToArray();
         }
         public void Preflight(object target) {
             var refusal = world.PartRefusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
             var observed = world.ObservePart(target);
-            if (!GroupChecks.Finite(observed.Part.Placement) || !GroupChecks.Finite(observed.GroupState.Root.Placement)) throw new InvalidOperationException("Map coordinates are unavailable for the part or its group root");
+            if (!GroupChecks.Finite(observed.Part.Placement) || !GroupChecks.Finite(observed.GroupState.Root.Placement)) throw new InvalidOperationException("Map coordinates are unavailable for the part or its group");
         }
-        // Without a fixed placement of its own the part stands in its group root: its placement says so, and applied back
+        // Without a fixed placement of its own the part stands in its top scene object: its placement says so, and applied back
         // it returns the part to its place in the group.
         public ObjectState Read(object target) {
             var observed = world.ObservePart(target);
@@ -947,9 +949,9 @@ namespace RailroaderScenePatcher.Core {
         // A part stands in the object directly above it, so a part below a moved part keeps its place in that part.
         public Placement FramePlacement(object target) => world.ObservePart(target).ParentPlacement;
         public void CheckRelationships(object target, ObjectState state) {
-            if (state?.Marker != null) throw new InvalidOperationException("Baked scenery parts do not support track-marker relationships");
-            if (state?.Coverage != null) throw new InvalidOperationException("Baked scenery parts do not support crossing-coverage relationships");
-            if (state?.Equipment != null) throw new InvalidOperationException("Baked scenery parts do not support crossing-equipment relationships");
+            if (state?.Marker != null) throw new InvalidOperationException("Parts do not support track-marker relationships");
+            if (state?.Coverage != null) throw new InvalidOperationException("Parts do not support crossing-coverage relationships");
+            if (state?.Equipment != null) throw new InvalidOperationException("Parts do not support crossing-equipment relationships");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Placement?.Following != null && world.FollowingRefusal(target) is string following) throw new InvalidOperationException(following);
             var refusal = (state?.Active == null ? null : world.ActivityRefusal(target)) ?? (state?.Placement == null ? null : world.PlacementRefusal(target))
@@ -994,7 +996,7 @@ namespace RailroaderScenePatcher.Core {
             var after = world.ObservePart(target);
             if (!GroupChecks.SamePlacement(after.Part.Placement, placement) || (active != null && after.Part.Active != active)) throw new InvalidOperationException("The part's placement or activity does not match the requested state");
             var group = before.GroupState.Root; var now = after.GroupState.Root;
-            if (!ReferenceEquals(after.Group, before.Group) || !GroupChecks.SamePlacement(now.Placement, group.Placement) || now.Active != group.Active) throw new InvalidOperationException("Editing the part changed its group root");
+            if (!ReferenceEquals(after.Group, before.Group) || !GroupChecks.SamePlacement(now.Placement, group.Placement) || now.Active != group.Active) throw new InvalidOperationException("Editing the part changed its group");
             var difference = GroupChecks.Layout(before.GroupState, after.GroupState, h => ReferenceEquals(h, target) || holds.Contains(h), target)
                 ?? GroupChecks.Colliders(before.GroupState, after.GroupState) ?? GroupChecks.Culling(after.GroupState, now.Active != false, plan);
             if (difference != null) throw new InvalidOperationException("Editing the part changed more than the part itself: " + difference);
@@ -1027,14 +1029,14 @@ namespace RailroaderScenePatcher.Core {
         public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, ComponentType, RequiredVersion);
     }
 
-    // The debug summary of the baked scenery rule's verdicts for one load attempt. The objects that share a verdict are
+    // The debug summary of the scene object rule's verdicts for one load attempt. The objects that share a verdict are
     // counted, and only a verdict with few objects names them, so a player's debug log stays readable.
-    public static class BakedSceneryChecks {
+    public static class SceneObjectChecks {
         public const int ListLimit = 30;
         // checks holds each candidate object's path with its verdict text.
         public static IEnumerable<string> Summary(IEnumerable<KeyValuePair<string, string>> checks, int listLimit = ListLimit) {
             var all = (checks ?? Enumerable.Empty<KeyValuePair<string, string>>()).ToArray();
-            yield return "Checked " + all.Length + " candidate baked scenery objects. Counts by result:";
+            yield return "Checked " + all.Length + " candidate scene objects. Counts by result:";
             foreach (var verdict in all.GroupBy(c => c.Value, StringComparer.Ordinal).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)) {
                 var count = verdict.Count();
                 yield return count + (count == 1 ? " object: " : " objects: ") + verdict.Key;

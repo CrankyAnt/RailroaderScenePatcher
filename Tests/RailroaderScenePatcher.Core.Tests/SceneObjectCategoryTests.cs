@@ -6,11 +6,11 @@ using System.Linq;
 using RailroaderScenePatcher.Core;
 using RailroaderScenePatcher;
 
-// Baked scenery categories: which category the generic rules give each group root, which scene objects are container
-// objects, which are kept out, and how the outliner nests groups under categories and parts under groups. All from
+// Scene objects categories: which category the generic rules give each top scene object, which scene objects only hold other
+// scene objects, which are kept out, and how the outliner nests groups under categories and parts under groups. All from
 // supplied hierarchy and component facts.
-static class BakedCategoryTests {
-    static void Check(bool value, string message) { if (!value) throw new Exception("Baked scenery category: " + message); }
+static class SceneObjectCategoryTests {
+    static void Check(bool value, string message) { if (!value) throw new Exception("Scene objects category: " + message); }
 
     // The Railroader 0.6.3 Large Scenery catalogue, as the ticket records it: scene object below World/Large Scenery,
     // group or scene object below it, kind, category. The rules reach each category without naming these objects.
@@ -113,12 +113,12 @@ Wilmot | Wilmot Station | Group | Station building";
     public static void Run() {
         CategoryNames();
         EveryRootTakesItsTableCategory();
-        ContainerObjectHasNoGroupEntry();
+        GroupHolderHasNoGroupEntry();
         VerdictsKeepObjectsOut();
         OutlinerNestsGroupsAndParts();
         BridgesOutsideTheTable();
         SelectGroupFindsTheGroup();
-        Console.WriteLine("PASS: baked scenery categories");
+        Console.WriteLine("PASS: scene objects categories");
     }
 
     static void CategoryNames() {
@@ -126,7 +126,7 @@ Wilmot | Wilmot Station | Group | Station building";
     }
 
     // The world of the catalogue: every row a scene object at its path. A crossbuck stands in an unprotected
-    // crossing, a container object holds only its child groups, and every other root holds what it holds in the game
+    // crossing, a holder holds only its child groups, and every other root holds what it holds in the game
     // where the rules read that: a lamp post culls itself, a storage display holds piles or a log pond, a group named
     // after its place alone holds the objects that say what it is, and the Almond Bridge carries its culler and
     // construction controller. Every other root is a model with one part.
@@ -164,48 +164,48 @@ Wilmot | Wilmot Station | Group | Station building";
         Pads(world);
         return world;
     }
-    static GroupRootVerdict At(IEnumerable<GroupRootVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
+    static SceneObjectVerdict At(IEnumerable<SceneObjectVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
 
     static void EveryRootTakesItsTableCategory() {
-        var verdicts = BakedSceneryRules.Classify(World());
+        var verdicts = SceneObjectRules.Classify(World());
         foreach (var row in Rows.Where(r => !r.Container)) {
             var verdict = At(verdicts, row.Path);
-            Check(verdict != null && (verdict.Disposition == GroupDisposition.Group || verdict.Disposition == GroupDisposition.InspectionOnly), row.Path + " is a listed group root");
+            Check(verdict != null && (verdict.Disposition == GroupDisposition.Group || verdict.Disposition == GroupDisposition.InspectionOnly), row.Path + " is a listed top scene object");
             Check(verdict.Category == row.Category && verdict.Subcategory == row.Subcategory, row.Path + " stands under " + row.Category + (row.Subcategory == null ? "" : " / " + row.Subcategory) + " (got " + verdict.Category + (verdict.Subcategory == null ? "" : " / " + verdict.Subcategory) + ")");
         }
         var listed = verdicts.Where(v => v.Disposition == GroupDisposition.Group || v.Disposition == GroupDisposition.InspectionOnly).ToArray();
-        Check(listed.Length == Rows.Count(r => !r.Container), "the catalogue's groups are the listed group roots, no more (got " + listed.Length + ")");
+        Check(listed.Length == Rows.Count(r => !r.Container), "the catalogue's groups are the listed top scene objects, no more (got " + listed.Length + ")");
         // Whittier Stenzel is a Lights group whose two spotlights stay parts nested under it.
         var stenzel = new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Stenzel", new Node("Spotlight Outdoor").Solid(), new Node("Spotlight Outdoor (1)").Solid()))));
-        var lights = BakedSceneryRules.Classify(stenzel);
-        Check(At(lights, "World/Large Scenery/Whittier/Whittier Stenzel")?.Category == "Lights" && BakedSceneryRules.Parts(lights).Count(p => p.Disposition == PartDisposition.Part && p.GroupPath == "World/Large Scenery/Whittier/Whittier Stenzel") == 2,
+        var lights = SceneObjectRules.Classify(stenzel);
+        Check(At(lights, "World/Large Scenery/Whittier/Whittier Stenzel")?.Category == "Lights" && SceneObjectRules.Parts(lights).Count(p => p.Disposition == PartDisposition.Part && p.GroupPath == "World/Large Scenery/Whittier/Whittier Stenzel") == 2,
             "Whittier Stenzel is a Lights group and its two spotlights are its parts");
         // An industry building is its own group in Industry building.
-        Check(Rows.Where(r => r.Category == "Industry building").All(r => At(verdicts, r.Path).Category == "Industry building"), "an industry building is a group root of its own in Industry building");
+        Check(Rows.Where(r => r.Category == "Industry building").All(r => At(verdicts, r.Path).Category == "Industry building"), "an industry building is a top scene object of its own in Industry building");
     }
 
-    // A container object, an object without components or a telling name whose children all cull themselves, has no
-    // group entry; its children are the group roots, each with its parts.
-    static void ContainerObjectHasNoGroupEntry() {
+    // A holder, an object without components or a telling name whose children all cull themselves, has no
+    // group entry; its children are the top scene objects, each with its parts.
+    static void GroupHolderHasNoGroupEntry() {
         var posts = new[] { "", " (1)", " (2)", " (3)", " (4)", " (6)", " (7)", " (8)", " (9)", " (10)", " (11)", " (12)", " (13)" }.Select(n => "Tall Post Shade" + n).ToArray();
         var yard = new Node("Bryson Yard", posts.Select(name => new Node(name, new Node("Post").Solid(), new Node("Bulb").Solid()).With("Helpers.Culling.RendererCuller")).ToArray());
-        var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", yard, new Node("Bryson Depot", new Node("Roof").Solid())))));
+        var verdicts = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", yard, new Node("Bryson Depot", new Node("Roof").Solid())))));
         const string Yard = "World/Large Scenery/Bryson/Bryson Yard";
-        Check(At(verdicts, Yard)?.Disposition == GroupDisposition.ContainerObject, "Bryson Yard is a container object: it has no group entry");
+        Check(At(verdicts, Yard)?.Disposition == GroupDisposition.GroupHolder, "Bryson Yard is a scene object that only holds other groups: it has no group entry");
         var lamps = verdicts.Where(v => v.Path.StartsWith(Yard + "/", StringComparison.Ordinal)).ToArray();
         Check(lamps.Length == 13 && lamps.All(v => v.Disposition == GroupDisposition.Group && v.Category == "Lights") && posts.All(name => lamps.Any(v => v.Path == Yard + "/" + name)), "each of the 13 yard lamp posts is its own group in Lights (got " + lamps.Length + ")");
-        var parts = BakedSceneryRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
-        Check(posts.All(name => parts.Count(p => p.GroupPath == Yard + "/" + name) == 2) && !parts.Any(p => p.GroupPath == Yard), "each lamp post lists its own parts, and none is a part of the container object");
+        var parts = SceneObjectRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
+        Check(posts.All(name => parts.Count(p => p.GroupPath == Yard + "/" + name) == 2) && !parts.Any(p => p.GroupPath == Yard), "each lamp post lists its own parts, and none is a part of the scene object that only holds other groups");
         // The rule holds wherever the object stands and whatever it is called: a yard of lamp posts in another town is a
-        // container object too.
-        var elsewhere = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("East Yard", new Node("Tall Post Shade", new Node("Post").Solid()).With("Helpers.Culling.RendererCuller"))))));
-        Check(At(elsewhere, "World/Large Scenery/Sylva/East Yard")?.Disposition == GroupDisposition.ContainerObject && At(elsewhere, "World/Large Scenery/Sylva/East Yard/Tall Post Shade")?.Category == "Lights",
-            "a yard of lamp posts in another town is a container object and each post a Lights group");
+        // holder too.
+        var elsewhere = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("East Yard", new Node("Tall Post Shade", new Node("Post").Solid()).With("Helpers.Culling.RendererCuller"))))));
+        Check(At(elsewhere, "World/Large Scenery/Sylva/East Yard")?.Disposition == GroupDisposition.GroupHolder && At(elsewhere, "World/Large Scenery/Sylva/East Yard/Tall Post Shade")?.Category == "Lights",
+            "a yard of lamp posts in another town is a scene object that only holds other groups and each post a Lights group");
         // An object whose children do not cull themselves stays a group, and so does one whose name says what it is.
-        var other = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Post").Solid())),
+        var other = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Post").Solid())),
             new Node("Sylva Oil", new Node("Tall Post Shade", new Node("Post").Solid()).With("Helpers.Culling.RendererCuller"))))));
-        Check(At(other, "World/Large Scenery/Sylva/Bryson Yard")?.Disposition == GroupDisposition.Group && At(other, "World/Large Scenery/Sylva/Bryson Yard").Category == "Lights", "an object whose children do not cull themselves stays a group root, and is what it holds");
-        Check(At(other, "World/Large Scenery/Sylva/Sylva Oil")?.Disposition == GroupDisposition.Group && At(other, "World/Large Scenery/Sylva/Sylva Oil").Category == "Industry building", "an object whose name says what it is stays a group root");
+        Check(At(other, "World/Large Scenery/Sylva/Bryson Yard")?.Disposition == GroupDisposition.Group && At(other, "World/Large Scenery/Sylva/Bryson Yard").Category == "Lights", "an object whose children do not cull themselves stays a top scene object, and is what it holds");
+        Check(At(other, "World/Large Scenery/Sylva/Sylva Oil")?.Disposition == GroupDisposition.Group && At(other, "World/Large Scenery/Sylva/Sylva Oil").Category == "Industry building", "an object whose name says what it is stays a top scene object");
     }
 
     static void VerdictsKeepObjectsOut() {
@@ -213,12 +213,12 @@ Wilmot | Wilmot Station | Group | Station building";
             new Node("Almond", new Node("Cube").Solid()),
             new Node("Bryson", new Node("Bryson Appalachian Hardwoods", new Node("A").Solid(), new Node("B").Solid())),
             new Node("Sylva", new Node("New Shed", new Node("Wall").Solid()), new Node("Thing", new Node("Wall").Solid()), new Node("Masked Thing", new Node("Wall").Solid()).With("Character.SpawnPoint"))));
-        var verdicts = BakedSceneryRules.Classify(world);
+        var verdicts = SceneObjectRules.Classify(world);
         foreach (var path in new[] { "World/Large Scenery/Almond/Cube", "World/Large Scenery/Bryson/Bryson Appalachian Hardwoods" }) {
             var verdict = At(verdicts, path);
-            Check(verdict?.Disposition == GroupDisposition.NotListed && verdict.Reason == BakedSceneryRules.NoFunction && verdict.Category == null, path + " is not listed: it has no function in the game");
+            Check(verdict?.Disposition == GroupDisposition.NotListed && verdict.Reason == SceneObjectRules.NoFunction && verdict.Category == null, path + " is not listed: it has no function in the game");
         }
-        Check(!BakedSceneryRules.Parts(verdicts).Any(p => p.Path.Contains("Appalachian")), "an object that is not listed lists no parts");
+        Check(!SceneObjectRules.Parts(verdicts).Any(p => p.Path.Contains("Appalachian")), "an object that is not listed lists no parts");
         // A new group takes its category from the rules; a listed group no rule recognises stands under Unclassified.
         // A group no supported operation covers and no rule recognises has no category in its verdict; the outliner
         // files it under Unclassified, marked inspection only (OutlinerGroupingTests.InspectionOnlyRowsStandUnderTheirCategory).
@@ -229,8 +229,8 @@ Wilmot | Wilmot Station | Group | Station building";
     }
 
     // The outliner rows of a small inventory: groups, parts, an inspection-only group with a category, and one without.
-    static SceneObservation Entry(string path, string category = null, string subcategory = null, string groupPath = null, string only = null, string family = BakedSceneryRules.Family, string[] dependencies = null) =>
-        new SceneObservation(new object(), new TargetIdentity("scene", path, "UnityEngine.Transform"), family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+    static SceneObservation Entry(string path, string category = null, string subcategory = null, string groupPath = null, string only = null, string family = SceneObjectRules.Family, string[] dependencies = null) =>
+        new SceneObservation(new object(), new TargetIdentity("scene", path, "UnityEngine.Transform"), groupPath != null && family == SceneObjectRules.Family ? SceneObjectRules.ChildFamily : family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
             new string[0], dependencies ?? new string[0], new string[0], only ?? "Placement", inspectionOnly: only, groupPath: groupPath, category: category, subcategory: subcategory);
     sealed class Inventory : IInspectionScene {
         public List<SceneObservation> Objects = new List<SceneObservation>();
@@ -243,8 +243,8 @@ Wilmot | Wilmot Station | Group | Station building";
         scene.Objects.AddRange(new[] {
             Entry(Dealer + "/Bent/Beams", groupPath: Dealer),
             Entry(Bryson + "Bridge 1", "Bridge", "Rail bridges", only: "not yet supported"),
-            // A group root names every component below it among its dependencies, as the native inventory does.
-            Entry(Dealer, "Industry building", dependencies: new[] { "Component scene/" + Dealer + "/Heap [UnityEngine.MeshRenderer]", "Culling and colliders of every part follow the group root" }),
+            // A top scene object names every component below it among its dependencies, as the native inventory does.
+            Entry(Dealer, "Industry building", dependencies: new[] { "Component scene/" + Dealer + "/Heap [UnityEngine.MeshRenderer]", "Culling and colliders of every part follow the top scene object" }),
             Entry(Dealer + "/Heap", groupPath: Dealer),
             Entry("World/Large Scenery/Almond/Almond Road Bridge", "Bridge", "Road bridges"),
             Entry(Bryson + "Bryson Depot", "Station building"),
@@ -265,9 +265,9 @@ Wilmot | Wilmot Station | Group | Station building";
     // controller and bridge, which other families list, stand under Bridge / Rail bridges too.
     static void BridgesOutsideTheTable() {
         var world = new Node("World", new Node("Roads Bryson", new Node("Concrete Road Bridge - 20m", new Node("Deck").Solid()),
-            new Node("US19 Gov Island", new Node("Grade Crossing Setup").With(BakedSceneryRules.CrossingController).Family(), new Node("Concrete Road Bridge - 60m", new Node("Deck").Solid()))),
+            new Node("US19 Gov Island", new Node("Grade Crossing Setup").With(SceneObjectRules.CrossingController).Family(), new Node("Concrete Road Bridge - 60m", new Node("Deck").Solid()))),
             new Node("Large Scenery", new Node("Newtown", new Node("Plate Girder Bridge Span", new Node("Girder").Solid()))));
-        var verdicts = BakedSceneryRules.Classify(world);
+        var verdicts = SceneObjectRules.Classify(world);
         foreach (var path in new[] { "World/Roads Bryson/Concrete Road Bridge - 20m", "World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m" }) {
             var verdict = At(verdicts, path);
             Check(verdict?.Disposition == GroupDisposition.Group && verdict.Category == "Bridge" && verdict.Subcategory == "Road bridges", path + " is a road bridge: it stands under Bridge / Road bridges (got " + verdict?.Category + ")");
@@ -280,7 +280,7 @@ Wilmot | Wilmot Station | Group | Station building";
         BridgeEditsDoNotFollowTheCategory();
     }
 
-    // Whether a group is a rail or a road bridge for its edits is a rule of its own (BakedSceneryRules.RailBridge,
+    // Whether a group is a rail or a road bridge for its edits is a rule of its own (SceneObjectRules.RailBridge,
     // RoadBridge), not the outliner's category: a group the outliner files under Bridge by another word, or by what it
     // holds, is edited as any group.
     static void BridgeEditsDoNotFollowTheCategory() {
@@ -288,18 +288,18 @@ Wilmot | Wilmot Station | Group | Station building";
             new Node("Bridge 2", new Node("Steel").Solid()), new Node("Newtown Road Bridge", new Node("Deck").Solid()),
             new Node("Timber Trestle", new Node("Bent").Solid()), new Node("Newtown Culled", new Node("Road Bridge Abutment").Solid(), new Node("Road Bridge Side").Solid()).With("Helpers.SimpleCuller"),
             new Node("Newtown Depot", new Node("Roof").Solid()))));
-        var verdicts = BakedSceneryRules.Classify(world);
-        GroupRootVerdict V(string name) => At(verdicts, "World/Large Scenery/Newtown/" + name);
+        var verdicts = SceneObjectRules.Classify(world);
+        SceneObjectVerdict V(string name) => At(verdicts, "World/Large Scenery/Newtown/" + name);
         Check(V("Bridge 2").Bridge == BridgeKind.Rail && V("Bridge 2").Subcategory == "Rail bridges" && V("Newtown Road Bridge").Bridge == BridgeKind.Road && V("Newtown Road Bridge").Subcategory == "Road bridges",
             "a rail bridge and a road bridge are bridges for their edits, and the outliner files them as such");
         Check(V("Timber Trestle").Category == "Bridge" && V("Timber Trestle").Subcategory == "Rail bridges" && V("Timber Trestle").Bridge == BridgeKind.None,
             "a trestle is filed under Bridge by the outliner's word and is no bridge for its edits (got " + V("Timber Trestle").Bridge + ")");
         Check(V("Newtown Culled").Category == "Bridge" && V("Newtown Culled").Bridge == BridgeKind.None, "a group filed under Bridge by what it holds is no bridge for its edits (got " + V("Newtown Culled").Category + " " + V("Newtown Culled").Bridge + ")");
         Check(V("Newtown Depot").Bridge == BridgeKind.None, "a depot is no bridge");
-        Check(BakedSceneryRules.FollowingRefusal(V("Bridge 2").Bridge) == BakedSceneryRules.RailBridgeNoFollowing && BakedSceneryRules.FollowingRefusal(V("Newtown Road Bridge").Bridge) == BakedSceneryRules.RoadBridgeNoFollowing
-            && BakedSceneryRules.FollowingRefusal(V("Timber Trestle").Bridge) == null && BakedSceneryRules.FollowingRefusal(V("Newtown Culled").Bridge) == null,
+        Check(SceneObjectRules.FollowingRefusal(V("Bridge 2").Bridge) == SceneObjectRules.RailBridgeNoFollowing && SceneObjectRules.FollowingRefusal(V("Newtown Road Bridge").Bridge) == SceneObjectRules.RoadBridgeNoFollowing
+            && SceneObjectRules.FollowingRefusal(V("Timber Trestle").Bridge) == null && SceneObjectRules.FollowingRefusal(V("Newtown Culled").Bridge) == null,
             "only a bridge by the edit rule refuses track following");
-        Check(BakedSceneryRules.RailBridge(null, "Plate Girder Bridge End (1)") && BakedSceneryRules.RailBridge(null, "Almond Bridge") && !BakedSceneryRules.RailBridge(null, "Almond Road Bridge") && !BakedSceneryRules.RailBridge(null, "Bridgewater Mill") && !BakedSceneryRules.RailBridge(null, "Timber Trestle"),
+        Check(SceneObjectRules.RailBridge(null, "Plate Girder Bridge End (1)") && SceneObjectRules.RailBridge(null, "Almond Bridge") && !SceneObjectRules.RailBridge(null, "Almond Road Bridge") && !SceneObjectRules.RailBridge(null, "Bridgewater Mill") && !SceneObjectRules.RailBridge(null, "Timber Trestle"),
             "the edit rule reads the word Bridge in the root's name, and a road bridge is no rail bridge");
     }
 
@@ -309,8 +309,8 @@ Wilmot | Wilmot Station | Group | Station building";
         var group = Entry(Dealer, "Industry building"); var part = Entry(Dealer + "/Heap", groupPath: Dealer); var sign = Entry("World/Sign", family: "Track marker");
         scene.Objects.AddRange(new[] { part, group, sign });
         var inventory = new SceneInventory(scene); inventory.Refresh();
-        Check(ReferenceEquals(InventoryPresentationState.GroupOf(inventory, part), group), "a part's group is the group root's entry");
-        Check(InventoryPresentationState.GroupOf(inventory, group) == null && InventoryPresentationState.GroupOf(inventory, sign) == null, "a group root and an object outside any group have no group to select");
+        Check(ReferenceEquals(InventoryPresentationState.GroupOf(inventory, part), group), "a part's group is the top scene object's entry");
+        Check(InventoryPresentationState.GroupOf(inventory, group) == null && InventoryPresentationState.GroupOf(inventory, sign) == null, "a top scene object and an object outside any group have no group to select");
         Check(InventoryPresentationState.PartOf(part) == "Part of: Bryson Coal Dealer" && InventoryPresentationState.PartOf(group) == null, "the line names the part's group, and only a part has it");
     }
 }

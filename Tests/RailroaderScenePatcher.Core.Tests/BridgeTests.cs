@@ -97,7 +97,7 @@ static class BridgeTests {
         world.Objects["World/Twin"] = new List<object> { new FakeBridge(), new FakeBridge() };
         result = new PatchEngine(scene).Apply(Doc(Bridge("twin", path: "World/Twin")));
         Assert(!result.Outcomes["twin"].Applied && result.Outcomes["twin"].ResolvedTarget == null && world.Mutations == 0, "An ambiguous bridge identity fails");
-        var board = Bridge("board-structure").Replace("bridge-colliders-v1", "independent-board-v1");
+        var board = Bridge("board-structure").Replace("bridge-colliders-v1", "location-sign-v1");
         result = new PatchEngine(scene).Apply(Doc(board));
         Assert(!result.Outcomes["board-structure"].Applied && world.Mutations == 0, "Another pattern's structure does not resolve as a bridge");
     }

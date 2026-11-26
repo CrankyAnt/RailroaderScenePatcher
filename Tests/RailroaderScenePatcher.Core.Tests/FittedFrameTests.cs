@@ -6,7 +6,7 @@ using System.Linq;
 using RailroaderScenePatcher.Core;
 
 // A frame follows its model: the one box around an object, a group or a mesh lies along what it holds, also where the
-// scene object's own axes do not, as with a group root that stands square to the world while its building lies along
+// scene object's own axes do not, as with a top scene object that stands square to the world while its building lies along
 // the track, or a crossing pad whose mesh is built along a curve in axes of its own.
 static class FittedFrameTests {
     static readonly ScreenRect View = new ScreenRect(0, 0, 2560, 1440);
@@ -49,7 +49,7 @@ static class FittedFrameTests {
 
     public static void Run() {
         MeshAlongACurve();
-        GroupRootSquareToTheWorld();
+        TopObjectSquareToTheWorld();
         SmallGainKeepsTheObjectsAxes();
         TiltedObjectKeepsItsAxes();
         WithoutAnOrientation();
@@ -80,7 +80,7 @@ static class FittedFrameTests {
     // track at 35 degrees. Framed whole, the one box around them lies along the track: about as small as the box
     // the trestle's own axes give, and much smaller than the box in the root's axes, which also covers ground beside
     // the trestle.
-    static void GroupRootSquareToTheWorld() {
+    static void TopObjectSquareToTheWorld() {
         var trestle = Turned(0, 4, 100, 60, 8, 6, 35); var bins = Turned(20 * Math.Cos(35 * Math.PI / 180) - 6 * Math.Sin(35 * Math.PI / 180), 2, 100 + 20 * Math.Sin(35 * Math.PI / 180) + 6 * Math.Cos(35 * Math.PI / 180), 12, 4, 6, 35);
         var boxes = new[] { BoxOf("trestle", trestle), BoxOf("bins", bins) };
         var eye = new WorldPoint(0, 120, 20); var view = Camera(eye, 55);
@@ -268,7 +268,7 @@ static class FittedFrameTests {
     }
 
     // A group's one box lies along its objects too, and where its objects stand counts only for an object without a
-    // box of its own: the pivot of a group root that stands apart from the root's building does not widen the box,
+    // box of its own: the pivot of a top scene object that stands apart from the root's building does not widen the box,
     // while a controller without a box of its own still counts.
     static void GroupFrameFollowsItsObjects() {
         var eye = new WorldPoint(0, 300, -100); var view = Camera(eye, 60);

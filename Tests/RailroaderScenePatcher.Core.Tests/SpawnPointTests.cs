@@ -125,8 +125,8 @@ static class SpawnPointTests {
         Assert(!engine.Apply(Doc(Spawn("missing", path: "World/POIs/Nowhere"))).Outcomes["missing"].Applied && world.Mutations == 0, "A path without a spawn point resolves to nothing");
         world.Objects["World/POIs/Twin"] = new List<object> { new FakeSpawn(), new FakeSpawn() };
         Assert(!engine.Apply(Doc(Spawn("twin", path: "World/POIs/Twin"))).Outcomes["twin"].Applied && world.Mutations == 0, "An ambiguous spawn point identity fails");
-        var group = Spawn("group").Replace("spawn-point-v1", BakedSceneryGroups.Structure).Replace("Character.SpawnPoint", "UnityEngine.Transform");
-        Assert(!engine.Apply(Doc(group)).Outcomes["group"].Applied && world.Mutations == 0, "A baked scenery group identity does not resolve as a spawn point");
+        var group = Spawn("group").Replace("spawn-point-v1", SceneObjects.Structure).Replace("Character.SpawnPoint", "UnityEngine.Transform");
+        Assert(!engine.Apply(Doc(group)).Outcomes["group"].Applied && world.Mutations == 0, "A scene object with child objects identity does not resolve as a spawn point");
         Assert(scene.Resolve(new TargetIdentity("level4", Alarka, SpawnPoints.Component, null)).Count == 1, "An identity without a structure names the spawn point by its component");
     }
     static void ActivityAndRepeatedApplication() {
@@ -249,9 +249,9 @@ static class SpawnPointTests {
         Assert(rows.All(r => r.Problems.Count == 0 && r.InspectionOnly == null), "An inactive spawn point shows no problem and none is inspection only");
     }
     static void GroupsWithSpawnPointsPointToTheFamily() {
-        var verdict = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Depot", new Node("Spawn").With(SpawnPoints.Component), new Node("Shell").Solid())))))
+        var verdict = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Depot", new Node("Spawn").With(SpawnPoints.Component), new Node("Shell").Solid())))))
             .Single(v => v.Path == "World/Large Scenery/Town/Depot");
-        Assert(verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Ticket == null && verdict.Reason == BakedSceneryRules.SpawnPointReason && verdict.ReasonIsSentence,
+        Assert(verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Ticket == null && verdict.Reason == SceneObjectRules.SpawnPointReason && verdict.ReasonIsSentence,
             "A group that holds a spawn point names the Spawn point family, without a ticket: " + verdict.Reason + " " + verdict.Ticket);
     }
     // A disabled spawn point is not in SpawnPoint.All: rescue, teleport and the default start pass it by;
@@ -365,14 +365,14 @@ static class SpawnPointTests {
         var byComponent = new PatchEditingSession(new PatchEngine(capabilities), otherEditor, other); otherEditor.Session = byComponent;
         Assert(byComponent.MinimumPatcherVersion == SpawnPoints.RequiredVersion, "A target named by its spawn point component alone needs it too: " + byComponent.MinimumPatcherVersion);
     }
-    // A spawn point root carries a family of its own, so the baked scenery rule makes it no group, also when it has
+    // A spawn point root carries a family of its own, so the scene object rule makes it no group, also when it has
     // something physical, and no part of a group either.
     static void SpawnPointRootIsNoGroupRow() {
-        var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("POIs",
+        var verdicts = SceneObjectRules.Classify(new Node("World", new Node("POIs",
             new Node("Alarka").With(SpawnPoints.Component).Family(),
             new Node("Bryson").With(SpawnPoints.Component, "UnityEngine.BoxCollider").Solid().Family())));
         foreach (var path in new[] { "World/POIs/Alarka", "World/POIs/Bryson" })
             Assert(verdicts.Single(v => v.Path == path).Disposition == GroupDisposition.ExistingFamily, path + " is no group row: " + verdicts.Single(v => v.Path == path).Disposition);
-        Assert(SpawnPoints.FamilyOf(SpawnPoints.Component, BakedSceneryRules.WorldRoot) == SpawnPoints.Family, "The family rule the inventory calls lists it");
+        Assert(SpawnPoints.FamilyOf(SpawnPoints.Component, SceneObjectRules.WorldRoot) == SpawnPoints.Family, "The family rule the inventory calls lists it");
     }
 }

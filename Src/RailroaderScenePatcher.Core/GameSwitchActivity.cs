@@ -22,7 +22,7 @@ namespace RailroaderScenePatcher.Core {
     // The game-facing operations on the objects a switch of the game sets active or inactive. Each switch sets the
     // activity of the objects its lists name.
     public interface IGameSwitchHost {
-        // Which loaded switches set the object's activity; None for an object that no switch names. A switch of a container object
+        // Which loaded switches set the object's activity; None for an object that no switch names. A switch of a holder
         // above the object is no switch of the object.
         GameSwitch Switches(object node);
         // The object's own activity now.

@@ -64,4 +64,4 @@ Before changing a spawn point, the patcher checks that its scene is loaded and i
 
 ## Limits
 
-Automated tests check placement and activity with a controlled spawn point. The Railroader 0.6.3 runs did not establish rescue, the default start without a start setup, the behavior of an inactive point named by a start setup, or precedence when a map also supplies native spawns. A baked scenery group that holds a spawn point cannot be moved as a whole. Edit each spawn point in its own family.
+Automated tests check placement and activity with a controlled spawn point. The Railroader 0.6.3 runs did not establish rescue, the default start without a start setup, the behavior of an inactive point named by a start setup, or precedence when a map also supplies native spawns. A group that holds a spawn point cannot be moved as a whole. Edit each spawn point in its own family.

@@ -8,7 +8,7 @@ namespace RailroaderScenePatcher.Core {
     // the normal build has no type, no hook and no way to arm a failure. One armed failure trips at the next mutation that
     // reaches its point, whether that mutation is an edit, an Undo or Redo step or a world-load application, and then
     // disarms itself. The unreadable-group and unreadable-parts points are no mutation failures: each stays armed for one
-    // group root.
+    // top scene object.
     public static class FaultInjection {
         // The points a failure can be armed at, by the names the test mod passes.
         public const string AfterMutation = "after-mutation", DuringRestoration = "during-restoration", BetweenAdditionSteps = "between-addition-steps";
@@ -32,7 +32,7 @@ namespace RailroaderScenePatcher.Core {
             lock (gate) { armed = point; failRestoration = false; }
         }
         public static void Disarm() { lock (gate) { armed = null; failRestoration = false; unreadableGroup = null; unreadableParts = null; } }
-        // The group root that world marking reads as unreadable, as the Group skipped line names it
+        // The top scene object that world marking reads as unreadable, as the Group skipped line names it
         // (scene name/path), or null.
         static string unreadableGroup;
         public static string UnreadableGroup { get { lock (gate) return unreadableGroup; } }
@@ -40,17 +40,17 @@ namespace RailroaderScenePatcher.Core {
         // until Disarm or another root is armed, so world marking skips that group each time it decides its groups.
         // The root is kept as typed, since a scene object's name may begin or end with a space.
         public static void ArmUnreadableGroup(string root) {
-            if (String.IsNullOrWhiteSpace(root)) throw new ArgumentException("A group root is required", nameof(root));
+            if (String.IsNullOrWhiteSpace(root)) throw new ArgumentException("A top scene object is required", nameof(root));
             lock (gate) unreadableGroup = root;
         }
-        // The group root whose parts the family reads as unreadable, named as for the unreadable-group point, or null.
+        // The top scene object whose parts the family reads as unreadable, named as for the unreadable-group point, or null.
         static string unreadableParts;
         public static string UnreadableParts { get { lock (gate) return unreadableParts; } }
         // Arms the unreadable-parts point, beside any other point: every read of the parts of the group with this root
         // throws until Disarm or another root is armed, so the family skips that group each time it decides its groups.
         // The root is kept as typed.
         public static void ArmUnreadableParts(string root) {
-            if (String.IsNullOrWhiteSpace(root)) throw new ArgumentException("A group root is required", nameof(root));
+            if (String.IsNullOrWhiteSpace(root)) throw new ArgumentException("A top scene object is required", nameof(root));
             lock (gate) unreadableParts = root;
         }
         // root is computed only while the point is armed.

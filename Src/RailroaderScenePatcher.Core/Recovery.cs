@@ -185,7 +185,7 @@ namespace RailroaderScenePatcher.Core {
                 case "Marker ID": return Pair("Marker IDs", "repairing-duplicate-marker-ids.md");
             }
             if (structure == ConstructionSceneryScene.Structure) return Pair("Construction segments", "repairing-construction-segments.md");
-            if (structure == IndependentBoards.Structure) return Pair("Boards", "moving-boards.md");
+            if (structure == LocationSigns.Structure) return Pair("Location signs", "moving-location-signs.md");
             if (structure == BridgeScene.Structure) return Pair("Bridges", "placing-bridges.md");
             if (structure == StationMapIconRules.Structure) return Pair("Station map icons", "moving-station-map-icons.md");
             if (structure == TrackMarkerScene.Structure) return Pair("Track bindings", "repairing-track-bindings.md");
@@ -196,8 +196,8 @@ namespace RailroaderScenePatcher.Core {
             if (structure == MilepostScene.Structure) return Pair("Mileposts", "repositioning-mileposts.md");
             if (structure == ExistingEquipmentScene.MastStructure || structure == ExistingEquipmentScene.BellStructure)
                 return Pair("Existing crossing equipment", "moving-crossing-equipment.md");
-            if (structure == BakedSceneryGroups.Structure || structure == BakedSceneryParts.Structure)
-                return Pair("Baked scenery groups", "moving-baked-scenery-groups.md");
+            if (structure == SceneObjects.Structure || structure == ChildObjects.Structure)
+                return Pair("Scene objects", "moving-scene-objects.md");
             return Pair("Editing in the Map Editor", EditingGuide);
         }
         static KeyValuePair<string, string> Pair(string title, string file) => new KeyValuePair<string, string>(title, file);

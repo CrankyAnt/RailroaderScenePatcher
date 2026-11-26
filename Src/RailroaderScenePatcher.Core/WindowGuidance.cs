@@ -11,13 +11,13 @@ namespace RailroaderScenePatcher.Core {
     // composes its guidance from these constants, never from a copy, so the window and the log keep one wording.
     // Each text is one or more whole sentences, each ending with a period, and is appended after a space.
     public static class WindowGuidance {
-        // Baked scenery.
+        // Scene objects.
         public const string EditTrackMarkersIndividually = "Edit its track markers individually in the Track marker family.";
         public const string EditSpawnPointsIndividually = "Edit its spawn points individually in the Spawn point family.";
         public const string RemovePadMarkerId = "Remove padMarkerId from this target.";
         public const string EditCulledParts = "Edit the parts it holds directly.";
         public const string EditHeldGroups = "Edit the groups it holds.";
-        public const string EditAsGroup = "Edit it as a baked scenery group.";
+        public const string EditAsGroup = "Edit it as a group.";
 
         // Marker IDs and track bindings.
         public const string EnterUnusedId = "Enter an ID that no other scene marker or map object uses.";

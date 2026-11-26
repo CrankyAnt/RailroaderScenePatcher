@@ -11,7 +11,7 @@ namespace RailroaderScenePatcher.Core {
     // the vertical to lie along the points: of the boxes with a side along an edge of the points' outline seen from
     // above, the one with the least ground area. The box of the object's own axes stays unless that box is clearly
     // smaller, at most ObjectMarkingGeometry.FitShare of its size, so a model that lies nearly along its object's axes
-    // or is nearly round keeps them. A group root that stands square to the world while its building lies along the
+    // or is nearly round keeps them. A top scene object that stands square to the world while its building lies along the
     // track, and a mesh built along a curve in axes of its own, such as a crossing pad, are framed along what they show.
     // A tilted object keeps the box of its own axes, which turns with it.
     public sealed class BoxAlongBuilder {

@@ -57,8 +57,8 @@ namespace RailroaderScenePatcher.Core {
         // Set for a track-following placement: Position and Rotation are then its evaluation at the anchor's current pose,
         // or null until it is evaluated. Null for a fixed placement.
         public TrackFollowing Following { get; internal set; }
-        // Set on a placement a scene reads for an object that stands in a frame that can move, such as a part of a baked
-        // scenery group in its group root, while no fixed placement holds the object: the map placement of that frame
+        // Set on a placement a scene reads for an object that stands in a frame that can move, such as a child object
+        // in its top scene object, while no fixed placement holds the object: the map placement of that frame
         // when the object was read. Position and Rotation stay map coordinates. Applied back, such a placement returns
         // the object to its place in the frame. Null for every other placement.
         public Placement Frame { get; internal set; }
@@ -73,8 +73,8 @@ namespace RailroaderScenePatcher.Core {
                 Quaternion.Normalize(Quaternion.Multiply(turn, Quaternion.Multiply(inverse, Rotation)))) { Frame = new Placement((double[])now.Position.Clone(), (double[])now.Rotation.Clone()) };
         }
     }
-    // A scene whose objects can stand in a frame that moves, such as the parts of a baked scenery group in their group
-    // root. The engine evaluates such an object's underlying placement at the frame's placement now, so a removal returns
+    // A scene whose objects can stand in a frame that moves, such as the child objects of a scene object in their top
+    // scene object. The engine evaluates such an object's underlying placement at the frame's placement now, so a removal returns
     // the object to its place in the frame wherever the frame stands.
     public interface IFramedScene {
         // The map placement of the frame the object stands in now, or null when it stands in none.

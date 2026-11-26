@@ -197,6 +197,6 @@ static class StarterPlacementTests {
             Check(setups.Use(used) == StarterUse.Used && setups.Family(used, "Track marker") == StarterPlacements.Family, "A marker an active setup holds is in the Starter placement family: " + used);
         Check(setups.Use(Retired) == StarterUse.Unused && setups.Family(Retired, "Track marker") == null, "A marker only an inactive setup holds stays out of the inventory");
         Check(setups.Use(Sign) == StarterUse.None && setups.Family(Sign, "Track marker") == "Track marker", "A marker no setup holds keeps its own family");
-        Check(StarterPlacements.Family == "Starter placement", "The family is named Starter placement");
+        Check(StarterPlacements.Family == "Starter placement marker", "The family is named Starter placement marker");
     }
 }

@@ -172,7 +172,7 @@ static class FailureRecoveryTests {
         var w = new EditWorld();
         Assert(RecoveryGuidance.For(w.Session.Edit(Q, At(40), null), "Placement", "Placement", null) == null, "An applied outcome needs no guidance");
         w.Scene.FailNextApplies = 1;
-        var restored = RecoveryGuidance.For(w.Session.Edit(P, At(70), null), "Placement", "Placement", IndependentBoards.Structure);
+        var restored = RecoveryGuidance.For(w.Session.Edit(P, At(70), null), "Placement", "Placement", LocationSigns.Structure);
         Assert(restored.Kind == FailureKind.Restored && restored.Guide == "editing-placement-in-the-map-editor.md#set-a-numeric-placement" && restored.Line("Placement").Contains("was undone") && restored.Correction == "The scene patch file is unchanged. Correct the cause and try again.", "A restored placement failure links the placement guide");
         var pin = w.Pin(P); w.P.X = 5;
         var stale = RecoveryGuidance.For(w.Session.Edit(P, At(71), null, pin), "Modification", "Removal", BridgeScene.Structure);
@@ -185,9 +185,9 @@ static class FailureRecoveryTests {
             Assert(!guidance.Correction.Contains("JSON") && !guidance.Correction.Contains("scene-patches.json"), "Scene patch editing guidance corrects through the editor, not the file: " + guidance.Correction);
         // Each panel action opens the guide of the operation it ran: the place, the action and the target's capability decide.
         var routes = new[] {
-            new[] { "Placement", "Placement", IndependentBoards.Structure, "editing-placement-in-the-map-editor.md#set-a-numeric-placement" },
-            new[] { "Gizmo", "Gizmo drag", IndependentBoards.Structure, "using-transform-gizmos.md" },
-            new[] { "Snap", "Physical snap", IndependentBoards.Structure, "snapping-to-track.md" },
+            new[] { "Placement", "Placement", LocationSigns.Structure, "editing-placement-in-the-map-editor.md#set-a-numeric-placement" },
+            new[] { "Gizmo", "Gizmo drag", LocationSigns.Structure, "using-transform-gizmos.md" },
+            new[] { "Snap", "Physical snap", LocationSigns.Structure, "snapping-to-track.md" },
             new[] { "Follow", "Track following", TrackMarkerScene.Structure, "following-track.md" },
             new[] { "Track binding", "Set binding", TrackMarkerScene.Structure, "repairing-track-bindings.md" },
             new[] { "Track binding", "Set binding", CrossingPadScene.Structure, "rebinding-crossing-pads.md" },
@@ -199,9 +199,9 @@ static class FailureRecoveryTests {
             new[] { "Lights and gates", "Adding a gate", CrossingCoverageScene.Structure, "adding-crossing-equipment.md" },
             new[] { "Bells", "Adding a bell", CrossingCoverageScene.Structure, "adding-crossing-bells.md" },
             new[] { "Modification", "Removal", ExistingEquipmentScene.MastStructure, "moving-crossing-equipment.md" },
-            new[] { "Modification", "Removal", BakedSceneryParts.Structure, "moving-baked-scenery-groups.md" },
+            new[] { "Modification", "Removal", ChildObjects.Structure, "moving-scene-objects.md" },
             new[] { "Modification", "Recheck", BridgeScene.Structure, "placing-bridges.md" },
-            new[] { "Modification", "Removal", IndependentBoards.Structure, "moving-boards.md" },
+            new[] { "Modification", "Removal", LocationSigns.Structure, "moving-location-signs.md" },
             new[] { "Modification", "Recheck", null, RecoveryGuidance.EditingGuide } };
         foreach (var route in routes) {
             var guide = RecoveryGuidance.Guide(route[0], route[1], route[2]).Value;
@@ -240,13 +240,13 @@ static class FailureRecoveryTests {
         var failed = session.Edit(P, At(70), null);
         Assert(failed.Failure == FailureKind.AwaitingOutput && p.X == 4, "A restored edit with pending output waits for it: " + failed.Error);
         var waiting = session.Edit(P, At(71), null);
-        var guidance = RecoveryGuidance.For(waiting, "Placement", "Placement", IndependentBoards.Structure);
+        var guidance = RecoveryGuidance.For(waiting, "Placement", "Placement", LocationSigns.Structure);
         Assert(waiting.Failure == FailureKind.AwaitingOutput && waiting.Remaining.Count == 0 && p.X == 4, "An edit while the restored output is pending is refused as waiting, not blocked: " + waiting.Failure + " " + waiting.Error);
         Assert(guidance.Heading == "is waiting for terrain" && guidance.Correction == "Terrain output is still pending. Wait for the terrain to update before editing again, or click Retry on the Changes tab."
             && guidance.Line("Placement").Contains("The game is still regenerating terrain after an earlier edit.")
             && !guidance.Line("Placement").Contains("was undone"), "The second edit reports the pending terrain without claiming it was undone: " + guidance.Line("Placement"));
         Assert(!session.CleanupUnverified(P), "Pending output is not an unverified cleanup");
-        var guard = RecoveryGuidance.For(session.GuardOutcome(P), "Placement", "Placement", IndependentBoards.Structure);
+        var guard = RecoveryGuidance.For(session.GuardOutcome(P), "Placement", "Placement", LocationSigns.Structure);
         Assert(guard?.Kind == FailureKind.AwaitingOutput && guard.Heading == "is waiting for terrain", "The guard the panel checks first also reports that the edit is waiting.");
         scene.Pending = false;
         Assert(session.Edit(P, At(72), null).Applied && p.X == 72, "Once the output completes the object accepts edits");

@@ -12,7 +12,7 @@ namespace RailroaderScenePatcher {
     // The native operations of the existing crossing equipment capability: the light object of a mast, with its gate on
     // a child, and the bell player a crossing controller creates. The crossing controller's object is the equipment's
     // group: its transforms, cullers and own culling are read and written through the group world, so a moved mast
-    // culls as a moved part of a baked scenery group does. The rules live in Core's ExistingEquipmentPattern and
+    // culls as a moved child object does. The rules live in Core's ExistingEquipmentPattern and
     // ExistingEquipmentScene.
     //
     // Railroader 0.6.3: Track.KeyValueLampMaterialController and RollingStock.Controls.KeyValueBoolAnimator take the
@@ -218,7 +218,7 @@ namespace RailroaderScenePatcher {
         }
         public string ActivityRefusal(object part) => ActivityProblem(part as GameObject);
         // No switch of the game names a crossing device in Railroader 0.6.3. A mast or bell that a progression or a map
-        // feature switches is refused a disable that could not hold, with the reason, as a baked scenery group is.
+        // feature switches is refused a disable that could not hold, with the reason, as a scene object with child objects is.
         public string DisableRefusal(object target) => GroupWorld.DisableProblem(target as GameObject);
         // Existing equipment refuses track-following placement itself (ExistingEquipmentScene).
         public string FollowingRefusal(object target) => null;

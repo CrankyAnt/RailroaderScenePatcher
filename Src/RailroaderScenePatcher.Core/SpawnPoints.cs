@@ -31,7 +31,7 @@ namespace RailroaderScenePatcher.Core {
         // The family of a component below a scene root of this name, or null: every scene spawn point that the inventory
         // can list at all, wherever it stands.
         public static string FamilyOf(string componentType, string sceneRoot) =>
-            componentType == Component && BakedSceneryRules.ListedBelow(sceneRoot, false) ? Family : null;
+            componentType == Component && SceneObjectRules.ListedBelow(sceneRoot, false) ? Family : null;
         // The binding lines of a spawn point: the name teleport offers, its priority for the default
         // start, and each start setup that names it, by that setup's identifier. A setup without an identifier has no
         // line here: the adapter names it by its object, as the starter placement markers do. When the setups cannot

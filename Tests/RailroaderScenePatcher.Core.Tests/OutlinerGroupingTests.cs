@@ -12,7 +12,7 @@ using OutlineNode = RailroaderScenePatcher.InventoryPresentationState.OutlineNod
 static class OutlinerGroupingTests {
     static void Check(bool value, string message) { if (!value) throw new Exception("Outliner grouping: " + message); }
 
-    const string SceneName = "scene", Baked = BakedSceneryRules.Family, Bryson = "World/Large Scenery/Bryson/", Dealer = Bryson + "Bryson Coal Dealer", Signs = Bryson + "Bryson Signs",
+    const string SceneName = "scene", Baked = SceneObjectRules.Family, Bryson = "World/Large Scenery/Bryson/", Dealer = Bryson + "Bryson Coal Dealer", Signs = Bryson + "Bryson Signs",
         Allen = "World/Roads Sylva/Grade Crossing - Allen", Stenzel = "World/Roads Whittier/Crossing Unprotected - Stenzel";
     // An inspection-only entry carries its reason as its supported edits too, as NativeInventory builds it (operations = only).
     static SceneObservation Entry(string path, string family, double x, double z, string category = null, string groupPath = null, string holderPath = null, string only = null, string[] problems = null, string padMarkerId = null, string displayName = null, string subcategory = null) =>
@@ -27,7 +27,7 @@ static class OutlinerGroupingTests {
     sealed class World : IOutlinerScene {
         public string WorldKey => "world";
         public ObjectFacts Facts(SceneObservation entry) =>
-            entry.Identity.Path.EndsWith("Loc: Connelly", StringComparison.Ordinal) ? new ObjectFacts { Own = new[] { BakedSceneryRules.RendererCuller }, AtOrBelow = new[] { BakedSceneryRules.RendererCuller } } : new ObjectFacts();
+            entry.Identity.Path.EndsWith("Loc: Connelly", StringComparison.Ordinal) ? new ObjectFacts { Own = new[] { SceneObjectRules.RendererCuller }, AtOrBelow = new[] { SceneObjectRules.RendererCuller } } : new ObjectFacts();
         public double[] Bounds(SceneObservation entry) => null;
         public IEnumerable<PlaceSource> PlaceSources(IReadOnlyList<SceneObservation> entries, List<string> notes) => new[] {
             new PlaceSource(PlaceSourceKind.MapData, "Bryson", new[] { 4400.0, 5400 }), new PlaceSource(PlaceSourceKind.MapData, "Sylva", new[] { 25000.0, -800 }),
@@ -54,8 +54,8 @@ static class OutlinerGroupingTests {
         var road = Entry("World/Large Scenery/Sylva/Sylva Road Bridge", Baked, 25040, -840, "Bridge", subcategory: "Road bridges");
         // An object of a family no operation covers and no category names, and a listed group no rule recognises.
         var stand = Entry("World/Large Scenery/Sylva/Odd Fixture", "Odd fixture", 25050, -850, only: FamilyReason);
-        var thing = Entry("World/Large Scenery/Sylva/Thing", Baked, 25060, -860, BakedSceneryCategories.Unclassified);
-        // An inspection-only group whose verdict has no category (BakedCategoryTests: "Masked Thing").
+        var thing = Entry("World/Large Scenery/Sylva/Thing", Baked, 25060, -860, SceneObjectCategories.Unclassified);
+        // An inspection-only group whose verdict has no category (SceneObjectCategoryTests: "Masked Thing").
         var masked = Entry("World/Large Scenery/Sylva/Masked Thing", Baked, 25070, -870, only: CommandBand.NotYetSupported("groups with a spawn point"));
         scene.Objects.AddRange(new[] { swing, girder, road, stand, thing, masked });
         var inventory = new SceneInventory(scene); inventory.Refresh();
@@ -68,14 +68,14 @@ static class OutlinerGroupingTests {
             var tree = OutlinerGrouping.Build(all, inventory.Entries, "", false, null);
             Check(Shape(new[] { Find(tree.Tops, "Bridge") }) == "[Bridge]{[Rail bridges]{[Bryson]{Bridge 9 Swing Bridge}} [Road bridges]{[Sylva]{Sylva Road Bridge}}}",
                 "by category, the inspection-only bridge stands under its category, kind and place beside the editable one (got " + Shape(tree.Tops) + ")");
-            Check(Shape(new[] { Find(tree.Tops, BakedSceneryCategories.Unclassified) }) == "[Unclassified]{[Sylva]{Masked Thing Odd Fixture Thing}}",
+            Check(Shape(new[] { Find(tree.Tops, SceneObjectCategories.Unclassified) }) == "[Unclassified]{[Sylva]{Masked Thing Odd Fixture Thing}}",
                 "an object that fits no category stands under Unclassified, also when it is inspection only (got " + Shape(tree.Tops) + ")");
             Check(!tree.Tops.Any(t => t.Label.IndexOf("Inspection only", StringComparison.OrdinalIgnoreCase) >= 0), "there is no Inspection only group in the tree");
             OutlinerGrouping.ByPlace = true;
             var byPlace = OutlinerGrouping.Build(all, inventory.Entries, "", false, null);
             Check(Shape(new[] { Find(byPlace.Tops, "Bryson") }) == "[Bryson]{[Bridge]{[Rail bridges]{Bridge 9 Swing Bridge}}}",
                 "by place, the inspection-only bridge stands under its place, category and kind (got " + Shape(new[] { Find(byPlace.Tops, "Bryson") }) + ")");
-            Check(Shape(new[] { Find(Find(byPlace.Tops, "Sylva").Children, BakedSceneryCategories.Unclassified) }) == "[Unclassified]{Masked Thing Odd Fixture Thing}",
+            Check(Shape(new[] { Find(Find(byPlace.Tops, "Sylva").Children, SceneObjectCategories.Unclassified) }) == "[Unclassified]{Masked Thing Odd Fixture Thing}",
                 "by place, an object that fits no category stands under its place and Unclassified (got " + Shape(new[] { Find(byPlace.Tops, "Sylva") }) + ")");
             // The row is marked inspection only, and only an inspection-only object is.
             Check(InventoryPresentationState.RowMark(swing) == "inspection only" && InventoryPresentationState.RowMark(stand) == "inspection only" && InventoryPresentationState.RowMark(masked) == "inspection only"
@@ -101,7 +101,7 @@ static class OutlinerGroupingTests {
         var scene = new Inventory();
         var dealer = Entry(Dealer, Baked, 4410, 5410, "Industry building");
         var yardLimit = Entry(Signs + "/Yard Limit", "Track marker", 4300, 5300);
-        var board = Entry("World/Signs/Loc: Connelly", "Independent board", 12040, 5565, problems: new[] { "The board's mask is missing" });
+        var board = Entry("World/Signs/Loc: Connelly", "Location sign", 12040, 5565, problems: new[] { "The board's mask is missing" });
         var shed = Entry("World/Large Scenery/Sylva/Sylva Shed", Baked, 25020, -820, only: "This group contains a map icon, which the patcher can't move with a group.");
         var iconSigns = Entry("World/Large Scenery/Sylva/Depot Signs", Baked, 25030, -830, "Sign", only: "This group contains a map icon, which the patcher can't move with a group.");
         scene.Objects.AddRange(new[] {
@@ -116,7 +116,7 @@ static class OutlinerGroupingTests {
             // A sign container holds only signs another family lists: it has no row, and its sign stands on its own.
             Entry(Signs, Baked, 0, 0, "Sign", only: "You can't move this group as a whole."), yardLimit,
             // A crossing with a controller: the controller holds its mast, pad and detection span.
-            Entry(Allen, "Crossing controller", 25100, -700), Entry(Allen + "/Track 1 East", "Track span", 25101, -701, holderPath: Allen),
+            Entry(Allen, "Grade crossing controller", 25100, -700), Entry(Allen + "/Track 1 East", "Track span", 25101, -701, holderPath: Allen),
             Entry(Allen + "/Signal 1/Signal 1", "Crossing mast", 25102, -702), Entry(Allen + "/Crossing Pad", "Crossing pad marker", 25103, -703),
             // A light and a bell the patcher added stand with the crossing's own equipment, under the names the inventory gives them.
             Entry(Allen + "/Signal 1 copy", SceneFamilies.AddedEquipment, 25104, -704, displayName: "Signal 1 (added)"), Entry(Allen + "/Brass bell", SceneFamilies.AddedBell, 25105, -705, displayName: "Brass bell (added)"),

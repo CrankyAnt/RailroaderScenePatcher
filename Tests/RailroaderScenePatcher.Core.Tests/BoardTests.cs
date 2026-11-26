@@ -11,7 +11,7 @@ using RailroaderScenePatcher.Core;
 // leaves both stale until the culling position is refreshed and the mask is rebuilt, and a mask change
 // invalidates loaded terrain tiles at its old and new bounds, which then build asynchronously.
 class FakeBoard {
-    public string Scene = "BushnellWhittier-MapManager", Path = IndependentBoards.SylvaPath;
+    public string Scene = "BushnellWhittier-MapManager", Path = LocationSigns.SylvaPath;
     public double[] Position = { 25692.9766, 633.4856, 441.8128 }, Rotation = { 0.0, 0.0, 0.0, 1.0 };
     public bool Active = true, ParentsActive = true, Culler = true, CullerEnabled = true, MaskEnabled = true, Flattens;
     public int Masks = 1;
@@ -100,10 +100,10 @@ static class BoardTests {
     static readonly double[] Far = { 26310.0, 640.0, 393.8 };
     static readonly double[] Turned = { 0.0, 0.13052619, 0.0, 0.99144486 };
     static string Num(double v) => v.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-    static string Target(string path = IndependentBoards.SylvaPath, string structure = ",\"structure\":\"independent-board-v1\"") =>
+    static string Target(string path = LocationSigns.SylvaPath, string structure = ",\"structure\":\"location-sign-v1\"") =>
         "\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + path + "\",\"component\":\"Helpers.Culling.RendererCuller\"" + structure + "}";
     static string Place(double[] p, double[] r = null) => "\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", p.Select(Num)) + "],\"rotation\":[" + String.Join(",", (r ?? Turned).Select(Num)) + "]}";
-    static string Mod(string id, string body, string deps = "[]", string path = IndependentBoards.SylvaPath) => "\"" + id + "\":{" + Target(path) + "," + body + ",\"dependsOn\":" + deps + "}";
+    static string Mod(string id, string body, string deps = "[]", string path = LocationSigns.SylvaPath) => "\"" + id + "\":{" + Target(path) + "," + body + ",\"dependsOn\":" + deps + "}";
     static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
     static bool Near(double[] a, double[] b, double tolerance = 0.001) => a != null && b != null && a.Zip(b, (x, y) => Math.Abs(x - y)).All(d => d <= tolerance);
     // The registrations the native components hold agree with the board's own placement and activity.
@@ -113,9 +113,9 @@ static class BoardTests {
     }
     // Whether Setup's board holds a mask that also flattens the terrain height.
     static bool flattening;
-    static (FakeBoardWorld, FakeBoard, IndependentBoards, PatchEngine) Setup() {
+    static (FakeBoardWorld, FakeBoard, LocationSigns, PatchEngine) Setup() {
         var world = new FakeBoardWorld(); var board = world.Add(new FakeBoard { Flattens = flattening }); world.BuildTiles();
-        var boards = new IndependentBoards(world); return (world, board, boards, new PatchEngine(boards));
+        var boards = new LocationSigns(world); return (world, board, boards, new PatchEngine(boards));
     }
     internal static void Run() {
         PlacementMovesBoardAndItsRegistrations();
@@ -173,7 +173,7 @@ static class BoardTests {
         Assert(session.Edit(Sylva, PlacementAt(Moved), null).Applied, "The board is placed");
         var finds = world.Finds;
         for (var row = 0; row < 825; row++) Assert(session.IsChanged(Sylva) && !session.IsChanged(Whittier), "The placed board is changed, another board is not");
-        Assert(session.IsChanged(new TargetIdentity(Scene, IndependentBoards.SylvaPath, IndependentBoards.CullerType)) && !session.IsChanged(new TargetIdentity(Scene, IndependentBoards.SylvaPath, "Other.Component")),
+        Assert(session.IsChanged(new TargetIdentity(Scene, LocationSigns.SylvaPath, LocationSigns.CullerType)) && !session.IsChanged(new TargetIdentity(Scene, LocationSigns.SylvaPath, "Other.Component")),
             "An observation without a structure matches the modification of the same object; another component does not");
         Assert(world.Finds == finds, "Marking rows does not search the scene: " + (world.Finds - finds));
         mapEditor.Undo();
@@ -186,7 +186,7 @@ static class BoardTests {
     static void InspectedOutputResolvesOncePerInspection() {
         var (world, board, boards, session, mapEditor, store) = PatchEditing();
         Assert(session.Edit(Sylva, PlacementAt(Far), null).Applied, "The board moves to another terrain tile");
-        SceneObservation Observe() => new SceneObservation(board, Sylva, "Independent board", true, board.Position, board.Rotation, new string[0], new string[0], new string[0], "Fixed placement and activity");
+        SceneObservation Observe() => new SceneObservation(board, Sylva, "Location sign", true, board.Position, board.Rotation, new string[0], new string[0], new string[0], "Fixed placement and activity");
         var inspected = Observe();
         var output = new RailroaderScenePatcher.InspectedOutput();
         var finds = world.Finds;
@@ -212,10 +212,10 @@ static class BoardTests {
         Assert(world.Finds == finds + 2, "The failed resolution is remembered for that observation: " + (world.Finds - finds));
         world.Boards.Remove(twin);
     }
-    static readonly TargetIdentity Sylva = new TargetIdentity(Scene, IndependentBoards.SylvaPath, IndependentBoards.CullerType, IndependentBoards.Structure);
-    static readonly TargetIdentity Whittier = new TargetIdentity(Scene, OtherPath, IndependentBoards.CullerType, IndependentBoards.Structure);
+    static readonly TargetIdentity Sylva = new TargetIdentity(Scene, LocationSigns.SylvaPath, LocationSigns.CullerType, LocationSigns.Structure);
+    static readonly TargetIdentity Whittier = new TargetIdentity(Scene, OtherPath, LocationSigns.CullerType, LocationSigns.Structure);
     static Placement PlacementAt(double[] p) => new Placement((double[])p.Clone(), (double[])Turned.Clone());
-    static (FakeBoardWorld, FakeBoard, IndependentBoards, PatchEditingSession, NativeMapEditor, Store) PatchEditing(string patch = null) {
+    static (FakeBoardWorld, FakeBoard, LocationSigns, PatchEditingSession, NativeMapEditor, Store) PatchEditing(string patch = null) {
         var (world, board, boards, engine) = Setup();
         var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
         if (patch != null) engine.Apply(patch, "author/pack");
@@ -236,8 +236,8 @@ static class BoardTests {
         var result = engine.Apply(Doc(Mod("other", Place(new[] { 110.0, 5.0, 90.0 }), path: OtherPath)), "author/pack");
         Assert(result.Outcomes["other"].Applied && Near(other.Position, new[] { 110.0, 5.0, 90.0 }) && Consistent(world, other), "Another board conforming to the pattern receives placement and refreshed registrations");
         Assert(Near(board.Position, new FakeBoard().Position), "Placing one board leaves another unchanged");
-        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, OtherPath, IndependentBoards.CullerType, IndependentBoards.Structure)) == "0.5.0", "Boards beyond the Sylva board need the pattern-based patcher");
-        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, IndependentBoards.SylvaPath, IndependentBoards.CullerType, IndependentBoards.Structure)) == null, "The original Sylva target needs no newer capability minimum");
+        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, OtherPath, LocationSigns.CullerType, LocationSigns.Structure)) == "0.5.0", "Boards beyond the Sylva board need the pattern-based patcher");
+        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, LocationSigns.SylvaPath, LocationSigns.CullerType, LocationSigns.Structure)) == null, "The original Sylva target needs no newer capability minimum");
     }
     static void PreflightRefusalLeavesBoardUnchanged() {
         foreach (var (name, change, reason) in new (string, Action<FakeBoard>, string)[] {
@@ -267,7 +267,7 @@ static class BoardTests {
         result = engine.Apply(Doc(Mod("move", Place(Moved)), "elsewhere"), "author/pack");
         Assert(result.Error != null && result.Outcomes.Count == 0 && !Near(board.Position, Moved) && world.PlacementWrites == 0, "A map mismatch rejects the scene patch file before resolution");
         (world, board, boards, engine) = Setup();
-        result = engine.Apply(Doc("\"wrong\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + IndependentBoards.SylvaPath + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-v1\"}," + Place(Moved) + ",\"dependsOn\":[]}"), "author/pack");
+        result = engine.Apply(Doc("\"wrong\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + LocationSigns.SylvaPath + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-v1\"}," + Place(Moved) + ",\"dependsOn\":[]}"), "author/pack");
         Assert(!result.Outcomes["wrong"].Applied && world.PlacementWrites == 0, "Another structure identity does not resolve to a board");
     }
     static void RepeatAndOrderDoNotAccumulate() {
@@ -334,7 +334,7 @@ static class BoardTests {
         engine.Apply(Doc(Mod("move", Place(Far))), "author/pack");
         // The old position's tile is rebuilt; the invalidation of the new one is lost before the game builds it.
         world.PendingTiles.Remove("52,0"); world.BuildTiles(); boards.Poll();
-        world.Clock = IndependentBoards.OutputTimeout + 1; boards.Poll();
+        world.Clock = LocationSigns.OutputTimeout + 1; boards.Poll();
         var output = boards.Output(board);
         Assert(output.Error != null && output.Completed.Count == 1 && output.Outstanding.Count == 1 && !output.Settled, "A terrain write that does not complete is reported with its completed and outstanding writes");
         Assert(Near(board.Position, Far) && Consistent(world, board), "The board edit is kept when terrain output fails");
@@ -361,7 +361,7 @@ static class BoardTests {
         Assert(session.Edit(Sylva, PlacementAt(Moved), null).Applied && Near(board.Position, Moved) && Consistent(world, board) && world.Registrations == 1, "This mod's board placement moves the board and its registrations");
         var scenePatchFile = JObject.Parse(session.ScenePatchFileText);
         var modification = (JObject)scenePatchFile["modifications"].First.First;
-        Assert((string)modification["target"]["structure"] == IndependentBoards.Structure && modification["placement"] != null && modification.Properties().All(p => p.Name != "binding"), "The scene patch file records the board placement without a track binding");
+        Assert((string)modification["target"]["structure"] == LocationSigns.Structure && modification["placement"] != null && modification.Properties().All(p => p.Name != "binding"), "The scene patch file records the board placement without a track binding");
         mapEditor.Undo();
         Assert(Near(board.Position, original) && Consistent(world, board) && world.Registrations == 1, "Undo restores the captured placement and registrations without an owned leftover");
         mapEditor.Redo();
@@ -379,7 +379,7 @@ static class BoardTests {
         var (world, board, boards, session, mapEditor, store) = PatchEditing();
         Assert(session.Edit(Sylva, PlacementAt(Far), null).Applied, "The board edit applies");
         world.PendingTiles.Remove("52,0"); world.BuildTiles(); boards.Poll();
-        world.Clock = IndependentBoards.OutputTimeout + 1; boards.Poll();
+        world.Clock = LocationSigns.OutputTimeout + 1; boards.Poll();
         var output = session.Output(Sylva);
         Assert(output.Error != null && output.Completed.Count == 1 && output.Outstanding.Count == 1, "A terrain-write failure names its completed and outstanding writes");
         Assert(Near(board.Position, Far) && session.ScenePatchFileText.Contains("26310"), "The in-memory edit survives the terrain-write failure");
@@ -400,7 +400,7 @@ static class BoardTests {
         Assert(JObject.Parse(session.ScenePatchFileText)["modifications"].Count() == 0 && mapEditor.UndoGroups.Count == 0, "A failed edit leaves the scene patch file and history unchanged");
         var blocked = session.Edit(Sylva, PlacementAt(Moved), null);
         Assert(!blocked.Applied && blocked.Failure == FailureKind.AwaitingOutput && !session.CleanupUnverified(Sylva), "The board waits for the restored terrain output before the next edit, without counting as an incomplete cleanup: " + blocked.Error);
-        world.PendingTiles.Clear(); world.Clock = IndependentBoards.OutputTimeout + 1; boards.Poll();
+        world.PendingTiles.Clear(); world.Clock = LocationSigns.OutputTimeout + 1; boards.Poll();
         Assert(session.Output(Sylva).Error != null && !session.Edit(Sylva, PlacementAt(Moved), null).Applied, "Restored terrain output that stopped keeps the board guarded");
         Assert(session.Recheck(Sylva).Applied && world.Invalidated.Count > 0 && !session.Edit(Sylva, PlacementAt(Moved), null).Applied, "Recheck requests the restored output again and keeps the guard until it verifies");
         world.BuildTiles(); boards.Poll();

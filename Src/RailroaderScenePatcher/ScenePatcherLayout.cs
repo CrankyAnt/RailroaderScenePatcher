@@ -320,7 +320,7 @@ namespace RailroaderScenePatcher {
                 var select = CommandBand.SelectInWorld(selection != null, pending);
                 Button(row, "Select in world", () => BeginSelection(SelectionKind.SceneObject, null)).Inactive(select != null)
                     .Tooltip("Select in world", CommandBand.Tooltip("Click a marking in the world to choose the object to inspect.", select));
-                // A crossing node of the outliner is a game-defined group: Focus goes to the crossing.
+                // A crossing node of the outliner is a complex: Focus goes to the crossing.
                 var groupNode = selected == null ? crossingNode : null;
                 var focus = groupNode != null ? (groupNode.Point == null ? "This crossing has no position." : null) : CommandBand.Focus(selected != null, FocusUnavailable());
                 var starter = selected != null && selected.Family == StarterPlacements.Family;
@@ -438,7 +438,7 @@ namespace RailroaderScenePatcher {
                 return OutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, OutlinerTrackPoint);
             } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The patcher couldn't build the scene object outliner. Report this to the patcher maintainer.", e); return null; }
         }
-        // The object count line's text. The count is that of the tree: container objects and native track spans have no row.
+        // The object count line's text. The count is that of the tree: scene objects that only hold other groups and native track spans have no row.
         string OutlinerSummary(OutlinerGrouping.Result tree) =>
             inventory == null ? "Inspection is unavailable" : tree == null ? "The object list couldn't be built. The log has the cause." : OutlinerGrouping.Summary(tree, inventory.Entries);
         // The outliner's rows, in a section that rebuilds by itself. countLine shows the object count, as countMarkup
@@ -687,7 +687,7 @@ namespace RailroaderScenePatcher {
 
         // A rail bridge outside Ela or a road bridge, or a part of one: it takes no
         // track-following placement.
-        BridgeKind InspectedBridge => selected == null || selected.Family != BakedSceneryRules.Family ? BridgeKind.None
+        BridgeKind InspectedBridge => selected == null || !SceneObjectRules.InFamilies(selected.Family) ? BridgeKind.None
             : selected.GroupPath == null ? selected.Bridge : InventoryPresentationState.GroupOf(inventory, selected)?.Bridge ?? BridgeKind.None;
         bool IsRailBridge => InspectedBridge == BridgeKind.Rail;
         bool IsRoadBridge => InspectedBridge == BridgeKind.Road;
@@ -709,7 +709,7 @@ namespace RailroaderScenePatcher {
             var heldBy = InventoryPresentationState.HeldBy(selected);
             if (heldBy != null) {
                 builder.HStack(row => {
-                    Line(row, Literal(heldBy), "Crossing controller", selected.HolderPath, RowHeight).EqualFlexibleWidth(0);
+                    Line(row, Literal(heldBy), "Grade crossing controller", selected.HolderPath, RowHeight).EqualFlexibleWidth(0);
                     ActButton(row, SelectControllerAct());
                 }).ChildrenKeepHeight().Height(RowHeight);
             }
@@ -746,10 +746,10 @@ namespace RailroaderScenePatcher {
                 Section(builder, "Inspection notes");
                 foreach (var note in selected.Notes) PlainLabel(builder, Breakable(note));
             }
-            // A group of the Baked scenery group family, and each part of it, is decorative: the game reads nothing from
+            // A scene object of the Scene object family, and each child object of it, is decorative: the game reads nothing from
             // where it stands. An industry's buildings and storage display say that the industry works on its native
             // track spans, and a storage pile names the storage it shows.
-            if (selected.InspectionOnly == null && selected.Family == BakedSceneryRules.Family) {
+            if (selected.InspectionOnly == null && SceneObjectRules.InFamilies(selected.Family)) {
                 Section(builder, "Use in the game");
                 PlainLabel(builder, CommandBand.UseInGame(selected, selected.GroupPath != null ? InventoryPresentationState.GroupOf(inventory, selected) : null));
             }
@@ -762,7 +762,7 @@ namespace RailroaderScenePatcher {
             }
             Section(builder, "State");
             if (HoldWarning is string warning) builder.AddLabel(Tint(Amber, warning));
-            // A group root's own flag can be off while only its simple culler hides it; the observation reads the authored flag.
+            // A top scene object's own flag can be off while only its simple culler hides it; the observation reads the authored flag.
             Field(builder, "Enabled", EnabledText()).Tooltip("Enabled", "Whether this object is active in the scene.");
             if (FollowsGroup) Field(builder, "Track group", CommandBand.TrackGroup(Editable));
             // The edits that the controls offer and why each other one is not available, from the controls' own rules.
@@ -847,7 +847,7 @@ namespace RailroaderScenePatcher {
                 StartersError = NativeInventory.StartersError,
             };
             if (editable && target != null) {
-                live.ActivitySwitched = selected.GroupPath != null || selected.Family == BakedSceneryRules.Family ? GroupWorld.ActivityProblem(target) : IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
+                live.ActivitySwitched = selected.GroupPath != null || SceneObjectRules.InFamilies(selected.Family) ? GroupWorld.ActivityProblem(target) : IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
                 live.DisableProblem = GroupWorld.DisableProblem(target);
             }
             // A crossing whose lights, gates and bells the session cannot read offers no equipment edit, with that reason.
@@ -1317,7 +1317,7 @@ namespace RailroaderScenePatcher {
                 try { lines = attachment.Session.Changes(selected.Identity); } catch { }
                 if (lines != null) foreach (var line in lines) PlainLabel(builder, Breakable(line));
             }
-            // Terrain output exists only for an object with a terrain mask: an independent board, and an object that
+            // Terrain output exists only for an object with a terrain mask: a location sign, and an object that
             // holds a scene ground mask or stands above one. The section is there only for those, in plain words.
             if (!HasTerrain) return;
             Section(builder, "Terrain");
@@ -1343,7 +1343,7 @@ namespace RailroaderScenePatcher {
             return CommandBand.GroupTerrain(group.DisplayName, text, held.Error != null || held.Outstanding.Count != 0);
         }
         // Whether the inspected object has terrain output at all.
-        bool HasTerrain => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || CommandBand.HoldsGroundMask(selected.Dependencies));
+        bool HasTerrain => selected != null && (selected.Identity.Structure == LocationSigns.Structure || CommandBand.HoldsGroundMask(selected.Dependencies));
 
         // The footer, the same on every tab: the message area, then one row with the actions on the inspected object
         // that belong to no tab, Remove modification and Recheck. A pending world choice or an active gizmo takes that
@@ -1796,7 +1796,7 @@ namespace RailroaderScenePatcher {
             var target = observation?.Handle as GameObject;
             // Own culling switches a moved mast by camera distance, as it does a moved part: the observation reads what the scene or the modder set.
             // An object a progression controller or a map feature switches reads whether no explicit disable holds it off.
-            return target != null && (observation.Family == BakedSceneryRules.Family || observation.Family == ExistingEquipmentScene.MastFamily ? observation.Enabled : GroupWorld.ProgressionEnabled(target) ?? target.activeSelf);
+            return target != null && (SceneObjectRules.InFamilies(observation.Family) || observation.Family == ExistingEquipmentScene.MastFamily ? observation.Enabled : GroupWorld.ProgressionEnabled(target) ?? target.activeSelf);
         }
         static double[] EnteredRotation(double x, double y, double z) {
             var rotation = Quaternion.Euler((float)x, (float)y, (float)z);
@@ -1968,10 +1968,10 @@ namespace RailroaderScenePatcher {
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and boards", "A bridge moves as a whole, and the scenery of its track stays in place. The terrain output of a board or a ground mask regenerates after the move." },
-                    new[] { "Baked scenery groups", "Moving a group also moves its parts. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
+                    new[] { "Scene objects", "Moving a group also moves its parts. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
                     new[] { "Spawn points", "The game reads a spawn point's current location each time a player starts, is rescued, or teleports. A disabled spawn point isn't offered, except by a start setup that names it." } },
                 Guides = new[] { new[] { "Fixed placement", RecoveryGuidance.NumericPlacementGuide }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
-                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" }, new[] { "Spawn points", "moving-spawn-points.md" },
+                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Location signs", "moving-location-signs.md" }, new[] { "Scene objects", "moving-scene-objects.md" }, new[] { "Spawn points", "moving-spawn-points.md" },
                     new[] { "Station map icons", "moving-station-map-icons.md" }, new[] { "Existing crossing equipment", "moving-crossing-equipment.md" } } },
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Check what the object is connected to, and change the connections it supports.",
                 Terms = new[] {
@@ -1992,7 +1992,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Remove modification", "Deletes this mod's modification and restores the object's underlying state, not an earlier patched position." },
                     new[] { "Recheck", "After a failed edit, compares the object with the scene patch file and unblocks it once they agree." },
                     new[] { "Terrain output", "The game regenerates terrain after moving a board or a ground mask. Save doesn't write that output. Click Retry to ask for it again." } },
-                Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "File recovery", "recover-scene-patch-files.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
+                Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Location signs", "moving-location-signs.md" }, new[] { "File recovery", "recover-scene-patch-files.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
         };
         void DrawHelp(UIPanelBuilder builder, string region) {
             if (!Help.TryGetValue(region, out var help)) return;

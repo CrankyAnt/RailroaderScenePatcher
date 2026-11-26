@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Edit and save fixed placement in the native map editor
 
-Use the native map editor to move, rotate, disable, or restore a supported scene object. This guide also explains how Save, Undo, and Redo handle those edits. You can currently edit [independent boards](moving-boards.md), [the Ela bridge](placing-bridges.md), [baked scenery groups and their parts](moving-baked-scenery-groups.md), and [player spawn points](moving-spawn-points.md).
+Use the native map editor to move, rotate, disable, or restore a supported scene object. This guide also explains how Save, Undo, and Redo handle those edits. You can currently edit [location signs](moving-location-signs.md), [the Ela bridge](placing-bridges.md), [scene objects and their child objects](moving-scene-objects.md), and [player spawn points](moving-spawn-points.md).
 
 For other operations, see the [modder manual](modder-manual.md). To make changes in a text editor, see [Write a scene patch file](writing-scene-patch-files.md).
 
@@ -94,11 +94,11 @@ The line above the messages shows why the inspected object cannot currently be e
 
 ## Disable or enable the object
 
-On the **Object** tab, click **Disable** or **Enable**. The scene patch file stores `"active": false` or `"active": true` in the same modification as the placement. Disabling a board makes the game release its culling and terrain mask. A disabled bridge stops colliding.
+On the **Object** tab, click **Disable** or **Enable**. The scene patch file stores `"active": false` or `"active": true` in the same modification as the placement. Disabling a location sign makes the game release its culling and terrain mask. A disabled bridge stops colliding.
 
-Generic activity requires patcher 0.2.0. Native board, bridge, and track-marker activity capabilities require 0.5.0. Save derives the dependency minimum from the scene patch file's content. See [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
+Generic activity requires patcher 0.2.0. Native location sign, bridge, and track-marker activity capabilities require 0.5.0. Save derives the dependency minimum from the scene patch file's content. See [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
-After a board edit, the **Terrain** section on the **Changes** tab shows the state of the terrain output the game regenerates at the old and new positions. Save does not write this generated output. See [move a board with its terrain effects](moving-boards.md) for completion, retry, and limits.
+After a location sign edit, the **Terrain** section on the **Changes** tab shows the state of the terrain output the game regenerates at the old and new positions. Save does not write this generated output. See [move a location sign with its terrain effects](moving-location-signs.md) for completion, retry, and limits.
 
 ## Undo and redo
 
@@ -149,7 +149,7 @@ Save refuses to write the dependency if an existing constraint in `Info.json`, s
 The message area distinguishes three outcomes and explains how to correct each problem:
 
 - `refused` means the patcher stopped before changing anything. The scene, scene patch file, and history are unchanged. Correct the value or selection named in the message and apply again. If the object changed or the inventory is stale, click **Refresh**, inspect the object again, and repeat the action.
-- `failed and was undone` means the change started but failed. The patcher restored the object and verified the restoration. The scene patch file is unchanged and no history step was added. Correct the cause and apply again. For a board, the message is `was undone; waiting for terrain`. The object is restored, but the game is still regenerating terrain at its restored placement. An edit before that finishes receives the same message. Once the terrain is updated, edit again or click **Retry** on the **Changes** tab. Recheck is not needed.
+- `failed and was undone` means the change started but failed. The patcher restored the object and verified the restoration. The scene patch file is unchanged and no history step was added. Correct the cause and apply again. For a location sign, the message is `was undone; waiting for terrain`. The object is restored, but the game is still regenerating terrain at its restored placement. An edit before that finishes receives the same message. Once the terrain is updated, edit again or click **Retry** on the **Changes** tab. Recheck is not needed.
 - `failed; cleanup is incomplete` means the patcher could not verify the object's restoration. The message lists what remains, for example `Position: now 80, 2, 3, before 4, 2, 3` or `Owned spans still registered: ...`, or identifies the uncertain state. The footer repeats this information while you inspect the object. Further edits to it are refused with `is blocked by incomplete cleanup`. Other objects remain editable and your earlier edits stay in place.
 
 Click **Guide** to open the guide for the failed operation. The button is unavailable when no failure is shown.

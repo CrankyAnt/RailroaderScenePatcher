@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
-// The road bridges of the base-game map join the Baked scenery group family under Bridge /
+// The road bridges of the base-game map join the Scene object and Child object families under Bridge /
 // Road bridges, each with its parts. A road bridge carries a renderer culler and its own scene ground mask on its root,
 // so a move takes the mask's registration along, with the terrain output at the old and the new place tracked to
 // completion. The roads themselves are native map data.
@@ -27,7 +27,7 @@ static class RoadBridgeTests {
     static Node Bridge(string name) => new Node(name, new Node("Deck").Solid(), new Node("Abutment N").Solid(), new Node("Abutment S").Solid()).With(RectangleMask, RendererCuller);
     internal static Node World() {
         var folders = new Dictionary<string, List<Node>>();
-        var setup = new Node("Grade Crossing Setup", new Node("Mast").Solid()).With(BakedSceneryRules.CrossingController).Family();
+        var setup = new Node("Grade Crossing Setup", new Node("Mast").Solid()).With(SceneObjectRules.CrossingController).Family();
         var island = new List<Node> { setup };
         foreach (var path in Roots) {
             var parts = path.Split('/');
@@ -38,7 +38,7 @@ static class RoadBridgeTests {
         var towns = new[] { "Almond", "Nantahala" }.Select(town => new Node(town, folders[town].ToArray())).ToArray();
         return new Node("World", new[] { new Node("Large Scenery", towns) }.Concat(folders.Where(f => f.Key.StartsWith("Roads ", StringComparison.Ordinal)).Select(f => new Node(f.Key, f.Value.ToArray()))).ToArray());
     }
-    static GroupRootVerdict At(IReadOnlyList<GroupRootVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
+    static SceneObjectVerdict At(IReadOnlyList<SceneObjectVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
 
     public static void Run() {
         InventoryListsEachRoadBridgeOnceWithItsParts();
@@ -59,17 +59,17 @@ static class RoadBridgeTests {
     // A road bridge stands where its road goes, and Follow follows track: a track-following placement of a road bridge
     // or of one of its parts is refused before any mutation, and the Follow placement mode is unavailable with the reason.
     static void RoadBridgesDoNotFollowTrack() {
-        Assert(BakedSceneryRules.FollowingRefusal(BridgeKind.Road) == "Road bridges use fixed placement. They don't support track-following placement."
-            && BakedSceneryRules.FollowingRefusal(BridgeKind.Rail) == BakedSceneryRules.RailBridgeNoFollowing && BakedSceneryRules.FollowingRefusal(BridgeKind.None) == null,
-            "Bridges of both kinds refuse track following, each with its reason; other groups do not: " + BakedSceneryRules.FollowingRefusal(BridgeKind.Road));
+        Assert(SceneObjectRules.FollowingRefusal(BridgeKind.Road) == "Road bridges use fixed placement. They don't support track-following placement."
+            && SceneObjectRules.FollowingRefusal(BridgeKind.Rail) == SceneObjectRules.RailBridgeNoFollowing && SceneObjectRules.FollowingRefusal(BridgeKind.None) == null,
+            "Bridges of both kinds refuse track following, each with its reason; other groups do not: " + SceneObjectRules.FollowingRefusal(BridgeKind.Road));
         var f = new Span(); var scene = f.Scene(); scene.Tracks = new FixedTrack();
         string Follow(string id, string path, string structure) =>
             "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}," +
             "\"placement\":{\"mode\":\"trackFollowing\",\"track\":{\"segment\":\"S1\",\"end\":\"a\",\"distance\":10},\"offset\":[0,0,0],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
-        var result = new PatchEngine(scene).Apply(Doc(Follow("follow-bridge", GovBridge, BakedSceneryGroups.Structure), Follow("follow-deck", GovBridge + "/Deck", BakedSceneryParts.Structure)));
+        var result = new PatchEngine(scene).Apply(Doc(Follow("follow-bridge", GovBridge, SceneObjects.Structure), Follow("follow-deck", GovBridge + "/Deck", ChildObjects.Structure)));
         Assert(result.Outcomes.Values.All(o => !o.Applied && o.Failure == FailureKind.Refused && o.Error.Contains("Road bridges use fixed placement")) && f.World.Mutations == 0 && f.RegisteredOnceAt(Authored, 90) && f.Terrain.Rebuilds == 0,
             "Track-following placement of a road bridge and of its part is refused before mutation: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Failure + " " + o.Error)));
-        var roadEdits = SupportedEdits.Of(EditEntries.Of(BakedSceneryRules.Family, BakedSceneryGroups.Structure, CommandBand.GroupOperations, BridgeKind.Road));
+        var roadEdits = SupportedEdits.Of(EditEntries.Of(SceneObjectRules.Family, SceneObjects.Structure, CommandBand.GroupOperations, BridgeKind.Road));
         Assert(SupportedEdits.ModeBlock(roadEdits, CommandBand.FollowMode, true) == "Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it."
             && SupportedEdits.ModeBlock(roadEdits, CommandBand.NumericMode, true) == null && SupportedEdits.ModeBlock(roadEdits, CommandBand.GizmoMode, true) == null,
             "Follow is unavailable for a road bridge with the reason; Numeric and Gizmo stay: " + SupportedEdits.ModeBlock(roadEdits, CommandBand.FollowMode, true));
@@ -80,21 +80,21 @@ static class RoadBridgeTests {
     // entry of its group. A bridge without a mask line, as one whose mask component is disabled, names no terrain.
     static void UseInGameReadsTheRoadBridgeSubgroup() {
         SceneObservation Entry(string path, string[] dependencies, string groupPath = null, string subcategory = null) =>
-            new SceneObservation(new object(), new TargetIdentity(SceneName, path, "UnityEngine.Transform"), BakedSceneryRules.Family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
-                new string[0], dependencies, new string[0], CommandBand.GroupOperations, groupPath: groupPath, category: groupPath == null ? BakedSceneryCategories.Bridge : null, subcategory: subcategory, bridge: subcategory == BakedSceneryCategories.RoadBridges ? BridgeKind.Road : BridgeKind.None);
+            new SceneObservation(new object(), new TargetIdentity(SceneName, path, "UnityEngine.Transform"), SceneObjectRules.Family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+                new string[0], dependencies, new string[0], CommandBand.GroupOperations, groupPath: groupPath, category: groupPath == null ? SceneObjectCategories.Bridge : null, subcategory: subcategory, bridge: subcategory == SceneObjectCategories.RoadBridges ? BridgeKind.Road : BridgeKind.None);
         var line = CommandBand.GroundMaskDependency(true, new[] { "Concrete Road Bridge - 60m" }, false, group: true);
-        var bridge = Entry(GovBridge, new[] { "Culling", line }, subcategory: BakedSceneryCategories.RoadBridges);
+        var bridge = Entry(GovBridge, new[] { "Culling", line }, subcategory: SceneObjectCategories.RoadBridges);
         Assert(CommandBand.UseInGame(bridge, null) == "The bridge is decorative. Its road is native map data that the Map Editor edits. The bridge's ground mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
             "The road bridge's entry: " + CommandBand.UseInGame(bridge, null));
         Assert(CommandBand.UseInGame(Entry(GovBridge + "/Deck", new[] { "Culling" }, GovBridge), bridge) == CommandBand.PartDecorative, "A part of a road bridge keeps the part's text");
         // The text follows what the group is for its edits, not where the outliner files it.
-        var filedOnly = new SceneObservation(new object(), new TargetIdentity(SceneName, GovBridge, "UnityEngine.Transform"), BakedSceneryRules.Family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
-            new string[0], new[] { "Culling", line }, new string[0], CommandBand.GroupOperations, category: BakedSceneryCategories.Bridge, subcategory: BakedSceneryCategories.RoadBridges);
+        var filedOnly = new SceneObservation(new object(), new TargetIdentity(SceneName, GovBridge, "UnityEngine.Transform"), SceneObjectRules.Family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+            new string[0], new[] { "Culling", line }, new string[0], CommandBand.GroupOperations, category: SceneObjectCategories.Bridge, subcategory: SceneObjectCategories.RoadBridges);
         Assert(!CommandBand.UseInGame(filedOnly, null).Contains("Its road is native map data"), "A group the outliner files under Road bridges that is no road bridge for its edits has no road bridge text: " + CommandBand.UseInGame(filedOnly, null));
-        var unmasked = Entry(Whittier, new[] { "Culling" }, subcategory: BakedSceneryCategories.RoadBridges);
+        var unmasked = Entry(Whittier, new[] { "Culling" }, subcategory: SceneObjectCategories.RoadBridges);
         Assert(CommandBand.UseInGame(unmasked, null) == "The bridge is decorative. Its road is native map data that the Map Editor edits. Moving or disabling this group changes no game function." && !CommandBand.HoldsGroundMask(unmasked.Dependencies),
             "A road bridge whose mask is disabled names no terrain and has no terrain output: " + CommandBand.UseInGame(unmasked, null));
-        var rail = Entry("World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge", new[] { "Culling" }, subcategory: BakedSceneryCategories.RailBridges);
+        var rail = Entry("World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge", new[] { "Culling" }, subcategory: SceneObjectCategories.RailBridges);
         Assert(CommandBand.UseInGame(rail, null) == CommandBand.Decorative, "A rail bridge without a controller keeps its text");
     }
 
@@ -147,17 +147,17 @@ static class RoadBridgeTests {
     // 60-metre bridge inside US19 Gov Island is one of them, beside that folder's grade-crossing setup, which keeps
     // its own family.
     static void InventoryListsEachRoadBridgeOnceWithItsParts() {
-        var verdicts = BakedSceneryRules.Classify(World());
-        var parts = BakedSceneryRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
+        var verdicts = SceneObjectRules.Classify(World());
+        var parts = SceneObjectRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
         foreach (var path in Roots) {
             var found = verdicts.Where(v => v.Path == path).ToArray();
-            Assert(found.Length == 1 && found[0].Disposition == GroupDisposition.Group && found[0].Category == BakedSceneryCategories.Bridge && found[0].Subcategory == BakedSceneryCategories.RoadBridges && found[0].Ticket == null,
+            Assert(found.Length == 1 && found[0].Disposition == GroupDisposition.Group && found[0].Category == SceneObjectCategories.Bridge && found[0].Subcategory == SceneObjectCategories.RoadBridges && found[0].Ticket == null,
                 path + " is listed once as a group under Bridge / Road bridges: " + String.Join(", ", found.Select(v => v.Disposition + " " + v.Category + "/" + v.Subcategory + " " + v.Reason)));
             Assert(parts.Where(p => p.GroupPath == path).Select(p => p.Path.Substring(path.Length + 1)).SequenceEqual(new[] { "Deck", "Abutment N", "Abutment S" }), path + " lists its parts");
         }
         Assert(At(verdicts, GovIsland) == null && At(verdicts, GovIsland + "/Grade Crossing Setup")?.Disposition == GroupDisposition.ExistingFamily, "US19 Gov Island stays a folder, and its grade-crossing setup keeps its family");
         Assert(!parts.Any(p => p.GroupPath == GovBridge && p.Path.Contains("Grade Crossing Setup")), "The grade-crossing setup is no part of the road bridge beside it");
-        Assert(BakedSceneryRules.PartName(GovBridge, GovBridge + "/Deck") == "Concrete Road Bridge - 60m / Deck", "A part is named with its bridge");
+        Assert(SceneObjectRules.PartName(GovBridge, GovBridge + "/Deck") == "Concrete Road Bridge - 60m / Deck", "A part is named with its bridge");
     }
 
     // The 60-metre bridge inside US19 Gov Island and, as the unedited control, the 20-metre bridge beside its folder, as
@@ -188,9 +188,9 @@ static class RoadBridgeTests {
         public Span(string path = GovBridge, bool flattens = false, bool maskEnabled = true) {
             Terrain = new FakeMaskWorld(World); Masks = new GroundMasks(Terrain);
             Deck = Group.Parts[0]; Culler = Group.Cullers[0];
-            var verdicts = BakedSceneryRules.Classify(RoadBridgeTests.World());
+            var verdicts = SceneObjectRules.Classify(RoadBridgeTests.World());
             World.GroupVerdicts = verdicts.ToDictionary(v => v.Path, v => v);
-            World.Verdicts = BakedSceneryRules.Parts(verdicts).GroupBy(v => v.Path).ToDictionary(g => g.Key, g => g.First());
+            World.Verdicts = SceneObjectRules.Parts(verdicts).GroupBy(v => v.Path).ToDictionary(g => g.Key, g => g.First());
             World.Objects[path] = new List<object> { Group }; World.Objects[Control] = new List<object> { Other };
             World.PartsAt[path + "/Deck"] = new List<object> { Deck };
             World.SetActive(Group, true); World.SetActive(Other, true); World.Mutations = 0;
@@ -201,7 +201,7 @@ static class RoadBridgeTests {
         }
         public SceneCapabilities Scene() {
             var holds = new PartHolds(); var scene = new SceneCapabilities(() => World.Maps, null);
-            scene.Add(new BakedSceneryGroups(World, holds: holds, masks: Masks)); scene.Add(new BakedSceneryParts(World, holds, masks: Masks));
+            scene.Add(new SceneObjects(World, holds: holds, masks: Masks)); scene.Add(new ChildObjects(World, holds, masks: Masks));
             return scene;
         }
         public double[] At(object handle) => (handle is FakeGroup group ? World.Observe(group).Root.Placement : World.ObservePart(handle).Part.Placement).Position.ToArray();
@@ -223,11 +223,11 @@ static class RoadBridgeTests {
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
         (position == null ? "" : ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + N(position) + "],\"rotation\":[" + String.Join(",", Turn.Yaw(yaw).Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "]}") +
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
-    static string GroupMod(string id, double[] position = null, bool? active = null, double yaw = 0, string path = GovBridge) => Mod(id, path, BakedSceneryGroups.Structure, position, active, yaw);
-    static string PartMod(string id, string path, double[] position = null, bool? active = null) => Mod(id, path, BakedSceneryParts.Structure, position, active);
+    static string GroupMod(string id, double[] position = null, bool? active = null, double yaw = 0, string path = GovBridge) => Mod(id, path, SceneObjects.Structure, position, active, yaw);
+    static string PartMod(string id, string path, double[] position = null, bool? active = null) => Mod(id, path, ChildObjects.Structure, position, active);
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
-    static readonly TargetIdentity BridgeId = new TargetIdentity(SceneName, GovBridge, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
-    static readonly TargetIdentity DeckId = new TargetIdentity(SceneName, GovBridge + "/Deck", BakedSceneryParts.ComponentType, BakedSceneryParts.Structure);
+    static readonly TargetIdentity BridgeId = new TargetIdentity(SceneName, GovBridge, SceneObjects.ComponentType, SceneObjects.Structure);
+    static readonly TargetIdentity DeckId = new TargetIdentity(SceneName, GovBridge + "/Deck", ChildObjects.ComponentType, ChildObjects.Structure);
 
     // The US19 Gov Island bridge moves and turns as one: its parts, its culling sphere and its colliders follow, and the
     // mask on its root holds one registration at the new centre with the shape turned with the bridge. The terrain at
@@ -290,7 +290,7 @@ static class RoadBridgeTests {
             "The move carries the flattening mask and tracks both places: " + outcome.Error + " " + f.Where());
         var s = new Span(OldHomeTown, flattens: true); var store = new Store(); var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(s.Engine, mapEditor, store); mapEditor.Session = session;
-        var id = new TargetIdentity(SceneName, OldHomeTown, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
+        var id = new TargetIdentity(SceneName, OldHomeTown, SceneObjects.ComponentType, SceneObjects.Structure);
         Assert(session.Edit(id, new Placement(Far, Upright), null).Applied && s.RegisteredOnceAt(Far, 90) && mapEditor.IsDirty && mapEditor.CanUndo, "In scene patch editing the move applies: " + s.Where());
         mapEditor.Undo(); Assert(s.RegisteredOnceAt(Authored, 90) && !mapEditor.IsDirty, "Undo returns the bridge and its mask: " + s.Where());
         Assert(session.Edit(id, null, false).Applied && !s.Group.Active && s.Mask.Keys.Count == 0, "A disable of the flattening bridge applies and releases its mask");
@@ -410,7 +410,7 @@ static class RoadBridgeTests {
         f.Terrain.BuildTiles(); f.Masks.Poll();
         mapEditor.Undo(); Assert(Close(f.At(f.Group), Far) && f.RegisteredOnceAt(Far, 130) && Close(f.At(f.Deck), held), "Undo of the removal moves the bridge and its mask again: " + f.Where());
         Persistence(true, all, "After Undo of the removal");
-        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=" + BakedSceneryGroups.RequiredVersion) && (int)JObject.Parse(store.Patch)["formatVersion"] == 1, "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=" + SceneObjects.RequiredVersion) && (int)JObject.Parse(store.Patch)["formatVersion"] == 1, "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
         Persistence(false, new string[0], "After Save");
         var fresh = new Span();
         var reload = fresh.Engine.Apply(store.Patch);
@@ -420,6 +420,6 @@ static class RoadBridgeTests {
         Assert(fresh.ControlUnchanged(), "The control is unchanged after the reload: " + fresh.Where());
         var strict = new Store { Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.9.0\"]}}" };
         var other = new Span(); var strictEditor = new NativeMapEditor(); var kept = new PatchEditingSession(other.Engine, strictEditor, strict); strictEditor.Session = kept;
-        Assert(kept.Edit(BridgeId, new Placement(Far, Upright), null).Applied && strictEditor.Save() == null && strict.Info.Contains(">=0.9.0") && !strict.Info.Contains(">=" + BakedSceneryGroups.RequiredVersion), "A stricter existing constraint is retained: " + strict.Info);
+        Assert(kept.Edit(BridgeId, new Placement(Far, Upright), null).Applied && strictEditor.Save() == null && strict.Info.Contains(">=0.9.0") && !strict.Info.Contains(">=" + SceneObjects.RequiredVersion), "A stricter existing constraint is retained: " + strict.Info);
     }
 }

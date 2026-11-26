@@ -86,7 +86,7 @@ namespace RailroaderScenePatcher {
         }
         // The game's components that switch renderers off by camera distance and hold the renderers they switch: a
         // renderer culler (_cullRenderers) and the builder of a curve mesh such as a crossing pad (_renderers).
-        static readonly Type rendererCuller = Native.Type(BakedSceneryRules.RendererCuller), curveBuilder = Native.Type("BezierCurveMesh.CurveMeshBuilderBase");
+        static readonly Type rendererCuller = Native.Type(SceneObjectRules.RendererCuller), curveBuilder = Native.Type("BezierCurveMesh.CurveMeshBuilderBase");
         static readonly System.Reflection.FieldInfo cullRenderers = rendererCuller?.GetField("_cullRenderers", Native.Flags), curveRenderers = curveBuilder?.GetField("_renderers", Native.Flags);
         static bool HeldByCuller(Renderer renderer) {
             for (var t = renderer.transform; t != null; t = t.parent)
@@ -119,7 +119,7 @@ namespace RailroaderScenePatcher {
         // The storage piles and log ponds at and below an object that outline it: listed with its renderers, and passed
         // over while the scene or a modder switched them off, as a renderer is. Both lay out their logs through the
         // game's instancer and have no renderer of their own.
-        static readonly Type pileType = Native.Type(BakedSceneryRules.StoragePile), pondType = Native.Type(BakedSceneryRules.LogPond);
+        static readonly Type pileType = Native.Type(SceneObjectRules.StoragePile), pondType = Native.Type(SceneObjectRules.LogPond);
         static readonly System.Reflection.FieldInfo pileWidth = pileType?.GetField("width", Native.Flags), pileHeight = pileType?.GetField("maxHeight", Native.Flags),
             pileProfile = (pileType ?? pondType)?.BaseType?.GetField("profile", Native.Flags), pondWidth = pondType?.GetField("width", Native.Flags), pondLength = pondType?.GetField("length", Native.Flags);
         readonly Dictionary<GameObject, KeyValuePair<int, Component[]>> piles = new Dictionary<GameObject, KeyValuePair<int, Component[]>>();
@@ -153,14 +153,14 @@ namespace RailroaderScenePatcher {
                 return corners;
             } catch { return null; }
         }
-        // The eight corners of the box a log pond lays its logs out in (BakedSceneryRules.LogPondBox): its width across,
+        // The eight corners of the box a log pond lays its logs out in (SceneObjectRules.LogPondBox): its width across,
         // its length plus width along, and one log's radius up and down from the water line. Null when the log pond has
         // no profile or its settings cannot be read.
         static WorldPoint[] PondBox(Component pond) {
             try {
                 var profile = pileProfile?.GetValue(pond);
                 if (profile == null || pondWidth == null || pondLength == null) return null;
-                var box = BakedSceneryRules.LogPondBox((float)pondWidth.GetValue(pond), (float)pondLength.GetValue(pond), Convert.ToSingle(Native.Read(profile, "EffectiveRadius")));
+                var box = SceneObjectRules.LogPondBox((float)pondWidth.GetValue(pond), (float)pondLength.GetValue(pond), Convert.ToSingle(Native.Read(profile, "EffectiveRadius")));
                 var centre = new Vector3((float)box.Item1[0], (float)box.Item1[1], (float)box.Item1[2]); var half = new Vector3((float)box.Item2[0], (float)box.Item2[1], (float)box.Item2[2]);
                 var matrix = pond.transform.localToWorldMatrix; var corners = new WorldPoint[8];
                 for (var i = 0; i < 8; i++) corners[i] = Point(matrix.MultiplyPoint3x4(centre + Vector3.Scale(half, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1))));
@@ -365,7 +365,7 @@ namespace RailroaderScenePatcher {
         // Where the last click fell: the list of the candidates of one spot opens beside it.
         Vector2 lastPick;
         // The candidates a click at the pointer selects (WorldPick.Resolve): the rule of the click and of the hover.
-        // A game-defined group that shows as one takes part with its square marker and frame as one object, and
+        // A complex that shows as one takes part with its square marker and frame as one object, and
         // stands for its objects. A candidate that is not in view has no marker and no frame to meet the pointer.
         WorldPickResult Resolve(SpatialCandidate[] candidates, Shape[] shapes, GroupLayout groups, Camera camera, Vector3 origin, Vector2 pointer) {
             PickTarget Target(Shape shape, bool marked) => shape == null ? new PickTarget(0, 0, false, false)
@@ -376,12 +376,12 @@ namespace RailroaderScenePatcher {
             return WorldPick.Resolve(pointer.x, pointer.y, targets, groups.Shown.Select(group => new PickGroup(Target(group.Shape, true), group.Members, group.Own, group.Unlisted, group.Kind)).ToArray());
         }
 
-        // A game-defined group that shows as one square marker: its objects among the candidates, as indices, those
+        // A complex that shows as one square marker: its objects among the candidates, as indices, those
         // of them that show on their own, those its choice list leaves out (its detection spans), what the group
         // shows and its one marking, or null when it is not in view.
-        sealed class ShownGroup { internal int[] Members; internal int[] Own; internal int[] Unlisted; internal GroupShows Shows; internal Shape Shape; internal GameDefinedGroupKind Kind; }
+        sealed class ShownGroup { internal int[] Members; internal int[] Own; internal int[] Unlisted; internal GroupShows Shows; internal Shape Shape; internal ComplexKind Kind; }
         // The groups that show as one from this camera, for each candidate whether its group stands for it, the
-        // candidates that show their own frame at their group's frame distance (GameDefinedGroups.OwnFrameDistance).
+        // candidates that show their own frame at their group's frame distance (Complexes.OwnFrameDistance).
         // The inspected object has its frame at any distance.
         sealed class GroupLayout {
             internal ShownGroup[] Shown = new ShownGroup[0]; internal bool[] Hidden; internal readonly List<int> OwnAtGroupDistance = new List<int>();
@@ -395,16 +395,16 @@ namespace RailroaderScenePatcher {
         // The component facts of a group, read from the family the inventory gave an object: a crossing controller
         // anchors a grade-crossing setup, a track marker that is no crossing pad is, below that controller's root, a
         // whistle sign, and a track span there is a detection span that the controller manages.
-        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span", ConstructionFamily = "Bridge construction scenery", PadFamily = "Crossing pad marker";
+        const string ControllerFamily = "Grade crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span", ConstructionFamily = "Bridge construction scenery", PadFamily = "Crossing pad marker";
         // The inventory snapshot, set by the owner: a group holds inventory objects, whatever a choice offers, so
         // Select in world and a choice for a scene patch file show one crossing the same way.
         internal Func<IReadOnlyList<SceneObservation>> Inventory;
         // One group of the inventory: its objects that have a usable position, for each of them whether the group's
-        // choice list offers it and its frame surrounds it (GameDefinedGroup.Listed), and the scene object of the
+        // choice list offers it and its frame surrounds it (Complex.Listed), and the scene object of the
         // game component that anchors it, whose orientation the group's one box takes.
-        // Stands is the index among Objects of the root of a baked scenery group with parts, which stands for the
-        // group (GameDefinedGroup.Root), or -1.
-        sealed class InventoryGroup { internal SpatialCandidate[] Objects; internal bool[] Listed; internal GameObject Root; internal int Stands = -1; internal GameDefinedGroupKind Kind; }
+        // Stands is the index among Objects of a top scene object with parts, which stands for the
+        // group (Complex.Root), or -1.
+        sealed class InventoryGroup { internal SpatialCandidate[] Objects; internal bool[] Listed; internal GameObject Root; internal int Stands = -1; internal ComplexKind Kind; }
         // The groups are decided once per inventory snapshot, and again when the snapshot is another one or has
         // another number of entries, and after the scene may have changed (ClearSurface, on every move of the
         // native map editor's history). Without a snapshot they are decided from the candidates of the choice.
@@ -427,10 +427,10 @@ namespace RailroaderScenePatcher {
             groupedFrom = from; groupedCount = count; mappedFor = null; inventoryGroups = new InventoryGroup[0];
             try {
                 var all = listed ? snapshot.ToArray() : candidates.Where(c => c.Observation != null).Select(c => c.Observation).ToArray();
-                // A root of the Baked scenery group family anchors a baked scenery group with the inventory objects
+                // A root of the Scene object and Child object families anchors a scene object with child objects with the inventory objects
                 // below it: its parts, and the objects of other families there.
-                bool BakedRoot(SceneObservation o) => o.Family == BakedSceneryRules.Family && o.GroupPath == null && o.Handle is GameObject go && go != null && GroupWorld.IsGroupRoot(go);
-                var roots = all.Select(BakedRoot).ToArray();
+                bool TopSceneObject(SceneObservation o) => SceneObjectRules.InFamilies(o.Family) && o.GroupPath == null && o.Handle is GameObject go && go != null && GroupWorld.IsTopObject(go);
+                var roots = all.Select(TopSceneObject).ToArray();
                 // What a game component names: the piles an industry's storage fills, and the scene objects whose
                 // visibility a construction controller sets. A fact that cannot be read forms no group.
                 var storage = new Dictionary<GameObject, GameObject>();
@@ -441,7 +441,7 @@ namespace RailroaderScenePatcher {
                 }
                 // A crossing without a controller: its crossbucks and pads stand in one scene object. Where crossings
                 // share that object, each crossbuck names its crossing's pad by marker ID, and so does the pad itself.
-                bool Crossbuck(SceneObservation o) => o.Family == BakedSceneryRules.Family && o.GroupPath == null && o.Category == BakedSceneryCategories.GradeCrossing;
+                bool Crossbuck(SceneObservation o) => SceneObjectRules.InFamilies(o.Family) && o.GroupPath == null && o.Category == SceneObjectCategories.GradeCrossing;
                 var sharedPads = new HashSet<Tuple<GameObject, string>>(all.Where(o => Crossbuck(o) && o.Identity.PadMarkerId != null && o.Handle is GameObject go && go != null && go.transform.parent != null)
                     .Select(o => Tuple.Create(((GameObject)o.Handle).transform.parent.gameObject, o.Identity.PadMarkerId)));
                 object CrossingOf(SceneObservation o, GameObject go) {
@@ -454,7 +454,7 @@ namespace RailroaderScenePatcher {
                 }
                 if (all.Any(o => o.Family == ControllerFamily || o.Family == ConstructionFamily || Crossbuck(o)) || roots.Any(r => r) || storage.Count != 0) {
                     var found = new List<InventoryGroup>();
-                    foreach (var group in GameDefinedGroups.Of(all.Select((o, i) => {
+                    foreach (var group in Complexes.Of(all.Select((o, i) => {
                             if (!(o.Handle is GameObject go) || go == null) return null;
                             var targets = Targets(o, go);
                             return new GroupObject(go, Above(go), o.Family == ControllerFamily, o.Family == MarkerFamily, o.Family == SpanFamily, roots[i], o.GroupPath != null,
@@ -470,11 +470,11 @@ namespace RailroaderScenePatcher {
                     }
                     inventoryGroups = found.ToArray();
                 }
-            } catch (Exception e) { PatcherLog.Warning("The patcher couldn't read game-defined groups for scene object selection. Report this to the patcher maintainer.", e); }
+            } catch (Exception e) { PatcherLog.Warning("The patcher couldn't read groups for scene object selection. Report this to the patcher maintainer.", e); }
             return inventoryGroups;
         }
         // A group that world marking skips shows its objects on its own; one developer diagnostic line says so, once
-        // per group root and reason.
+        // per top scene object and reason.
         static readonly GroupSkips skips = new GroupSkips(PatcherLog.Debug);
         static string RootPath(GameObject root) => root == null ? null : root.scene.name + "/" + BoardScene.PathOf(root.transform);
         internal static void Skipped(GameObject root, string reason) => skips.Skip(RootPath(root), reason);
@@ -538,14 +538,14 @@ namespace RailroaderScenePatcher {
                 // parts show, and the root shows only as the candidate of a choice or as the inspected object.
                 var stands = groups[g].Stands < 0 ? -1 : indices[groups[g].Stands];
                 // A choice that offers the root and none of its parts shows the root as any object.
-                if (!GameDefinedGroups.RootStands(stands, members)) stands = -1;
+                if (!Complexes.RootStands(stands, members)) stands = -1;
                 if (marking.Shows == GroupShows.Objects) {
-                    if (stands >= 0 && !GameDefinedGroups.ShowsOwn(marking.Shows, Same(candidates[stands], chosen), Inspected(candidates[stands]), true)) layout.Hidden[stands] = layout.Absent[stands] = true;
+                    if (stands >= 0 && !Complexes.ShowsOwn(marking.Shows, Same(candidates[stands], chosen), Inspected(candidates[stands]), true)) layout.Hidden[stands] = layout.Absent[stands] = true;
                     continue;
                 }
                 var own = members.Where(m => Same(candidates[m], chosen) || Inspected(candidates[m])).ToArray();
-                foreach (var m in members) layout.Hidden[m] = !GameDefinedGroups.ShowsOwn(marking.Shows, Same(candidates[m], chosen), Inspected(candidates[m]), m == stands);
-                var ownDistance = GameDefinedGroups.OwnFrameDistance(marking.Shows);
+                foreach (var m in members) layout.Hidden[m] = !Complexes.ShowsOwn(marking.Shows, Same(candidates[m], chosen), Inspected(candidates[m]), m == stands);
+                var ownDistance = Complexes.OwnFrameDistance(marking.Shows);
                 if (ownDistance > ObjectMarkingGeometry.FrameDistance) layout.OwnAtGroupDistance.AddRange(own);
                 var unlisted = indices.Where((i, k) => i >= 0 && !listed[k]).ToArray();
                 shown.Add(new ShownGroup { Members = members, Own = own, Unlisted = unlisted, Shows = marking.Shows, Shape = GroupShape(marking, camera), Kind = groups[g].Kind });

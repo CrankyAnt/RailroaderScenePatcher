@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
-// Lake surfaces: the Whittier Log Pond and Fontana Lake (1) and (2) join the Baked scenery group family with their
+// Lake surfaces: the Whittier Log Pond and Fontana Lake (1) and (2) join the Scene object and Child object families with their
 // parts, the log pond keeps showing the sawmill's storage, and each lake's culling follows it. Controlled hierarchies
 // follow the Railroader 0.6.3 scene: the log pond's root holds its water mesh (a LakePolygon with a mesh renderer) and
 // its logs (a Scenery.LogPond without a renderer of its own); a Fontana lake is one water mesh with a renderer culler.
@@ -24,7 +24,7 @@ static class LakeSurfaceTests {
         new Node("Rivers",
             new Node("Fontana Lake (1)").With(Lake, Renderer, Culler).Solid(),
             new Node("Fontana Lake (2)").With(Lake, Renderer, Culler).Solid()));
-    static GroupRootVerdict At(IReadOnlyList<GroupRootVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
+    static SceneObjectVerdict At(IReadOnlyList<SceneObjectVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
 
     public static void Run() {
         InventoryListsLakeSurfacesWithTheirParts();
@@ -42,28 +42,28 @@ static class LakeSurfaceTests {
     // category table names it, and the Fontana lakes under Other, which takes a listed group the table does not name.
     // The log pond's water mesh and its logs are its parts.
     static void InventoryListsLakeSurfacesWithTheirParts() {
-        var verdicts = BakedSceneryRules.Classify(World());
+        var verdicts = SceneObjectRules.Classify(World());
         foreach (var path in new[] { LogPond, Fontana1, Fontana2 }) {
             var group = verdicts.Where(v => v.Path == path).ToArray();
             Assert(group.Length == 1 && group[0].Disposition == GroupDisposition.Group, path + " is listed once as a group: " + String.Join(", ", group.Select(g => g.Disposition + " " + g.Reason)));
         }
-        Assert(At(verdicts, LogPond).Category == BakedSceneryCategories.StorageDisplay, "The log pond stands under Storage display: " + At(verdicts, LogPond).Category);
-        Assert(At(verdicts, Fontana1).Category == BakedSceneryCategories.Water && At(verdicts, Fontana2).Category == BakedSceneryCategories.Water, "The Fontana lakes stand under Water");
-        var parts = BakedSceneryRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
+        Assert(At(verdicts, LogPond).Category == SceneObjectCategories.StorageDisplay, "The log pond stands under Storage display: " + At(verdicts, LogPond).Category);
+        Assert(At(verdicts, Fontana1).Category == SceneObjectCategories.Water && At(verdicts, Fontana2).Category == SceneObjectCategories.Water, "The Fontana lakes stand under Water");
+        var parts = SceneObjectRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
         Assert(parts.Count(p => p.Path == Water) == 1 && parts.Count(p => p.Path == Logs) == 1, "The water mesh and the logs are each one part of the log pond: " + String.Join(", ", parts.Select(p => p.Path)));
         Assert(parts.Where(p => p.Path.StartsWith(LogPond + "/", StringComparison.Ordinal)).All(p => p.GroupPath == LogPond), "The log pond's parts belong to its group");
         Assert(!parts.Any(p => p.GroupPath == Fontana1 || p.GroupPath == Fontana2), "A Fontana lake is one object without parts");
-        Assert(BakedSceneryRules.PartName(LogPond, Logs) == "Whittier Log Pond / LogPond", "The logs are named with their group");
+        Assert(SceneObjectRules.PartName(LogPond, Logs) == "Whittier Log Pond / LogPond", "The logs are named with their group");
         // The logs have no renderer or collider in the scene: they count as physical presence, as a storage pile does,
         // so a log pond root that holds only its logs is still a listed group.
-        var bare = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Log Pond", new Node("LogPond").With("Scenery.LogPond")))))), LogPond);
+        var bare = At(SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Log Pond", new Node("LogPond").With("Scenery.LogPond")))))), LogPond);
         Assert(bare?.Disposition == GroupDisposition.Group, "The logs alone give the log pond physical presence: " + bare?.Disposition + " " + bare?.Reason);
     }
 
     // No exclusion keeps a group that holds a lake surface or a log pond out of the family any more.
     static void NoExclusionNamesALakeSurface() {
-        Assert(!BakedSceneryRules.Exclusions.Any(e => e.Component == Lake || e.Component == "Scenery.LogPond" || e.Ticket == "#93"), "No exclusion names a lake surface or a log pond");
-        var verdicts = BakedSceneryRules.Classify(World());
+        Assert(!SceneObjectRules.Exclusions.Any(e => e.Component == Lake || e.Component == "Scenery.LogPond" || e.Ticket == "#93"), "No exclusion names a lake surface or a log pond");
+        var verdicts = SceneObjectRules.Classify(World());
         Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.InspectionOnly), "No lake is inspection only: " + String.Join(", ", verdicts.Where(v => v.Disposition == GroupDisposition.InspectionOnly).Select(v => v.Path)));
     }
 
@@ -82,22 +82,22 @@ static class LakeSurfaceTests {
         Assert(holder.SequenceEqual(new[] { "Log ponds below=1" }), "A group or part above a log pond carries only the count below it: " + String.Join(" | ", holder));
         Assert(CommandBand.LogPondBindings(false, 0, null).Count == 0, "An object without a log pond carries no log pond binding");
 
-        var logs = CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, storage, own);
+        var logs = CommandBand.UseInGame(true, SceneObjectCategories.StorageDisplay, storage, own);
         Assert(logs == "This log pond shows the logs storage of Whittier Saw Mill. Moving or disabling the log pond doesn't change the storage. The industry keeps working on its native track spans.",
             "The log pond names the storage and says moving it does not change it: " + logs);
-        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, CommandBand.LogPondBindings(true, 0, null)).StartsWith("This log pond shows the industry's storage.", StringComparison.Ordinal),
+        Assert(CommandBand.UseInGame(true, SceneObjectCategories.StorageDisplay, null, CommandBand.LogPondBindings(true, 0, null)).StartsWith("This log pond shows the industry's storage.", StringComparison.Ordinal),
             "A log pond no synchronizer names still speaks of the log pond");
-        var group = CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, storage, holder);
+        var group = CommandBand.UseInGame(false, SceneObjectCategories.StorageDisplay, storage, holder);
         Assert(group == "Decorative. Its log pond shows the logs storage of Whittier Saw Mill. Moving or disabling this group doesn't change the storage. The industry keeps working on its native track spans.",
             "The log pond group names the storage and says moving or disabling the group does not change it: " + group);
-        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, holder) == "Decorative. Its log pond shows the industry's storage. Moving or disabling this part doesn't change the storage. The industry keeps working on its native track spans.",
+        Assert(CommandBand.UseInGame(true, SceneObjectCategories.StorageDisplay, null, holder) == "Decorative. Its log pond shows the industry's storage. Moving or disabling this part doesn't change the storage. The industry keeps working on its native track spans.",
             "A part above a log pond speaks of itself");
-        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, new string[0]) == "Decorative. The industry loads and unloads on its native track spans, so moving or disabling this part doesn't affect loading or unloading.",
+        Assert(CommandBand.UseInGame(true, SceneObjectCategories.StorageDisplay, null, new string[0]) == "Decorative. The industry loads and unloads on its native track spans, so moving or disabling this part doesn't affect loading or unloading.",
             "The water mesh is a decorative part of the storage display");
-        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.Water, null, new string[0]) == CommandBand.Decorative, "A Fontana lake is decorative");
+        Assert(CommandBand.UseInGame(false, SceneObjectCategories.Water, null, new string[0]) == CommandBand.Decorative, "A Fontana lake is decorative");
         // Piles keep the texts of #98, chosen from the same bindings.
-        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, null, new[] { CommandBand.PilesBinding(2) }) == CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, null, true)
-            && CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, "pulpwood storage of Sylva Paperboard", new[] { CommandBand.StorageBinding("a.b", "pulpwood") }) == CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, "pulpwood storage of Sylva Paperboard", false),
+        Assert(CommandBand.UseInGame(false, SceneObjectCategories.StorageDisplay, null, new[] { CommandBand.PilesBinding(2) }) == CommandBand.UseInGame(false, SceneObjectCategories.StorageDisplay, null, true)
+            && CommandBand.UseInGame(true, SceneObjectCategories.StorageDisplay, "pulpwood storage of Sylva Paperboard", new[] { CommandBand.StorageBinding("a.b", "pulpwood") }) == CommandBand.UseInGame(true, SceneObjectCategories.StorageDisplay, "pulpwood storage of Sylva Paperboard", false),
             "Piles keep their texts");
         // A lake surface's dependency names what moves with it and what stays native, and whether its water is part of
         // a static batch, which the game run reads from the inspection.
@@ -111,7 +111,7 @@ static class LakeSurfaceTests {
     // moves, and every transform check would pass. A move is refused before any mutation with the reason; an activity
     // edit still applies.
     static void StaticBatchRefusesAMove() {
-        var reason = BakedSceneryRules.StaticBatchRefusal("Fontana Lake (1)");
+        var reason = SceneObjectRules.StaticBatchRefusal("Fontana Lake (1)");
         Assert(reason == "The water surface Fontana Lake (1) is part of a static batch. The game would keep drawing it at its old position, so this lake surface can't be moved.",
             "The refusal names the water surface and why: " + reason);
         var f = new Lakes(); f.World.PlacementRefused[f.Fontana] = reason;
@@ -120,8 +120,8 @@ static class LakeSurfaceTests {
             "A batched lake move is refused before mutation: " + outcome.Failure + " " + outcome.Error);
         var hide = f.Engine.Apply(Doc(GroupMod("hide-fontana", Fontana1, active: false))).Outcomes["hide-fontana"];
         Assert(hide.Applied && !f.Fontana.Active, "Disabling a batched lake still applies: " + hide.Error);
-        var part = new Lakes(); part.World.PlacementRefused[part.WaterMesh] = BakedSceneryRules.StaticBatchRefusal("Whittier Saw Mill Log Pond");
-        outcome = part.Engine.Apply(Doc(Mod("move-water", Water, BakedSceneryParts.Structure, LogsTarget))).Outcomes["move-water"];
+        var part = new Lakes(); part.World.PlacementRefused[part.WaterMesh] = SceneObjectRules.StaticBatchRefusal("Whittier Saw Mill Log Pond");
+        outcome = part.Engine.Apply(Doc(Mod("move-water", Water, ChildObjects.Structure, LogsTarget))).Outcomes["move-water"];
         Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && part.World.Mutations == 0, "A batched water part move is refused before mutation: " + outcome.Error);
         var session = new Lakes(); session.World.PlacementRefused[session.Fontana] = reason;
         var store = new Store(); var mapEditor = new NativeMapEditor(); var editing = new PatchEditingSession(session.Engine, mapEditor, store); mapEditor.Session = editing;
@@ -129,11 +129,11 @@ static class LakeSurfaceTests {
         Assert(!edit.Applied && session.World.Mutations == 0 && !mapEditor.IsDirty, "In scene patch editing the move is refused and nothing is outstanding: " + edit.Error);
         // A gizmo drag sets the placement itself; the gesture is refused when it starts, before any preview moves the
         // object. The inspectable group of the part tests stands in for a batched lake surface.
-        var g = new BakedPartTests.Fixture(); g.World.PlacementRefused[g.Group] = reason;
+        var g = new ChildObjectTests.Fixture(); g.World.PlacementRefused[g.Group] = reason;
         var gStore = new Store(); var gEditor = new NativeMapEditor(); var gSession = new PatchEditingSession(g.Engine, gEditor, gStore); gEditor.Session = gSession;
         var inventory = new SceneInventory(g.Scene); inventory.Refresh();
         string refused = null;
-        try { new PlacementGesture(g.Engine, gSession, new TargetIdentity(SceneName, "World/Large Scenery/Whittier/Whittier Saw Mill", BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure),
+        try { new PlacementGesture(g.Engine, gSession, new TargetIdentity(SceneName, "World/Large Scenery/Whittier/Whittier Saw Mill", SceneObjects.ComponentType, SceneObjects.Structure),
             inventory.Pin(inventory.Entries.Single(e => ReferenceEquals(e.Handle, g.Group)))); }
         catch (InvalidOperationException e) { refused = e.Message; }
         Assert(refused != null && refused.Contains("static batch") && g.World.Mutations == 0, "A gizmo gesture on a batched lake is refused before it moves anything: " + refused);
@@ -142,19 +142,19 @@ static class LakeSurfaceTests {
     // The log pond's logs have no renderer: the world frames them with the box of the pond they lay out in, its width
     // across and its length plus width along, one log's radius up and down from the water line, as #98 frames a pile.
     static void LogPondFrameFollowsItsLayout() {
-        var box = BakedSceneryRules.LogPondBox(4, 8, 0.25);
+        var box = SceneObjectRules.LogPondBox(4, 8, 0.25);
         Assert(box.Item1.SequenceEqual(new[] { 0.0, 0, 0 }) && box.Item2.SequenceEqual(new[] { 2.0, 0.25, 6 }), "The log pond box: centre " + N(box.Item1) + " half " + N(box.Item2));
-        var round = BakedSceneryRules.LogPondBox(10, 0, 0.3);
+        var round = SceneObjectRules.LogPondBox(10, 0, 0.3);
         Assert(round.Item2.SequenceEqual(new[] { 5.0, 0.3, 5 }), "A pond without a straight section is as long as it is wide: " + N(round.Item2));
     }
 
     // Refusal and failure texts of the bulk scenery refresh name the object kind: a log pond is no storage pile.
     static void BulkTextsNameTheKind() {
-        Assert(BakedSceneryRules.BulkKind("Scenery.LogPond") == "log pond" && BakedSceneryRules.BulkKind("Scenery.Pile") == "storage pile", "The kind of a bulk scenery object");
-        Assert(BakedSceneryRules.BulkMembersRefusal(true, false) == "The game's storage pile members are unavailable. This group and its piles can't be moved, enabled, or disabled.", "Piles keep the #98 text");
-        Assert(BakedSceneryRules.BulkMembersRefusal(false, true) == "The game's log pond members are unavailable. This group and its log pond can't be moved, enabled, or disabled.",
-            "A log pond group names the log pond: " + BakedSceneryRules.BulkMembersRefusal(false, true));
-        Assert(BakedSceneryRules.BulkMembersRefusal(true, true) == "The game's storage pile and log pond members are unavailable. This group, its piles, and its log pond can't be moved, enabled, or disabled.",
+        Assert(SceneObjectRules.BulkKind("Scenery.LogPond") == "log pond" && SceneObjectRules.BulkKind("Scenery.Pile") == "storage pile", "The kind of a bulk scenery object");
+        Assert(SceneObjectRules.BulkMembersRefusal(true, false) == "The game's storage pile members are unavailable. This group and its piles can't be moved, enabled, or disabled.", "Piles keep the #98 text");
+        Assert(SceneObjectRules.BulkMembersRefusal(false, true) == "The game's log pond members are unavailable. This group and its log pond can't be moved, enabled, or disabled.",
+            "A log pond group names the log pond: " + SceneObjectRules.BulkMembersRefusal(false, true));
+        Assert(SceneObjectRules.BulkMembersRefusal(true, true) == "The game's storage pile and log pond members are unavailable. This group, its piles, and its log pond can't be moved, enabled, or disabled.",
             "Both kinds are named");
     }
 
@@ -174,15 +174,15 @@ static class LakeSurfaceTests {
             WaterMesh = Pond.Add(new FakePart { Id = "Whittier Saw Mill Log Pond#1", Offset = new[] { 284.0, -3, -870 } });
             LogsPart = Pond.Add(new FakePart { Id = "LogPond#2", Offset = new[] { 257.0, -3, -904 } });
             Fontana.Cullers.Add(FontanaCuller);
-            var verdicts = BakedSceneryRules.Classify(LakeSurfaceTests.World());
+            var verdicts = SceneObjectRules.Classify(LakeSurfaceTests.World());
             World.GroupVerdicts = verdicts.ToDictionary(v => v.Path, v => v);
-            World.Verdicts = BakedSceneryRules.Parts(verdicts).ToDictionary(v => v.Path, v => v);
+            World.Verdicts = SceneObjectRules.Parts(verdicts).ToDictionary(v => v.Path, v => v);
             World.Objects[LogPond] = new List<object> { Pond }; World.Objects[Fontana1] = new List<object> { Fontana };
             World.PartsAt[Water] = new List<object> { WaterMesh }; World.PartsAt[Logs] = new List<object> { LogsPart };
             World.SetActive(Pond, true); World.SetActive(Fontana, true); World.Mutations = 0;
             var holds = new PartHolds();
             var scene = Scene = new SceneCapabilities(() => World.Maps, null);
-            scene.Add(new BakedSceneryGroups(World, holds: holds)); scene.Add(new BakedSceneryParts(World, holds));
+            scene.Add(new SceneObjects(World, holds: holds)); scene.Add(new ChildObjects(World, holds));
             Engine = new PatchEngine(scene);
         }
         public double[] At(FakePart part) => World.ObservePart(part).Part.Placement.Position.ToArray();
@@ -197,10 +197,10 @@ static class LakeSurfaceTests {
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
         (position == null ? "" : ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", position.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "],\"rotation\":[0,0,0,1]}") +
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
-    static string GroupMod(string id, string path, double[] position = null, bool? active = null) => Mod(id, path, BakedSceneryGroups.Structure, position, active);
+    static string GroupMod(string id, string path, double[] position = null, bool? active = null) => Mod(id, path, SceneObjects.Structure, position, active);
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
-    static TargetIdentity GroupId(string path) => new TargetIdentity(SceneName, path, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
-    static TargetIdentity PartId(string path) => new TargetIdentity(SceneName, path, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure);
+    static TargetIdentity GroupId(string path) => new TargetIdentity(SceneName, path, SceneObjects.ComponentType, SceneObjects.Structure);
+    static TargetIdentity PartId(string path) => new TargetIdentity(SceneName, path, ChildObjects.ComponentType, ChildObjects.Structure);
     static readonly double[] Upright = { 0, 0, 0, 1 }, PondTarget = { 1350, 10, 60 }, FontanaTarget = { 700, 5, 420 }, LogsTarget = { 1300, 7, 0 };
     static readonly double[] PondAuthored = { 1100, 10, 20 }, FontanaAuthored = { 600, 5, 300 }, LogsAuthored = { 1357, 7, -884 };
 
@@ -222,11 +222,11 @@ static class LakeSurfaceTests {
         Assert(shifted.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && N(shifted.At(shifted.Pond)) == N(PondTarget) && N(shifted.At(shifted.Fontana)) == N(FontanaTarget),
             "A load at another origin reaches the same map placements: " + shifted.Where());
         var hidden = new Lakes();
-        Assert(hidden.Engine.Apply(Doc(GroupMod("hide-fontana", Fontana1, active: false), Mod("move-logs", Logs, BakedSceneryParts.Structure, LogsTarget, false))).Outcomes.Values.All(o => o.Applied)
+        Assert(hidden.Engine.Apply(Doc(GroupMod("hide-fontana", Fontana1, active: false), Mod("move-logs", Logs, ChildObjects.Structure, LogsTarget, false))).Outcomes.Values.All(o => o.Applied)
             && !hidden.Fontana.Active && hidden.Culls() == null && !hidden.LogsPart.Active && Near(hidden.At(hidden.LogsPart), LogsTarget) && Near(hidden.At(hidden.WaterMesh), new[] { 1384.0, 7, -850 }),
             "A disabled lake holds no culling sphere, and the logs move and disable on their own: " + hidden.Where());
         // The log pond's root and its logs resolve only as what the rule lists them as.
-        var wrong = new Lakes().Engine.Apply(Doc(Mod("root-as-part", LogPond, BakedSceneryParts.Structure, PondTarget), Mod("logs-as-group", Logs, BakedSceneryGroups.Structure, PondTarget)));
+        var wrong = new Lakes().Engine.Apply(Doc(Mod("root-as-part", LogPond, ChildObjects.Structure, PondTarget), Mod("logs-as-group", Logs, SceneObjects.Structure, PondTarget)));
         Assert(wrong.Outcomes.Values.All(o => !o.Applied), "A lake root does not resolve as a part, nor its logs as a group");
 
         var refused = new Lakes(); refused.World.Refused = "The group's scene is not loaded";
@@ -238,7 +238,7 @@ static class LakeSurfaceTests {
         Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal) && Near(failed.At(failed.Pond), PondAuthored) && failed.Pond.Active
             && Near(failed.At(failed.LogsPart), LogsAuthored), "A failure after mutation restores the log pond's placement and activity: " + outcome.Error + " " + failed.Where());
         var failedPart = new Lakes(); failedPart.World.ThrowAfterPartPlacement = true;
-        outcome = failedPart.Engine.Apply(Doc(Mod("move-logs", Logs, BakedSceneryParts.Structure, LogsTarget, false))).Outcomes["move-logs"];
+        outcome = failedPart.Engine.Apply(Doc(Mod("move-logs", Logs, ChildObjects.Structure, LogsTarget, false))).Outcomes["move-logs"];
         Assert(!outcome.Applied && Near(failedPart.At(failedPart.LogsPart), LogsAuthored) && failedPart.LogsPart.Active, "A failure after mutation restores the logs' placement and activity: " + outcome.Error);
 
         var stuck = new Lakes(); stuck.World.LeavePartBehind = stuck.World.KeepPartBehind = true;
@@ -272,7 +272,7 @@ static class LakeSurfaceTests {
         var removed = session.Remove(PartId(Logs));
         Assert(removed.Applied && Near(f.At(f.LogsPart), new[] { 1607.0, 7, -844 }), "Remove modification returns the logs to their place in the moved log pond: " + removed.Error + " " + f.Where());
         mapEditor.Undo(); Assert(Near(f.At(f.LogsPart), LogsTarget), "Undo of the removal holds the logs again");
-        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=" + BakedSceneryGroups.RequiredVersion) && (int)JObject.Parse(store.Patch)["formatVersion"] == 1,
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=" + SceneObjects.RequiredVersion) && (int)JObject.Parse(store.Patch)["formatVersion"] == 1,
             "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
         Persistence(false, new string[0], "After Save");
         var fresh = new Lakes();
@@ -281,7 +281,7 @@ static class LakeSurfaceTests {
             && Near(fresh.Culls(), FontanaTarget) && fresh.Pond.Parts.Count == 2 && fresh.Fontana.Cullers.Count == 1, "A reloaded world reproduces the moves without duplicated state: " + fresh.Where());
         var strict = new Store { Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.9.0\"]}}" };
         var other = new Lakes(); var strictEditor = new NativeMapEditor(); var kept = new PatchEditingSession(other.Engine, strictEditor, strict); strictEditor.Session = kept;
-        Assert(kept.Edit(GroupId(Fontana1), new Placement(FontanaTarget, Upright), null).Applied && strictEditor.Save() == null && strict.Info.Contains(">=0.9.0") && !strict.Info.Contains(">=" + BakedSceneryGroups.RequiredVersion),
+        Assert(kept.Edit(GroupId(Fontana1), new Placement(FontanaTarget, Upright), null).Applied && strictEditor.Save() == null && strict.Info.Contains(">=0.9.0") && !strict.Info.Contains(">=" + SceneObjects.RequiredVersion),
             "A stricter existing constraint is retained: " + strict.Info);
     }
 }

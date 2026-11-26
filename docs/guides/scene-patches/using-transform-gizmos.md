@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move and rotate with a transform gizmo
 
-Use a transform gizmo in **Scene Patcher** to move or rotate an existing target in the native map editor. The target must have a supported fixed-placement adapter. Independent boards, supported bridges, and supported Generic track markers each have their own dependency checks. Other inventory entries have no placement edit in Scene Patcher.
+Use a transform gizmo in **Scene Patcher** to move or rotate an existing target in the native map editor. The target must have a supported fixed-placement adapter. Location signs, supported bridges, and supported Generic track markers each have their own dependency checks. Other inventory entries have no placement edit in Scene Patcher.
 
 1. Refresh the inventory and inspect the object, or confirm it through world selection. Use **Focus** in the command band to bring it into view.
 2. On the **Placement** tab, click **Gizmo**. The native map editor's Move gizmo appears on the object immediately. On the switch, click **Rotate** for rotation rings or **Move** to return to movement. The gizmo changes immediately and stays on the object while **Gizmo** mode is open. The six read-only position and rotation fields update as you drag.
@@ -12,7 +12,7 @@ Use a transform gizmo in **Scene Patcher** to move or rotate an existing target 
 
 The scene patch file stores `placement.mode` as `fixed`, with a position in map coordinates and a quaternion rotation. The display converts that position through the current local origin. An origin shift moves the gizmo's local frame without changing the mod's map coordinates. The gizmo appears at the object's marking even if the game doesn't move the object with its origin. One example is a marker under `Setups` that no setup holds. The patcher measures the total drag from the object's map-coordinate placement at the start of the gesture. It doesn't accumulate movement from preview frames. See the [v1 scene patch file reference](scene-patch-file-v1.md).
 
-Physical placement does not create, repair, or detach a logical binding. On a track marker, a gesture moves the object and leaves its stored track location and its named location unchanged; a binding set in the same modification stays in it. Change the binding as described in [repair, replace, or detach a track-marker binding](repairing-track-bindings.md). Bridge placement includes its collider and culling effects while separate track-owned scenery stays in place. Board previews refresh culling and mask registration; [terrain output](moving-boards.md) can remain outstanding after the gesture.
+Physical placement does not create, repair, or detach a logical binding. On a track marker, a gesture moves the object and leaves its stored track location and its named location unchanged; a binding set in the same modification stays in it. Change the binding as described in [repair, replace, or detach a track-marker binding](repairing-track-bindings.md). Bridge placement includes its collider and culling effects while separate track-owned scenery stays in place. Location sign previews refresh culling and mask registration; [terrain output](moving-location-signs.md) can remain outstanding after the gesture.
 
 ## End a drag or the gizmo
 

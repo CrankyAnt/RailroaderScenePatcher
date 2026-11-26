@@ -28,7 +28,7 @@ namespace RailroaderScenePatcher.Core {
     public interface IOwnedObjectScene {
         bool IsOwned(object handle);
     }
-    // A scene that checks scene objects for the inventory with a rule that can leave them out, as the baked scenery rule
+    // A scene that checks scene objects for the inventory with a rule that can leave them out, as the scene object rule
     // checks the objects below World. It gives one value per checked object: null for an object it lists, otherwise the
     // reason it leaves the object out.
     public interface ICheckedObjectsScene {
@@ -160,13 +160,13 @@ namespace RailroaderScenePatcher.Core {
         // the native map editor does not edit it. Such an object is listed under its category, marked inspection only, shows no
         // problem and offers no edit; what would be a problem for a supported kind is a note here.
         public string InspectionOnly { get; }
-        // For a part of a baked scenery group, the hierarchy path of its group root; null for every other object.
+        // For a child object, the hierarchy path of its top scene object; null for every other object.
         public string GroupPath { get; }
-        // For a baked scenery group root, the category the outliner lists it under and its subgroup there; null for
+        // For a top scene object, the category the outliner lists it under and its subgroup there; null for
         // every other object. Presentation metadata: the rule decides both from the identity path.
         public string Category { get; }
         public string Subcategory { get; }
-        // For a group root, whether it is a rail bridge or a road bridge for its edits (GroupRootVerdict.Bridge).
+        // For a top scene object, whether it is a rail bridge or a road bridge for its edits (SceneObjectVerdict.Bridge).
         public BridgeKind Bridge { get; }
         // For an object that another object holds through a game component, the hierarchy path of that holder: a
         // detection span, a track span that a crossing controller holds in a circuit, names its controller. Null for every other
@@ -225,7 +225,7 @@ namespace RailroaderScenePatcher.Core {
         internal string Fingerprint => new JArray(Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family, Active,
             new JArray(Rotation), new JArray(Bindings), new JArray(Dependencies), new JArray(Problems), Operations, new JArray(Notes), InspectionOnly, new JArray(Information)).ToString(Newtonsoft.Json.Formatting.None);
         public bool Matches(SceneObservation current) => current != null && ReferenceEquals(Handle, current.Handle) && Fingerprint == current.Fingerprint && SamePosition(current);
-        // Whether a search text matches the object by what it says about itself. A group root names every component
+        // Whether a search text matches the object by what it says about itself. A top scene object names every component
         // below it among its dependencies, so a search for a part also finds its group: such a dependency line,
         // which names an object below this one, does not count here. An empty text matches every object.
         public bool MatchesItself(string text) {
@@ -236,7 +236,7 @@ namespace RailroaderScenePatcher.Core {
             return own.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0;
         }
         // The visible name and the group-qualified part name are searchable as shown.
-        internal string SearchText => String.Join(" ", new[] { DisplayName, Identity.Scene, Identity.Path, GroupPath == null ? null : BakedSceneryRules.PartName(GroupPath, Identity.Path), Identity.Component, Identity.Structure, Family, Category, Subcategory,
+        internal string SearchText => String.Join(" ", new[] { DisplayName, Identity.Scene, Identity.Path, GroupPath == null ? null : SceneObjectRules.PartName(GroupPath, Identity.Path), Identity.Component, Identity.Structure, Family, Category, Subcategory,
             Active ? "active" : "inactive", Operations, InspectionOnly }.Concat(Bindings).Concat(Dependencies).Concat(Problems).Concat(Notes).Concat(Information));
     }
     public sealed class SceneInventory {

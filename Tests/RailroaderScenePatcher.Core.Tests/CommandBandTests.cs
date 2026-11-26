@@ -64,32 +64,32 @@ static class CommandBandTests {
     // A group left out under a settled rule that needs no ticket, such as a group that holds track markers, is not
     // waiting for support and never reads "Not yet supported:"; a group a ticket covers does.
     static void GroupVerdictsSayNotYetOnlyWithATicket() {
-        GroupRootVerdict Verdict(string name, Node part) =>
-            BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node(name, part, new Node("Shell").Solid())))))
+        SceneObjectVerdict Verdict(string name, Node part) =>
+            SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node(name, part, new Node("Shell").Solid())))))
                 .Single(v => v.Path == "World/Large Scenery/Town/" + name);
-        const string family = "Baked scenery group";
+        const string family = "Scene object";
         var markers = Verdict("Signs", new Node("Yard Limit").With("Track.TrackMarker").Solid().Family());
         var settled = CommandBand.GroupInspectionOnly(markers, family);
-        Check(markers.Ticket == null && settled == "Not editable as a group: " + BakedSceneryRules.TrackMarkerReason,
+        Check(markers.Ticket == null && settled == "Not editable as a group: " + SceneObjectRules.TrackMarkerReason,
             "A group that no ticket covers reads Not editable as a group with its reason: " + settled);
         Check(settled.IndexOf("yet", StringComparison.OrdinalIgnoreCase) < 0 && CommandBand.Refusal(settled) == null,
             "Its reason promises no later support and is no refusal of a supported family: " + settled);
-        Check(CommandBand.EditReason(settled) == BakedSceneryRules.TrackMarkerReason && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + BakedSceneryRules.TrackMarkerReason
-            && CommandBand.Tooltip("Does something.", settled) == "Unavailable: " + BakedSceneryRules.TrackMarkerReason,
+        Check(CommandBand.EditReason(settled) == SceneObjectRules.TrackMarkerReason && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + SceneObjectRules.TrackMarkerReason
+            && CommandBand.Tooltip("Does something.", settled) == "Unavailable: " + SceneObjectRules.TrackMarkerReason,
             "The message, the Inspection only line and the tooltip give the reason without its label: " + CommandBand.Tooltip("Does something.", settled));
         var spawn = Verdict("Alarka Spawn", new Node("Spawn").With("Character.SpawnPoint"));
-        Check(spawn.Ticket == null && CommandBand.GroupInspectionOnly(spawn, family) == "Not editable as a group: " + BakedSceneryRules.SpawnPointReason,
+        Check(spawn.Ticket == null && CommandBand.GroupInspectionOnly(spawn, family) == "Not editable as a group: " + SceneObjectRules.SpawnPointReason,
             "A group with a spawn point reads Not editable as a group and names the Spawn point family: " + CommandBand.GroupInspectionOnly(spawn, family));
         var bridge = Verdict("Almond Road Bridge", new Node("Deck").Solid());
         Check(bridge.Ticket == null && CommandBand.GroupInspectionOnly(bridge, family) == null, "A road bridge is a listed group: " + CommandBand.GroupInspectionOnly(bridge, family));
         // A group with a map icon elsewhere needs no ticket: station map icons have their own family.
         var icon = Verdict("Depot", new Node("Icon").With("UI.Map.MapIcon"));
-        Check(icon.Ticket == null && CommandBand.GroupInspectionOnly(icon, family) == "Not editable as a group: " + BakedSceneryRules.MapIconReason,
+        Check(icon.Ticket == null && CommandBand.GroupInspectionOnly(icon, family) == "Not editable as a group: " + SceneObjectRules.MapIconReason,
             "A group with a map icon reads Not editable as a group: " + CommandBand.GroupInspectionOnly(icon, family));
         Check(CommandBand.GroupInspectionOnly(Verdict("Platform", new Node("Deck").Solid()), family) == null, "A listed group is not inspection only");
-        Check(CommandBand.GroupInspectionOnly(null, family) == "Not yet supported: this baked scenery group cannot be edited", "A group without a verdict waits for support");
+        Check(CommandBand.GroupInspectionOnly(null, family) == "Not yet supported: this scene object cannot be edited", "A group without a verdict waits for support");
         // A crossbuck is a listed group of its own, not inspection only.
-        var crossbuck = BakedSceneryRules.Classify(new Node("World", new Node("Roads Bryson", new Node("Crossing Unprotected",
+        var crossbuck = SceneObjectRules.Classify(new Node("World", new Node("Roads Bryson", new Node("Crossing Unprotected",
             new Node("Crossing Pad").With("Track.TrackMarker", "Track.TrackCurveMeshBuilder").Solid().Family(), new Node("Sign-Crossing0 (1)", new Node("LOD0").Solid()).With("Helpers.Culling.RendererCuller")))))
             .Single(v => v.Path.EndsWith("Sign-Crossing0 (1)", StringComparison.Ordinal));
         Check(crossbuck.Ticket == null && crossbuck.Crossbuck && CommandBand.GroupInspectionOnly(crossbuck, family) == null, "A crossbuck is a listed group: " + CommandBand.GroupInspectionOnly(crossbuck, family));
@@ -221,8 +221,8 @@ static class CommandBandTests {
     static void ReasonsReadAsOnePlainSentence() {
         Check(CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }) == null && CommandBand.WreckAction(true) == "Start derailed: Yes" && CommandBand.WreckAction(false) == "Start derailed: No", "The Wreck checkbox is usable for one reader and names its edit by the new state");
         // The Inspection only line of a tooltip or state line carries one label, with the reason as one plain sentence.
-        if (CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a spawn point")) != "Inspection only: Baked scenery groups that hold a spawn point cannot be edited.")
-            throw new Exception("The Inspection only line stacks labels: " + CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a spawn point")));
+        if (CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("groups that hold a spawn point")) != "Inspection only: Groups that hold a spawn point cannot be edited.")
+            throw new Exception("The Inspection only line stacks labels: " + CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("groups that hold a spawn point")));
         var starter = StarterPlacements.ObjectSettings + ".";
         var blocked = CommandBand.NotEditable(StarterPlacements.ObjectSettings);
         foreach (var row in new[] {
@@ -686,10 +686,10 @@ static class CommandBandTests {
         var offered = new[] {
             "Track marker: World/Large Scenery/Whittier/Whittier Signs/wh-e-water",
             "Track marker: World/Large Scenery/Whittier/Whittier Signs/wh-e-whistle [inactive]",
-            "Independent board: World/Signs/Loc: Walker Branch" };
+            "Location sign: World/Signs/Loc: Walker Branch" };
         Check(CommandBand.ChoiceLabel(offered[0], offered) == "wh-e-water (Track marker)", "The name comes first: " + CommandBand.ChoiceLabel(offered[0], offered));
         Check(CommandBand.ChoiceLabel(offered[1], offered) == "wh-e-whistle [inactive] (Track marker)", "An inactive object says so after its name: " + CommandBand.ChoiceLabel(offered[1], offered));
-        Check(CommandBand.ChoiceLabel(offered[2], offered) == "Loc: Walker Branch (Independent board)", "A colon inside a name stays in the name: " + CommandBand.ChoiceLabel(offered[2], offered));
+        Check(CommandBand.ChoiceLabel(offered[2], offered) == "Loc: Walker Branch (Location sign)", "A colon inside a name stays in the name: " + CommandBand.ChoiceLabel(offered[2], offered));
         var twins = new[] { "Crossing pad marker: World/Roads Wilmot/Crossing Unprotected/Crossing Pad", "Crossing pad marker: World/Roads Sylva/Crossing Unprotected (1)/Crossing Pad" };
         Check(CommandBand.ChoiceLabel(twins[0], twins) == "Crossing Unprotected/Crossing Pad (Cr..." && CommandBand.ChoiceLabel(twins[1], twins) == "Crossing Unprotected (1)/Crossing Pad...",
             "Equal names take their parents until they differ, and the cut falls at the end: " + CommandBand.ChoiceLabel(twins[0], twins) + " | " + CommandBand.ChoiceLabel(twins[1], twins));
@@ -699,22 +699,22 @@ static class CommandBandTests {
         Check(CommandBand.ChoiceLabel(null, offered) == "" && AddedChoicesKeepTheirVisibleName(), "No label gives none; added-object list rows and candidate captions keep their visible name");
     }
     static SceneObservation Baked(string path, string groupPath, bool active = true) => new SceneObservation(new object(),
-        new TargetIdentity("scene", path, "UnityEngine.Transform"), BakedSceneryRules.Family, active, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+        new TargetIdentity("scene", path, "UnityEngine.Transform"), groupPath == null ? SceneObjectRules.Family : SceneObjectRules.ChildFamily, active, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement", groupPath: groupPath);
     static void PartsReadAsPartsInWorldChoicesAndTheStateLine() {
-        // A part of a baked scenery group keeps its family for every rule, and the panel calls it a Part.
+        // A child object keeps its family for every rule, and the panel calls it a Part.
         var part = Baked("World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)", "World/Large Scenery/Bryson/Bryson Depot");
         var root = Baked("World/Large Scenery/Bryson/Bryson Depot", null);
-        Check(part.Family == BakedSceneryRules.Family, "The observed family of a part stays Baked scenery group");
-        Check(CommandBand.ShownFamily(part) == "Part" && CommandBand.ShownFamily(root) == BakedSceneryRules.Family, "A part shows as Part, a group root as Baked scenery group: " + CommandBand.ShownFamily(part));
+        Check(part.Family == SceneObjectRules.ChildFamily, "The observed family of a child object is Child object");
+        Check(CommandBand.ShownFamily(part) == "Part" && CommandBand.ShownFamily(root) == SceneObjectRules.Family, "A part shows as Part, a top scene object as Scene object: " + CommandBand.ShownFamily(part));
         Check(CommandBand.CandidateLabel(part) == "Part: World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)", "A part's candidate label names it a Part: " + CommandBand.CandidateLabel(part));
         Check(CommandBand.CandidateLabel(Baked(part.Identity.Path, part.GroupPath, active: false)).EndsWith(" [inactive]", StringComparison.Ordinal), "An inactive part says so");
         var labels = new[] { CommandBand.CandidateLabel(part), CommandBand.CandidateLabel(root) };
         var line = CommandBand.ChoiceLine("Object", 0, 1, labels[0], new[] { labels[0] }, part);
         Check(line == "Object: Spotlight Outdoor (1) (Part).", "The world choice's line reads the part as a Part: " + line);
-        Check(CommandBand.ChoiceLabel(labels[0], labels) == "Spotlight Outdoor (1) (Part)" && CommandBand.ChoiceLabel(labels[1], labels) == "Bryson Depot (Baked scenery group)",
+        Check(CommandBand.ChoiceLabel(labels[0], labels) == "Spotlight Outdoor (1) (Part)" && CommandBand.ChoiceLabel(labels[1], labels) == "Bryson Depot (Scene object)",
             "The world choice list reads the part as a Part and the group as a group: " + String.Join(" | ", labels.Select(label => CommandBand.ChoiceLabel(label, labels))));
-        Check(!line.Contains("(Baked scenery group)"), "No part reads as a Baked scenery group");
+        Check(!line.Contains("(Scene object)"), "No part reads as a Scene object");
     }
     static void AConfirmedWorldChoiceIsADebugLineLikeItsRefusals() {
         var label = "Part: World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)";

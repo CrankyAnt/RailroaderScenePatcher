@@ -42,7 +42,7 @@ namespace RailroaderScenePatcher {
             internal string StartersError { get; set; }
             // Whether the object holds the construction-segment relationship, read from its controller.
             internal bool? HoldsConstructionSegments { get; set; }
-            // The bridge kind of the object's group, for a part whose group root names it.
+            // The bridge kind of the object's group, for a part whose top scene object names it.
             internal BridgeKind? Bridge { get; set; }
         }
         // The reason that holds every placement and activity edit of a crossing controller: its capability takes only
@@ -58,10 +58,10 @@ namespace RailroaderScenePatcher {
         // Whether the object's activity follows its track group, by its binding lines.
         internal static bool FollowsGroup(SceneObservation entry) => entry != null && entry.Bindings.Any(b => b.IndexOf("follows track group", StringComparison.OrdinalIgnoreCase) >= 0 || b.IndexOf("targetActiveFollowsTrackGroup=True", StringComparison.OrdinalIgnoreCase) >= 0);
         // Whether the object holds the construction-segment relationship: the Ela construction controller, or a rail
-        // bridge group root that names construction segments.
+        // bridge top scene object that names construction segments.
         internal static bool HoldsSegments(SceneObservation entry, Live live = null) =>
             entry != null && (entry.Identity.Structure == ConstructionSceneryScene.Structure
-                || entry.Identity.Structure == BakedSceneryGroups.Structure && (live?.HoldsConstructionSegments ?? CommandBand.ConstructionSegments(entry.Bindings).Count != 0));
+                || entry.Identity.Structure == SceneObjects.Structure && (live?.HoldsConstructionSegments ?? CommandBand.ConstructionSegments(entry.Bindings).Count != 0));
 
         internal static IReadOnlyList<Edit> Of(SceneObservation entry, Live live = null) {
             if (entry == null) return Array.Empty<Edit>();

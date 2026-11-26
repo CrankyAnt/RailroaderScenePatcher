@@ -61,7 +61,7 @@ namespace RailroaderScenePatcher.Core {
         // Mask keys the component holds that the terrain system no longer stores.
         public int MissingMaskKeys { get; }
     }
-    // The native operations of the independent-board capability. Positions are map coordinates.
+    // The native operations of the location sign capability. Positions are map coordinates.
     public interface IBoardWorld : ITerrainWorld {
         IEnumerable<string> MapIds { get; }
         // Objects at the scene path that carry the board's renderer culler.
@@ -78,11 +78,11 @@ namespace RailroaderScenePatcher.Core {
         BoardRegistration Registration(object board);
     }
 
-    // Independent boards: scene objects with a renderer culler and a circle map mask and no track relationship.
+    // Location signs: scene objects with a renderer culler and a circle map mask and no track relationship.
     // Placement and activity refresh the culling sphere and the mask registration; the game's terrain system
     // then regenerates the output at the old and new positions, which this capability tracks to completion.
-    public sealed class IndependentBoards : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IDisposable {
-        public const string Structure = "independent-board-v1";
+    public sealed class LocationSigns : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IDisposable {
+        public const string Structure = "location-sign-v1";
         public const string CullerType = CullerTypes.RendererCuller;
         public const string SylvaScene = "BushnellWhittier-MapManager", SylvaPath = "World/Signs/Loc: Sylva Int";
         // Pattern-based boards share the delivery minimum; the original Sylva target retains its legacy support.
@@ -93,7 +93,7 @@ namespace RailroaderScenePatcher.Core {
         readonly Func<IEnumerable<SceneObservation>> discover;
         readonly TerrainOutput output;
         sealed class Snapshot { internal double[] Position, Rotation; internal bool Active; internal object Parent; }
-        public IndependentBoards(IBoardWorld world, Func<IEnumerable<SceneObservation>> discover = null) {
+        public LocationSigns(IBoardWorld world, Func<IEnumerable<SceneObservation>> discover = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world));
             this.discover = discover ?? (() => Array.Empty<SceneObservation>());
             output = new TerrainOutput(world);
@@ -107,7 +107,7 @@ namespace RailroaderScenePatcher.Core {
             // Other capabilities share the renderer culler; only an object that carries a circle mask is a board candidate.
             return (world.Find(identity.Scene, identity.Path) ?? Array.Empty<object>()).Where(o => world.Facts(o).Masks > 0).ToArray();
         }
-        // Why the object does not conform to the independent-board pattern, or null.
+        // Why the object does not conform to the location sign pattern, or null.
         public string Refusal(object target) {
             var facts = world.Facts(target);
             if (!facts.SceneLoaded) return "The board's scene is not loaded";

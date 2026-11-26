@@ -51,7 +51,7 @@ namespace RailroaderScenePatcher {
         internal static string EmptyListReason(SceneInventory inventory) {
             if (inventory == null || inventory.CheckedCount == 0 || inventory.UnlistedReasons.Count != inventory.CheckedCount) return null;
             if (inventory.Entries.Count - OutlinerGrouping.HiddenCount(inventory.Entries) > 0) return null;
-            return inventory.UnlistedReasons.All(reason => reason == BakedSceneryRules.RuntimeObject) ? NoEditableObjects : null;
+            return inventory.UnlistedReasons.All(reason => reason == SceneObjectRules.RuntimeObject) ? NoEditableObjects : null;
         }
         // The scene root of the detection spans the patcher adds for a crossing.
         internal const string CoverageRoot = "CrankyAnt Scene Patcher crossing coverage";
@@ -97,8 +97,8 @@ namespace RailroaderScenePatcher {
             if (ids.Count == 0) return Array.Empty<SceneObservation>();
             return (entries ?? Enumerable.Empty<SceneObservation>()).Where(e => e != null && !ReferenceEquals(e.Handle, self) && MarkerIdOf(e) is string id && ids.Contains(id)).ToArray();
         }
-        // Baked scenery parts include their group; other objects use their observed visible name.
-        internal static string Name(SceneObservation entry) => entry.GroupPath != null ? BakedSceneryRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
+        // Child objects include their group; other objects use their observed visible name.
+        internal static string Name(SceneObservation entry) => entry.GroupPath != null ? SceneObjectRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
 
         // The suffix of an added name (AddedEquipmentName); an Equipment ID holds no parenthesis.
         static readonly Regex AddedSuffix = new Regex(@" \(added(?:: [^()]+)?\)\z");
@@ -165,7 +165,7 @@ namespace RailroaderScenePatcher {
             internal int Count;
             internal readonly List<OutlineNode> Children = new List<OutlineNode>();
         }
-        // A part's name under its group: the path from the group root to the part.
+        // A part's name under its group: the path from the top scene object to the part.
         internal static string PartLabel(SceneObservation part) {
             var path = part.Identity.Path; var group = part.GroupPath;
             return group != null && path.StartsWith(group + "/", StringComparison.Ordinal) ? path.Substring(group.Length + 1).Replace("/", " / ") : part.DisplayName;
@@ -183,11 +183,11 @@ namespace RailroaderScenePatcher {
         internal static string HeldBy(SceneObservation entry) =>
             entry?.HolderPath == null ? null : "Detection span of: " + entry.HolderPath.Substring(entry.HolderPath.LastIndexOf('/') + 1);
 
-        // The inventory entry of the group a part belongs to, or null: for a group root, for an object outside any
+        // The inventory entry of the group a part belongs to, or null: for a top scene object, for an object outside any
         // group, and while the inventory does not hold exactly one entry for the group.
         internal static SceneObservation GroupOf(SceneInventory inventory, SceneObservation part) {
             if (inventory == null || part?.GroupPath == null) return null;
-            var found = inventory.Entries.Where(entry => entry.GroupPath == null && entry.Family == BakedSceneryRules.Family && entry.Identity.Scene == part.Identity.Scene && entry.Identity.Path == part.GroupPath).Take(2).ToArray();
+            var found = inventory.Entries.Where(entry => entry.GroupPath == null && SceneObjectRules.InFamilies(entry.Family) && entry.Identity.Scene == part.Identity.Scene && entry.Identity.Path == part.GroupPath).Take(2).ToArray();
             return found.Length == 1 ? found[0] : null;
         }
         // The Object tab's line that names a part's group, or null for any object that is no part.

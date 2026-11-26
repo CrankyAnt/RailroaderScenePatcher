@@ -12,7 +12,7 @@ using RailroaderScenePatcher.Core;
 static class EmptyListReasonTests {
     static void Check(bool value, string message) { if (!value) throw new Exception("Empty list reason: " + message); }
 
-    const string Runtime = BakedSceneryRules.RuntimeObject;
+    const string Runtime = SceneObjectRules.RuntimeObject;
     // A scene that supplies its listed objects and, for every scene object it checked, null when it lists it or the
     // reason it leaves it out.
     sealed class Scene : IInspectionScene, ICheckedObjectsScene {
@@ -23,8 +23,8 @@ static class EmptyListReasonTests {
         public IEnumerable<string> CheckedObjects() => Checks;
     }
     static SceneObservation Entry(string path) =>
-        new SceneObservation(new object(), new TargetIdentity("scene", path, "UnityEngine.Transform"), BakedSceneryRules.Family, true, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0, 1 },
-            new string[0], new string[0], new string[0], "Placement", category: BakedSceneryCategories.Unclassified);
+        new SceneObservation(new object(), new TargetIdentity("scene", path, "UnityEngine.Transform"), SceneObjectRules.Family, true, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0, 1 },
+            new string[0], new string[0], new string[0], "Placement", category: SceneObjectCategories.Unclassified);
     static SceneInventory Inventory(Scene scene) { var inventory = new SceneInventory(scene); inventory.Refresh(); return inventory; }
 
     internal static void Run() {
@@ -48,7 +48,7 @@ static class EmptyListReasonTests {
         // No listed object, and one checked object is left out for another reason: the current empty list stays.
         var otherReason = new Scene();
         otherReason.Checks.AddRange(Enumerable.Repeat(Runtime, 20));
-        otherReason.Checks.Add(BakedSceneryRules.MapLabel);
+        otherReason.Checks.Add(SceneObjectRules.MapLabel);
         var otherInventory = Inventory(otherReason);
         Check(otherInventory.CheckedCount == 21 && otherInventory.UnlistedReasons.Count == 21, "the inventory counts the object left out for another reason");
         Check(InventoryPresentationState.EmptyListReason(otherInventory) == null, "an inventory whose unlisted objects have another reason states no reason");

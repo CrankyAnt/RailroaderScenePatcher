@@ -14,14 +14,14 @@ namespace RailroaderScenePatcher.Core {
         public bool Marked { get; }
         public bool Area { get; }
     }
-    // A game-defined group that shows as one square marker, as the pointer meets it: where that marker stands and
+    // A complex that shows as one square marker, as the pointer meets it: where that marker stands and
     // whether the pointer is inside the group's frame, the objects the group holds, as indices into the targets, and
     // those of them that show their own marker and frame: a candidate and the inspected object.
     public sealed class PickGroup {
-        public PickGroup(PickTarget target, IReadOnlyList<int> objects, IReadOnlyList<int> own = null, IReadOnlyList<int> unlisted = null, GameDefinedGroupKind? kind = null) {
+        public PickGroup(PickTarget target, IReadOnlyList<int> objects, IReadOnlyList<int> own = null, IReadOnlyList<int> unlisted = null, ComplexKind? kind = null) {
             Target = target; Objects = objects ?? throw new ArgumentNullException(nameof(objects)); Own = own ?? Array.Empty<int>(); Unlisted = unlisted ?? Array.Empty<int>(); Kind = kind;
         }
-        public GameDefinedGroupKind? Kind { get; }
+        public ComplexKind? Kind { get; }
         public PickTarget Target { get; }
         public IReadOnlyList<int> Objects { get; }
         public IReadOnlyList<int> Own { get; }
@@ -75,7 +75,7 @@ namespace RailroaderScenePatcher.Core {
             }
             return all.Where(Same).OrderBy(i => i == winner ? 0 : 1).ThenBy(Distance).ThenBy(i => i).ToArray();
         }
-        // The click rule with game-defined groups that show as one. A group's square marker and frame take part as
+        // The click rule with complexes that show as one. A group's square marker and frame take part as
         // those of one object, in place of its objects other than those that show on their own. Where the rule picks
         // the group, its objects other than its unlisted ones are picked, in their order; objects and groups that
         // share the winner's spot come with it, and an object is listed once. Without groups this is the rule of one object each.
@@ -97,7 +97,7 @@ namespace RailroaderScenePatcher.Core {
             }
             var hovered = objects.Where(i => !hidden.Contains(i) && (targets[i].Area || OnMarker(targets[i], x, y))).ToArray();
             var onlyGroup = picked.Count == 1 ? groups[picked[0]] : null;
-            var isCrossingSetup = onlyGroup?.Kind == GameDefinedGroupKind.GradeCrossingSetup && objects.Count > 0 &&
+            var isCrossingSetup = onlyGroup?.Kind == ComplexKind.GradeCrossingSetup && objects.Count > 0 &&
                 objects.All(i => onlyGroup.Objects.Contains(i) && !onlyGroup.Unlisted.Contains(i));
             return new WorldPickResult(objects, picked, hovered, isCrossingSetup);
         }

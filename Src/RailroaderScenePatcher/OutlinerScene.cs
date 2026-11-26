@@ -49,7 +49,7 @@ namespace RailroaderScenePatcher {
             if (go == null) return null;
             var bounds = new Bounds(); var any = false;
             foreach (var renderer in go.GetComponentsInChildren<Renderer>(true)) {
-                if (renderer == null || !BakedSceneryRules.GivesPresence(renderer.GetType().FullName, true, false, false)) continue;
+                if (renderer == null || !SceneObjectRules.GivesPresence(renderer.GetType().FullName, true, false, false)) continue;
                 Bounds own;
                 if (renderer.enabled && renderer.gameObject.activeInHierarchy && renderer.bounds.size != Vector3.zero) own = renderer.bounds;
                 else {
@@ -103,10 +103,10 @@ namespace RailroaderScenePatcher {
                 var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(s);
                 if (!scene.isLoaded) continue;
                 foreach (var root in scene.GetRootGameObjects()) {
-                    if (root == null || !BakedSceneryRules.ListedBelow(root.name, false)) continue;
+                    if (root == null || !SceneObjectRules.ListedBelow(root.name, false)) continue;
                     foreach (var t in root.GetComponentsInChildren<Transform>(true)) {
                         if (t == null || (t.gameObject.hideFlags & HideFlags.DontSave) != 0) continue;
-                        var label = t.parent != null && t.parent.name == BakedSceneryRules.MapLabels && t.name != BakedSceneryRules.StationIcons;
+                        var label = t.parent != null && t.parent.name == SceneObjectRules.MapLabels && t.name != SceneObjectRules.StationIcons;
                         if (!label && !t.name.StartsWith(SceneClassification.LocPrefix, StringComparison.Ordinal)) continue;
                         var path = BoardScene.PathOf(t);
                         if (!listed.Contains(path)) sources.AddRange(ScenePlaces.SourcesOf(path, Bounds(t.gameObject)));

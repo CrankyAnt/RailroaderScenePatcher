@@ -59,13 +59,13 @@ static class GameSwitchTests {
             new FakeGroup { Position = position, Parts = new List<FakePart>(), Cullers = new List<FakeCuller>(), RootCulling = null, Constructed = switched, Switch = GameSwitch.Progression };
         public Stations() {
             World.Objects[GameSwitchTests.Cochran] = new List<object> { Cochran }; World.Objects[GameSwitchTests.Alarka] = new List<object> { Alarka }; World.Objects[GameSwitchTests.Almond] = new List<object> { Almond };
-            // A roof part below the Cochran group root, as a station building has parts.
+            // A roof part below the Cochran top scene object, as a station building has parts.
             var roof = Cochran.Add(new FakePart { Id = "Roof#1", Offset = new[] { 0.0, 4, 0 } });
             World.PartsAt[GameSwitchTests.Cochran + "/Roof"] = new List<object> { roof };
             World.Mutations = 0;
             var holds = new PartHolds();
             var scene = new SceneCapabilities(() => World.Maps, null);
-            scene.Add(new BakedSceneryGroups(World, holds: holds)); scene.Add(new BakedSceneryParts(World, holds));
+            scene.Add(new SceneObjects(World, holds: holds)); scene.Add(new ChildObjects(World, holds));
             Engine = new PatchEngine(scene);
         }
         // The progression controller of the station sets its group, as an IndustriesDidChange event makes it do.
@@ -73,11 +73,11 @@ static class GameSwitchTests {
         public GameSwitch Warned(FakeGroup station) => World.Constructions.HeldAgainst(station);
         public bool Reads(FakeGroup station) => World.Observe(station).Root.Active == true;
     }
-    static string Mod(string id, string path, bool? active, string component = BakedSceneryGroups.ComponentType, string structure = BakedSceneryGroups.Structure) =>
+    static string Mod(string id, string path, bool? active, string component = SceneObjects.ComponentType, string structure = SceneObjects.Structure) =>
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"" + component + "\",\"structure\":\"" + structure + "\"}" +
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
-    static TargetIdentity GroupId(string path) => new TargetIdentity(SceneName, path, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
+    static TargetIdentity GroupId(string path) => new TargetIdentity(SceneName, path, SceneObjects.ComponentType, SceneObjects.Structure);
 
     // An explicitly disabled station group stays inactive when its progression controller switches it on, also after a
     // repeated application; the warning names progression. An object no switch sets holds its disable natively and gets
@@ -110,7 +110,7 @@ static class GameSwitchTests {
         f.Progression(f.Alarka, true);
         Assert(f.Alarka.Active && f.Warned(f.Alarka) == GameSwitch.None, "The unedited station follows progression on, without a warning");
         // A move of a switched station leaves its activity to the switch.
-        var moved = f.Engine.Apply(Doc(Mod("hide-cochran", Cochran, false), "\"move-alarka\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + Alarka + "\",\"component\":\"" + BakedSceneryGroups.ComponentType + "\",\"structure\":\"" + BakedSceneryGroups.Structure + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[5800,610,1700],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}"));
+        var moved = f.Engine.Apply(Doc(Mod("hide-cochran", Cochran, false), "\"move-alarka\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + Alarka + "\",\"component\":\"" + SceneObjects.ComponentType + "\",\"structure\":\"" + SceneObjects.Structure + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[5800,610,1700],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}"));
         Assert(moved.Outcomes.Values.All(o => o.Applied), "A move of the switched station applies: " + String.Join("; ", moved.Outcomes.Values.Select(o => o.Error)));
         f.Progression(f.Alarka, false);
         Assert(!f.Alarka.Active && !f.World.Diverted(f.Alarka), "The moved station still follows progression off");
@@ -474,6 +474,6 @@ static class GameSwitchTests {
         var retry = stuck.Engine.Apply(Doc(Mod("again", Cochran, false))).Outcomes["again"];
         Assert(!retry.Applied && retry.Error.Contains("Cleanup") && stuck.World.Mutations == mutations && !stuck.World.Diverted(stuck.Cochran), "The retry on the affected group is blocked without a mutation: " + retry.Error);
     }
-    static string MoveAndHide(string id, string path) => "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"" + BakedSceneryGroups.ComponentType + "\",\"structure\":\"" + BakedSceneryGroups.Structure + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[4300,600,1500],\"rotation\":[0,0,0,1]},\"active\":false,\"dependsOn\":[]}";
+    static string MoveAndHide(string id, string path) => "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"" + SceneObjects.ComponentType + "\",\"structure\":\"" + SceneObjects.Structure + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[4300,600,1500],\"rotation\":[0,0,0,1]},\"active\":false,\"dependsOn\":[]}";
     static string MoveAndShow(string id, string path) => MoveAndHide(id, path).Replace("\"active\":false", "\"active\":true");
 }

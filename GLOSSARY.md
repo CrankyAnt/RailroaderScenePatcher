@@ -88,13 +88,13 @@ _Avoid_: Source scene
 These are project terms for editing and applying scene patches, not additional Railroader definition types or Unity object types.
 
 **Scene object**:
-An object in a Unity scene loaded for the map that may have physical placement, activity, logical bindings, or dependent state.
+An object in a Unity scene loaded for the map that may have physical placement, activity, logical bindings, or dependent state. A top scene object is the scene object at the top of a complex; a child object is a scene object below it.
 
-**Independent board**:
-A board scene object whose physical placement is independent of any logical binding to a track.
+**Location sign**:
+A board scene object whose physical placement is independent of any logical binding to a track. The scene names these signs with "Loc:".
 
 **Terrain output**:
-Content generated for terrain tiles from the current scene state, including vegetation affected by an independent board.
+Content generated for terrain tiles from the current scene state, including vegetation affected by a location sign.
 
 **Scene patch**:
 Desired changes that a supplying mod makes to supported scene objects and their relationships.
@@ -204,7 +204,7 @@ A named set of track that the map enables or makes available as a whole, for exa
 The game's unlocking of stations and industries as play advances. A progression controller switches the scene objects of a station on or off from the station's progression state.
 
 **Map feature**:
-A part of the map that the game unlocks as a whole, such as a branch, a facility or a signal system, switching on the track groups and scene objects it names.
+A part of the map that the game unlocks as a whole, such as a branch, a facility or a signal system, switching on the tracks and scene objects it names.
 
 **Group-driven activity**:
 A scene object's activity as the game sets it from whether its track group is enabled, or as the game's progression or a map feature switches that object.
@@ -214,7 +214,7 @@ _Avoid_: Group-following object
 A scene object's dependence on its track group, through which enabling or disabling the group changes the scene object's activity.
 
 **Explicit disable**:
-A mod value that holds a scene object inactive, which takes precedence over later group-driven activity.
+A mod value that holds a scene object inactive, which takes precedence over later activity that the game sets from track enablement.
 
 **Circuit**:
 One detection unit of an existing crossing's controller, whose detection spans, such as its approach and island spans, decide when the crossing's equipment activates.
@@ -278,11 +278,11 @@ The scene objects of the map context that the patcher lists for inspection. Rule
 The development reference, outside scene patch editing, that names each rule keeping scene objects out of the inventory.
 
 **Family**:
-A kind of scene object that the patcher supports under its own rules, such as track markers, scene spawn points or station map icons. An object's family decides what an edit of it may do.
+A kind of scene object that the patcher supports under its own rules, such as track markers, scene spawn points or station map icons. An object's family decides what an edit of it may do. A family is named after its game class when that class carries one family, such as Milepost, Spawn point, Track span or Grade crossing controller. When one class carries several families, the family name joins the class to the game's word for the role, such as Crossing pad marker, Starter placement marker or Station map icon. A family with no game class of its own, such as Crossing mast, keeps its name. The window shows family names in sentence case with spaces; Milepost is one word.
 
 **Category**:
 What a scene object is to a modder, such as Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building, Water or Road scenery. Spawn point, Starter placement, Station map icon and Track marker are categories too. An object that fits none of them is Unclassified.
-_Avoid_: Other, Group
+_Avoid_: Other
 
 **Kind**:
 What tells the objects of one category apart, such as Rail bridges and Road bridges under Bridge, or Speed signs and Mileposts under Sign.
@@ -302,27 +302,18 @@ A track span in native map data, which the native map editor edits, such as indu
 **Native spawn**:
 A spawn in native map data, which the native map editor edits and calls Spawn. It is distinct from a scene spawn point.
 
-**Baked scenery group**:
-A scene-serialized group of buildings, structures, fixtures, props, lamps, signs, click spots, lake surfaces, rail bridge constructions or road bridges, which receives physical placement and activity as a whole and per part. Trees and vegetation are terrain and bulk scenery, not baked scenery. It is a group by hierarchy: one scene object and the scene objects below it. Railroader has no term for it. Compare game-defined group, whose objects are placed one by one.
+**Complex**:
+A top scene object with the child objects below it, which Scene Patcher shows as one: a square marker, one object frame beyond 125 metres and one choice list. Examples are a station's building complex, a grade-crossing setup (also a crossing without a controller), a rail bridge construction and an industry storage display. The window never shows the word "complex"; it calls a complex a "group" in every text and control. Where a modder could take that group for a track group of the native map editor, the window's tooltip says that it means scene objects. Each child object keeps its own inventory entry and edits. Trees and vegetation are terrain and bulk scenery, not complexes. A scene object that holds separate complexes and has no role of its own, such as Bryson Yard, is not a complex, and the patcher does not list it.
+_Avoid_: Cluster
 
-**Group root**:
-The scene object at the top of a baked scenery group. The inventory lists a baked scenery group as one entry for its root.
-
-**Part**:
-A scene object inside a baked scenery group, other than its group root, that can receive its own physical placement or activity. A component or mesh inside one scene object is not a part.
-
-**Container object**:
-A scene object that only holds other scene objects and has nothing visible of its own, such as the Bryson Signs object or a place's object under Large Scenery. A container object is not a group: the scene objects it holds are listed and edited by their own family or group. The native map editor's Folder is a folder of map data, not a container object.
-_Avoid_: Folder
+**Child object**:
+A scene object below a top scene object, in the same complex, that can receive its own physical placement or activity. The window calls a child object a "part". A component or mesh inside one scene object is not a child object. A child object that only carries a simple culler (the game's SimpleCuller) and has no renderer, collider, light, storage pile or log pond of its own is not an editable child object: the child objects it holds stay listed and are edited under their top scene object.
 
 **Game culler**:
 A game component that culls the objects it covers: the object it stands on, the renderers below it, or the objects on its list. Its three kinds are the simple culler, the renderer culler and the game-object culler.
 
 **Culling sphere**:
-A sphere, with a centre and a radius, that the game keeps for culling the objects it covers. A game culler holds one for its group or part, and a part that a move takes out of the sphere of a culler above it gets a culling sphere of its own.
-
-**Culling container**:
-A container object below a baked scenery group root that carries a simple culler and has no renderer, collider, light, storage pile or log pond of its own. It is not an object to edit: its parts stay listed and edited under their group.
+A sphere, with a centre and a radius, that the game keeps for culling the objects it covers. A game culler holds one for its top scene object or child object, and a child object that a move takes out of the sphere of a culler above it gets a culling sphere of its own.
 
 **Scene spawn point**:
 A scene object that marks a player spawn location used for starting, teleporting and rescue. It is distinct from a native spawn.
@@ -331,7 +322,7 @@ A scene object that marks a player spawn location used for starting, teleporting
 A scene object that shows a station on the map.
 
 **Station click spot**:
-The invisible part of a station's baked scenery group that opens the station window.
+The invisible child object of a station's complex that opens the station window.
 _Avoid_: Click volume
 
 **Milepost**:
@@ -349,21 +340,21 @@ A water mesh that the scene saves for a lake and that the game draws where its s
 _Avoid_: Water surface
 
 **Log pond**:
-The game's bulk scenery component for an industry's logs on water, part of an industry storage display beside its lake surface.
+The game's bulk scenery component for an industry's logs on water, in an industry storage display beside its lake surface.
 
 **Rail bridge construction**:
-A rail bridge whose root holds a construction controller, which shows or hides its parts as its construction segments change. It is a game-defined group and needs its construction segments.
+A rail bridge whose top scene object holds a construction controller, which shows or hides its child objects as its construction segments change. It is a complex and needs its construction segments.
 
 **Road bridge**:
-A bridge for a road, a baked scenery group whose group root holds no construction controller. It is not a rail bridge construction.
+A bridge for a road, a complex whose top scene object holds no construction controller. It is not a rail bridge construction.
 _Avoid_: Road bridge construction
 
 **Construction segment**:
-A track segment that the construction controller of a rail bridge construction reads to show or hide the construction's parts. A rail bridge construction needs its construction segments.
+A track segment that the construction controller of a rail bridge construction reads to show or hide the construction's child objects. A rail bridge construction needs its construction segments.
 _Avoid_: Construction scenery segment
 
 **Construction controller**:
-The game's controller on the root of a rail bridge construction. It sets the activity of the objects its entries name whenever the construction state of its segments changes.
+The game's controller on the top scene object of a rail bridge construction. It sets the activity of the objects its entries name whenever the construction state of its segments changes.
 _Avoid_: Track construction controller
 
 **Scene marker**:
@@ -407,13 +398,13 @@ The place on a scene marker, a crossing pad included, where the marker's track b
 The setting of a new-game car placement that decides whether its cars start derailed as a wreck.
 
 **Grade-crossing setup**:
-An existing crossing's controller with the scene objects below its root other than its whistle signs, such as crossing masts, the bell, detection spans and crossing pads.
+An existing crossing's controller with the scene objects below its top scene object other than its whistle signs, such as crossing masts, the bell, detection spans and crossing pads.
 
 **Crossing mast**:
 One post of an existing crossing that carries its crossing light and, on a child at the same place, its gate. It is one inventory entry.
 
 **Unprotected crossing**:
-A road crossing without a crossing controller, whose root holds one or more crossing pads with whistle signs and crossbucks. It is distinct from an existing crossing.
+A road crossing without a crossing controller, whose top scene object holds one or more crossing pads with whistle signs and crossbucks. It is distinct from an existing crossing.
 
 **Crossbuck**:
 The X-shaped road sign beside an unprotected crossing.
@@ -433,11 +424,11 @@ _Avoid_: Object list
 
 **Outliner view**:
 One of the two arrangements of the outliner: By category, which lists category, kind, place and then the objects, or By place, which lists place, category, kind and then the objects. Both views hold the same rows.
-_Avoid_: Grouping, mode
+_Avoid_: Mode
 
 **Inspection only**:
 The state of an inventory scene object that no supported family covers and that the native map editor does not edit. The outliner lists it under its category, marked inspection only, and the Object tab gives the reason it is not yet supported.
-_Avoid_: Inspection only group, Inspection only category
+_Avoid_: Inspection only category
 
 **Problems filter**:
 The outliner filter that limits the list to scene objects with a detected problem.
@@ -473,21 +464,17 @@ One supported operation carried out in Guided mode, with its own pinned target a
 A world marking that shows an invisible scene object at its physical placement, so that the modder can place it. A helper marker is the square marker of an invisible scene object.
 
 **Square marker**:
-The marker, a square with a plus, of a scene object in the world, or of a game-defined group beyond 125 metres. A click on a scene object's square marker makes that object the candidate; a click that picks a group's square marker opens the group's choice list.
+The marker, a square with a plus, of a scene object in the world, or of a complex beyond 125 metres. A click on a scene object's square marker makes that object the candidate; a click that picks a complex's square marker opens the complex's choice list.
 
 **Object frame**:
-The outline around a scene object in the world, or around a game-defined group beyond 125 metres, which shows within the frame distance.
+The outline around a scene object in the world, or around a complex beyond 125 metres, which shows within the frame distance.
 
 **Frame distance**:
-The camera distance beyond which a scene object or a game-defined group shows only its square marker.
+The camera distance beyond which a scene object or a complex shows only its square marker.
 
 **Candidate**:
-The scene object that a click or a choice from the choice list proposes, framed in blue, before Confirm makes it the inspected object. A candidate in a game-defined group beyond 125 metres shows its own square marker and object frame. No operation uses a candidate.
+The scene object that a click or a choice from the choice list proposes, framed in blue, before Confirm makes it the inspected object. A candidate in a complex beyond 125 metres shows its own square marker and object frame. No operation uses a candidate.
 
 **Choice list**:
-The native dropdown next to the pointer that lists the scene objects of one click: those of square markers that overlap at the pointer, with a game-defined group's objects in place of its square marker, or the objects of a game-defined group that the click picks. A choice from it makes the candidate.
+The native dropdown next to the pointer that lists the scene objects of one click: those of square markers that overlap at the pointer, with a complex's objects in place of its square marker, or the objects of a complex that the click picks. A choice from it makes the candidate.
 _Avoid_: Picker, popup
-
-**Game-defined group**:
-Scene objects that are one thing in the game and that the world shows as one square marker and one object frame beyond 125 metres: a grade-crossing setup, a crossing without a controller, a station, a rail bridge construction or an industry storage display. A game component holds most of them together, so their objects can stand apart in the scene hierarchy. A crossing without a controller has no such component: its crossing object holds its crossbucks and pads. Each object of a game-defined group keeps its own inventory entry and edits. Compare baked scenery group, which is placed as a whole.
-_Avoid_: Cluster, marker group

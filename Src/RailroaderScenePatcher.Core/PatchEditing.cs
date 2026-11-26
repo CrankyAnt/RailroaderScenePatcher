@@ -275,7 +275,7 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var item in scenePatchFile.Items) {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
                     // A crossbuck that its crossing's pad marker ID names needs the crossbuck identity.
-                    if ((item["target"] as JObject)?[TargetIdentity.PadMarkerMember] != null) minimum = Max(minimum, BakedSceneryGroups.RequiredVersion);
+                    if ((item["target"] as JObject)?[TargetIdentity.PadMarkerMember] != null) minimum = Max(minimum, SceneObjects.RequiredVersion);
                     // Activity of a track-marker object may be the explicit disable of a group follower, which needs the group capability.
                     if (item["active"] != null && (item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) minimum = Max(minimum, TrackFollowingVersion);
                     // Track-following placement needs its capability whether or not it is available on this build.
@@ -299,12 +299,12 @@ namespace RailroaderScenePatcher.Core {
                     TargetIdentity target;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); } catch (InvalidOperationException) { continue; }
                     // Board placement beyond the Sylva board needs its capability whether or not it is available on this build.
-                    var board = IndependentBoards.RequiredVersion(target);
+                    var board = LocationSigns.RequiredVersion(target);
                     if (board != null) minimum = Max(minimum, board);
-                    // A baked scenery group modification needs its capability whether or not it is available on this build.
-                    if (target.Structure == BakedSceneryGroups.Structure) minimum = Max(minimum, BakedSceneryGroups.RequiredVersion);
-                    // So does a modification of a part of a baked scenery group.
-                    if (target.Structure == BakedSceneryParts.Structure) minimum = Max(minimum, BakedSceneryParts.RequiredVersion);
+                    // A modification of a top scene object needs its capability whether or not it is available on this build.
+                    if (target.Structure == SceneObjects.Structure) minimum = Max(minimum, SceneObjects.RequiredVersion);
+                    // So does a modification of a child object.
+                    if (target.Structure == ChildObjects.Structure) minimum = Max(minimum, ChildObjects.RequiredVersion);
                     // So does a modification of a scene spawn point.
                     if (target.Structure == SpawnPoints.Structure || (target.Structure == null && target.Component == SpawnPoints.Component)) minimum = Max(minimum, SpawnPoints.RequiredVersion);
                     // So does a modification of a station map icon.

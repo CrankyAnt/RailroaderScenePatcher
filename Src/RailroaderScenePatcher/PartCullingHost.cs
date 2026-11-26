@@ -11,7 +11,7 @@ using RailroaderScenePatcher.Core;
 using UnityEngine;
 
 namespace RailroaderScenePatcher {
-    // The game side of own culling for moved parts of baked scenery groups: the handler of a simple culler's culling
+    // The game side of own culling for moved child objects: the handler of a simple culler's culling
     // group, registrations with the game's culling managers, the renderer list of a renderer culler and the object list
     // of a game-object culler. The rules live in Core's CullingPlan and PartCullingController. Everything here stands
     // on top of the game's own registrations and is put back when a part's own culling ends.

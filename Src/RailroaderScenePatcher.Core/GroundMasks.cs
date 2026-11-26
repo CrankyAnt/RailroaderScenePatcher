@@ -12,7 +12,7 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<double> Centre { get; }
         public IReadOnlyList<double> Axis { get; }
     }
-    // One scene ground mask (a component in Map.Runtime.MaskComponents) at or below a group root or part, observed with
+    // One scene ground mask (a component in Map.Runtime.MaskComponents) at or below a top scene object or part, observed with
     // copied values. Positions are map coordinates.
     public sealed class GroundMaskState {
         public GroundMaskState(string id, string holder, bool enabled, bool flattens, IEnumerable<double> centre, IEnumerable<double> axis, int modifiers, IEnumerable<GroundMaskRegistration> registrations, int missingKeys) {
@@ -36,14 +36,14 @@ namespace RailroaderScenePatcher.Core {
         // Keys the component holds that the terrain system no longer stores.
         public int MissingKeys { get; }
     }
-    // The scene ground masks of baked scenery as the game holds them, and the terrain system they register in.
+    // The scene ground masks of scene objects as the game holds them, and the terrain system they register in.
     public interface IGroundMaskWorld : ITerrainWorld {
-        // The scene ground masks at and below a group root or part, in a stable order.
+        // The scene ground masks at and below a top scene object or part, in a stable order.
         IReadOnlyList<GroundMaskState> Masks(object target);
         // Makes the mask register again where its holder stands now, through the game's own rebuild.
         void Rebuild(object target, string id);
     }
-    // Scene ground masks of baked scenery groups. A mask registers its shape in the game's terrain system where its
+    // Scene ground masks of scene objects with child objects. A mask registers its shape in the game's terrain system where its
     // holder stood when it was enabled; after a move of the holder, the mask is rebuilt so that its registration follows,
     // and the game regenerates terrain and vegetation at the old and the new place. A mask that flattens the terrain
     // height follows the same way: the game rebuilds a tile from its base heights and the masks registered there
@@ -53,12 +53,12 @@ namespace RailroaderScenePatcher.Core {
         const double CentreTolerance = 0.1, AxisToleranceDegrees = 0.1;
         readonly IGroundMaskWorld world;
         readonly TerrainOutput output;
-        // Whether a holder with these component types is an independent board: a renderer culler and a circle mask on one
+        // Whether a holder with these component types is a location sign: a renderer culler and a circle mask on one
         // object without a track component, such as a Loc: location sign. The board family rebuilds that mask itself
         // when the board is the edited target.
         public static bool HeldByBoard(IEnumerable<string> components) {
             var types = components?.Where(type => type != null).ToArray();
-            return types != null && types.Contains(IndependentBoards.CullerType) && types.Contains(CircleMask) && !types.Any(type => type.StartsWith("Track.", StringComparison.Ordinal));
+            return types != null && types.Contains(LocationSigns.CullerType) && types.Contains(CircleMask) && !types.Any(type => type.StartsWith("Track.", StringComparison.Ordinal));
         }
         const string CircleMask = "Map.Runtime.MaskComponents.CircleMapMask";
         // Whether an edit of a family that moves its holders' masks moves this mask. heldByTarget: the edited object holds

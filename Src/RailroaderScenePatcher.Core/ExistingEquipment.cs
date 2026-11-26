@@ -81,7 +81,7 @@ namespace RailroaderScenePatcher.Core {
     // child, or the bell of a crossing controller. Both are physical placement and activity only: the equipment keeps
     // observing its controller, which keeps driving it. The crossing controller is the equipment's group for culling:
     // a mast moved out of the sphere of its crossing's culler keeps a culling sphere of its own, as a moved part of a
-    // baked scenery group does, and the culler keeps its radius. A fixed placement holds the equipment in map
+    // scene object with child objects does, and the culler keeps its radius. A fixed placement holds the equipment in map
     // coordinates; without one it stands where the scene has it in the object above it.
     public sealed class ExistingEquipmentScene : IScene, IVersionedScene, IFramedScene, IRelationshipScene, IRetainedScene {
         public const string MastStructure = "existing-crossing-mast-v1", BellStructure = "existing-crossing-bell-v1";

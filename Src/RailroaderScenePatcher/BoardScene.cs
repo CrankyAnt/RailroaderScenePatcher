@@ -9,12 +9,12 @@ using RailroaderScenePatcher.Core;
 using UnityEngine;
 
 namespace RailroaderScenePatcher {
-    // The native operations of the independent-board capability: board transforms, the renderer culler,
-    // the circle map mask and the terrain system. The capability rules live in Core's IndependentBoards.
+    // The native operations of the location sign capability: board transforms, the renderer culler,
+    // the circle map mask and the terrain system. The capability rules live in Core's LocationSigns.
     internal sealed class BoardScene : IBoardWorld, IDisposable {
-        internal const string CullerType = IndependentBoards.CullerType;
+        internal const string CullerType = LocationSigns.CullerType;
         internal const string MaskType = "Map.Runtime.MaskComponents.CircleMapMask";
-        internal const string Structure = IndependentBoards.Structure;
+        internal const string Structure = LocationSigns.Structure;
         readonly Type transformer, culler, mask, maskBase;
         object terrain;
         readonly EventInfo tileEvent;
@@ -30,7 +30,7 @@ namespace RailroaderScenePatcher {
             culler = Native.Type(CullerType); mask = Native.Type(MaskType); maskBase = Native.Type("Map.Runtime.MaskComponents.MaskComponentBase");
             var manager = Native.Type("Map.Runtime.MapManager");
             terrain = manager == null ? null : Native.Read(manager, "Instance");
-            if (transformer == null || culler == null || mask == null || maskBase == null || terrain == null) throw new InvalidOperationException("Independent board prerequisites unavailable");
+            if (transformer == null || culler == null || mask == null || maskBase == null || terrain == null) throw new InvalidOperationException("Location sign prerequisites unavailable");
             // Check this capability's required members before any target is resolved.
             foreach (var method in new[] { "WorldToGame", "GameToWorld" })
                 if (transformer.GetMethods(Native.Flags).Count(m => m.Name == method && m.GetParameters().Length == 1) != 1) throw new MissingMethodException(method);

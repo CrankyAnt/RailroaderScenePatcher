@@ -52,7 +52,7 @@ namespace RailroaderScenePatcher.Core {
             var holding = placements.Where(p => ReferenceEquals(p.Marker, marker)).ToArray();
             return holding.Length == 0 ? StarterUse.None : holding.Any(p => p.SetupActive) ? StarterUse.Used : StarterUse.Unused;
         }
-        // The family a marker is listed in: Starter placement when it is used, none for an unused one, which stays out
+        // The family a marker is listed in: Starter placement marker when it is used, none for an unused one, which stays out
         // of the inventory, and its own family when no setup holds it.
         public string Family(object marker, string otherwise) {
             switch (Use(marker)) {
@@ -232,7 +232,7 @@ namespace RailroaderScenePatcher.Core {
         public StarterReading(BindingNeed need, IReadOnlyList<string> readers, string note) { Need = need; Readers = readers ?? Array.Empty<string>(); Note = note; }
     }
     public static class StarterPlacements {
-        public const string Family = "Starter placement";
+        public const string Family = "Starter placement marker";
         // The inspection note of a marker, and the Refresh's report, when the setups could not be read.
         public static string Unreadable(string error) => "Inspection unavailable: " + UnreadableReason(error);
         // The reason of Unreadable without its label, as a tooltip gives it after its own label.

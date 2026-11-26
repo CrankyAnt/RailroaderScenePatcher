@@ -5,10 +5,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using RailroaderScenePatcher.Core;
-using Fixture = BakedPartTests.Fixture;
+using Fixture = ChildObjectTests.Fixture;
 
-// Own culling for parts of baked scenery groups that a move takes out of their culler's sphere, against the controlled
-// saw mill group: the group root stands at map 1100, 10, 20 with a simple culler of radius 10; Platform, Ramp and Lamp
+// Own culling for child objects that a move takes out of their culler's sphere, against the controlled
+// saw mill group: the top scene object stands at map 1100, 10, 20 with a simple culler of radius 10; Platform, Ramp and Lamp
 // stand below the root, the jetty at 1100, 10, 14 with a renderer culler of its own, and the post below the jetty at
 // 1101, 10, 14. Every part fills a cube of one metre. The tests set what the camera sees: the game's sphere of a simple
 // culler through See, and an own sphere through Show.
@@ -21,10 +21,10 @@ static class PartCullingTests {
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
         (position == null ? "" : ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + N(position) + "],\"rotation\":[0,0,0,1]}") +
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
-    static string Part(string id, string name, double[] position = null, bool? active = null) => Mod(id, Mill + "/" + name, BakedSceneryParts.Structure, position, active);
+    static string Part(string id, string name, double[] position = null, bool? active = null) => Mod(id, Mill + "/" + name, ChildObjects.Structure, position, active);
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
-    static TargetIdentity PartId(string name) => new TargetIdentity(SceneName, Mill + "/" + name, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure);
-    static readonly TargetIdentity GroupId = new TargetIdentity(SceneName, Mill, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
+    static TargetIdentity PartId(string name) => new TargetIdentity(SceneName, Mill + "/" + name, ChildObjects.ComponentType, ChildObjects.Structure);
+    static readonly TargetIdentity GroupId = new TargetIdentity(SceneName, Mill, SceneObjects.ComponentType, SceneObjects.Structure);
     static bool Near(IReadOnlyList<double> a, IReadOnlyList<double> b, double tolerance = 0.001) => a != null && a.Count == b.Count && a.Zip(b, (x, y) => Math.Abs(x - y)).All(d => d <= tolerance);
     static (Store, NativeMapEditor, PatchEditingSession) Session(Fixture f) {
         var store = new Store(); var mapEditor = new NativeMapEditor();
@@ -77,7 +77,7 @@ static class PartCullingTests {
         MovedPartBelowAMovedListedObjectShows();
         PartInsideAListedSphereButOutsideTheSimpleSphereGetsItsOwn();
         GameObjectCullersStandOnGradeCrossings();
-        NoListedObjectIsABakedSceneryPart();
+        NoListedObjectIsAChildObject();
         EndingThePatcherReturnsTheCullingToTheGame();
         InstallWaitsForTheGamesCuller();
         StaleCallbacksWriteNothing();
@@ -187,18 +187,18 @@ static class PartCullingTests {
         var (_, _, session) = Session(f);
         Assert(session.Edit(PartId("Jetty"), new Placement(new[] { 1160.0, 10, 20 }, Identity), null).Applied, "The part with a simple culler of its own moves out");
         Assert(Spheres(f).Count == 0 && own.Radius == 10, "Its own culler stays its sphere; nothing is registered for it");
-        Assert(own.Handler != null && root.Handler != null, "Own culling listens to the part's culler and sets the group root");
+        Assert(own.Handler != null && root.Handler != null, "Own culling listens to the part's culler and sets the top scene object");
         f.World.See(f.Group, own, false);
         Assert(!f.Jetty.Active && f.Group.Active, "The game's culler still switches the part itself");
         f.World.See(f.Group, root, false);
         Assert(!f.Group.Active, "With both spheres hidden the group is off");
         f.World.See(f.Group, own, true);
-        Assert(f.Jetty.Active && f.Group.Active && !f.Platform.Active, "While the part's own culler is visible the group root is on for it, and the rest follows the root culler");
+        Assert(f.Jetty.Active && f.Group.Active && !f.Platform.Active, "While the part's own culler is visible the top scene object is on for it, and the rest follows the root culler");
         f.World.See(f.Group, root, true);
         Assert(session.Remove(PartId("Jetty")).Applied && own.Handler == null && root.Handler == null && f.World.Culling.Leftovers.Count == 0, "Removal puts the game's handlers back");
     }
 
-    // The rows of the activity rule: the group root is the container, the jetty the object between the culler and the
+    // The rows of the activity rule: the top scene object is the container, the jetty the object between the culler and the
     // moved post, the rail a part of the jetty with no moved part below it, and the platform a part of the root.
     static void ActivityFollowsTheSpheresEachObjectNeeds() {
         var f = Plain(); var root = Root(f);
@@ -419,7 +419,7 @@ static class PartCullingTests {
         var lister = new FakeCuller { Id = ".|Helpers.Culling.GameObjectCuller", Switcher = true, Lists = { f.Jetty }, Radius = radius, Authored = radius };
         f.Group.Cullers.Add(lister); return lister;
     }
-    // Another part below the jetty, at the offset from the group root, under the path Jetty/<name>.
+    // Another part below the jetty, at the offset from the top scene object, under the path Jetty/<name>.
     static FakePart BelowJetty(Fixture f, string name, double[] offset, FakePart parent = null) {
         var path = parent == null ? "Jetty/" + name : f.World.PartsAt.Single(p => p.Value.Contains(parent)).Key.Substring(Mill.Length + 1) + "/" + name;
         var part = f.Group.Add(new FakePart { Id = path + "#" + (f.Group.Parts.Count + 1), Offset = offset, Parent = parent ?? f.Jetty });
@@ -611,7 +611,7 @@ static class PartCullingTests {
 
     // Where the game-object cullers of Railroader 0.6.3 stand, from the inventory ledger of the base-game map: each
     // row of such a culler with every component row at and below its object. Every one stands on a grade-crossing
-    // controller, which the crossing families list, and in no listed baked scenery group. The ledger does not hold
+    // controller, which the crossing families list, and in no listed scene object with child objects. The ledger does not hold
     // what each culler lists; the native probe's culling readout records that.
     static void GameObjectCullersStandOnGradeCrossings() {
         const string culler = "Helpers.Culling.GameObjectCuller";
@@ -626,21 +626,21 @@ static class PartCullingTests {
         }
         foreach (var row in rows) At(row[1]).With(row[0]);
         // A crossing controller's object belongs to the crossing families; everything in the extract renders or collides.
-        void Mark(Node node) { node.Physical = true; node.HasFamily = node.Own.Contains(BakedSceneryRules.CrossingController); foreach (var kid in node.Kids) Mark(kid); }
+        void Mark(Node node) { node.Physical = true; node.HasFamily = node.Own.Contains(SceneObjectRules.CrossingController); foreach (var kid in node.Kids) Mark(kid); }
         Mark(world);
-        var verdicts = BakedSceneryRules.Classify(world);
-        var parts = BakedSceneryRules.Parts(verdicts).Where(v => v.Disposition == PartDisposition.Part).ToArray();
+        var verdicts = SceneObjectRules.Classify(world);
+        var parts = SceneObjectRules.Parts(verdicts).Where(v => v.Disposition == PartDisposition.Part).ToArray();
         foreach (var path in cullers) {
-            Assert(At(path).Own.Contains(BakedSceneryRules.CrossingController), path + " stands on a grade-crossing controller");
-            Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.Group && (path == v.Path || path.StartsWith(v.Path + "/", StringComparison.Ordinal))), path + " stands in no listed baked scenery group");
-            Assert(!parts.Any(v => v.Path == path || v.Path.StartsWith(path + "/", StringComparison.Ordinal)), "No baked scenery part stands at or below " + path);
+            Assert(At(path).Own.Contains(SceneObjectRules.CrossingController), path + " stands on a grade-crossing controller");
+            Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.Group && (path == v.Path || path.StartsWith(v.Path + "/", StringComparison.Ordinal))), path + " stands in no listed scene object with child objects");
+            Assert(!parts.Any(v => v.Path == path || v.Path.StartsWith(path + "/", StringComparison.Ordinal)), "No child object stands at or below " + path);
         }
     }
 
-    // The paths among listed that are a baked scenery part, or stand below one: an object a game-object culler lists
+    // The paths among listed that are a child object, or stand below one: an object a game-object culler lists
     // there would be one that own culling could have to take over. The hierarchy is built from component rows and the
     // listed paths; a crossing controller's object belongs to the crossing families, and every object renders or collides.
-    static string[] ListedBakedParts(IEnumerable<string[]> rows, IEnumerable<string> listed) {
+    static string[] ListedChildObjects(IEnumerable<string[]> rows, IEnumerable<string> listed) {
         var world = new Node("World");
         Node At(string path) {
             var node = world;
@@ -649,24 +649,24 @@ static class PartCullingTests {
         }
         foreach (var row in rows) At(row[1]).With(row[0]);
         foreach (var path in listed) At(path);
-        void Mark(Node node) { node.Physical = true; node.HasFamily = node.Own.Contains(BakedSceneryRules.CrossingController); foreach (var kid in node.Kids) Mark(kid); }
+        void Mark(Node node) { node.Physical = true; node.HasFamily = node.Own.Contains(SceneObjectRules.CrossingController); foreach (var kid in node.Kids) Mark(kid); }
         Mark(world);
-        var parts = BakedSceneryRules.Parts(BakedSceneryRules.Classify(world)).Where(v => v.Disposition == PartDisposition.Part).Select(v => v.Path).ToArray();
+        var parts = SceneObjectRules.Parts(SceneObjectRules.Classify(world)).Where(v => v.Disposition == PartDisposition.Part).Select(v => v.Path).ToArray();
         return listed.Where(path => parts.Any(part => path == part || path.StartsWith(part + "/", StringComparison.Ordinal))).ToArray();
     }
     // What the four game-object cullers of Railroader 0.6.3 list: eight signals, each below a grade-crossing setup.
-    // None is a baked scenery part, so the base-game map has no listed part for own culling to take over.
-    static void NoListedObjectIsABakedSceneryPart() {
+    // None is a child object, so the base-game map has no listed part for own culling to take over.
+    static void NoListedObjectIsAChildObject() {
         var rows = CullerInventoryExtract.Rows; var listed = CullerInventoryExtract.Listed;
         var cullers = rows.Where(r => r[0] == "Helpers.Culling.GameObjectCuller").Select(r => r[1]).OrderBy(p => p, StringComparer.Ordinal).ToArray();
         Assert(listed.Length == 8 && listed.Select(l => l[0]).Distinct().OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(cullers), "The extract holds the eight listed objects of the four game-object cullers");
         Assert(listed.All(l => l[1].StartsWith(l[0] + "/", StringComparison.Ordinal)), "Every listed object stands below its culler's grade-crossing setup");
-        var found = ListedBakedParts(rows, listed.Select(l => l[1]));
-        Assert(found.Length == 0, "No object a game-object culler lists is a baked scenery part: " + String.Join(", ", found));
-        // The check finds a listed baked scenery part where one exists: a lamp of a shed that is a listed group.
+        var found = ListedChildObjects(rows, listed.Select(l => l[1]));
+        Assert(found.Length == 0, "No object a game-object culler lists is a child object: " + String.Join(", ", found));
+        // The check finds a listed child object where one exists: a lamp of a shed that is a listed group.
         const string lamp = "World/Large Scenery/Town/Shed/Lamp";
-        var withLamp = ListedBakedParts(rows.Concat(new[] { new[] { "UnityEngine.MeshRenderer", lamp }, new[] { "Helpers.Culling.GameObjectCuller", "World/Large Scenery/Town/Shed" } }), listed.Select(l => l[1]).Concat(new[] { lamp }));
-        Assert(withLamp.SequenceEqual(new[] { lamp }), "A listed part of a baked scenery group is found: " + String.Join(", ", withLamp));
+        var withLamp = ListedChildObjects(rows.Concat(new[] { new[] { "UnityEngine.MeshRenderer", lamp }, new[] { "Helpers.Culling.GameObjectCuller", "World/Large Scenery/Town/Shed" } }), listed.Select(l => l[1]).Concat(new[] { lamp }));
+        Assert(withLamp.SequenceEqual(new[] { lamp }), "A listed child object is found: " + String.Join(", ", withLamp));
     }
 
     // The patcher's state ends while the scene stays loaded: everything own culling took over goes back to the game.
@@ -678,7 +678,7 @@ static class PartCullingTests {
         Assert(lamps.Lists.Count == 1 && container.Renders.Count == 1 && root.Handler != null && Spheres(f).Count > 0, "Own culling holds the list, the renderers and the handler");
         f.World.See(f.Group, root, false);
         Assert(f.Group.Active, "While own culling runs, the moved parts keep the root on");
-        // The entry point disposes the capabilities; the baked scenery group capability disposes its world.
+        // The entry point disposes the capabilities; the scene object with child objects capability disposes its world.
         f.Scene.Dispose();
         Assert(Spheres(f).Count == 0 && f.World.Culling.RegionCount == 0 && root.Handler == null, "Disposing the capabilities releases every sphere and puts the game's handler back");
         Assert(lamps.Lists.Count == 2 && lamps.Lists.Count(l => l == f.Lamp) == 1 && container.Renders.Count == 3, "The list and the renderers are restored");
@@ -757,7 +757,7 @@ static class PartCullingTests {
         var second = new FakeGroup();
         f.World.Objects[Other] = new List<object> { second };
         f.World.PartsAt[Other + "/Lamp"] = new List<object> { second.Parts[2] };
-        Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost), Mod("far-lamp", Other + "/Lamp", BakedSceneryParts.Structure, new[] { 1160.0, 10, 30 }, null)), "Both groups have a moved part out of their culler's sphere");
+        Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost), Mod("far-lamp", Other + "/Lamp", ChildObjects.Structure, new[] { 1160.0, 10, 30 }, null)), "Both groups have a moved part out of their culler's sphere");
         Assert(Spheres(f).Count == 2, "Each group holds its own sphere");
         f.World.Culling.GroupName = group => ReferenceEquals(group, f.Group) ? Mill : ReferenceEquals(group, second) ? Other : null;
         var failure = "game function gone";
@@ -818,7 +818,7 @@ static class PartCullingTests {
     }
 
     static void InspectorNamesOwnCulling() {
-        var text = BakedSceneryRules.PartCullingDependency;
+        var text = SceneObjectRules.PartCullingDependency;
         Assert(text.Contains("its own culling") && text.Contains("keeps its radius") && !text.Contains("expand"), "The inspector says a moved part keeps its own culling and the group's culler its radius: " + text);
     }
 }

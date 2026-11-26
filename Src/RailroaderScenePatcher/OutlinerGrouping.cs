@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher {
             internal List<Unit> Members = new List<Unit>();
             internal string Category, Kind, Place, CrossingPath;
         }
-        // A node without an inventory row that stands for a game-defined group: where Focus goes, in map coordinates.
+        // A node without an inventory row that stands for a complex: where Focus goes, in map coordinates.
         internal sealed class GroupNode { internal string Label; internal double[] Point; }
         internal sealed class Result {
             internal IReadOnlyList<OutlineNode> Tops;
@@ -109,17 +109,17 @@ namespace RailroaderScenePatcher {
             if (entries == null) return new HashSet<SceneObservation>();
             if (ReferenceEquals(containersFrom, entries)) return containers;
             var found = new HashSet<SceneObservation>();
-            foreach (var group in entries.Where(e => e.Family == SceneFamilies.BakedScenery && e.GroupPath == null && e.Category == BakedSceneryCategories.Sign)) {
+            foreach (var group in entries.Where(e => SceneObjectRules.InFamilies(e.Family) && e.GroupPath == null && e.Category == SceneObjectCategories.Sign)) {
                 var below = group.Identity.Path + "/";
                 bool Inside(SceneObservation e) => e.Identity.Scene == group.Identity.Scene && e.Identity.Path.StartsWith(below, StringComparison.Ordinal);
-                if (!entries.Any(e => e.GroupPath == group.Identity.Path && e.Identity.Scene == group.Identity.Scene) && entries.Any(e => e.Family != SceneFamilies.BakedScenery && Inside(e))) found.Add(group);
+                if (!entries.Any(e => e.GroupPath == group.Identity.Path && e.Identity.Scene == group.Identity.Scene) && entries.Any(e => !SceneObjectRules.InFamilies(e.Family) && Inside(e))) found.Add(group);
             }
             containersFrom = entries; containers = found;
             return found;
         }
         // A track span of the scene that no crossing controller holds is a native track span and gets no row. The
         // base map has none: the spans the game builds from its operations data while it runs never enter the
-        // inventory (BakedSceneryRules.SpanListed), so they are not hidden here and are in no count.
+        // inventory (SceneObjectRules.SpanListed), so they are not hidden here and are in no count.
         internal static bool IsNativeSpan(SceneObservation r) => r.Family == SpanFamily && r.HolderPath == null && !r.Identity.Path.StartsWith(InventoryPresentationState.CoverageRoot, StringComparison.Ordinal);
         internal static int HiddenCount(IReadOnlyList<SceneObservation> entries) => entries == null ? 0 : SignContainers(entries).Count + entries.Count(IsNativeSpan);
         // The outliner's count line: the rows the tree lists, of the objects it can list.
@@ -172,7 +172,7 @@ namespace RailroaderScenePatcher {
             try { return Scene.Facts(e) ?? new ObjectFacts(); }
             catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("facts", "The patcher couldn't read an object's components. The outliner uses its name and object family to choose its category and kind: " + ex.GetBaseException().Message); return new ObjectFacts(); }
         }
-        // The category and kind of a listed object that is no part, from the generic rules. A group root keeps the
+        // The category and kind of a listed object that is no part, from the generic rules. A top scene object keeps the
         // category the inventory gave it by the same rules.
         static SceneClass ClassOf(SceneObservation e) {
             if (classCache.TryGetValue(e, out var known)) return known;
@@ -271,9 +271,9 @@ namespace RailroaderScenePatcher {
             }
             b.Result.Tops = lastTops = tops;
             b.Result.Listed = tops.Sum(t => t.Count);
-            b.Result.Unplaced = tops.Where(t => t.Label == OutlineTree.NoPlace || t.Label == BakedSceneryCategories.Unclassified).Sum(t => t.Count);
+            b.Result.Unplaced = tops.Where(t => t.Label == OutlineTree.NoPlace || t.Label == SceneObjectCategories.Unclassified).Sum(t => t.Count);
             if (b.Diagnostics) {
-                b.Result.CatchAll.AddRange(b.Units.Where(u => u.Place == null || u.Category == BakedSceneryCategories.Unclassified).Select(Describe));
+                b.Result.CatchAll.AddRange(b.Units.Where(u => u.Place == null || u.Category == SceneObjectCategories.Unclassified).Select(Describe));
                 b.Result.Violations.AddRange(OutlineTree.Violations(tops, b.PlaceView, places.All.Select(p => p.Name)));
             }
             return b.Result;
@@ -298,12 +298,12 @@ namespace RailroaderScenePatcher {
             return at.Length == 0 ? null : new[] { at.Average(p => p[0]), at.Average(p => p[1]), at.Average(p => p[2]) };
         }
 
-        // Container objects and native track spans leave the list.
+        // Sign holders and native track spans leave the list.
         static void HideContainersAndNativeSpans(BuildContext b) {
             var signContainers = SignContainers(b.Entries);
             foreach (var r in b.Rows.Where(r => signContainers.Contains(r) || IsNativeSpan(r))) {
                 b.Hidden.Add(r);
-                if (b.Diagnostics) b.Result.Hidden.Add((signContainers.Contains(r) ? "container object " : "native track span ") + r.Identity.Path);
+                if (b.Diagnostics) b.Result.Hidden.Add((signContainers.Contains(r) ? "sign holder " : "native track span ") + r.Identity.Path);
             }
             foreach (var e in b.Entries) {
                 var at = new ScenePath(e.Identity.Scene, e.Identity.Path);
@@ -326,10 +326,10 @@ namespace RailroaderScenePatcher {
             }
             foreach (var u in b.Units) {
                 // A group that holds matching parts but does not match itself is shown dimmed, only to hold them.
-                if (!u.Node.Context && u.Row != null && u.Node.Children.Count != 0 && u.Row.GroupPath == null && u.Row.HolderPath == null && u.Row.Family == BakedSceneryRules.Family
+                if (!u.Node.Context && u.Row != null && u.Node.Children.Count != 0 && u.Row.GroupPath == null && u.Row.HolderPath == null && SceneObjectRules.InFamilies(u.Row.Family)
                     && !u.Row.MatchesItself(b.Search) && !MatchesGrouping(u.Row, b.Search, b.TrackPoint)) { u.Node.Context = true; u.Node.Count--; }
                 u.Node.Children.Sort((x, y) => { var by = OutlineTree.NaturalComparer.Instance.Compare(x.Label, y.Label); return by != 0 ? by : StringComparer.Ordinal.Compare(x.Row.Identity.Path, y.Row.Identity.Path); });
-                var found = u.Row == null ? SceneClassification.Class(BakedSceneryCategories.Unclassified, null) : ClassOf(u.Row);
+                var found = u.Row == null ? SceneClassification.Class(SceneObjectCategories.Unclassified, null) : ClassOf(u.Row);
                 u.Category = found.Category; u.Kind = found.Kind;
             }
         }
@@ -342,7 +342,7 @@ namespace RailroaderScenePatcher {
                     var positions = u.Members.Select(m => Measure(m.Row, b.TrackPoint)).Where(p => p != null).ToArray();
                     u.Place = places.Of(u.CrossingPath, positions.Length == 0 ? null : new[] { positions.Average(p => p[0]), positions.Average(p => p[1]) })?.Name;
                 }
-                if (u.Category == BakedSceneryCategories.GradeCrossing) u.Kind = u.Row?.Family == ControllerFamily ? SceneClassification.ProtectedCrossings : SceneClassification.UnprotectedCrossings;
+                if (u.Category == SceneObjectCategories.GradeCrossing) u.Kind = u.Row?.Family == ControllerFamily ? SceneClassification.ProtectedCrossings : SceneClassification.UnprotectedCrossings;
                 if (b.Diagnostics && u.Row?.InspectionOnly != null) b.Result.InspectionOnlyRows.Add(u.Node.Label + " (" + u.Row.Identity.Path + ") [" + u.Row.Family + "] under " + u.Category + ": " + u.Row.InspectionOnly);
             }
         }

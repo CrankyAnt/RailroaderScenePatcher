@@ -297,13 +297,13 @@ static class LogModeTests {
         var failure = new InvalidOperationException("outer", new Exception("game function gone"));
         var once = new LogOnce();
         var log = RecordingLog.Capture(true, () => {
-            once.Warning("k", BakedSceneryRules.CullingUpdateFailure("BushnellWhittier-MapManager/World/Mill"), failure);
-            once.Warning("k", BakedSceneryRules.CullingUpdateFailure("BushnellWhittier-MapManager/World/Mill"), failure);
-            once.Warning("j", BakedSceneryRules.CullingUpdateFailure(null), failure);
+            once.Warning("k", SceneObjectRules.CullingUpdateFailure("BushnellWhittier-MapManager/World/Mill"), failure);
+            once.Warning("k", SceneObjectRules.CullingUpdateFailure("BushnellWhittier-MapManager/World/Mill"), failure);
+            once.Warning("j", SceneObjectRules.CullingUpdateFailure(null), failure);
         });
         Assert(log.At(LogLevel.Warning).SequenceEqual(new[] {
             "The patcher couldn't update visibility for moved parts of BushnellWhittier-MapManager/World/Mill. Report this to the patcher maintainer: game function gone",
-            "The patcher couldn't update visibility for moved baked scenery parts. Report this to the patcher maintainer: game function gone" }), "One text names the group or the parts: " + String.Join(" | ", log.At(LogLevel.Warning)));
+            "The patcher couldn't update visibility for moved parts. Report this to the patcher maintainer: game function gone" }), "One text names the group or the parts: " + String.Join(" | ", log.At(LogLevel.Warning)));
         Assert(log.At(LogLevel.Debug).Count() == 2 && log.At(LogLevel.Debug).All(l => l.Contains("System.InvalidOperationException")), "Each written warning adds its full exception as a debug line");
     }
 

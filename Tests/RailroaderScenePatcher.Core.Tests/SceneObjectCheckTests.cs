@@ -5,13 +5,13 @@ using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
 
-// The debug summary of the baked scenery rule's verdicts that one load attempt writes.
-static class BakedSceneryCheckTests {
+// The debug summary of the scene object rule's verdicts that one load attempt writes.
+static class SceneObjectCheckTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
 
     internal static void Run() {
         SummaryPerLoad();
-        Console.WriteLine("PASS: baked scenery checks");
+        Console.WriteLine("PASS: scene object checks");
     }
 
     static KeyValuePair<string, string> Check(string path, string verdict) => new KeyValuePair<string, string>(path, verdict);
@@ -26,9 +26,9 @@ static class BakedSceneryCheckTests {
             .Concat(Enumerable.Range(0, 3).Select(i => Check("s/World/Roads/Crossing " + (3 - i), crossing)))
             .Concat(new[] { Check("s/World/Builder Photo Setup/Camera", rig) })
             .ToArray();
-        var lines = BakedSceneryChecks.Summary(checks, 3).ToArray();
+        var lines = SceneObjectChecks.Summary(checks, 3).ToArray();
         Assert(lines.SequenceEqual(new[] {
-            "Checked 2404 candidate baked scenery objects. Counts by result:",
+            "Checked 2404 candidate scene objects. Counts by result:",
             "2400 objects: No scenery group row in the outliner. The patcher offers no group edits for this object. Reason: Objects the game creates while running",
             "3 objects: Listed as a scenery group. Category: Grade crossing",
             "  s/World/Roads/Crossing 1",
