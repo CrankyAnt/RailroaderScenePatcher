@@ -36,7 +36,7 @@ Each repair changes one holder, and each replacement ID belongs to one marker. U
 
 **Set replacement ID** is unavailable if the field is empty, contains only spaces, holds the marker's current ID, begins with a reserved prefix, or begins or ends with a space. Its tooltip explains why.
 
-The **Replacement marker ID** section is disabled for objects outside the **Generic track marker** family. The reason names the family, such as **Milepost**, to distinguish it from the marker type **Generic**, which mileposts and starter placement markers can also show. The section is also disabled for a generic track marker whose underlying ID is unique, unless this mod already sets a replacement ID.
+The **Replacement marker ID** section is disabled for objects outside the **Generic track marker** family. Its tooltip reads `Only the Generic track marker family.` Marker type **Generic** alone isn't enough: mileposts and starter placement markers can also have that type. The section is also disabled for a generic track marker whose underlying ID is unique, unless this mod already sets a replacement ID.
 
 After **Set replacement ID**, the caption above the other holders changes from **Also holding** to **Still holding** and includes the underlying ID, for example `Still holding Mg6m, the underlying ID`. The list names the holders that keep that ID. The selected marker now has a unique replacement ID, so its detected problem disappears. The other holders keep sharing the underlying ID until each has its own.
 

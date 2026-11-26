@@ -124,7 +124,7 @@ The outliner lists these markers under the **Starter placement** category, once 
 
 - A marker that a car placement of an active setup holds is listed, enabled or not, because the game reads it at a new game.
 - A marker that only setups that are switched off hold is not listed: the game never reads it.
-- A marker that no setup holds is no starter placement marker. It stays an ordinary marker: a Generic marker is in the **Generic track marker** family, whatever its name or place under `Setups`.
+- A marker that no setup holds isn't a starter placement marker. If its type is Generic, it belongs to the **Generic track marker** family, regardless of its name or its position under `Setups`.
 
 The **Object** tab lists under **Used by** every setup and car placement that reads the marker, with the cars of each cut and whether the placement is a wreck. A listed marker needs a usable binding whether it is enabled or not: an empty binding, or a stored track location whose segment no longer exists, is a problem. A binding on an existing segment shows no problem.
 

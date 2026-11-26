@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Repair, replace, or detach a track-marker binding
 
-Set, replace, or detach the track location of a Generic track marker, such as a yard-limit or station sign. Its `Track.TrackMarker` stores the binding as a segment ID, an end to measure from, and a distance in meters. The track graph registers the marker under that segment so game code can find it by ID.
+Set, replace, or detach the track location of an object in the **Generic track marker** family, such as a yard-limit or station sign. Its `Track.TrackMarker` stores the binding as a segment ID, an end to measure from, and a distance in meters. The track graph registers the marker under that segment so game code can find it by ID.
 
 Changing the binding never moves the object. Placement and activity are separate settings in the same modification. You can change them before or after a binding edit, or without editing the binding at all. Track-marker relationship and target capabilities require patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content. See [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 

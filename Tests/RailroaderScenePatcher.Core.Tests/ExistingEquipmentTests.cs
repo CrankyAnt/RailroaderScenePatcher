@@ -483,8 +483,8 @@ static class ExistingEquipmentTests {
         Assert(CommandBand.NoBindingReason(Row(span.Identity.Path, "Track span", Crossing, "changed")) == CommandBand.DetectionSpanNoBinding, "The holder, not the message text, decides");
         foreach (var row in new[] { looseSpan, controller, mast, bell, board, null })
             Assert(CommandBand.NoBindingReason(row) == CommandBand.NoTrackBinding, "Another object without a binding names the families whose binding the patcher edits");
-        Assert(CommandBand.NoTrackBinding == "Only markers, mileposts and pads have one", "The reason names the families with editable track bindings");
-        Assert(CommandBand.Sentence(CommandBand.DetectionSpanNoBinding) == "Edit it on its crossing controller." && CommandBand.Sentence(CommandBand.NoTrackBinding) == "Only markers, mileposts and pads have one.", "Each reason forms a plain sentence");
+        Assert(CommandBand.NoTrackBinding == "Only markers, mileposts and pads use bindings", "The reason names the families with editable track bindings");
+        Assert(CommandBand.Sentence(CommandBand.DetectionSpanNoBinding) == "Edit it on its crossing controller." && CommandBand.Sentence(CommandBand.NoTrackBinding) == "Only markers, mileposts and pads use bindings.", "Each reason forms a plain sentence");
         Assert(CommandBand.HoldsMarker(StarterPlacements.Family) && !CommandBand.HoldsMarker("Track span") && !CommandBand.HoldsMarker(null), "The marker families are one list");
     }
 

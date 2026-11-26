@@ -44,7 +44,7 @@ static class SupportedEditsTests {
         foreach (var pair in new[] {
             (GameSwitchActivity.ProgressionMembersRefusal, "Progression data can't be read"),
             (GameSwitchActivity.MapFeatureMembersRefusal, "Map feature data can't be read"),
-            (GameSwitchActivity.UnsharedRefusal, "Progression or a map feature switches it"),
+            (GameSwitchActivity.UnsharedRefusal, "Progression or a map feature controls it"),
         }) Check(Shown(board, new SupportedEdits.Live { DisableProblem = pair.Item1 }) == "Available: Move, Rotate, Follow a track | Unavailable: | • " + pair.Item2 + ": Disable", "live activity reason: " + pair.Item2);
         var bell = Entry("Crossing bell", ExistingEquipmentScene.BellStructure, CommandBand.BellOperations, active: false);
         Check(Shown(bell, new SupportedEdits.Live { ActivitySwitched = "This game build cannot reconfigure the bell when it is enabled again: missing method" })
@@ -54,8 +54,8 @@ static class SupportedEditsTests {
             == "Available: Move, Rotate, Follow a track, Disable, Set track binding | Unavailable: | • Its current ID can't be read: Set replacement marker ID", "unreadable marker ID");
         var starter = Entry(StarterPlacements.Family, StarterPlacementScene.Structure, StarterPlacements.Operations,
             bindings: new[] { StarterPlacements.ReaderPrefix + new string('a', 1000), StarterPlacements.ReaderPrefix + new string('b', 1000) });
-        Check(Shown(starter) == "Available: Set track location | Unavailable: | • Has no effect on where cars start: " + Placed + " | " + NoReplacementId + " | • Several new-game car placements read it: Set Start derailed", "several readers do not expand the reason");
-        Check(CommandBand.Tooltip("Binding.", CommandBand.NoBindingReason(board)) == "Only markers, mileposts and pads have one.", "binding fallback tooltip");
+        Check(Shown(starter) == "Available: Set track location | Unavailable: | • Has no effect on where cars start: " + Placed + " | " + NoReplacementId + " | • Several new-game car placements use it: Set Start derailed", "several readers do not expand the reason");
+        Check(CommandBand.Tooltip("Binding.", CommandBand.NoBindingReason(board)) == "Only markers, mileposts and pads use bindings.", "binding fallback tooltip");
     }
 
     static void AnAbsentSceneBlocksEveryEdit() {
@@ -79,27 +79,27 @@ static class SupportedEditsTests {
             ["Editing this board would leave one of its attached objects out of date: " + new string('x', 1000)] = "Its attached object is out of date",
             ["The board's renderer culler must be present and enabled"] = "Its structure isn't supported",
             ["The board must carry exactly one enabled circle map mask"] = "Its structure isn't supported",
-            ["the marker reference scan failed: " + new string('x', 1000)] = "Its marker references couldn't be read",
-            ["The direct-reference scan is unavailable; other holders of this marker are unknown"] = "Its marker references couldn't be read",
-            ["Crossing pad editing is unavailable"] = "Its state couldn't be read",
-            ["The game's scene spawn point type is unavailable."] = "Game members it needs are unavailable",
-            ["The game's construction controller is unavailable."] = "Game members it needs are unavailable",
-            ["The game's ground mask members are unavailable, so you can't move, enable, or disable this group or its parts."] = "Game members it needs are unavailable",
-            ["Construction scenery entries unavailable"] = "Game members it needs are unavailable",
+            ["the marker reference scan failed: " + new string('x', 1000)] = "Its marker references can't be read",
+            ["The direct-reference scan is unavailable; other holders of this marker are unknown"] = "Its marker references can't be read",
+            ["Crossing pad editing is unavailable"] = "Its state can't be read",
+            ["The game's scene spawn point type is unavailable."] = "Required game support is unavailable",
+            ["The game's construction controller is unavailable."] = "Required game support is unavailable",
+            ["The game's ground mask members are unavailable, so you can't move, enable, or disable this group or its parts."] = "Required game support is unavailable",
+            ["Construction scenery entries unavailable"] = "Required game support is unavailable",
             ["Missing script on the pad object"] = "Its structure isn't supported",
             ["The pad builder has no mesh container or mesh profile; native generation cannot produce its geometry"] = "Its structure isn't supported",
             ["Use the milepost's own settings to edit it"] = "Edit it on its milepost",
             ["Edit this marker through its crossing pad"] = "Edit it on its crossing pad",
-            ["The pad's activity follows a track group; the crossing-pad operation does not support group-driven activity"] = "Its activity follows a track group",
+            ["The pad's activity follows a track group; the crossing-pad operation does not support group-driven activity"] = "Its track group controls its activity",
             ["Only the Ela Bridge Scenery construction controller has construction segments of its own. For another rail bridge, set the construction segments on its group."] = "Edit it on its group",
-            [SceneObjectRules.TrackMarkerReason] = "It holds track markers; edit them one by one",
-            [SceneObjectRules.SpawnPointReason] = "It holds spawn points; edit them one by one",
-            [SceneObjectRules.MapIconReason] = "It holds a map icon; edit it separately",
+            [SceneObjectRules.TrackMarkerReason] = "Edit its track markers one by one",
+            [SceneObjectRules.SpawnPointReason] = "Edit its spawn points one by one",
+            [SceneObjectRules.MapIconReason] = "Edit its map icon separately",
             [SceneObjectRules.StationAgentReason] = "Station click spots are native map data",
             [SceneObjectRules.ConstructionOutsideBridge] = "It holds a construction controller",
-            [SceneObjectRules.TopObjectRefusal] = "Edit the group as a whole instead",
-            [SceneObjectRules.CullerOnlyRefusal] = "Edit the parts it holds directly",
-            [SceneObjectRules.GroupHolderRefusal] = "Edit the groups it holds instead",
+            [SceneObjectRules.TopObjectRefusal] = "Edit the whole group instead",
+            [SceneObjectRules.CullerOnlyRefusal] = "Edit its parts directly",
+            [SceneObjectRules.GroupHolderRefusal] = "Edit its groups instead",
             ["its crossing controller is disabled, so its bell cannot work"] = "Its crossing controller is disabled",
         };
         foreach (var pair in cases) {
@@ -122,9 +122,9 @@ static class SupportedEditsTests {
             Check(pair.Value.Length <= 45, "reason remains within 45 characters with long source values");
         }
         var noState = Entry("Location sign", null, null);
-        Check(Shown(noState) == "Unavailable: | • Its state couldn't be read: Move, Rotate, Follow a track, Disable", "an empty operations list names the unread state");
+        Check(Shown(noState) == "Unavailable: | • Its state can't be read: Move, Rotate, Follow a track, Disable", "an empty operations list names the unread state");
         var noFamily = Entry("Unrecognised family", null, CommandBand.InspectionOnly("Unrecognised family", false));
-        Check(Shown(noFamily) == "Unavailable: | • No edit for this family: Move, Rotate, Follow a track, Disable", "an inspection-only family has no edit");
+        Check(Shown(noFamily) == "Unavailable: | • This family has no supported edits: Move, Rotate, Follow a track, Disable", "an inspection-only family has no edit");
         var values = new EditFeedback();
         values.Refuse("Placement", "Move", "Enter a finite number.");
         Check(values.Messages[0].Text == "Move refused. Enter a finite number.", "a value correction keeps its own text");
@@ -135,10 +135,10 @@ static class SupportedEditsTests {
         var board = Entry("Location sign", LocationSigns.Structure, "Edits of this family");
         Check(Shown(board, new SupportedEdits.Live { Enabled = false }) == "Available: Move, Rotate, Follow a track, Enable", "an inactive object offers Enable");
         var follower = Entry("Generic track marker", TrackMarkerScene.Structure, "Edits of this family", bindings: new[] { "Activity follows track group G1" }, active: false);
-        Check(Shown(follower) == "Available: Move, Rotate, Follow a track, Set track binding, Set replacement marker ID | Unavailable: | • Clear activity returns it to its track group: Enable", "an inactive group follower takes Clear activity");
+        Check(Shown(follower) == "Available: Move, Rotate, Follow a track, Set track binding, Set replacement marker ID | Unavailable: | • Clear activity restores track group control: Enable", "an inactive group follower takes Clear activity");
         var mast = Entry(ExistingEquipmentScene.MastFamily, ExistingEquipmentScene.MastStructure, CommandBand.MastOperations);
         Check(Shown(mast, new SupportedEdits.Live { ActivitySwitched = CommandBand.EquipmentSwitched }) == "Available: Move, Rotate | Unavailable: | " + NoFollowEquipment + " | • The game switches it by camera distance: Disable", "camera-switched equipment takes no activity setting");
-        Check(Shown(board, new SupportedEdits.Live { DisableProblem = GameSwitchActivity.UnsharedRefusal }) == "Available: Move, Rotate, Follow a track | Unavailable: | • Progression or a map feature switches it: Disable"
+        Check(Shown(board, new SupportedEdits.Live { DisableProblem = GameSwitchActivity.UnsharedRefusal }) == "Available: Move, Rotate, Follow a track | Unavailable: | • Progression or a map feature controls it: Disable"
             && Shown(board, new SupportedEdits.Live { Enabled = false, DisableProblem = GameSwitchActivity.UnsharedRefusal }) == "Available: Move, Rotate, Follow a track, Enable", "the disable problem holds back Disable only");
         var starter = Entry(StarterPlacements.Family, StarterPlacementScene.Structure, StarterPlacements.Operations, bindings: new[] { StarterPlacements.ReaderPrefix + "Kitchen: 3 cars" });
         Check(Shown(starter) == "Available: Set track location, Set Start derailed | Unavailable: | • Has no effect on where cars start: " + Placed + " | " + NoReplacementId, "one reader offers Start derailed");
@@ -150,7 +150,7 @@ static class SupportedEditsTests {
         var added = Entry(SceneFamilies.AddedEquipment, null, CommandBand.AddedEquipmentOperations("Signal 1 (added)"));
         Check(Shown(added) == "Unavailable: | • Edit it on its crossing controller: " + Placed, "added equipment points to its crossing controller");
         var swing = Entry(SceneObjectRules.Family, null, null, only: CommandBand.NotYetSupported("groups that hold a spawn point"));
-        Check(Shown(swing) == "Unavailable: | • It holds spawn points; edit them one by one: " + Placed, "spawn points are edited one by one");
+        Check(Shown(swing) == "Unavailable: | • Edit its spawn points one by one: " + Placed, "spawn points are edited one by one");
         var refusedPad = Entry("Crossing pad marker", null, CommandBand.NotEditable("Missing script on the pad object"));
         Check(Shown(refusedPad) == "Unavailable: | • Its structure isn't supported: " + Placed + ", Set track binding", "a refused pad groups its unavailable edits");
         var part = Entry(SceneObjectRules.ChildFamily, ChildObjects.Structure, CommandBand.PartOperations, groupPath: "World/G");
@@ -158,7 +158,7 @@ static class SupportedEditsTests {
         var signGroup = Entry(SceneObjectRules.Family, SceneObjects.Structure, CommandBand.GroupOperations, bindings: new[] { "Marker segment: Abc" });
         Check(!Shown(signGroup).Contains(SupportedEdits.Binding), "binding lines do not invent a binding edit");
         var unreadMarker = Entry("Generic track marker", null, CommandBand.NotEditable("the marker reference scan failed: scan error"));
-        Check(Shown(unreadMarker) == "Unavailable: | • Its marker references couldn't be read: " + Placed + ", Set track binding", "an unreadable Generic marker keeps its binding edit with its reason");
+        Check(Shown(unreadMarker) == "Unavailable: | • Its marker references can't be read: " + Placed + ", Set track binding", "an unreadable Generic marker keeps its binding edit with its reason");
         foreach (var family in new[] { "Generic track marker", "Milepost", "Crossing pad marker" }) {
             var refused = Entry(family, null, CommandBand.NotEditable("the marker has no track location"));
             Check(SupportedEdits.ReasonOf(SupportedEdits.Of(refused), SupportedEdits.Binding) == "Its structure isn't supported", "a refused binding has its object's reason");
@@ -196,7 +196,7 @@ static class SupportedEditsTests {
     // The explicit expected Supported edits of each kind of object, in the window's words.
     const string SharedBlock = "Another object shares its hierarchy path";
     const string Placed = "Move, Rotate, Follow a track, Disable";
-    const string NoReplacementId = "• Generic track markers only: Set replacement marker ID";
+    const string NoReplacementId = "• Only the Generic track marker family: Set replacement marker ID";
     const string NoFollowEquipment = "• Uses fixed placement: Follow a track";
     const string RailNoFollow = "Unavailable: | " + NoFollowEquipment;
     static readonly Dictionary<string, string> Expected = new Dictionary<string, string> {
@@ -209,13 +209,13 @@ static class SupportedEditsTests {
         ["milepost"] = "Available: Move, Rotate, Disable, Set track binding | " + RailNoFollow + " | " + NoReplacementId,
         ["mast"] = "Available: Move, Rotate, Disable | " + RailNoFollow,
         ["bell"] = "Available: Move, Disable | Unavailable: | • A bell's sound has no direction: Rotate | " + NoFollowEquipment,
-        ["crossing controller"] = "Available: Edit crossing coverage, Edit crossing equipment | Unavailable: | • Its placement and activity aren't edited: " + Placed,
+        ["crossing controller"] = "Available: Edit crossing coverage, Edit crossing equipment | Unavailable: | • Its placement and activity can't be edited: " + Placed,
         ["construction controller"] = "Available: Set construction segments | Unavailable: | • Its placement has no effect in the game: Move, Rotate, Follow a track | • The game needs it to show bridge parts: Disable",
         ["starter"] = "Available: Set track location | Unavailable: | • Has no effect on where cars start: " + Placed
-            + " | " + NoReplacementId + " | • No new-game car placement reads it: Set Start derailed",
+            + " | " + NoReplacementId + " | • No new-game car placement uses it: Set Start derailed",
         ["shared board"] = "Unavailable: | • " + SharedBlock + ": " + Placed,
         ["detection span"] = "Unavailable: | • Edit it on its crossing controller: " + Placed,
-        ["sign group"] = "Unavailable: | • It holds track markers; edit them one by one: " + Placed,
+        ["sign group"] = "Unavailable: | • Edit its track markers one by one: " + Placed,
         ["refused marker"] = "Unavailable: | • Its structure isn't supported: " + Placed + ", Set track binding",
     };
     static string SharedMarker(int holders) => "Unavailable: | • " + SharedBlock + ": " + Placed + ", Set track binding";
@@ -319,7 +319,7 @@ static class SupportedEditsTests {
     static void CrossingControllerOffersOnlyItsConnections() {
         var controller = Entry("Grade crossing controller", CrossingCoverageScene.Structure, "Set which tracks each circuit detects.", component: CrossingCoverageScene.ComponentType);
         var edits = SupportedEdits.Of(controller);
-        const string reason = "Its placement and activity aren't edited";
+        const string reason = "Its placement and activity can't be edited";
         Check(Shown(controller) == "Available: Edit crossing coverage, Edit crossing equipment | Unavailable: | • " + reason + ": Move, Rotate, Follow a track, Disable",
             "a crossing controller: " + Shown(controller));
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
