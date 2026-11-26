@@ -115,10 +115,15 @@ namespace RailroaderScenePatcher {
         }
         // The footer report of a completed preview: the preview's own lines, as the form shows them, then the click that
         // applies it. A removal or correction that builds nothing says so here too, wherever the form stands in the tab.
-        internal static string PreviewReport(string kind, IEnumerable<string> lines) {
+        // A preview whose edit changes nothing says so, as the unchanged result of Apply does, and asks for no click.
+        internal static string PreviewReport(string kind, IEnumerable<string> lines, bool unchanged = false) {
             var shown = (lines ?? Enumerable.Empty<string>()).Where(line => !String.IsNullOrWhiteSpace(line)).Select(Sentence).ToArray();
-            return kind + " preview completed." + (shown.Length == 0 ? "" : " " + String.Join(" ", shown)) + " " + WindowGuidance.ApplyPreview;
+            return kind + " preview completed." + (shown.Length == 0 ? "" : " " + String.Join(" ", shown)) + " " + (unchanged ? UnchangedResult : WindowGuidance.ApplyPreview);
         }
+        const string UnchangedResult = "The object has this value already.";
+        // Why a coverage form's Apply is inactive, or null: it waits for a preview, and a preview whose edit changes
+        // nothing leaves it inactive, as every control whose fields hold the current values is (Equal values).
+        internal static string CoverageApplyBlock(bool previewed, bool unchanged) => !previewed ? "Click Preview first." : unchanged ? UnchangedResult : null;
         // The addition a Use corrects: the refused addition whose Edit form is open (editedId) takes the device as its
         // source and keeps its ID and placement. Null when Use starts a new addition: no form, a new addition's form, or
         // the form of an addition that is built or that the scene patch file no longer holds.
@@ -600,7 +605,9 @@ namespace RailroaderScenePatcher {
         internal const string RepairConstructionSegmentsTip = "Open the Connections tab to select the segments of the bridge's track.";
         static bool ConstructionProblem(string problem) => problem != null && problem.EndsWith(ConstructionRecovery, StringComparison.Ordinal);
         internal static bool OffersConstructionRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(ConstructionProblem);
-        internal static bool OffersBindingRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(problem => problem != null && !ConstructionProblem(problem)
+        // The track-binding guided task, for a problem of a binding; a construction or crossing detection problem names
+        // its own repair route instead.
+        internal static bool OffersBindingRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(problem => problem != null && !ConstructionProblem(problem) && !CircuitSpanProblems.IsDetectionProblem(problem)
             && (problem.IndexOf("segment", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("binding", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("track location", StringComparison.OrdinalIgnoreCase) >= 0));
         internal const string ConstructionDependency = "Construction: the game shows or hides parts of this bridge by the construction state of its track segments.";
         // The binding lines of a construction controller's segment ids, checked against the segment ids the track graph
@@ -830,12 +837,8 @@ namespace RailroaderScenePatcher {
         const string NotYetSupportedPrefix = "Not yet supported: ", NotEditableAsGroupPrefix = "Not editable as a group: ";
         // The Inspection only line of a row tooltip and of the state line: one label, and the reason as one plain sentence.
         internal static string InspectionOnlyLine(string reason) => "Inspection only: " + Sentence(reason);
-        // Every number the panel shows or fills a field with: metres and degrees to three decimals, without trailing
-        // zeros, never in scientific notation, and no negative zero. A value below half a thousandth reads 0.
-        internal static string Number(double value) {
-            var text = value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
-            return text == "-0" ? "0" : text;
-        }
+        // Every number the panel shows or fills a field with, by the one shared rule (ShownNumber).
+        internal static string Number(double value) => ShownNumber.Text(value);
         // The value an edit takes from a field: the object's own exact value while the field still shows it, so a
         // field that was not touched changes nothing by its rounding; the entered number otherwise.
         internal static bool Entered(string text, double own, out double value) {
@@ -1015,10 +1018,21 @@ namespace RailroaderScenePatcher {
         // The result of an edit that applied. An edit that changed nothing says so; an edit whose value equals the
         // object's value without this mod says that the modification no longer sets it; completed replaces the
         // plain result of an edit that did something else than its name says.
+        // An unchanged edit names no label of its own: the footer and the log line put the place's label before every
+        // result, so a label here would stand twice.
         internal static string EditResult(string action, bool unchanged, bool reverted, string completed) =>
-            unchanged ? action + ": the object has this value already."
+            unchanged ? UnchangedResult
             : reverted ? action + " completed. The value equals the object's value without this mod, so the modification no longer sets it."
             : completed ?? action + " completed.";
+        // The state line's instruction while nothing is inspected, in the full window and the compact rail alike.
+        internal const string SelectInstruction = "Select an outliner object or click Select in world.";
+        // The entry icon's caption and tooltip: what a click on the icon does now, open the window or close it, or the
+        // reload requirement while one holds.
+        internal static (string Caption, string Reason) EntryStatus(bool open, string reloadRequirement) =>
+            reloadRequirement != null ? ("Scene Patcher: reload", reloadRequirement) : ("Scene Patcher", open ? "Close the Scene Patcher window." : "Open the Scene Patcher window.");
+        // A result that begins with its own source does not say it twice: "Placement  completed.".
+        internal static string WithoutSource(string source, string text) =>
+            source != null && text.StartsWith(source + " ", StringComparison.OrdinalIgnoreCase) ? text.Substring(source.Length + 1) : text;
         // The name of a candidate among the offers of a world choice: its number when several are offered, the same
         // in the world label, the message and the panel's list.
         internal static string ChoiceTag(string word, int number, int offers) => offers > 1 && number > 0 ? word + " " + number : word;

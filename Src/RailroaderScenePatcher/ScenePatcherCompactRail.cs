@@ -97,12 +97,12 @@ namespace RailroaderScenePatcher {
         // ---- Context sections ----
 
         // A context with fewer lines than most views show keeps their height (CompactRail.ContextPadding), so inspecting
-        // an object after a world choice or the hint does not move the message area, the actions, or the outliner.
+        // an object after a world choice does not move the message area, the actions, or the outliner. With nothing
+        // inspected the context stays empty: the state line gives the select instruction once.
         void CompactContextBlock(UIPanelBuilder builder, CompactView view) {
             var block = builder.VStack(column => {
                 column.ConfigureLayout(4f);
                 if (guided.Enabled || selected != null) view.Context(column);
-                else WrappedLine(column, Literal("Select a row in the outliner or click Select in world."));
             });
             var padding = CompactRail.ContextPadding(block.childCount, LineHeight, 4f);
             if (padding > 0) builder.Spacer(padding);

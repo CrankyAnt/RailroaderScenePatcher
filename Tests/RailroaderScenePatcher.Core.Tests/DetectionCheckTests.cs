@@ -30,6 +30,7 @@ static class DetectionCheckTests {
     public static void Run() {
         EndOutsideItsSegmentIsAProblemWithARepairRoute();
         EndToleranceFollowsTheGame();
+        ProblemDistancesReadToThreeDecimals();
         MissingSegmentIsLeftToTheExistingCheck();
         NoRouteIsAProblemWithARepairRoute();
         AdditionNamesEditDetectionAddition();
@@ -61,6 +62,14 @@ static class DetectionCheckTests {
         Assert(problem.EndsWith("On the controller's Connections tab, click Edit circuit PI and select tracks for this circuit or detach it.", StringComparison.Ordinal),
             "A native circuit's repair route is Edit circuit on the Connections tab: " + problem);
         Assert(!BindingRules.IsNote(problem) && findings.Information.Count == 0, "A repairable fault is a problem, not information or a note");
+    }
+    // The problem's distances read to three decimals without trailing zeros, as every number the window shows.
+    static void ProblemDistancesReadToThreeDecimals() {
+        var track = Track();
+        track.Segment("S1", 40.5);
+        var spans = new[] { new DetectionSpan("PA", At("S1", "a", 10), At("S1", "a", 50.12345678)), Valid()[1], Valid()[2] };
+        var problem = CircuitSpanChecks.Findings(0, "PI", spans, Ids(track), track, null).Problems.Single();
+        Assert(problem.Contains("the end lies 50.123 m from end a of segment S1, which is 40.5 m long."), "The problem's distances read to three decimals: " + problem);
     }
     // An end is valid as the game's Location.IsValid judges it: from 0 to the segment's length, each within 0.0001 m.
     static void EndToleranceFollowsTheGame() {

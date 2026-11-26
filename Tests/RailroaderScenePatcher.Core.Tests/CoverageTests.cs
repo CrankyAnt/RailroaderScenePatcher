@@ -192,6 +192,7 @@ static partial class CoverageTests {
         UnresolvedDetectionSpanIsAControllerProblem();
         NonEditableControllerHasNoCoverageAndListsDetectionAsInformation();
         InspectionChangesNoObjectPatchDataOrHistory();
+        CoverageDistancesReadToThreeDecimals();
         RunForm();
         Console.WriteLine("PASS: crossing coverage omission, explicit selection, detachment, retention, refusal, restoration and scene patch editing");
     }
@@ -221,6 +222,19 @@ static partial class CoverageTests {
         Assert(OfferedFor(0).SequenceEqual(new[] { "Sccw", "Sz8t", "S3ddf", "Snp1" }), "Approach A offers the shared Island and Approach B start segment");
         Assert(OfferedFor(1).SequenceEqual(new[] { "S63c", "Sz8t", "S3ddf", "Snp1" }), "Island excludes its current Sccw and offers Approach A's S63c");
         Assert(OfferedFor(2).SequenceEqual(new[] { "S63c", "Sz8t", "S3ddf", "Snp1" }), "Approach B excludes its current Sccw and offers Approach A's S63c");
+    }
+    // Every coverage distance the window shows, in a preview, on the Changes tab or in a refusal, reads to three
+    // decimals without trailing zeros, as every other number does; the stored value keeps its full precision.
+    static void CoverageDistancesReadToThreeDecimals() {
+        var across = new SpanRange(new TrackLocation("S63c", "b", 1.70391845703125), new TrackLocation("S3ddf", "a", 8.987599));
+        Assert(across.ToString() == "S63c end b 1.704 m to S3ddf end a 8.988 m", "A range across segments reads to three decimals: " + across);
+        var along = new SpanRange(new TrackLocation("Sccw", "a", 0.11684718728065491), new TrackLocation("Sccw", "a", 50.79974));
+        Assert(along.ToString() == "Sccw end a 0.117 to 50.8 m", "A range on one segment reads to three decimals: " + along);
+        Assert(across.From.Distance == 1.70391845703125, "The stored distance keeps its precision");
+        var f = new Fixture();
+        var far = "\"Pipr\":{\"approachA\":" + Range("Snew", 308, 600.12345678) + ",\"island\":" + Range("Snew", 292, 308) + ",\"approachB\":" + Range("Snew", 292, 50) + "}";
+        var outcome = new PatchEngine(f.Scene).Apply(Doc(Cover("far", far))).Outcomes["far"];
+        Assert(!outcome.Applied && outcome.Error.Contains("distance 600.123 lies outside segment Snew"), "A refused distance reads to three decimals: " + outcome.Error);
     }
     static void MarkingsIncludeTheWholeRouteOfEvaluatedSpans() {
         var f = new Fixture();

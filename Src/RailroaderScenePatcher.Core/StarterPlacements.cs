@@ -222,7 +222,7 @@ namespace RailroaderScenePatcher.Core {
             }
             return null;
         }
-        static string Cars(StarterCut cut) => (cut.Placement.Cars.Count == 0 ? "no cars" : String.Join(", ", cut.Placement.Cars)) + ", " + cut.Length.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " m";
+        static string Cars(StarterCut cut) => (cut.Placement.Cars.Count == 0 ? "no cars" : String.Join(", ", cut.Placement.Cars)) + ", " + ShownNumber.Text(cut.Length) + " m";
     }
     public sealed class StarterReading {
         public BindingNeed Need { get; }

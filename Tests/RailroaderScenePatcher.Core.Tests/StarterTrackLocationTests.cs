@@ -125,6 +125,7 @@ static class StarterTrackLocationTests {
         DetachIsRefused();
         MissingAndAmbiguousSegmentsAreRefused();
         DistanceOutsideTheSegmentIsRefused();
+        TheCutLengthReadsToThreeDecimals();
         TheWholeCutMustPassTheGamesRule();
         TheMarkerNeedsOneReader();
         CutsAreJudgedWithTheScenePatchFilesOtherStarterPlacements();
@@ -199,6 +200,13 @@ static class StarterTrackLocationTests {
     }
     // The whole cut, with the setup's other cuts, must pass the game's rule: enough track behind the front, available
     // track, a switch lined with the movement and no cut placed before it in the way; and it may not block a later cut.
+    // The cut's length in a refusal reads to three decimals without trailing zeros, as every number the window shows.
+    static void TheCutLengthReadsToThreeDecimals() {
+        var (world, _, _, _, scene) = Setup();
+        foreach (var car in world.CarLengths.Keys.ToArray()) world.CarLengths[car] += 0.1234;
+        var outcome = new PatchEngine(scene).Apply(Doc(Starter("short", HopperPath, At("S1", "a", 10)))).Outcomes["short"];
+        Check(!outcome.Applied && System.Text.RegularExpressions.Regex.IsMatch(outcome.Error, @", \d+\.\d{3} m\) does not fit"), "The cut length reads to three decimals: " + outcome.Error);
+    }
     static void TheWholeCutMustPassTheGamesRule() {
         Refused(Starter("short", HopperPath, At("S1", "a", 10)), "short", "does not fit with its front at S1 / a / 10: Not enough track.", "A cut that runs off the end of the track is refused");
         Refused(Starter("closed", HopperPath, At("Sclosed", "a", 40)), "closed", "Track not available.", "A cut on unavailable track is refused");

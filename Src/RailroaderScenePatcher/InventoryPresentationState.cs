@@ -44,6 +44,8 @@ namespace RailroaderScenePatcher {
             inventory == null ? Array.Empty<SceneObservation>() : inventory.Search(search).Where(entry => Passes(entry, filter, changed)).ToArray();
         // What the outliner area states instead of an empty list on a map where the patcher lists no scene object because
         // the game creates every scene object it checked while it runs.
+        // The outliner help's term for this state: the reason's own words.
+        internal const string NoEditableObjectsTerm = "No objects the patcher can edit";
         internal const string NoEditableObjects = "This map has no objects the patcher can edit. While the map is running, the game creates all the scene objects the patcher checks for editing.";
         // The reason the outliner area states instead of its list, or null: the inventory lists no object, it checked at
         // least one scene object, and it left out every one because the game creates it while it runs. A search or a
@@ -108,7 +110,9 @@ namespace RailroaderScenePatcher {
             // Cut only the name, on a text-element boundary. Measure with the suffix and any caller-supplied markup.
             var elements = StringInfo.ParseCombiningCharacters(suffix.Success ? name.Substring(0, suffix.Index) : name);
             var shortened = "…" + suffix.Value;
-            if (suffix.Success && measure(shortened) > width) return suffix.Value.Substring(1);
+            // Too narrow even for the ellipsis and the suffix: the ellipsis still marks the cut source name, and the
+            // outliner cuts the rest at the end of the row.
+            if (suffix.Success && measure(shortened) > width) return shortened;
             var lower = 0;
             var upper = elements.Length - 1;
             while (lower <= upper) {

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 
 namespace RailroaderScenePatcher.Core {
     // What a milepost edit must leave as it is: the post's prefix, origin flag, mile value, displayed text and model, and
@@ -36,7 +35,7 @@ namespace RailroaderScenePatcher.Core {
             if (before == null) return null;
             if (Prefix != before.Prefix) return "the milepost prefix changed from " + before.Prefix + " to " + Prefix;
             if (Origin != before.Origin) return "the milepost's origin flag changed";
-            if (Mileage != before.Mileage) return "the mile value changed from " + before.Mileage.ToString("R", CultureInfo.InvariantCulture) + " to " + Mileage.ToString("R", CultureInfo.InvariantCulture);
+            if (Mileage != before.Mileage) return "the mile value changed from " + ShownNumber.Text(before.Mileage) + " to " + ShownNumber.Text(Mileage);
             if (Text != before.Text) return "the milepost's display text changed from " + before.Text + " to " + Text;
             if (before.ActiveInHierarchy && RenderedText != before.RenderedText) return "the text rendered on the milepost changed from " + before.RenderedText + " to " + RenderedText;
             if (Model != before.Model) return "the milepost model changed";

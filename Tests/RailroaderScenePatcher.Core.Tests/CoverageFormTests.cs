@@ -102,6 +102,7 @@ static partial class CoverageTests {
             "A distance left as it shows keeps its exact stored value");
         var preview = session.PreviewCoverage(Crossing, "P6id", value);
         Assert(preview.Error == null && preview.Lines.All(l => l.Contains(": retained,")), "The preview of an unchanged native circuit retains every circuit: " + preview.Error + String.Join(" | ", preview.Lines));
+        Assert(preview.Unchanged, "The preview of an edit that changes nothing says so");
         var outcome = session.Cover(Crossing, "P6id", value);
         Assert(outcome.Applied && outcome.Unchanged && f.World.Mutations == 0 && f.Native && mapEditor.UndoGroups.Count == 0 && session.ScenePatchFileText.Contains("\"modifications\": {}"),
             "Apply without a change leaves the crossing's coverage and the scene patch file unchanged: " + outcome.Error);
@@ -113,7 +114,8 @@ static partial class CoverageTests {
         form.Values[CoverageFormFields.First(0, true) + 2] = "40";
         var value = form.Parse(false, out var problem);
         var preview = session.PreviewCoverage(Crossing, "P6id", value);
-        Assert(preview.Error == null && preview.Lines.Any(l => l.StartsWith("Circuit P6id", StringComparison.Ordinal) && l.Contains("Sother end b " + Single(210.123456).ToString("R", System.Globalization.CultureInfo.InvariantCulture) + " m to Snew end a 40 m")), "The preview shows the changed span over two segments: " + preview.Error + String.Join(" | ", preview.Lines));
+        Assert(preview.Error == null && preview.Lines.Any(l => l.StartsWith("Circuit P6id", StringComparison.Ordinal) && l.Contains("Sother end b 210.123 m to Snew end a 40 m")), "The preview shows the changed span over two segments: " + preview.Error + String.Join(" | ", preview.Lines));
+        Assert(!preview.Unchanged, "The preview of a changed end is a change");
         var outcome = session.Cover(Crossing, "P6id", value);
         Assert(outcome.Applied && !outcome.Unchanged, "The changed end applies: " + outcome.Error);
         var approach = Only(session)["relationships"]["crossingCoverage"]["circuits"]["P6id"]["approachA"];
@@ -124,6 +126,7 @@ static partial class CoverageTests {
         var stored = new CoverageFormFields();
         stored.Read(session.Coverage(Crossing)["P6id"]);
         Assert(Shows(stored, 0, false, "Sother", "b", "210.123") && Shows(stored, 0, true, "Snew", "a", "40"), "Edit circuit reopens the stored circuit with its two ends: " + String.Join(",", stored.Values));
+        Assert(session.PreviewCoverage(Crossing, "P6id", stored.Parse(false, out _)).Unchanged, "The preview of the stored circuit unchanged says that it changes nothing");
         Assert(session.Cover(Crossing, "P6id", stored.Parse(false, out _)).Unchanged, "Applying the stored circuit unchanged changes nothing");
     }
     static void StoredCircuitAndAdditionFillTheForm() {

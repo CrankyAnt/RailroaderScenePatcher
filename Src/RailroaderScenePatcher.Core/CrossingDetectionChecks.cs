@@ -140,6 +140,6 @@ namespace RailroaderScenePatcher.Core {
             return at >= -EndTolerance && at <= (float)length + EndTolerance;
         }
         static string Unavailable(string name, Exception e) => "Inspection unavailable: " + name + " could not be checked against the track: " + e.GetBaseException().Message;
-        static string Metres(double value) => value.ToString("0.##", CultureInfo.InvariantCulture) + " m";
+        static string Metres(double value) => ShownNumber.Text(value) + " m";
     }
 }
