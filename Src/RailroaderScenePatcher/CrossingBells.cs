@@ -78,7 +78,9 @@ namespace RailroaderScenePatcher {
     // and volume, keeps and later disposes the loaded reference, and sets the player's play field and its key-value object's
     // bell key from the lights state. Locomotive bells (Audio.BellController) load their definition the same way. An added
     // bell is a separate player beneath the controller that follows the same route with a definition of its own, holds its own
-    // loaded reference and observes the controller's bell key, so the controller drives it without knowing it.
+    // loaded reference and observes the controller's bell key, so the controller drives it without knowing it. Its sources are
+    // the bell definitions the game uses at grade crossings: the one the controller loads, named by its
+    // DefaultCrossingBellIdentifier constant.
     internal sealed class CrossingBells {
         const string PlayerType = "Audio.IntegerLoopingPlayer", DefinitionType = "Model.Definition.Data.BellDefinition", ObjectDefinitionType = "Model.Definition.Data.ObjectDefinition",
             ProviderType = "Model.Database.IDefinitionProvider", LibraryType = "Model.Database.IContentLibrary", LocatorType = "Model.Database.AssetLocator",
@@ -91,6 +93,8 @@ namespace RailroaderScenePatcher {
         readonly PropertyInfo boolValue;
         readonly object bellGroup, distant;
         internal string Key { get; }
+        // The bell sources: the identifiers of the bell definitions the game's crossing controllers load.
+        internal IReadOnlyList<string> Sources { get; }
         readonly Type controllerType;
         // Raises a warning with a key, a message and the originator it is about; null logs it to the Unity log.
         internal Action<string, string, string> Warn;
@@ -119,6 +123,9 @@ namespace RailroaderScenePatcher {
             var key = controller.GetField("KeyBell", Native.Flags);
             if (key == null || !key.IsLiteral || !(key.GetRawConstantValue() is string bell) || String.IsNullOrEmpty(bell)) throw new MissingFieldException(controller.FullName, "KeyBell");
             Key = bell;
+            var crossingBell = controller.GetField("DefaultCrossingBellIdentifier", Native.Flags);
+            if (crossingBell == null || !crossingBell.IsLiteral || !(crossingBell.GetRawConstantValue() is string identifier) || String.IsNullOrEmpty(identifier)) throw new MissingFieldException(controller.FullName, "DefaultCrossingBellIdentifier");
+            Sources = new[] { identifier };
         }
         static Type Need(string name) => Native.Type(name) ?? throw new TypeLoadException(name + " unavailable");
         static FieldInfo Field(Type type, string name) => type.GetField(name, Native.Flags) ?? throw new MissingFieldException(type.FullName, name);
@@ -146,7 +153,7 @@ namespace RailroaderScenePatcher {
         }
         // What the bell pattern reads from the definition and the destination controller.
         internal BellFacts Facts(BellSource source, GameObject destination) {
-            var facts = new BellFacts { DestinationKeyValueObjects = destination.GetComponents(owner).Length, Kind = Native.Read(source.Definition, "Kind") as string };
+            var facts = new BellFacts { DestinationKeyValueObjects = destination.GetComponents(owner).Length, Kind = Native.Read(source.Definition, "Kind") as string, CrossingBell = Sources.Contains(source.Identifier) };
             if (facts.Kind != "Bell") return facts;
             var audio = Native.Read(source.Definition, "Audio");
             var asset = audio == null ? null : Native.Read(audio, "Audio");
@@ -243,8 +250,7 @@ namespace RailroaderScenePatcher {
             if (native == null || reference == null) return;
             var audio = Native.Read(reference, "Asset") as UnityEngine.Object;
             if (audio == null) return;
-            var field = controllerType.GetField("DefaultCrossingBellIdentifier", Native.Flags);
-            if (field == null || !field.IsLiteral || !(field.GetRawConstantValue() is string identifier)) throw new MissingFieldException(controllerType.FullName, "DefaultCrossingBellIdentifier");
+            var identifier = Sources[0];
             var source = Resolve(identifier).FirstOrDefault() ?? throw new InvalidOperationException("The crossing bell definition " + identifier + " is not in the content library");
             var facts = Facts(source, controllerObject);
             configure.Invoke(native, new object[] { audio, facts.Indexes.Select(i => (float)i).ToArray(), (float)facts.Volume });

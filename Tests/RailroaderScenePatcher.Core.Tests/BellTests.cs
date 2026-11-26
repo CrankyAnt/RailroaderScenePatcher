@@ -41,6 +41,7 @@ static class BellTests {
     }
     public static void Run() {
         ABellIsBuiltFromItsDefinitionAndBoundToTheController();
+        OnlyTheGamesCrossingBellsAreSources();
         EligibilityFollowsThePatternAcrossSounds();
         MissingAmbiguousAndNonconformingSourcesChangeNothing();
         InvalidBellContentIsRefused();
@@ -62,6 +63,7 @@ static class BellTests {
     static void UnavailableBellRowsUseShortReasons() {
         foreach (var (problem, expected) in new[] {
             (EquipmentAddition.BellsUnavailable, "Crossing bells are unavailable in this version of the game."),
+            (BellPattern.CrossingBellMissing(CrossingBell), "The game's crossing bell definition " + CrossingBell + " isn't in the content library, so no bell can be added."),
             (EquipmentAddition.BellDefinitionsUnreadable, "The patcher couldn't read the bell definitions from the game's content library, so it can't list bells. Report this to the patcher maintainer and include the Player log.") }) {
             var row = SourceCandidate.UnavailableBells(problem);
             Assert(!row.Eligible && RailroaderScenePatcher.CommandBand.Sentence(row.Problem) == expected,
@@ -87,6 +89,8 @@ static class BellTests {
         Assert(f.Bells.Count == 1 && f.World.Constructed == 1 && f.Observers == 1, "A new engine in the same world adopts the bell instead of duplicating it");
         engine.Apply(Doc(Equip("bells", Bell("bell", x: 12))), "author/pack");
         Assert(f.Bells.Count == 1 && f.World.Constructed == 1 && f.Bells[0].Position[0] == 12 && f.World.AudioReferences == 1, "A changed placement moves the bell and keeps its audio");
+        // A game whose crossings use a second bell definition.
+        f.World.CrossingBells.Add("rr/bell-modded");
         f.World.Bell("rr/bell-modded", b => b.Facts.Audio = "rr/other");
         engine.Apply(Doc(Equip("bells", Bell("bell", "rr/bell-modded", 12))), "author/pack");
         f.World.FinishLoads();
@@ -111,11 +115,13 @@ static class BellTests {
             ["destination owner"] = R(b => b.Facts.DestinationKeyValueObjects = 0, "the destination crossing controller has no key-value objects, so it cannot address the bell"),
             ["destination owners"] = R(b => b.Facts.DestinationKeyValueObjects = 2, "has several key-value objects"),
         };
-        foreach (var r in rejected) f.World.Bell("test/" + r.Key, r.Value.Key);
+        // Each rule is checked on a crossing bell definition, as a game whose crossings use these definitions holds them.
+        f.World.CrossingBells.AddRange(new[] { "rr/bell-loco-brass", "modder/bell-unexamined" });
+        foreach (var r in rejected) { f.World.Bell("test/" + r.Key, r.Value.Key); f.World.CrossingBells.Add("test/" + r.Key); }
         var candidates = f.Scene.EquipmentCandidates(f.Crossing).Where(c => c.Source.IsDefinition).ToList();
-        Assert(candidates.All(c => c.Pattern == EquipmentAddition.BellPattern) && candidates.Count == 3 + rejected.Count, "Every bell definition is offered with the bell pattern");
+        Assert(candidates.All(c => c.Pattern == EquipmentAddition.BellPattern) && candidates.Count == 3 + rejected.Count, "Every crossing bell definition is offered with the bell pattern");
         Assert(candidates.Where(c => c.Eligible).Select(c => c.Source.Definition).OrderBy(d => d, StringComparer.Ordinal).SequenceEqual(new[] { "modder/bell-unexamined", "rr/bell-loco-brass", CrossingBell }),
-            "Every conforming definition is eligible, whatever its sound: " + String.Join(", ", candidates.Where(c => c.Eligible).Select(c => c.Source.Definition)));
+            "Every conforming crossing bell definition is eligible, whatever its sound: " + String.Join(", ", candidates.Where(c => c.Eligible).Select(c => c.Source.Definition)));
         foreach (var r in rejected) {
             var candidate = candidates.Single(c => c.Source.Definition == "test/" + r.Key);
             Assert(!candidate.Eligible && candidate.Problem.Contains(r.Value.Value), "Rule " + r.Key + " names its concrete gap: " + candidate.Problem);
@@ -131,7 +137,48 @@ static class BellTests {
         Assert(devices != null && devices[1] == "adding-crossing-equipment.md#ineligible-sources", "A rejected device keeps the light and gate guide's link");
         var result = new PatchEngine(f.Scene).Apply(Doc(Equip("bells", Bell("brass", "rr/bell-loco-brass") + "," + Bell("clang", "modder/bell-unexamined", 30) + "," + Bell("native", CrossingBell, 40))));
         f.World.FinishLoads();
-        Assert(result.Outcomes["bells"].Applied && f.Bells.Count == 3 && f.World.AudioReferences == 3 && f.Observers == 3, "Unexamined definitions conforming to the pattern build bells without a per-sound list: " + result.Outcomes["bells"].Error);
+        Assert(result.Outcomes["bells"].Applied && f.Bells.Count == 3 && f.World.AudioReferences == 3 && f.Observers == 3, "Unexamined crossing bell definitions conforming to the pattern build bells without a per-sound list: " + result.Outcomes["bells"].Error);
+    }
+    // The bell sources are the bell definitions the game uses at grade crossings. The content library also holds the
+    // locomotive bells and bells other mods add; they are not listed, and a scene patch file that names one has that bell
+    // refused with the reason. Without a usable crossing bell the list offers no bell and says why.
+    static void OnlyTheGamesCrossingBellsAreSources() {
+        var f = new Fixture();
+        f.World.Bells[0].Name = "US&S Teardrop Crossing Bell";
+        foreach (var (id, name) in new[] { ("rr/bell-emd-bronze", "EMD Bronze Bell"), ("rr/bell-cn-brass", "CN Brass Rope Bell"), ("rr/bell-alco-brass", "ALCO Brass Bell"), ("othermod/bell-church", "Church Bell") })
+            f.World.Bell(id, b => b.Name = name);
+        var bells = f.Scene.EquipmentCandidates(f.Crossing).Where(c => c.Source.IsDefinition).ToList();
+        Assert(bells.Count == 1 && bells[0].Eligible && bells[0].Source.Definition == CrossingBell && bells[0].Label == "US&S Teardrop Crossing Bell (" + CrossingBell + ")",
+            "The bell list holds the game's crossing bell and no locomotive or other mod's bell: " + String.Join(", ", bells.Select(b => b.Label)));
+        foreach (var (definition, name) in new[] { ("rr/bell-emd-bronze", "bell-emd-bronze"), ("othermod/bell-church", "bell-church") }) {
+            var g = new Fixture();
+            g.World.Bell(definition);
+            var refused = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Bell("bell", definition))), "author/pack").Outcomes["bad"];
+            Assert(!refused.Applied && refused.Cause == FailureCause.InvalidDefinition && g.World.Mutations == 0 && g.Unchanged
+                && refused.Error.Contains("Equipment bell: source " + name + " does not conform to " + EquipmentAddition.BellPattern + ": " + BellPattern.NotACrossingBell + ". " + WindowGuidance.SelectEligibleSource),
+                "A bell from " + definition + " is refused with a reason that names its source: " + refused.Error);
+        }
+        // The list follows the bell definition the game loads for its crossings, whichever identifier that is.
+        var other = new Fixture();
+        other.World.CrossingBells[0] = "rr/bell-crossing-v2"; other.World.Bell("rr/bell-crossing-v2");
+        Assert(other.Scene.EquipmentCandidates(other.Crossing).Where(c => c.Source.IsDefinition).Select(c => c.Source.Definition).SequenceEqual(new[] { "rr/bell-crossing-v2" }),
+            "The list holds the definition of the bell the game's crossing controllers have");
+        // No usable crossing bell: a missing definition leaves one row with why; one that cannot be loaded is listed with its reason.
+        var missing = new Fixture();
+        missing.World.Bells.Clear(); missing.World.Bell("rr/bell-emd-bronze");
+        var none = missing.Scene.EquipmentCandidates(missing.Crossing).Where(c => c.Source.IsDefinition).ToList();
+        Assert(none.Count == 1 && !none[0].Eligible && none[0].Problem == BellPattern.CrossingBellMissing(CrossingBell),
+            "Without the crossing bell definition the list offers no bell and says why: " + String.Join(", ", none.Select(b => b.Label + ": " + b.Problem)));
+        var unloadable = new Fixture();
+        unloadable.World.Bells[0].Facts.AudioResolves = false; unloadable.World.Bells[0].Facts.Audio = "rr/missing-clip"; unloadable.World.Bell("rr/bell-emd-bronze");
+        var silent = unloadable.Scene.EquipmentCandidates(unloadable.Crossing).Where(c => c.Source.IsDefinition).ToList();
+        Assert(silent.Count == 1 && !silent[0].Eligible && silent[0].Source.Definition == CrossingBell && silent[0].Problem.Contains("cannot be found in the content library"),
+            "A crossing bell that cannot be loaded is the only row, with why: " + String.Join(", ", silent.Select(b => b.Label + ": " + b.Problem)));
+        var unknown = new Fixture();
+        unknown.World.CrossingBells.Clear();
+        var noIdentifier = unknown.Scene.EquipmentCandidates(unknown.Crossing).Where(c => c.Source.IsDefinition).ToList();
+        Assert(noIdentifier.Count == 1 && !noIdentifier[0].Eligible && noIdentifier[0].Problem == EquipmentAddition.BellsUnavailable,
+            "A game that names no crossing bell offers no bell: " + String.Join(", ", noIdentifier.Select(b => b.Problem)));
     }
     static KeyValuePair<Action<FakeBell>, string> R(Action<FakeBell> breaks, string reason) => new KeyValuePair<Action<FakeBell>, string>(breaks, reason);
     static void MissingAmbiguousAndNonconformingSourcesChangeNothing() {
@@ -139,7 +186,7 @@ static class BellTests {
             ["missing"] = f => Bell("bell", "rr/bell-not-installed"),
             ["ambiguous"] = f => { f.World.Bell(); return Bell("bell"); },
             ["nonconforming"] = f => { f.World.Bell("rr/horn-leslie", b => b.Facts.Kind = "Horn"); return Bell("bell", "rr/horn-leslie"); },
-            ["unavailable audio"] = f => { f.World.Bell("rr/bell-unpacked", b => b.Facts.AudioResolves = false); return Bell("bell", "rr/bell-unpacked"); },
+            ["unavailable audio"] = f => { f.World.CrossingBells.Add("rr/bell-unpacked"); f.World.Bell("rr/bell-unpacked", b => b.Facts.AudioResolves = false); return Bell("bell", "rr/bell-unpacked"); },
         };
         foreach (var c in cases) {
             var f = new Fixture();
@@ -201,7 +248,7 @@ static class BellTests {
         Assert(!kept.Outcomes["bells"].Applied && kept.Outcomes["bells"].Error.Contains("its audio failed to load") && kept.Outcomes["bells"].Error.Contains("Remove or replace that bell. You can still edit crossing coverage"),
             "The next edit that keeps the bell is refused with what to do: " + kept.Outcomes["bells"].Error);
         var h = new Fixture();
-        h.World.Bell("rr/bell-short", b => b.ClipSeconds = 1);
+        h.World.CrossingBells.Add("rr/bell-short"); h.World.Bell("rr/bell-short", b => b.ClipSeconds = 1);
         var shortClip = new PatchEngine(h.Scene).Apply(Doc(Equip("bells", Bell("bell", "rr/bell-short"))), "author/pack");
         h.World.FinishLoads();
         Assert(shortClip.Outcomes["bells"].Applied && h.World.Warnings.Single().Contains("does not split its clip") && h.World.AudioReferences == 0, "A clip its indexes do not fit is warned about and holds no audio: " + String.Join("|", h.World.Warnings));
@@ -248,7 +295,7 @@ static class BellTests {
         Assert(!light.Applied && light.Error.Contains("its audio failed to load"), "An edit that keeps the failed bell is refused: " + light.Error);
         var replaced = session.AddEquipment(Crossing, NewBell(definition: "rr/bell-replacement"));
         Assert(!replaced.Applied && replaced.Error.Contains("is unavailable in the content library"), "A replacement needs an available definition: " + replaced.Error);
-        h.World.Bell("rr/bell-replacement");
+        h.World.CrossingBells.Add("rr/bell-replacement"); h.World.Bell("rr/bell-replacement");
         replaced = session.AddEquipment(Crossing, NewBell(definition: "rr/bell-replacement"));
         h.World.FinishLoads();
         Assert(replaced.Applied && h.Bells.Single().Bell.Identifier == "rr/bell-replacement" && h.Bells[0].AudioLoaded, "A failed bell is replaced by another definition: " + replaced.Error);

@@ -21,7 +21,7 @@ class FakeDevice {
 // A bell definition of the content library: the facts the bell pattern reads from it. The production BellPattern judges
 // them. The default is the game's crossing bell, whose audio splits at two indexes.
 class FakeBell {
-    public string Identifier = "rr/bell-uss-teardrop-crossing-rh", Name = "Crossing Bell";
+    public string Identifier = FakeEquipmentWorld.CrossingBell, Name = "Crossing Bell";
     public BellFacts Facts = new BellFacts { Audio = "rr/bell-crossing", Indexes = new double[] { 0.4, 1.2 }, Volume = 0.8 };
     public double ClipSeconds = 3;
     // The reason crossing bells are unavailable on this game build, or null: the source then resolves to a placeholder.
@@ -41,6 +41,10 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
         public FakeBell Bell; public bool AudioLoaded; public string LoadProblem; public int Observers;
     }
     public readonly List<FakeBell> Bells = new List<FakeBell>();
+    // The bell definition the game's grade crossing controllers load, as Railroader 0.6.3 names it.
+    public const string CrossingBell = "rr/bell-uss-teardrop-crossing-rh";
+    // The bell definitions the game uses at grade crossings: the bell sources.
+    public readonly List<string> CrossingBells = new List<string> { CrossingBell };
     // Loaded audio references the bells hold; each release lowers it. A bell that is built and loading holds none yet.
     public int AudioReferences, PendingLoads;
     // Loads complete later, as in the game, where the load continues on a later frame: FinishLoads stands for that frame.
@@ -72,7 +76,11 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
         : Devices.Where(d => d.Owner == null && d.Scene == source.Scene && d.Path == source.Path).Cast<object>().ToArray();
     public string SourceProblem(object source, object controller, string pattern) {
         if (source is FakeBell unavailable && unavailable.BuildUnavailable != null) return EquipmentAddition.BellsUnavailable;
-        if (source is FakeBell bell) return pattern != EquipmentAddition.BellPattern ? "the pattern " + pattern + " is not supported for a definition" : BellPattern.Problem(bell.Facts);
+        if (source is FakeBell bell) {
+            if (pattern != EquipmentAddition.BellPattern) return "the pattern " + pattern + " is not supported for a definition";
+            bell.Facts.CrossingBell = CrossingBells.Contains(bell.Identifier);
+            return BellPattern.Problem(bell.Facts);
+        }
         if (pattern == EquipmentAddition.BellPattern) return "a loaded device is no bell definition";
         var d = (FakeDevice)source;
         if (pattern != EquipmentAddition.LightGatePattern) return "the pattern " + pattern + " is not supported";
@@ -81,7 +89,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     }
     public IReadOnlyList<SourceCandidate> Candidates(object controller) =>
         Devices.Where(d => d.Owner == null).Select(d => new SourceCandidate(new EquipmentSource(d.Scene, d.Path), d.Model, SourceProblem(d, controller, EquipmentAddition.LightGatePattern)))
-            .Concat(Bells.Select(b => SourceCandidate.Bell(b.Identifier, b.Name, SourceProblem(b, controller, EquipmentAddition.BellPattern)))).ToArray();
+            .Concat(BellPattern.Sources(CrossingBells, Bells, b => b.Identifier, b => b.Name, b => SourceProblem(b, controller, EquipmentAddition.BellPattern))).ToArray();
     public IReadOnlyList<object> Owned(object controller) => All.Where(a => ReferenceEquals(a.Controller, controller) && !a.Destroyed).Cast<object>().ToArray();
     public EquipmentAddition Describe(object addition) => ((Added)addition).Record;
     public object Construct(object controller, object source, EquipmentAddition addition) {
@@ -145,7 +153,7 @@ static class EquipmentTests {
     static string N(double value) => value.ToString(CultureInfo.InvariantCulture);
     static string Addition(string id, string source = SignalPath, double x = 10, string pattern = EquipmentAddition.LightGatePattern, string extra = "", double[] position = null) =>
         "\"" + id + "\":{\"pattern\":\"" + pattern + "\",\"source\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + source + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", (position ?? new[] { x, 0, 7 }).Select(N)) + "],\"rotation\":[0,0,0,1]}" + extra + "}";
-    static string BellAddition(string id, string definition = "rr/bell") =>
+    static string BellAddition(string id, string definition = FakeEquipmentWorld.CrossingBell) =>
         "\"" + id + "\":{\"pattern\":\"" + EquipmentAddition.BellPattern + "\",\"source\":{\"definition\":\"" + definition + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[30,0,7],\"rotation\":[0,0,0,1]}}";
     static string Equip(string id, string additions, string path = CrossingPath, string deps = "[]") => EquipRaw(id, "{" + additions + "}", path, deps);
     // A modification whose crossingEquipment value is the given JSON text, keyed by equipment ID when it is valid.
@@ -599,7 +607,7 @@ static class EquipmentTests {
     // CrossingReroute62 fixture does. The crossing lists every addition of this mod, not only those of its first modification.
     static void AdditionsInSeparateModificationsAreAllListed() {
         var f = new Fixture();
-        f.World.Bell("rr/bell", b => b.Name = "Teardrop bell"); f.World.LoadsPending = false;
+        f.World.Bell(FakeEquipmentWorld.CrossingBell, b => b.Name = "Teardrop bell"); f.World.LoadsPending = false;
         var engine = new PatchEngine(f.Scene);
         string Loc(double d) => "{\"segment\":\"Snew\",\"end\":\"a\",\"distance\":" + N(d) + "}";
         string Range(double a, double b) => "{\"from\":" + Loc(a) + ",\"to\":" + Loc(b) + "}";
@@ -640,7 +648,7 @@ static class EquipmentTests {
     static void AnAdditionWithoutItsCopyIsRebuiltFromItsSource() {
         foreach (var bell in new[] { false, true }) {
             var f = new Fixture();
-            if (bell) { f.World.Bell("rr/bell", b => b.Name = "Teardrop bell"); f.World.LoadsPending = false; }
+            if (bell) { f.World.Bell(FakeEquipmentWorld.CrossingBell, b => b.Name = "Teardrop bell"); f.World.LoadsPending = false; }
             var engine = new PatchEngine(f.Scene);
             var scenePatchFile = Doc(Equip("equip-crossing", bell ? BellAddition("ring") : Addition("west")));
             Assert(engine.Apply(scenePatchFile, "author/pack").Outcomes["equip-crossing"].Applied && f.Live.Count == 1, "The addition is built at load");
@@ -682,7 +690,7 @@ static class EquipmentTests {
         var entry = session.EquipmentEntries(Crossing).Single();
         Assert(entry.Built == null && entry.Problem.Contains(Refusal), "The listed addition gives the refusal that names its source: " + entry.Problem);
         var b = new Fixture();
-        b.World.Bell("rr/bell", d => d.Name = "Teardrop bell"); b.World.LoadsPending = false;
+        b.World.Bell(FakeEquipmentWorld.CrossingBell, d => d.Name = "Teardrop bell"); b.World.LoadsPending = false;
         var bellEngine = new PatchEngine(b.Scene);
         var bellFile = Doc(Equip("equip-crossing", BellAddition("ring")));
         bellEngine.Apply(bellFile, "author/pack");
@@ -691,7 +699,7 @@ static class EquipmentTests {
         b.Live.Single().CopyLost = true;
         b.World.Bells.Clear();
         var bellRecheck = bellSession.Recheck(Crossing);
-        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell is unavailable in the content library, so the equipment cannot be rebuilt"),
+        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell-uss-teardrop-crossing-rh is unavailable in the content library, so the equipment cannot be rebuilt"),
             "A lost bell whose definition is unavailable is refused with its recorded name and a next step: " + bellRecheck.Error);
     }
     static void AnAdditionWithoutItsCopyCanBeRemoved() {
@@ -980,6 +988,7 @@ static class EquipmentTests {
         var loads = new (string Case, Action<FakeEquipmentWorld> Setup, string Addition)[] {
             ("missing light or gate", w => { }, Addition("west", CrossingPath + "/Missing")),
             ("unavailable bell definition", w => { }, BellAddition("ring", "rr/bell-does-not-exist")),
+            ("bell definition the game does not use at grade crossings", w => w.Bell("rr/bell-emd-bronze"), BellAddition("ring", "rr/bell-emd-bronze")),
             ("ambiguous light or gate", w => { w.Device(CrossingPath + "/Twin"); w.Device(CrossingPath + "/Twin"); }, Addition("west", CrossingPath + "/Twin")),
             ("nonconforming light or gate", w => w.Device(CrossingPath + "/Bell", d => d.Facts.Bells = 1), Addition("west", CrossingPath + "/Bell")),
         };
@@ -1004,7 +1013,7 @@ static class EquipmentTests {
             ("missing placement", Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack"))) })
             Assert(refusal is InvalidPatchDefinitionException, "A " + name + " is the mod author's problem: " + refusal?.GetType().Name + " " + refusal?.Message);
         var h = new Fixture();
-        h.World.Bell("rr/bell", b => b.BuildUnavailable = "the bell player type is missing"); h.World.LoadsPending = false;
+        h.World.Bell(FakeEquipmentWorld.CrossingBell, b => b.BuildUnavailable = "the bell player type is missing"); h.World.LoadsPending = false;
         var build = new PatchEngine(h.Scene).Apply(Doc(Equip("bad", BellAddition("ring"))), "author/pack").Outcomes["bad"];
         Assert(!build.Applied && build.Error.Contains(EquipmentAddition.BellsUnavailable) && !build.Error.Contains("the bell player type is missing") && build.Cause != FailureCause.InvalidDefinition,
             "Bells this game build cannot provide stay a patcher problem: " + build.Cause + " " + build.Error);

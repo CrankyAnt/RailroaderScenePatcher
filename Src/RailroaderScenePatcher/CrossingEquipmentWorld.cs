@@ -175,14 +175,13 @@ namespace RailroaderScenePatcher {
                         position, rotation, child.name, CrossingEquipment.Place(owner.name, Ancestors(owner.transform)), crossingPosition, crossingRotation));
                 }
             }
-            // Every bell definition of the content library, eligible or with its reason, for the inspected controller.
-            // A failure to read them leaves the devices listed and names the reason in one rejected entry.
+            // The bell definitions the game uses at grade crossings, eligible or with their reason, for the inspected controller;
+            // other bell definitions of the content library are no sources. A failure to read them leaves the devices listed
+            // and names the reason in one rejected entry.
             if (bells == null) result.Add(SourceCandidate.UnavailableBells(bellsUnavailable));
             else if (target is GameObject destination && Loaded(destination)) {
                 try {
-                    var found = new List<SourceCandidate>();
-                    foreach (var bell in bells.All()) found.Add(SourceCandidate.Bell(bell.Identifier, bell.Name, SourceProblem(bell, destination, EquipmentAddition.BellPattern)));
-                    result.AddRange(found);
+                    result.AddRange(BellPattern.Sources(bells.Sources, bells.All(), b => b.Identifier, b => b.Name, b => SourceProblem(b, destination, EquipmentAddition.BellPattern)));
                 } catch (Exception e) {
                     PatcherLog.Warning("The patcher couldn't list bell definitions from the game's content library. Report this to the patcher maintainer.", e);
                     result.Add(SourceCandidate.UnavailableBells(EquipmentAddition.BellDefinitionsUnreadable));
