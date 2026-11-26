@@ -14,6 +14,7 @@
     <Compile Include="../../Src/RailroaderScenePatcher/EnteredEditValues.cs" Link="EnteredEditValues.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/CoverageFormFields.cs" Link="CoverageFormFields.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/CommandBand.cs" Link="CommandBand.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/SupportedEdits.cs" Link="SupportedEdits.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/CompactRail.cs" Link="CompactRail.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/RequestQueue.cs" Link="RequestQueue.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/SuppliedDefinitions.cs" Link="SuppliedDefinitions.cs" />

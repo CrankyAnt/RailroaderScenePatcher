@@ -8,7 +8,7 @@ using UI.Builder;
 using UnityEngine;
 
 namespace RailroaderScenePatcher {
-    // The replacement ID of a track marker, which repairs a duplicate marker ID: the Marker ID section of the
+    // The replacement ID of a track marker, which repairs a duplicate marker ID: the Replacement marker ID section of the
     // Connections tab, the other scene markers that share the ID, and the repair offered with the duplicate explanation
     // on the Object tab.
     public sealed partial class PatcherBehaviour {
@@ -49,20 +49,19 @@ namespace RailroaderScenePatcher {
             try { return attachment != null && identity != null && attachment.Session.HasMarkerId(identity); } catch { return false; }
         }
         // Why the replacement ID is unavailable for the inspected object now, or null when it is offered.
-        string MarkerIdBlock() {
-            var block = IsStarter ? StarterEditBlock() : EditBlock();
-            if (block != null) return block;
-            var reading = ReadSharers();
-            return CommandBand.MarkerIdUnavailable(selected?.Family, IsGenericMarker, reading.Underlying, reading.Sharers.Count, HasMarkerIdValue(selected?.Identity));
-        }
-        // The Marker ID section: the field with Set ID and Clear ID, then the scene markers that hold the underlying ID.
+        // The object's own reason comes first, as Supported edits names it; an object without a Replacement marker ID section, which
+        // only the guided task reaches, takes no replacement ID for its family.
+        string MarkerIdBlock() =>
+            EditUnavailable(SupportedEdits.MarkerId) ?? (IsStarter ? StarterEditBlock() : EditBlock())
+            ?? (IsGenericMarker ? null : CommandBand.MarkerIdUnavailable(selected?.Family, false, null, 0, false));
+        // The Replacement marker ID section: the field with Set replacement ID and Clear replacement ID, then the scene markers that hold the underlying ID.
         // The section stays visible for every marker; for a marker that takes no replacement ID it is disabled with the reason.
         void DrawMarkerId(UIPanelBuilder builder) {
             var identity = selected.Identity;
             var reading = ReadSharers();
             var block = MarkerIdBlock();
             var current = CurrentMarkerId();
-            Section(builder, "Marker ID");
+            Section(builder, "Replacement marker ID");
             ValueRow(builder, "Replacement ID", null, new[] { "ID" }, markerIdFields, 0, block,
                 CommandBand.ReplacementIdTip, column => false, freeText: true);
             // The instruction stands below the field while the field can be edited, here and in the guided task.
@@ -72,11 +71,11 @@ namespace RailroaderScenePatcher {
                 Func<string> setReason = () => CommandBand.MarkerIdSetReason(block, markerIdFields[0], current);
                 set.Inactive(setReason() != null);
                 var provider = set.RectTransform.GetComponent<UI.Tooltips.UITooltipProvider>() ?? set.RectTransform.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
-                provider.DynamicTooltipInfo = () => new TooltipInfo("Set marker ID", CommandBand.Tooltip("Give this marker the ID in the field. Its registration moves to the new ID. Every other holder of the old ID keeps its registration.", setReason()));
+                provider.DynamicTooltipInfo = () => new TooltipInfo("Set replacement marker ID", CommandBand.Tooltip("Give this marker the ID in the field. Its registration moves to the new ID. Every other holder of the old ID keeps its registration.", setReason()));
                 typed.Add(() => { if (set.RectTransform != null) set.Inactive(setReason() != null); });
                 var clear = CommandBand.ClearMarkerIdReason(IsStarter ? StarterEditBlock() : EditBlock(), HasMarkerIdValue(identity));
                 Button(row, CommandBand.ClearMarkerId, () => Edit(MarkerIdPlace, "Clearing the marker ID value", (edit, inspection) => edit.SetMarkerId(identity, null, inspection)))
-                    .Inactive(clear != null).Tooltip("Clear marker ID", CommandBand.Tooltip("Clear this mod's replacement ID to return the marker to its underlying ID.", clear));
+                    .Inactive(clear != null).Tooltip("Clear replacement marker ID", CommandBand.Tooltip("Clear this mod's replacement ID to return the marker to its underlying ID.", clear));
                 row.Spacer();
             }).ChildrenKeepHeight().Height(RowHeight);
             if (reading.Underlying != null && reading.Sharers.Count != 0) {
@@ -118,10 +117,10 @@ namespace RailroaderScenePatcher {
             Edit(MarkerIdPlace, "Set marker ID " + id, (edit, inspection) => edit.SetMarkerId(identity, id, inspection));
         }
         // The duplicate explanation of a holder that can receive a replacement ID offers the repair, active or not: for
-        // the inspected marker through its guided task and, beside it, through the Marker ID section of its Connections
+        // the inspected marker through its guided task and, beside it, through the Replacement marker ID section of its Connections
         // tab, and for each other scene marker that shares the ID through Select. A marker that has its replacement ID
         // keeps both buttons: the repair says it already has one, and the Connections tab changes or clears the ID. Set
-        // ID on the Connections tab is available whenever that tab's Marker ID section is, with its reason otherwise.
+        // ID on the Connections tab is available whenever that tab's Replacement marker ID section is, with its reason otherwise.
         void DrawDuplicateIdTasks(UIPanelBuilder builder) {
             var offers = CommandBand.OffersDuplicateRepair(selected?.Identity.Structure, selected?.Dependencies);
             if (!CommandBand.ShowsDuplicateRepairs(selected?.Identity.Structure, offers, HasMarkerIdValue(selected?.Identity))) return;

@@ -122,7 +122,7 @@ static class StarterPlacementTests {
         Check(RailroaderScenePatcher.CommandBand.Refusal(StarterPlacements.Operations) == null && StarterPlacements.Operations.StartsWith("Track location:", StringComparison.Ordinal)
             && StarterPlacements.Operations.IndexOf("not supported", StringComparison.OrdinalIgnoreCase) < 0, "Supported edits names the track location as the edit: " + StarterPlacements.Operations);
         var blocked = RailroaderScenePatcher.CommandBand.NotEditable(StarterPlacements.ObjectSettings);
-        Check(RailroaderScenePatcher.CommandBand.ModeBlock(RailroaderScenePatcher.CommandBand.GizmoMode, false, false, blocked) == RailroaderScenePatcher.CommandBand.EditReason(blocked)
+        Check(RailroaderScenePatcher.SupportedEdits.ModeBlock(RailroaderScenePatcher.SupportedEdits.Of(EditEntries.Of(StarterPlacements.Family, StarterPlacementScene.Structure, blocked)), RailroaderScenePatcher.CommandBand.GizmoMode, false) == RailroaderScenePatcher.CommandBand.EditReason(blocked)
             && RailroaderScenePatcher.CommandBand.EditReason(blocked).StartsWith("A new-game car placement reads only", StringComparison.Ordinal), "A disabled placement mode gives that reason: " + RailroaderScenePatcher.CommandBand.EditReason(blocked));
         Check(StarterPlacements.MarkerCapabilityRefusal.IndexOf("not supported", StringComparison.OrdinalIgnoreCase) < 0 && StarterPlacements.MarkerCapabilityRefusal.Contains("starter placement"),
             "The marker capability names the starter placement workflow, not an unsupported consumer: " + StarterPlacements.MarkerCapabilityRefusal);

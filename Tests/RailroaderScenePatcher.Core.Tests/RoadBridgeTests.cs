@@ -69,9 +69,10 @@ static class RoadBridgeTests {
         var result = new PatchEngine(scene).Apply(Doc(Follow("follow-bridge", GovBridge, BakedSceneryGroups.Structure), Follow("follow-deck", GovBridge + "/Deck", BakedSceneryParts.Structure)));
         Assert(result.Outcomes.Values.All(o => !o.Applied && o.Failure == FailureKind.Refused && o.Error.Contains("Road bridges use fixed placement")) && f.World.Mutations == 0 && f.RegisteredOnceAt(Authored, 90) && f.Terrain.Rebuilds == 0,
             "Track-following placement of a road bridge and of its part is refused before mutation: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Failure + " " + o.Error)));
-        Assert(CommandBand.ModeBlock(CommandBand.FollowMode, false, true, CommandBand.GroupOperations, roadBridge: true) == "Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it."
-            && CommandBand.ModeBlock(CommandBand.NumericMode, false, true, CommandBand.GroupOperations, roadBridge: true) == null && CommandBand.ModeBlock(CommandBand.GizmoMode, false, true, CommandBand.GroupOperations, roadBridge: true) == null,
-            "Follow is unavailable for a road bridge with the reason; Numeric and Gizmo stay: " + CommandBand.ModeBlock(CommandBand.FollowMode, false, true, CommandBand.GroupOperations, roadBridge: true));
+        var roadEdits = SupportedEdits.Of(EditEntries.Of(BakedSceneryRules.Family, BakedSceneryGroups.Structure, CommandBand.GroupOperations, BridgeKind.Road));
+        Assert(SupportedEdits.ModeBlock(roadEdits, CommandBand.FollowMode, true) == "Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it."
+            && SupportedEdits.ModeBlock(roadEdits, CommandBand.NumericMode, true) == null && SupportedEdits.ModeBlock(roadEdits, CommandBand.GizmoMode, true) == null,
+            "Follow is unavailable for a road bridge with the reason; Numeric and Gizmo stay: " + SupportedEdits.ModeBlock(roadEdits, CommandBand.FollowMode, true));
     }
     sealed class FixedTrack : ITrackPoseScene { public TrackPose TrackPose(TrackAnchor anchor) => new TrackPose(new[] { 3000.0, 530, 4300 }, new[] { 0.0, 0, 0, 1 }); }
 

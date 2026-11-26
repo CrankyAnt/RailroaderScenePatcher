@@ -23,7 +23,7 @@ To edit a milepost, all of these conditions must hold:
 - No loaded component other than the milepost and that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it refuses every marker until the next check.
 - While the post is enabled and active, the marker has exactly one named location and it matches the stored track location. Otherwise the marker has no named location.
 
-The inventory lists an object that meets these conditions in the `Milepost` family with the structure `milepost-v1`. For any other milepost, **Supported edits** on the **Object** tab reads **Not editable:** and gives the reason.
+The inventory lists an object that meets these conditions in the `Milepost` family with the structure `milepost-v1`. For any other milepost, **Supported edits** on the **Object** tab lists **Move** under **Unavailable:** and gives the reason.
 
 ## Move, rotate, or disable the milepost in the native map editor
 
