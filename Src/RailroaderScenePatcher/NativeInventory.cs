@@ -808,12 +808,11 @@ namespace RailroaderScenePatcher {
             foreach (DictionaryEntry bucket in buckets) {
                 if (!(bucket.Value is IDictionary entries) || !entries.Contains(id)) continue;
                 var named = entries[id]; var at = Field(named, "Location"); var segment = Field(at, "segment");
-                var location = (segment == null ? "no segment" : Text(Field(segment, "id"))) + " / " + Text(Field(at, "end")) + " / " + Text(Field(at, "distance"));
-                bindings.Add(ListedTrackLocation + " " + location + (segment != null && Equals(Field(segment, "id"), bucket.Key) ? "" : " under segment " + Text(bucket.Key)) +
-                    (ReferenceEquals(Field(named, "ObjectValue"), marker) ? "." : ". This location belongs to another object."));
+                bindings.Add(CommandBand.NamedLocationLine(segment == null ? null : Text(Field(segment, "id")), Text(Field(at, "end")),
+                    Convert.ToDouble(Field(at, "distance"), CultureInfo.InvariantCulture), Text(bucket.Key), ReferenceEquals(Field(named, "ObjectValue"), marker)));
                 found++;
             }
-            if (found == 0) bindings.Add(ListedTrackLocation + " none.");
+            if (found == 0) bindings.Add(CommandBand.NamedLocationLine(null, null, null, null, true));
         }
         static string Describe(object value) => value is Component c ? Label(c) : value is GameObject go ? go.scene.name + "/" + BoardScene.PathOf(go.transform) : Text(value);
     }
