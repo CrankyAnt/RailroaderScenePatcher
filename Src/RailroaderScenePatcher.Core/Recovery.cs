@@ -93,7 +93,7 @@ namespace RailroaderScenePatcher.Core {
             catch (Exception e) { return new[] { "The object's current state could not be read. Every setting is uncertain. Reason: " + e.Message }; }
             if (before == null) return new[] { "The state before the attempt could not be read. No comparison is possible, so every setting is uncertain" };
             var lines = new List<string>();
-            string Numbers(IReadOnlyList<double> values) => values == null ? "unknown" : String.Join(", ", values.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture)));
+            string Numbers(IReadOnlyList<double> values) => values == null ? "unknown" : String.Join(", ", values.Select(ShownNumber.Text));
             var was = before.Placement; var placement = now?.Placement;
             if (was?.Position != null && !PatchEditingSession.SamePosition(was.Position, placement?.Position)) lines.Add("Position: now " + Numbers(placement?.Position) + ", before " + Numbers(was.Position));
             if (was?.Rotation != null && !PatchEditingSession.SameRotation(was.Rotation, placement?.Rotation)) lines.Add("Rotation: does not match its value before the attempt");

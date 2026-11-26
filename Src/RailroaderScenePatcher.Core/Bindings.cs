@@ -19,7 +19,7 @@ namespace RailroaderScenePatcher.Core {
         public override string ToString() => Segment + "|" + End + "|" + Distance.ToString("R", CultureInfo.InvariantCulture);
         // The one form a track location is shown in: segment, end in lower case as the scene patch file writes it, and the
         // distance to three decimals.
-        public string Display => Segment + " / " + (End ?? "").ToLowerInvariant() + " / " + Distance.ToString("0.###", CultureInfo.InvariantCulture);
+        public string Display => Segment + " / " + (End ?? "").ToLowerInvariant() + " / " + ShownNumber.Text(Distance);
     }
     // The desired or observed relationship of a track marker: a location, or detached from the track.
     public sealed class MarkerBinding {
@@ -549,7 +549,7 @@ namespace RailroaderScenePatcher.Core {
             if (lengths.Count == 0) return "Relationship target segment " + location.Segment + " is missing";
             if (lengths.Count > 1) return "Relationship target segment " + location.Segment + " is ambiguous";
             if (Double.IsNaN(location.Distance) || location.Distance < 0 || location.Distance > lengths[0] + TrackLocation.DistanceTolerance)
-                return "Relationship distance " + location.Distance.ToString("R", CultureInfo.InvariantCulture) + " lies outside segment " + location.Segment;
+                return "Relationship distance " + ShownNumber.Text(location.Distance) + " lies outside segment " + location.Segment;
             return null;
         }
         bool Resolvable(TrackLocation location) => location != null && Unresolved(location) == null;

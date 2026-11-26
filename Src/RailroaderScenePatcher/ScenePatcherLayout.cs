@@ -1698,13 +1698,13 @@ namespace RailroaderScenePatcher {
                             return new[] { preview,
                                 Slot("Delete", "Preview deleting this detection addition.", block ?? (!inScenePatchFile ? "This addition is not in the scene patch file yet." : last ? "This is the crossing's last detection; return a native circuit to its coverage first." : null), () => PrepareCoverage(session, identity, circuitKey, null, additionId)),
                                 Empty,
-                                Slot("Apply", "Apply the previewed coverage.", block ?? (prepared == null ? "Click Preview first." : null), apply) };
+                                Slot("Apply", "Apply the previewed coverage.", block ?? CommandBand.CoverageApplyBlock(prepared != null, prepared?.Preview.Unchanged == true), apply) };
                         }
                         return new[] { preview,
                             Slot("Detach", "Preview detaching this circuit.", none ?? (last ? "This is the crossing's last covered circuit; detaching it would leave the crossing without detection." : null), () => PrepareCoverage(session, identity, circuitKey, CircuitCoverage.Detached, null), null, 1, 72),
                             // Every Clear in a tab names what it clears.
                             Slot(CommandBand.ClearCircuit, "Preview clearing this mod's value for the circuit; it returns to its underlying coverage.", none, () => PrepareCoverage(session, identity, circuitKey, null, null), null, 1, 112),
-                            Slot("Apply", "Apply the previewed coverage.", none ?? (prepared == null ? "Click Preview first." : null), apply, null, 1, 62) };
+                            Slot("Apply", "Apply the previewed coverage.", none ?? CommandBand.CoverageApplyBlock(prepared != null, prepared?.Preview.Unchanged == true), apply, null, 1, 62) };
                     }
                     // An object that holds no track binding has no track location row.
                     if (!IsStarter && !HoldsConstructionSegments && !HoldsBinding) return new Act[0];

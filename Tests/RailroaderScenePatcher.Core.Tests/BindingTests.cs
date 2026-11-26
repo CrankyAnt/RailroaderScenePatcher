@@ -267,6 +267,7 @@ static class BindingTests {
         DetachClearsLocationAndRegistration();
         ReplacementAndRepetitionKeepOneRegistration();
         UnresolvedTargetsChangeNothing();
+        RefusedDistanceReadsToThreeDecimals();
         UnsupportedRelationshipsAreRefusedAndIsolated();
         DependentsFollowRelationshipOutcome();
         FailureAfterMutationRestoresRelationship();
@@ -410,6 +411,12 @@ static class BindingTests {
         Assert(inactive.Outcomes["inactive"].Applied && sign.Segment == "Nnew" && world.Registrations(sign).Count == 0, "An inactive marker holds the binding without registration");
         Assert(new PatchEngine(scene).Apply(Doc(Binding("inactive", At("Nnew", "a", 3), extra: ",\"active\":true"))).Outcomes["inactive"].Applied && Entry(world, sign) == "Nnew|a|3", "Enabling registers the marker at its bound location");
         Assert(new PatchEngine(scene).Apply(Doc(Binding("inactive", At("Nnew", "a", 3), extra: ",\"active\":false"))).Outcomes["inactive"].Applied && world.Registrations(sign).Count == 0, "An explicit disable removes the registration and keeps the binding");
+    }
+    // A refused distance reads to three decimals without trailing zeros, as every number the window shows.
+    static void RefusedDistanceReadsToThreeDecimals() {
+        var (_, _, _, scene) = Setup();
+        var outcome = new PatchEngine(scene).Apply(Doc(Binding("far", At("Nnew", "a", 500.123456)))).Outcomes["far"];
+        Assert(!outcome.Applied && outcome.Error.Contains("Relationship distance 500.123 lies outside segment Nnew"), "The refused distance reads to three decimals: " + outcome.Error);
     }
     static void UnresolvedTargetsChangeNothing() {
         var cases = new[] {

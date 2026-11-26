@@ -1119,7 +1119,7 @@ namespace RailroaderScenePatcher {
             entries.Add(text.ToString());
             foreach (var entry in entries) PatcherLog.Debug(entry);
         }
-        static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+        static string Number(double value) => ShownNumber.Text(value);
         static string Vector(Vector3 v) => Number(v.x) + "/" + Number(v.y) + "/" + Number(v.z);
         static bool InFront(Camera camera, Vector3 point) => point.z >= camera.nearClipPlane && point.z <= camera.farClipPlane;
         static Rect Offset(Rect rect, Vector2 origin) => new Rect(rect.position - origin, rect.size);

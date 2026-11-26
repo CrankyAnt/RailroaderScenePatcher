@@ -75,9 +75,17 @@ static class MilepostTests {
         return e.Bucket + "|" + e.Location.End + "|" + e.Location.Distance.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
     static string Kept(FakeMilepostWorld world, FakeMarker m) { var p = world.Posts[m]; return p.Prefix + "|" + p.Origin + "|" + p.Mileage + "|" + p.Text + "|" + p.Model; }
+    // A changed mile value reads to three decimals without trailing zeros, as every number the window shows.
+    static void AChangedMileValueReadsToThreeDecimals() {
+        var before = new MilepostState("T", false, 46.10000000000001, "46.1", "46.1", "post-mesh", null, true);
+        var after = new MilepostState("T", false, 47.25, "46.1", "46.1", "post-mesh", null, true);
+        var difference = after.Difference(before);
+        Assert(difference == "the mile value changed from 46.1 to 47.25", "The mile values read to three decimals: " + difference);
+    }
     public static void Run() {
         GroundMaskTests.HeldMaskFollowsItsHolder("Milepost", masks => { var (world, t46, _, _) = Setup(); return (t46, new MilepostScene(world, Capability.Unchecked, masks)); }, Doc(Item("move-post", Place(90))));
         PlacementAndBindingAreSeparateSettings();
+        AChangedMileValueReadsToThreeDecimals();
         TargetsResolveExactlyOnce();
         ReplacementTracksResolveExactlyOnce();
         MapMismatchChangesNothing();

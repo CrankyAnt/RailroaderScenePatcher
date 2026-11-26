@@ -315,7 +315,7 @@ namespace RailroaderScenePatcher {
         string CompactState() {
             var bounds = PanelBounds;
             return "mode=" + (Compact ? "compact" : "full") + "; outliner=" + (CompactOutlinerShown ? "shown (" + CompactOutlinerRows + " rows)" : "hidden") +
-                "; rect=(" + Mathf.RoundToInt(bounds.x) + ", " + Mathf.RoundToInt(bounds.y) + ", " + Mathf.RoundToInt(bounds.width) + " x " + Mathf.RoundToInt(bounds.height) + ") px; scale=" + scale.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                "; rect=(" + Mathf.RoundToInt(bounds.x) + ", " + Mathf.RoundToInt(bounds.y) + ", " + Mathf.RoundToInt(bounds.width) + " x " + Mathf.RoundToInt(bounds.height) + ") px; scale=" + Core.ShownNumber.Text(scale);
         }
 
         void DisposeCompact() {

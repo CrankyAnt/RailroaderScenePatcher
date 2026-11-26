@@ -425,7 +425,7 @@ namespace RailroaderScenePatcher.Core {
         public static IReadOnlyList<string> ChangeLines(ObjectState state, ObjectState before) {
             var lines = new List<string>();
             if (state == null) return lines;
-            string Numbers(double[] values) => values == null ? "unknown" : String.Join(", ", values.Select(v => v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)));
+            string Numbers(double[] values) => values == null ? "unknown" : String.Join(", ", values.Select(ShownNumber.Text));
             string Location(MarkerBinding binding) => binding == null ? "unknown" : binding.IsDetached ? "detached" : binding.Location.Display;
             var placement = state.Placement;
             if (placement != null) {

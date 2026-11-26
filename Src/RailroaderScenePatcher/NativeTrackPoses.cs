@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
-using System.Globalization;
 using RailroaderScenePatcher.Core;
 using UnityEngine;
 
@@ -64,7 +63,7 @@ namespace RailroaderScenePatcher {
             var at = anchor.Location;
             var segment = Native.Call(shared, "GetSegment", at.Segment) ?? throw new InvalidOperationException("Track anchor " + anchor + " does not resolve: the segment is missing");
             var length = (float)Native.Call(segment, "GetLength");
-            if (at.Distance > length + 0.001) throw new InvalidOperationException("Track anchor " + anchor + " does not resolve: distance " + at.Distance.ToString("R", CultureInfo.InvariantCulture) + " lies outside the segment");
+            if (at.Distance > length + 0.001) throw new InvalidOperationException("Track anchor " + anchor + " does not resolve: distance " + ShownNumber.Text(at.Distance) + " lies outside the segment");
             var native = Activator.CreateInstance(location, segment, (float)at.Distance, Enum.Parse(end, at.End == "a" ? "A" : "B"));
             var methods = Array.FindAll(graph.GetMethods(Native.Flags), m => m.Name == "GetPositionRotation");
             if (methods.Length != 1) throw new MissingMethodException(GraphType, "GetPositionRotation");

@@ -60,6 +60,10 @@ static class CommandBandTests {
         Check(CommandBand.PreviewReport("Equipment", lines) == "Equipment preview completed. " + lines[0] + " Click Apply to apply it.",
             "The footer carries the preview line and asks for a click: " + CommandBand.PreviewReport("Equipment", lines));
         Check(CommandBand.PreviewReport("Coverage", new string[0]) == "Coverage preview completed. Click Apply to apply it.", "A preview without lines asks for the click only");
+        // Apply of a coverage form waits for a preview, and stays inactive with the reason after a preview that changes nothing.
+        Check(CommandBand.CoverageApplyBlock(false, false) == "Click Preview first." && CommandBand.CoverageApplyBlock(false, true) == "Click Preview first."
+            && CommandBand.CoverageApplyBlock(true, false) == null && CommandBand.CoverageApplyBlock(true, true) == "The object has this value already.",
+            "Apply is inactive before a preview and after a preview that changes nothing: " + CommandBand.CoverageApplyBlock(true, true));
         var unchanged = CommandBand.PreviewReport("Coverage", null, true);
         Check(unchanged == "Coverage preview completed. The object has this value already." && !unchanged.Contains(WindowGuidance.ApplyPreview),
             "A preview whose edit changes nothing says so and does not ask for Apply: " + unchanged);
@@ -650,6 +654,21 @@ static class CommandBandTests {
         foreach (var row in new[] { new object[] { 528.405334, "528.405" }, new object[] { 70.04144, "70.041" }, new object[] { 1.13392689E-05, "0" }, new object[] { -1.13392689E-05, "0" }, new object[] { 25692.9766, "25692.977" },
             new object[] { 0.0, "0" }, new object[] { 334.5, "334.5" }, new object[] { 1e21, "1000000000000000000000" }, new object[] { -0.0006, "-0.001" } })
             Check(CommandBand.Number((double)row[0]) == (string)row[1] && !CommandBand.Number((double)row[0]).Contains("E"), "A number reads " + row[1] + ", got " + CommandBand.Number((double)row[0]));
+        // Every shown number goes through the one shared formatter (ShownNumber). A number format elsewhere is a key
+        // form, a state signature, a full-precision verification record or the game's own text, each listed here.
+        var allowed = new[] {
+            "Src/RailroaderScenePatcher.Core/ShownNumber.cs|0.###",   // the shared formatter itself
+            "Src/RailroaderScenePatcher.Core/Bindings.cs|R",          // TrackLocation.ToString, a key form
+            "Src/RailroaderScenePatcher/BridgeWorld.cs|R",            // the bridge's state signature
+            "Src/RailroaderScenePatcher.Core/CrossingEquipment.cs|R", // the verification record, whose tolerances need full precision
+            "Src/RailroaderScenePatcher/NativeDiagnostics.cs|F1",     // the game's own warning text, matched exactly
+            "Src/RailroaderScenePatcher/TrackMarkerWorld.cs|F1" };    // the game's own warning text, matched exactly
+        var root = System.IO.Path.GetFullPath(System.IO.Path.Combine(SourceDirectory(), "..", ".."));
+        var formats = System.IO.Directory.GetFiles(System.IO.Path.Combine(root, "Src"), "*.cs", System.IO.SearchOption.AllDirectories)
+            .SelectMany(file => System.Text.RegularExpressions.Regex.Matches(System.IO.File.ReadAllText(file), @"ToString\(""(R|F\d|0\.#+)""").Cast<System.Text.RegularExpressions.Match>()
+                .Select(m => file.Substring(root.Length + 1).Replace('\\', '/') + "|" + m.Groups[1].Value))
+            .Where(found => !allowed.Contains(found)).ToArray();
+        Check(formats.Length == 0, "Every shown number goes through ShownNumber: " + String.Join(", ", formats));
         // A field that still shows the object's value stands for the exact value; a changed field for what was entered.
         Check(CommandBand.Entered("528.405", 528.405334, out var kept) && kept == 528.405334, "An untouched field keeps the exact value");
         Check(CommandBand.Entered(" 528.41 ", 528.405334, out var typed) && typed == 528.41, "A changed field gives the entered number");
@@ -875,6 +894,7 @@ static class CommandBandTests {
         Check(!rule.Hides, "The control clicked before shows its tooltip again");
     }
     // The rules that every window, tab and row of the panel shares: one table per rule, over all call sites.
+    static string SourceDirectory([System.Runtime.CompilerServices.CallerFilePath] string path = "") => System.IO.Path.GetDirectoryName(path);
     static void SharedRulesHoldAtEveryCallSite() {
         // Button padding: every button of every row is as wide as its widest label plus the native padding on both
         // sides, and every row fits the inspector's minimum with its full labels.

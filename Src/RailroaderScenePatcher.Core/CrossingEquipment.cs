@@ -96,7 +96,7 @@ namespace RailroaderScenePatcher.Core {
         }
         public override string ToString() {
             var p = Placement?.Position;
-            return (Scope.Length == 0 ? "" : Scope + " ") + Id + ": " + Pattern + " from " + Source + (p == null ? "" : " at (" + String.Join(", ", p.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture))) + ")");
+            return (Scope.Length == 0 ? "" : Scope + " ") + Id + ": " + Pattern + " from " + Source + (p == null ? "" : " at (" + String.Join(", ", p.Select(ShownNumber.Text)) + ")");
         }
     }
     // The equipment additions of one crossing. A mod's set lists only its explicit additions; an addition it omits stays
@@ -280,7 +280,7 @@ namespace RailroaderScenePatcher.Core {
             foreach (var index in indexes ?? new double[0]) {
                 var sample = (int)(index * frequency);
                 if (sample <= previous || sample >= samples)
-                    return "its audio index " + index.ToString("0.###", CultureInfo.InvariantCulture) + " s does not split its clip of " + ((double)samples / frequency).ToString("0.###", CultureInfo.InvariantCulture) + " s into parts of at least one sample";
+                    return "its audio index " + ShownNumber.Text(index) + " s does not split its clip of " + ShownNumber.Text((double)samples / frequency) + " s into parts of at least one sample";
                 previous = sample;
             }
             return null;

@@ -126,8 +126,8 @@ namespace RailroaderScenePatcher.Core {
             if (lengths.Count == 0) return "The track location's segment " + location.Segment + " is missing from the loaded track; no other segment is used";
             if (lengths.Count > 1) return "The track location's segment " + location.Segment + " is ambiguous on the loaded track; no other segment is used";
             if (Double.IsNaN(location.Distance) || location.Distance < 0 || location.Distance > lengths[0] + TrackLocation.DistanceTolerance)
-                return "The track location's distance " + location.Distance.ToString("0.###", CultureInfo.InvariantCulture) + " m lies outside segment " + location.Segment + ", which is "
-                    + lengths[0].ToString("0.###", CultureInfo.InvariantCulture) + " m long";
+                return "The track location's distance " + ShownNumber.Text(location.Distance) + " m lies outside segment " + location.Segment + ", which is "
+                    + ShownNumber.Text(lengths[0]) + " m long";
             return null;
         }
         // The whole cut at the new location, with the setup's other cuts at their markers' current locations, under the

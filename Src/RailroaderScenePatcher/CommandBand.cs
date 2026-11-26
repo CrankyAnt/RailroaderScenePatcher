@@ -121,6 +121,9 @@ namespace RailroaderScenePatcher {
             return kind + " preview completed." + (shown.Length == 0 ? "" : " " + String.Join(" ", shown)) + " " + (unchanged ? UnchangedResult : WindowGuidance.ApplyPreview);
         }
         const string UnchangedResult = "The object has this value already.";
+        // Why a coverage form's Apply is inactive, or null: it waits for a preview, and a preview whose edit changes
+        // nothing leaves it inactive, as every control whose fields hold the current values is (Equal values).
+        internal static string CoverageApplyBlock(bool previewed, bool unchanged) => !previewed ? "Click Preview first." : unchanged ? UnchangedResult : null;
         // The addition a Use corrects: the refused addition whose Edit form is open (editedId) takes the device as its
         // source and keeps its ID and placement. Null when Use starts a new addition: no form, a new addition's form, or
         // the form of an addition that is built or that the scene patch file no longer holds.
