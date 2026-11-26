@@ -24,9 +24,11 @@ namespace RailroaderScenePatcher.Core {
     }
     // The intended effect of a coverage edit on each circuit of a crossing, or why it would be refused.
     public sealed class CoveragePreview {
-        internal CoveragePreview(IReadOnlyList<string> lines, string error) { Lines = lines; Error = error; }
+        internal CoveragePreview(IReadOnlyList<string> lines, string error, bool unchanged = false) { Lines = lines; Error = error; Unchanged = unchanged; }
         public IReadOnlyList<string> Lines { get; }
         public string Error { get; }
+        // Whether Apply would leave the scene patch file as it is, by the equal-value rule of the edit.
+        public bool Unchanged { get; }
     }
     // The intended effect of an equipment edit on each addition of a crossing, or why it would be refused.
     public sealed class EquipmentPreview {
@@ -818,13 +820,18 @@ namespace RailroaderScenePatcher.Core {
                 // The preview follows the equal-value rule of the edit, so it shows what Apply would store.
                 var value = Normalised(existing, CoverageValue(target, existing, circuit, coverage, addition), engine.Underlying(resolved));
                 if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey).State);
+                if (value != null && existing != null) {
+                    if (value.Parent != null) value = (JObject)value.DeepClone();
+                    PreservingJson.KeepStoredPrecision(existing, value);
+                }
+                var unchanged = value == null ? existing == null : existing != null && PreservingJson.SameModification(existing, value);
                 var key = existing == null ? NewId(target, "cover-") : ScenePatchFile.Key(existing);
                 var candidate = (JObject)scenePatchFile.Modifications.DeepClone();
                 if (value == null) candidate.Remove(key); else candidate[key] = value;
                 var current = scene.Read(resolved).Coverage;
                 var desired = engine.Desired(candidate, resolved, scenePatchFileKey).Coverage;
                 CheckEffectiveCoverage(resolved, desired);
-                return new CoveragePreview(CrossingCoverage.Describe(current, desired), null);
+                return new CoveragePreview(CrossingCoverage.Describe(current, desired), null, unchanged);
             } catch (Exception e) { return new CoveragePreview(Array.Empty<string>(), e.Message); }
         }
         // The effective coverage an edit converges on must itself be valid: removing an entry can leave a crossing without

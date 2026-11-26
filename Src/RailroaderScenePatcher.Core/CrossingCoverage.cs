@@ -17,7 +17,7 @@ namespace RailroaderScenePatcher.Core {
             ? From.Segment + " end " + From.End + " " + Number(From.Distance) + " to " + Number(To.Distance) + " m"
             : End(From) + " to " + End(To);
         static string End(TrackLocation location) => location.Segment + " end " + location.End + " " + Number(location.Distance) + " m";
-        static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
+        static string Number(double value) => ShownNumber.Text(value);
     }
     public enum CircuitKind { Native, Tracks, Detached, Added }
     // What a crossing controller reports about the detection spans its circuits hold.
@@ -49,9 +49,13 @@ namespace RailroaderScenePatcher.Core {
         // circuit's tracks or detaches it, or that sets an addition's tracks or deletes it.
         internal static string Recovery(string circuit) {
             var addition = DetectionAddition.Id(circuit);
-            return addition == null ? "On the controller's Connections tab, click Edit circuit " + circuit + " and select tracks for this circuit or detach it."
-                : "On the controller's Connections tab, click Edit detection addition " + addition + " and select other tracks for this addition or delete it.";
+            return addition == null ? RecoveryStart + "circuit " + circuit + " and select tracks for this circuit or detach it."
+                : RecoveryStart + "detection addition " + addition + " and select other tracks for this addition or delete it.";
         }
+        const string RecoveryStart = "On the controller's Connections tab, click Edit ";
+        // Whether a problem is a crossing detection problem: it carries the circuit's recovery (Recovery), so its repair
+        // route is Edit circuit or Edit detection addition, never another guided task.
+        public static bool IsDetectionProblem(string problem) => problem != null && problem.IndexOf(" " + RecoveryStart, StringComparison.Ordinal) >= 0;
         // What Unresolved reports, without its recovery.
         internal static string UnresolvedFault(string circuit, string role, string span, string lower, string upper, ISet<string> segments) {
             var name = SpanName(circuit, role, span);
@@ -450,7 +454,7 @@ namespace RailroaderScenePatcher.Core {
                 if (lengths.Count == 0) return "track segment " + location.Segment + " is missing";
                 if (lengths.Count > 1) return "track segment " + location.Segment + " is ambiguous";
                 if (Double.IsNaN(location.Distance) || location.Distance < 0 || location.Distance > lengths[0] + TrackLocation.DistanceTolerance)
-                    return "distance " + location.Distance.ToString("R", CultureInfo.InvariantCulture) + " lies outside segment " + location.Segment;
+                    return "distance " + ShownNumber.Text(location.Distance) + " lies outside segment " + location.Segment;
             }
             if (TrackLocation.Same(range.From, range.To)) return "the selected track has no length";
             return null;

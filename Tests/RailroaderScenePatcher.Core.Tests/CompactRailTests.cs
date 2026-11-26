@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Linq;
 using RailroaderScenePatcher;
 
 static class CompactRailTests {
@@ -20,8 +21,20 @@ static class CompactRailTests {
         TheFullRecordIsWrittenBackWhileCompact();
         MovesWaitUntilTheButtonIsUp();
         ADraggedRailIsNoticedBeforeAScaleChange();
+        WithNothingInspectedTheSelectInstructionShowsOnce();
         Console.WriteLine("PASS: compact window sizes, rows, scrolling, context room, places across scale changes, full record, moves after the release and one-line texts");
     }
+
+    // With nothing inspected, the state line gives the select instruction; neither the rail's context section nor any
+    // other window text gives it a second time in other words.
+    static void WithNothingInspectedTheSelectInstructionShowsOnce() {
+        var root = System.IO.Path.GetFullPath(System.IO.Path.Combine(Root(), "..", ".."));
+        var hits = new[] { "Src/RailroaderScenePatcher/ScenePatcherLayout.cs", "Src/RailroaderScenePatcher/ScenePatcherCompactRail.cs", "Src/RailroaderScenePatcher/CommandBand.cs" }
+            .SelectMany(file => WindowWordsTests.Literals(System.IO.File.ReadAllText(System.IO.Path.Combine(root, file))))
+            .Where(literal => literal.IndexOf("click Select in world", StringComparison.Ordinal) >= 0).ToArray();
+        Check(hits.Length == 1 && hits[0] == CommandBand.SelectInstruction, "The select instruction has one wording, given once: " + String.Join(" | ", hits));
+    }
+    static string Root([System.Runtime.CompilerServices.CallerFilePath] string path = "") => System.IO.Path.GetDirectoryName(path);
 
     static void TheRailSizesFollowFromItsRows() {
         Check(Near(CompactRail.CollapsedContent, 476), "With the outliner hidden, the least content height is 476");

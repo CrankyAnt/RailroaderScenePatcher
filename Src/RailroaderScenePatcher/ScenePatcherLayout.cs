@@ -642,7 +642,7 @@ namespace RailroaderScenePatcher {
         // The state line of an inspected object, one row high, with the full states in its tooltip.
         RectTransform StateLineRow(UIPanelBuilder builder, string state, string states) => Line(builder, state, "State", states, RowHeight);
         string StateLine(out string plain) {
-            if (selected == null) { plain = "Select an outliner object or click Select in world."; return plain; }
+            if (selected == null) { plain = CommandBand.SelectInstruction; return plain; }
             var text = new List<string> { CommandBand.ShownFamily(selected) };
             if (!selected.Active) text.Add("Inactive");
             // The native map editor's badges, as its inspector shows them beside the row marker.
@@ -1436,7 +1436,7 @@ namespace RailroaderScenePatcher {
                     var message = messages[i]; var older = i > 0;
                     // A failed action's message takes its colour from its failure kind; any other result from its words.
                     var tone = message.Recovery != null ? (CommandBand.RecoveryWarning(message.Recovery.Kind) ? Amber : Red) : ToneOf(message.Text);
-                    var text = WithoutSource(message);
+                    var text = CommandBand.WithoutSource(message.Source, message.Text);
                     MessageSlot(lines, message.Source, PathBreaks(tone == null ? Literal(text) : Tint(tone + (older ? "80" : ""), text)), older);
                 }
             }, false);
@@ -1525,9 +1525,6 @@ namespace RailroaderScenePatcher {
             foreach (var text in label.GetComponentsInChildren<TMP_Text>(true)) text.margin = new Vector4(0, 0, 4, 0);
             return label;
         }
-        // A result that begins with its own source does not say it twice: "Placement  completed.".
-        static string WithoutSource(EditFeedback.Message message) =>
-            message.Text.StartsWith(message.Source + " ", StringComparison.OrdinalIgnoreCase) ? message.Text.Substring(message.Source.Length + 1) : message.Text;
         static string ToneOf(string text) {
             foreach (var word in new[] { " refused", " failed", "unavailable", "could not", " stopped", " blocked by" }) if (text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return Red;
             foreach (var word in new[] { " completed", " complete.", " copied", "requested again" }) if (text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return Green;
@@ -1938,13 +1935,13 @@ namespace RailroaderScenePatcher {
                     new[] { "Place", "The place an object's name or hierarchy path names, or else the nearest place the game names." },
                     new[] { "Changed", "Objects this mod changes, marked *. An object whose modification is refused is marked × instead. Its Changes tab gives the reason." },
                     new[] { "Disabled", "Objects that are switched off, whatever their parents are. They are never listed under Problems; find them here." },
-                    new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists, or a crossing detection span that the game cannot use: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
+                    new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists, or a crossing detection span that the game cannot use: a problem you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
                     new[] { "Groups and crossings", "A group lists its parts beneath it. A crossing controller lists its lights, gates, bells, pads, and detection spans beneath it. A crossing without a controller is one row that holds its crossbucks and pads: click it, then click Focus to go there." },
                     new[] { "Spawn point", "Scene spawn points are where players start, teleport to, or return after rescue. Edit native spawns in the Map Editor's Spawns category." },
                     new[] { StarterPlacements.Family, "An active new-game setup reads these markers' track locations to place its starting cars. The marker's own position has no effect. Click Focus to move the camera to where the cars stand." },
                     new[] { StationMapIconRules.Family, "The icons that show stations on the map. After moving a station in the Map Editor, move its icon to the station's new location." },
                     new[] { "Inspection only", "Marks an object of a kind the patcher has no edit for yet and the Map Editor does not edit. It stands under its category like any other object, has no problem marker and no edit. The Object tab gives the reason." },
-                    new[] { "No objects to list", "The outliner shows this when all the scene objects the patcher checks for editing are created by the game while the map is running. The patcher has no objects it can edit on this map." },
+                    new[] { InventoryPresentationState.NoEditableObjectsTerm, "The outliner shows this when all the scene objects the patcher checks for editing are created by the game while the map is running. The patcher has no objects it can edit on this map." },
                     new[] { "Dimmed rows", "A dimmed group row holds matching parts but does not match the search itself." },
                     new[] { "Focus", "Moves the camera to the inspected object, the starting point of a car placement, or the selected crossing." },
                     new[] { "Fit names", "Sizes the column to most names. Drag the divider for another width." } },
@@ -1952,7 +1949,7 @@ namespace RailroaderScenePatcher {
             [ObjectTab] = new HelpText { Title = "Object", Intro = "Check the object's state, problems, and dependencies before choosing an edit.",
                 Terms = new[] {
                     new[] { "Supported edits", "The edits offered for this object on the Placement, Object, and Connections tabs. Unavailable edits show the same reason as their disabled controls. These reasons aren't listed under Detected problems." },
-                    new[] { "Detected problems", "Defects you can repair with the patcher, each with its repair. On a crossing controller, these include a detection span with an end outside its track segment, or with no track route between its ends: the game detects no train on such a span." },
+                    new[] { "Detected problems", "Each problem the inspection found that you can repair with the patcher, with its repair. On a crossing controller, a problem can be a detection span with an end outside its track segment, or with no track route between its ends: the game detects no train on such a span." },
                     new[] { "Information", "What the inspection found that the patcher cannot repair on this object, such as the detection findings of a crossing controller that cannot be edited. Each names the reason." },
                     new[] { "Inspection notes", "What the inspection could not read or check. Nothing here can be repaired with the patcher, so it is not listed as a problem." },
                     new[] { "Enabled", "Whether the object is active. Disable holds it inactive; Clear activity returns it to its underlying activity." },

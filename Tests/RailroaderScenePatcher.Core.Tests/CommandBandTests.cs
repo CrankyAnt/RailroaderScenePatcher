@@ -60,6 +60,9 @@ static class CommandBandTests {
         Check(CommandBand.PreviewReport("Equipment", lines) == "Equipment preview completed. " + lines[0] + " Click Apply to apply it.",
             "The footer carries the preview line and asks for a click: " + CommandBand.PreviewReport("Equipment", lines));
         Check(CommandBand.PreviewReport("Coverage", new string[0]) == "Coverage preview completed. Click Apply to apply it.", "A preview without lines asks for the click only");
+        var unchanged = CommandBand.PreviewReport("Coverage", null, true);
+        Check(unchanged == "Coverage preview completed. The object has this value already." && !unchanged.Contains(WindowGuidance.ApplyPreview),
+            "A preview whose edit changes nothing says so and does not ask for Apply: " + unchanged);
     }
     // A group left out under a settled rule that needs no ticket, such as a group that holds track markers, is not
     // waiting for support and never reads "Not yet supported:"; a group a ticket covers does.
@@ -139,6 +142,8 @@ static class CommandBandTests {
             "A row slightly too narrow shortens only the source name: " + row.Fit(Width(Markup(name)) - 1, Width));
         Check(row.Fit(Width(Markup("… (added: north-signal)")), Width) == Markup("… (added: north-signal)"),
             "A narrow row keeps the Equipment ID readable before the source name: " + row.Fit(Width(Markup("… (added: north-signal)")), Width));
+        Check(row.Fit(Width(Markup("… (added: north-signal)")) - 5, Width) == Markup("… (added: north-signal)"),
+            "A row too narrow even for the Equipment ID keeps the ellipsis that marks the cut source name: " + row.Fit(Width(Markup("… (added: north-signal)")) - 5, Width));
         var other = new InventoryPresentationState.FittedRow("Other family", "Grade Crossing - Allen", Markup);
         Check(other.Fit(5, Width) == other.Full, "Other rows keep the outliner's own shortening at the end of the row");
     }
@@ -606,11 +611,41 @@ static class CommandBandTests {
         // The result of an edit says what happened.
         foreach (var row in new[] {
             new object[] { false, false, null, "Enable completed." },
-            new object[] { true, false, null, "Enable: the object has this value already." },
+            new object[] { true, false, null, "The object has this value already." },
             new object[] { false, true, null, "Enable completed. The value equals the object's value without this mod, so the modification no longer sets it." },
             new object[] { false, false, "Enable did something else.", "Enable did something else." },
-            new object[] { true, true, "x", "Enable: the object has this value already." } })
+            new object[] { true, true, "x", "The object has this value already." } })
             Check(CommandBand.EditResult("Enable", (bool)row[0], (bool)row[1], (string)row[2]) == (string)row[3], "An edit's result reads: " + row[3]);
+        // An unchanged result names no label of its own: the footer and the log line each put the place's label before
+        // it once, also where the action differs from the place.
+        foreach (var row in new[] { new[] { "Crossing coverage", "Crossing coverage" }, new[] { "Activity", "Disable" } }) {
+            var result = CommandBand.EditResult(row[1], true, false, null);
+            var footer = row[0] + " " + CommandBand.WithoutSource(row[0], result);
+            var line = CommandBand.LogLine(row[0], "World/Crossings/Bryson Everett", result);
+            Check(footer == row[0] + " The object has this value already." && line == "[" + row[0] + "] World/Crossings/Bryson Everett: The object has this value already.",
+                "An unchanged " + row[1] + " states its result once, without a second label: " + footer + " | " + line);
+        }
+        // A crossing detection problem names its own repair route, Edit circuit or Edit detection addition, and offers no
+        // track-binding guided task; a binding problem still offers it.
+        var track = new FakeDetectionTrack().Segment("S1", 40.5).Segment("S2", 200).Segment("S3", 100);
+        var segments = new System.Collections.Generic.HashSet<string>(track.Segments.Keys, StringComparer.Ordinal);
+        TrackLocation At(string segment, double distance) => new TrackLocation(segment, "a", distance);
+        DetectionSpan[] Circuit(string first) => new[] { new DetectionSpan("PA", At("S2", 50), At(first, 50)), new DetectionSpan("PI", At("S2", 50), At("S2", 70)), new DetectionSpan("PB", At("S2", 70), At("S3", 50)) };
+        var native = CircuitSpanChecks.Findings(0, "PI", Circuit("S1"), segments, track, null).Problems;
+        var addition = CircuitSpanChecks.Findings(0, DetectionAddition.Key("mod", "north"), Circuit("S1"), segments, track, null).Problems;
+        var unresolved = CircuitSpanChecks.Findings(0, "PI", Circuit("Sgone"), segments, track, null).Problems;
+        Check(native.Count == 1 && addition.Count == 1 && unresolved.Count == 1, "Each circuit has one detection problem: " + String.Join(" | ", native.Concat(addition).Concat(unresolved)));
+        foreach (var problem in native.Concat(addition).Concat(unresolved))
+            Check(!CommandBand.OffersBindingRepair(new[] { problem }), "A crossing detection problem offers no track-binding guided task: " + problem);
+        Check(CommandBand.OffersBindingRepair(new[] { "Duplicate marker ID Mg6m is repaired, but this is a different problem: the track binding names segment z5w8si, which doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab." })
+            && CommandBand.OffersBindingRepair(new[] { native[0], "Marker broken binding: missing segment S9" }), "A binding problem still offers the track-binding guided task");
+        // The entry icon's tooltip says what a click on the icon does now; a reload requirement keeps its own text.
+        Check(CommandBand.EntryStatus(false, null) == ("Scene Patcher", "Open the Scene Patcher window.") && CommandBand.EntryStatus(true, null) == ("Scene Patcher", "Close the Scene Patcher window."),
+            "The entry tooltip opens a closed window and closes an open one: " + CommandBand.EntryStatus(true, null));
+        Check(CommandBand.EntryStatus(true, "Reload the map.") == ("Scene Patcher: reload", "Reload the map.") && CommandBand.EntryStatus(false, "Reload the map.") == ("Scene Patcher: reload", "Reload the map."),
+            "A reload requirement keeps its caption and reason in both states");
+        Check(CommandBand.WithoutSource("Placement", "Placement completed.") == "completed." && CommandBand.WithoutSource("Placement", "Gizmo placement completed.") == "Gizmo placement completed.",
+            "A result that begins with its own source does not say it twice");
         // One rule for every shown number: three decimals, no trailing zeros, never scientific notation, no negative zero.
         foreach (var row in new[] { new object[] { 528.405334, "528.405" }, new object[] { 70.04144, "70.041" }, new object[] { 1.13392689E-05, "0" }, new object[] { -1.13392689E-05, "0" }, new object[] { 25692.9766, "25692.977" },
             new object[] { 0.0, "0" }, new object[] { 334.5, "334.5" }, new object[] { 1e21, "1000000000000000000000" }, new object[] { -0.0006, "-0.001" } })

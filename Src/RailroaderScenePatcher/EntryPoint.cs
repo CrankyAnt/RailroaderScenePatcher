@@ -787,8 +787,9 @@ namespace RailroaderScenePatcher {
                 if (inventory != null) foreach (var identity in replayed.ToArray()) {
                     var entry = inventory.Entries.FirstOrDefault(e => TargetIdentity.SameObject(e.Identity, identity));
                     var updated = entry == null ? null : inventory.ReobserveRelated(entry);
-                    // An Undo or Redo of this patcher's step: the fields show the object, and an open equipment form its addition, as they are now.
-                    if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) { ReadPlacement(); ReadOpenEquipment(); } ReobserveMarkerIdHolders(entry, updated); }
+                    // An Undo or Redo of this patcher's step: the fields show the object, an open equipment form its addition,
+                    // and an open Edit circuit or Edit detection addition form its detection spans, as they are now.
+                    if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) { ReadPlacement(); ReadOpenEquipment(); ReadOpenCoverage(); } ReobserveMarkerIdHolders(entry, updated); }
                 }
                 // Objects a follow update moved: every entry of the object takes its new observation, and the fields of
                 // the inspected one take its new placement.
@@ -846,9 +847,9 @@ namespace RailroaderScenePatcher {
                 reloadRequirement = attachment.Session.ReloadRequirement;
                 nextReloadCheck = Time.unscaledTime + 1f;
             }
-            presentation?.SetEntryStatus(reloadRequirement == null ? "Scene Patcher" : "Scene Patcher: reload",
-                reloadRequirement ?? "Open the Scene Patcher window.");
             bool open = presentation != null && presentation.IsOpen;
+            var entryStatus = CommandBand.EntryStatus(open, reloadRequirement);
+            presentation?.SetEntryStatus(entryStatus.Caption, entryStatus.Reason);
             if (!open) CancelGizmo();
             SyncInputRegions();
             if (open && selection?.Pending != null && inputBlocker?.WorldClick is Vector2 pointer) {
@@ -1486,7 +1487,7 @@ namespace RailroaderScenePatcher {
                 preparedCoverage = new PreparedCoverage { Circuit = circuit, Addition = addition, Value = value, Preview = preview };
                 // A preview that the session itself refuses carries its reason; either way the newest result leads.
                 if (preview.Error != null) feedback.Refuse(CoveragePlace, "Coverage preview", preview.Error);
-                else feedback.Report(CoveragePlace, CommandBand.PreviewReport("Coverage", null));
+                else feedback.Report(CoveragePlace, CommandBand.PreviewReport("Coverage", null, preview.Unchanged));
                 presentation?.RequestRefresh();
             });
         }
@@ -1603,6 +1604,18 @@ namespace RailroaderScenePatcher {
         }
         // Fills the fields from the track each role of the circuit or addition covers now; see CoverageFormFields.Read.
         void ReadCoverage(CircuitCoverage value) => coverageForm.Read(value);
+        // After a native history step the open Edit circuit or Edit detection addition form shows the circuit's detection
+        // spans as they are now, as the equipment form does (ReadOpenEquipment). A circuit or addition the crossing no
+        // longer holds leaves the form as it is; a new addition's form keeps the modder's values.
+        void ReadOpenCoverage() {
+            if (coverageCircuit == null || attachment == null || selected?.Identity.Structure != CrossingCoverageScene.Structure) return;
+            try {
+                var circuit = attachment.Session.Coverage(selected.Identity).Circuits.FirstOrDefault(c => c.Key == coverageCircuit);
+                if (circuit.Key == null) return;
+                preparedCoverage = null;
+                ReadCoverage(circuit.Value);
+            } catch (Exception) { }
+        }
         CircuitCoverage ParseCoverage(out string problem, bool addition) => coverageForm.Parse(addition, out problem);
         int queuedPasses;
         bool queuedCompared;

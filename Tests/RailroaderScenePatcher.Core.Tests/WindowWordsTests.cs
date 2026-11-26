@@ -23,6 +23,7 @@ static class WindowWordsTests {
         NoRetiredSceneryTerms();
         NoPavilionKindOrTrackRelativeFamily();
         GroupTooltipsSayTheyMeanSceneObjects();
+        HelpTermsUseTheWindowsWords();
         Console.WriteLine("PASS: window words group and part");
     }
 
@@ -57,6 +58,18 @@ static class WindowWordsTests {
     static IEnumerable<string> Hits(string file, params string[] words) {
         var text = File.ReadAllText(Path.Combine(Root(), file));
         return Literals(text).Where(l => words.Any(w => l.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0)).Select(l => file + ": \"" + l + "\"");
+    }
+
+    // The help explains a state or a heading with the word the window shows for it: the empty-map state by the reason
+    // the outliner states, and problems as problems, never with a second word for the same concept.
+    static void HelpTermsUseTheWindowsWords() {
+        Check(InventoryPresentationState.NoEditableObjects.IndexOf(InventoryPresentationState.NoEditableObjectsTerm, StringComparison.OrdinalIgnoreCase) >= 0,
+            "the outliner's empty-map reason names its help term: " + InventoryPresentationState.NoEditableObjectsTerm);
+        const string layout = "Src/RailroaderScenePatcher/ScenePatcherLayout.cs";
+        var source = File.ReadAllText(Path.Combine(Root(), layout));
+        Check(source.Contains("new[] { InventoryPresentationState.NoEditableObjectsTerm, "), "the outliner help takes the empty-map term from the window's reason");
+        var hits = Hits(layout, "No objects to list", "defect").ToArray();
+        Check(hits.Length == 0, "the help uses the window's terms only:\n" + String.Join("\n", hits));
     }
 
     static void WindowLiteralsNameNoComplexOrChildObject() {
