@@ -11,4 +11,4 @@ parts:
       - Src/RailroaderScenePatcher/
       - Directory.Build.props
 dependabot:
-  nuget: [/Src/RailroaderScenePatcher.Core, /Src/RailroaderScenePatcher, /Tests/RailroaderScenePatcher.Core.Tests, /Tools/NativeObservation, /Tests/FaultInjection]
+  nuget: [/Src/RailroaderScenePatcher.Core, /Src/RailroaderScenePatcher, /Tests/RailroaderScenePatcher.Core.Tests, /Tools/NativeObservation, /Tests/FaultInjection, /Tools/TerrainHeightReadout]
