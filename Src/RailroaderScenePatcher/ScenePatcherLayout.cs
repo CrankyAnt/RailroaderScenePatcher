@@ -110,6 +110,13 @@ namespace RailroaderScenePatcher {
         // another form stays text.
         void BindingFields(UIPanelBuilder builder, string line) {
             var values = InventoryPresentationState.BindingValues(line);
+            // A named location is its track location as the row's value, then each note as a line of its own.
+            if (values == null && line.StartsWith(CommandBand.ListedTrackLocation, StringComparison.Ordinal)) {
+                var named = CommandBand.NamedLocationRow(line);
+                Field(builder, CommandBand.ListedTrackLocation.TrimEnd(':'), Breakable(named.Value));
+                foreach (var note in named.Notes) PlainLabel(builder, Breakable(note));
+                return;
+            }
             if (values == null) {
                 var colon = line.IndexOf(": ", StringComparison.Ordinal);
                 if (colon > 0) Field(builder, line.Substring(0, colon), Breakable(line.Substring(colon + 2))); else PlainLabel(builder, Breakable(line));

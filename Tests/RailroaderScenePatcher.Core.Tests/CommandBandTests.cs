@@ -669,6 +669,25 @@ static class CommandBandTests {
                 .Select(m => file.Substring(root.Length + 1).Replace('\\', '/') + "|" + m.Groups[1].Value))
             .Where(found => !allowed.Contains(found)).ToArray();
         Check(formats.Length == 0, "Every shown number goes through ShownNumber: " + String.Join(", ", formats));
+        // A native distance read as text reaches the window only in a structured "distance=" binding line, which
+        // CommandBand.Shown formats; any other line takes it as a number through ShownNumber.
+        var rawDistances = System.IO.Directory.GetFiles(System.IO.Path.Combine(root, "Src"), "*.cs", System.IO.SearchOption.AllDirectories)
+            .SelectMany(file => System.Text.RegularExpressions.Regex.Matches(System.IO.File.ReadAllText(file), @"(.{0,16})Text\(Field\([^()]*""distance""\)\)").Cast<System.Text.RegularExpressions.Match>()
+                .Where(m => !m.Groups[1].Value.EndsWith("distance=\" + ", StringComparison.Ordinal)).Select(m => System.IO.Path.GetFileName(file) + ": " + m.Value.Trim()))
+            .ToArray();
+        Check(rawDistances.Length == 0, "A native distance reaches window text only through a distance= line: " + String.Join(" | ", rawDistances));
+        // A named location shows in the one form of a track location, as a value without a full stop; where it is
+        // registered under another segment or belongs to another object, that is information of its own.
+        Check(CommandBand.NamedLocationLine("Ss85", "A", 25.45431f, "Ss85", true) == "Named location: Ss85 / a / 25.454", "A named location reads in the shown form: " + CommandBand.NamedLocationLine("Ss85", "A", 25.45431f, "Ss85", true));
+        var noted = CommandBand.NamedLocationLine("Ss85", "B", 3, "S9xx", false);
+        Check(noted == "Named location: Ss85 / b / 3. Registered under segment S9xx. This location belongs to another object.", "A named location keeps its notes as sentences of their own: " + noted);
+        Check(CommandBand.NamedLocationLine(null, "A", 1, "S1", true) == "Named location: no segment / a / 1. Registered under segment S1." && CommandBand.NamedLocationLine(null, null, null, null, true) == "Named location: none",
+            "A location without a segment, and no named location, read as values");
+        var named = CommandBand.NamedLocationRow(noted);
+        Check(named.Value == "Ss85 / b / 3" && named.Notes.SequenceEqual(new[] { "Registered under segment S9xx.", "This location belongs to another object." }),
+            "The window shows the location as the row's value and each note as a line of its own: " + named.Value + " | " + String.Join(" | ", named.Notes));
+        var plain = CommandBand.NamedLocationRow("Named location: Ss85 / a / 25.454");
+        Check(plain.Value == "Ss85 / a / 25.454" && plain.Notes.Length == 0, "A location without notes is only the value");
         // A field that still shows the object's value stands for the exact value; a changed field for what was entered.
         Check(CommandBand.Entered("528.405", 528.405334, out var kept) && kept == 528.405334, "An untouched field keeps the exact value");
         Check(CommandBand.Entered(" 528.41 ", 528.405334, out var typed) && typed == 528.41, "A changed field gives the entered number");
