@@ -281,11 +281,11 @@ The development reference, outside scene patch editing, that names each rule kee
 A kind of scene object that the patcher supports under its own rules, such as track markers, scene spawn points or station map icons. An object's family decides what an edit of it may do. A family is named after its game class when that class carries one family, such as Milepost, Spawn point, Track span or Grade crossing controller. When one class carries several families, the family name joins the class to the game's word for the role, such as Crossing pad marker, Starter placement marker or Station map icon. A family with no game class of its own, such as Crossing mast, keeps its name. The window shows family names in sentence case with spaces; Milepost is one word.
 
 **Category**:
-What a scene object is to a modder, such as Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building, Water or Road scenery. Spawn point, Starter placement, Station map icon and Track marker are categories too. An object that fits none of them is Unclassified.
+What a scene object is to a modder, such as Station building, Platform, Lights, Sign, Mileposts, Grade crossing, Bridge, Industry building, Storage display, Railroad service building, Water or Road scenery. Spawn point, Starter placement, Station map icon and Track marker are categories too. An object that fits none of them is Unclassified.
 _Avoid_: Other
 
 **Kind**:
-What tells the objects of one category apart, such as Rail bridges and Road bridges under Bridge, or Speed signs and Mileposts under Sign.
+What tells the objects of one category apart, such as Rail bridges and Road bridges under Bridge, or Speed signs and Whistle signs under Sign.
 
 **Place**:
 A place on the map that the game names, such as Alarka Jct or Connelly Creek, and at which a scene object stands.
