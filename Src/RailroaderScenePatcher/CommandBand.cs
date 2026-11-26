@@ -120,7 +120,7 @@ namespace RailroaderScenePatcher {
             var shown = (lines ?? Enumerable.Empty<string>()).Where(line => !String.IsNullOrWhiteSpace(line)).Select(Sentence).ToArray();
             return kind + " preview completed." + (shown.Length == 0 ? "" : " " + String.Join(" ", shown)) + " " + (unchanged ? UnchangedResult : WindowGuidance.ApplyPreview);
         }
-        const string UnchangedResult = "The object has this value already.";
+        const string UnchangedResult = "The object already has this value.";
         // Why a coverage form's Apply is inactive, or null: it waits for a preview, and a preview whose edit changes
         // nothing leaves it inactive, as every control whose fields hold the current values is (Equal values).
         internal static string CoverageApplyBlock(bool previewed, bool unchanged) => !previewed ? "Click Preview first." : unchanged ? UnchangedResult : null;
@@ -1025,7 +1025,7 @@ namespace RailroaderScenePatcher {
             : reverted ? action + " completed. The value equals the object's value without this mod, so the modification no longer sets it."
             : completed ?? action + " completed.";
         // The state line's instruction while nothing is inspected, in the full window and the compact rail alike.
-        internal const string SelectInstruction = "Select an outliner object or click Select in world.";
+        internal const string SelectInstruction = "Select an object in the outliner or click Select in world.";
         // The entry icon's caption and tooltip: what a click on the icon does now, open the window or close it, or the
         // reload requirement while one holds.
         internal static (string Caption, string Reason) EntryStatus(bool open, string reloadRequirement) =>
