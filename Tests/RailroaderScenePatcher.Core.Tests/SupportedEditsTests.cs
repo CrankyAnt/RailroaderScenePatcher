@@ -113,7 +113,7 @@ static class SupportedEditsTests {
         ["milepost"] = "Available: Move, Rotate, Disable, and Set track binding. | Unavailable: Follow a track. Mileposts use fixed placement. Set the track binding under Connections. | " + NoReplacementId + "Milepost family.",
         ["mast"] = "Available: Move, Rotate, and Disable. | " + NoFollowEquipment,
         ["bell"] = "Available: Move and Disable. | Unavailable: Rotate. A bell's sound has no direction, so rotation does not apply to it. You can still set its position. | " + NoFollowEquipment,
-        ["crossing controller"] = "Available: Edit crossing coverage. | " + Placed + "The patcher only edits this controller's crossing coverage and equipment.",
+        ["crossing controller"] = "Available: Edit crossing coverage and Edit crossing equipment. | " + Placed + "The patcher edits only this controller's crossing coverage and crossing equipment.",
         ["construction controller"] = "Available: Set construction segments. | Unavailable: Move, Rotate, and Follow a track. A construction controller switches the bridge's parts on or off regardless of its own position. Moving it has no effect in the game. Move the bridge or its parts instead. | Unavailable: Disable. This controller switches the bridge's parts on or off as construction progresses. Disabling it would stop the game from doing this. Disable the bridge or its parts instead.",
         ["starter"] = "Available: Set track location. | " + Placed + "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; place the marker on the track under Connections. | "
             + NoReplacementId + "Starter placement family. | Unavailable: Set Start derailed. No new-game car placement in an active setup reads this marker, so it is not a starter placement marker.",
@@ -225,12 +225,16 @@ static class SupportedEditsTests {
     static void CrossingControllerOffersOnlyItsConnections() {
         var controller = Entry("Crossing controller", CrossingCoverageScene.Structure, "Set which tracks each circuit detects.", component: CrossingCoverageScene.ComponentType);
         var edits = SupportedEdits.Of(controller);
-        const string reason = "The patcher only edits this controller's crossing coverage and equipment.";
-        Check(Shown(controller) == "Available: Edit crossing coverage. | Unavailable: Move, Rotate, Follow a track, and Disable. " + reason,
+        const string reason = "The patcher edits only this controller's crossing coverage and crossing equipment.";
+        Check(Shown(controller) == "Available: Edit crossing coverage and Edit crossing equipment. | Unavailable: Move, Rotate, Follow a track, and Disable. " + reason,
             "a crossing controller: " + Shown(controller));
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
             Check(SupportedEdits.ModeReason(edits, mode) == reason, "placement mode " + mode + " of a crossing controller is refused with its reason: " + SupportedEdits.ModeReason(edits, mode));
         Check(CommandBand.Tooltip("Disable this object.", SupportedEdits.ReasonOf(edits, SupportedEdits.Activity)) == "Unavailable: " + reason, "its Disable tooltip gives the same reason");
+        // Its lights, gates and bells are an edit of their own, unavailable with the reason the session gives when they cannot be read.
+        var unread = new SupportedEdits.Live { EquipmentReason = "the crossing's equipment could not be read" };
+        Check(Shown(controller, unread) == "Available: Edit crossing coverage. | Unavailable: Move, Rotate, Follow a track, and Disable. " + reason + " | Unavailable: Edit crossing equipment. The crossing's equipment could not be read.",
+            "a crossing controller whose equipment cannot be read: " + Shown(controller, unread));
     }
 }
 // An object's entry for the Supported edits model, for the tests of one family's controls: its family, its structure,

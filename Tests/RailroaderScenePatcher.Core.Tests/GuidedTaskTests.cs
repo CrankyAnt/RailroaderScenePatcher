@@ -100,7 +100,7 @@ static class GuidedTaskTests {
             new TargetIdentity("scene", "crossing", CrossingCoverageScene.ComponentType, null)
         }) {
             foreach (var task in new[] { GuidedTaskKind.Placement, GuidedTaskKind.Snap, GuidedTaskKind.Activity })
-                Check(GuidedTaskState.TargetBlock(task, crossing) == "The patcher only edits this controller's crossing coverage and equipment.", "A crossing controller cannot offer " + task);
+                Check(GuidedTaskState.TargetBlock(task, crossing) == "The patcher edits only this controller's crossing coverage and crossing equipment.", "A crossing controller cannot offer " + task);
             foreach (var task in new[] { GuidedTaskKind.Binding, GuidedTaskKind.DetachBinding, GuidedTaskKind.StarterPlacement })
                 Check(GuidedTaskState.TargetBlock(task, crossing) == null, "Other task rules decide whether a crossing controller can offer " + task);
         }

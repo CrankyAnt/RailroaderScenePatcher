@@ -850,6 +850,9 @@ namespace RailroaderScenePatcher {
                 live.ActivitySwitched = selected.GroupPath != null || selected.Family == BakedSceneryRules.Family ? GroupWorld.ActivityProblem(target) : IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
                 live.DisableProblem = GroupWorld.DisableProblem(target);
             }
+            // A crossing whose lights, gates and bells the session cannot read offers no equipment edit, with that reason.
+            if (CommandBand.EditsCoverage(selected.Identity) && attachment != null)
+                try { attachment.Session.Equipment(selected.Identity); } catch (Exception e) { live.EquipmentReason = e.GetBaseException().Message; }
             if (IsGenericMarker) {
                 var reading = ReadSharers();
                 live.MarkerIdReason = CommandBand.MarkerIdUnavailable(selected.Family, true, reading.Underlying, reading.Sharers.Count, HasMarkerIdValue(selected.Identity));

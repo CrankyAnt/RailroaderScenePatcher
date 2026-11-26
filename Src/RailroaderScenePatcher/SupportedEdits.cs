@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher {
     internal static class SupportedEdits {
         // The edits, in the order Supported edits names them. Activity is named by its button: Disable or Enable.
         internal const string Move = "Move", Rotate = "Rotate", Follow = "Follow a track", Activity = "Activity", Binding = "Set track binding",
-            MarkerId = "Set marker ID", Coverage = "Edit crossing coverage", Segments = "Set construction segments", TrackLocation = "Set track location", Wreck = "Set Start derailed";
+            MarkerId = "Set marker ID", Coverage = "Edit crossing coverage", Equipment = "Edit crossing equipment", Segments = "Set construction segments", TrackLocation = "Set track location", Wreck = "Set Start derailed";
         internal sealed class Edit {
             internal Edit(string key, string name, string reason) { Key = key; Name = name; Reason = reason; }
             // The edit's constant above.
@@ -34,6 +34,8 @@ namespace RailroaderScenePatcher {
             internal string ActivitySwitched { get; set; }
             // Why the game would not keep the object disabled, such as a progression that cannot be read.
             internal string DisableProblem { get; set; }
+            // Why the crossing's lights, gates and bells cannot be read now, so that none can be added, edited or removed.
+            internal string EquipmentReason { get; set; }
             // Why a generic track marker takes no replacement ID now, as its Marker ID section reads it.
             internal string MarkerIdReason { get; set; }
             // Why the setups that read a starter placement marker could not be read.
@@ -45,7 +47,7 @@ namespace RailroaderScenePatcher {
         }
         // The reason that holds every placement and activity edit of a crossing controller: its capability takes only
         // its crossing coverage and added equipment.
-        internal const string CrossingNoEdit = "The patcher only edits this controller's crossing coverage and equipment.";
+        internal const string CrossingNoEdit = "The patcher edits only this controller's crossing coverage and crossing equipment.";
         static readonly HashSet<string> MarkerStructures = new HashSet<string>(StringComparer.Ordinal) { CrossingPadScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure };
         // Whether the object's track binding is edited through its track marker: a crossing pad, a generic track marker or a milepost.
         internal static bool EditsBinding(string structure) => structure != null && MarkerStructures.Contains(structure);
@@ -89,7 +91,8 @@ namespace RailroaderScenePatcher {
                 return edits;
             }
             if (HoldsSegments(entry, live)) { edits.Add(new Edit(Segments, Segments, null)); return edits; }
-            if (coverage) edits.Add(new Edit(Coverage, Coverage, null));
+            // A crossing controller's Connections tab edits its coverage and, as a separate edit, its added lights, gates and bells.
+            if (coverage) { edits.Add(new Edit(Coverage, Coverage, null)); edits.Add(new Edit(Equipment, Equipment, live?.EquipmentReason == null ? null : CommandBand.Sentence(live.EquipmentReason))); }
             // An object that holds a track binding: its own reason when the patcher does not edit it, as for every other edit.
             if (HoldsBinding(entry.Family)) edits.Add(new Edit(Binding, Binding, editable && EditsBinding(structure) ? null : own ?? CommandBand.EditReason(entry.Operations)));
             if (EditsBinding(structure))
