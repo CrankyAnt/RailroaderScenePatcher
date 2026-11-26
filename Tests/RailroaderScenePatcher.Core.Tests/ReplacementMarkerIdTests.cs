@@ -410,13 +410,12 @@ static class ReplacementMarkerIdTests {
     // The Marker ID row of the Connections tab and its guided task: the replacement ID stays visible and disabled with its
     // reason for any marker that does not take one, and Set id and Clear id state why they cannot be used.
     static void MarkerIdRowStatesItsReasons() {
-        // A milepost and a starter placement marker are native track markers of type Generic too, so the reason names the
-        // families: the Generic track marker family, not the marker type alone.
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false) == "Only objects in the Generic track marker family can have a replacement ID. This object is in the Milepost family.",
+        // A milepost and a starter placement marker are native track markers of type Generic too; the reason names the family.
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false) == "Generic track markers only",
             "A marker of another family keeps the row disabled with its reason: " + RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false));
         Assert(ReplacementMarkerIds.NotSupported == "Only objects in the Generic track marker family can have a replacement ID." && ReplacementMarkerIds.NotSupported.Contains(SceneFamilies.TrackMarker + " family"),
             "The refusal names the family Generic track marker, not the marker type Generic that a milepost also shows: " + ReplacementMarkerIds.NotSupported);
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mown", 0, false) == "Only this marker holds marker ID Mown, so it doesn't need a replacement ID.", "A marker ID of its own needs no replacement");
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mown", 0, false) == "No other object holds its marker ID", "A marker ID of its own needs no replacement");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mg6m", 1, false) == null && RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mg6m", 0, true) == null,
             "A shared native id offers the replacement ID, and a marker that already has one keeps the row");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "", "Mg6m") == ReplacementMarkerIds.Empty, "An empty field states the reason");

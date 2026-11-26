@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using RailroaderScenePatcher;
 
 static class HelpWindowTests {
@@ -11,7 +14,26 @@ static class HelpWindowTests {
         TheWheelReachesTheEndOfTheContent();
         AHelpNeverCoversTheMapEditorsTitleBar();
         AHelpFollowsItsQuestionMarkThroughAScaleChange();
+        ObjectHelpExplainsSupportedEditsAndReasonGroups();
         Console.WriteLine("PASS: help windows scroll at the game's wheel step, keep off the Map Editor's title bar and follow a UI scale change");
+    }
+
+    static void ObjectHelpExplainsSupportedEditsAndReasonGroups([CallerFilePath] string path = "") {
+        var root = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path), "..", ".."));
+        var source = File.ReadAllText(Path.Combine(root, "Src", "RailroaderScenePatcher", "ScenePatcherLayout.cs"));
+        var start = source.IndexOf("[ObjectTab] = new HelpText", StringComparison.Ordinal);
+        var end = source.IndexOf("[PlacementTab] = new HelpText", start, StringComparison.Ordinal);
+        Check(start >= 0 && end > start, "The Object tab has context help");
+        var words = WindowWordsTests.Literals(source.Substring(start, end - start));
+        var headings = new[] { "Supported edits", "Placement fixed or set elsewhere", "The game controls its activity", "Edited elsewhere", "Not supported", "Blocked for now" };
+        var previous = -1;
+        foreach (var heading in headings) {
+            var index = words.IndexOf(heading);
+            Check(index > previous && words.Count(word => word == heading) == 1, "Object help names each reason group once in order: " + heading);
+            previous = index;
+        }
+        Check(words[words.IndexOf("Supported edits") + 1].Contains("disabled control's tooltip"), "Supported edits explains the disabled control's reason");
+        Check(words[words.IndexOf("Blocked for now") + 1].Contains("related object"), "Blocked for now includes related object states as well as failed reads");
     }
 
     static void TheWheelMovesAsTheGamesScrollViewsDo() {

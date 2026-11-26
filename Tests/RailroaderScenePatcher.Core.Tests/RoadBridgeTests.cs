@@ -70,7 +70,7 @@ static class RoadBridgeTests {
         Assert(result.Outcomes.Values.All(o => !o.Applied && o.Failure == FailureKind.Refused && o.Error.Contains("Road bridges use fixed placement")) && f.World.Mutations == 0 && f.RegisteredOnceAt(Authored, 90) && f.Terrain.Rebuilds == 0,
             "Track-following placement of a road bridge and of its part is refused before mutation: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Failure + " " + o.Error)));
         var roadEdits = SupportedEdits.Of(EditEntries.Of(SceneObjectRules.Family, SceneObjects.Structure, CommandBand.GroupOperations, BridgeKind.Road));
-        Assert(SupportedEdits.ModeBlock(roadEdits, CommandBand.FollowMode, true) == "Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it."
+        Assert(SupportedEdits.ModeBlock(roadEdits, CommandBand.FollowMode, true) == "Uses fixed placement"
             && SupportedEdits.ModeBlock(roadEdits, CommandBand.NumericMode, true) == null && SupportedEdits.ModeBlock(roadEdits, CommandBand.GizmoMode, true) == null,
             "Follow is unavailable for a road bridge with the reason; Numeric and Gizmo stay: " + SupportedEdits.ModeBlock(roadEdits, CommandBand.FollowMode, true));
     }

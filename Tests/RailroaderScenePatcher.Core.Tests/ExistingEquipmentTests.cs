@@ -435,12 +435,12 @@ static class ExistingEquipmentTests {
     static void InspectorNamesWhatAppliesAndWhy() {
         Assert(CommandBand.MastOperations.Contains("gate") && CommandBand.MastOperations.Contains("crossing controller") && CommandBand.BellOperations.Contains("bell"), "Supported edits name the mast with its gate and the bell");
         Assert(CommandBand.Refusal(CommandBand.DetectionSpanOperations) != null && CommandBand.DetectionSpanOperations.Contains("track locations") && CommandBand.DetectionSpanOperations.Contains("Connections"), "A detection span says that its position is its track locations and where coverage is edited: " + CommandBand.DetectionSpanOperations);
-        Assert(CommandBand.EditReason(CommandBand.DetectionSpanOperations).StartsWith("A span's track locations determine its position", StringComparison.Ordinal), "That reason is what its disabled placement shows: " + CommandBand.EditReason(CommandBand.DetectionSpanOperations));
+        Assert(CommandBand.EditReason(CommandBand.DetectionSpanOperations) == "Edit it on its crossing controller", "That reason is what its disabled placement shows: " + CommandBand.EditReason(CommandBand.DetectionSpanOperations));
         // Track-following placement is not offered for existing equipment; the other modes are.
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode })
             Assert(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of(ExistingEquipmentScene.MastFamily, ExistingEquipmentScene.MastStructure, CommandBand.MastOperations)), mode, true) == null, "Mode " + mode + " applies to a mast");
-        Assert(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of(ExistingEquipmentScene.MastFamily, ExistingEquipmentScene.MastStructure, CommandBand.MastOperations)), CommandBand.FollowMode, true) == CommandBand.EquipmentNoFollow && CommandBand.EquipmentNoFollow.Contains("fixed placement"), "Follow says why it does not apply");
-        Assert(CommandBand.Tooltip("Keep the object's placement relative to a chosen track or endpoint.", CommandBand.EquipmentNoFollow).StartsWith("Unavailable: ", StringComparison.Ordinal), "A disabled mode's tooltip gives the reason");
+        Assert(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of(ExistingEquipmentScene.MastFamily, ExistingEquipmentScene.MastStructure, CommandBand.MastOperations)), CommandBand.FollowMode, true) == "Uses fixed placement", "Follow says why it does not apply");
+        Assert(CommandBand.Tooltip("Keep the object's placement relative to a chosen track or endpoint.", CommandBand.EquipmentNoFollow) == "Uses fixed placement.", "A disabled mode's tooltip gives the reason");
         NonconformingEquipmentHasItsOperationsDisabled();
         // A bell's sound has no direction: its rotation stays visible and disabled with that reason; a mast's applies.
         Assert(CommandBand.RotationBlock(ExistingEquipmentScene.BellStructure) == CommandBand.BellNoRotation && CommandBand.BellNoRotation.Contains("no direction") && CommandBand.RotationBlock(ExistingEquipmentScene.MastStructure) == null && CommandBand.RotationBlock(null) == null,
@@ -478,14 +478,13 @@ static class ExistingEquipmentTests {
         var named = Row("World/Named", "Station", bindings: new[] { CommandBand.ListedTrackLocation + " Abc a 1.0" });
         Assert(!SupportedEdits.HoldsBinding(carrier.Family) && CommandBand.CurrentBindings(carrier).Length == 1 && !SupportedEdits.HoldsBinding(named.Family),
             "Only a track marker, milepost or crossing pad has a Track binding section, and only marker lines are a current binding");
-        Assert(CommandBand.NoBindingReason(span) == CommandBand.DetectionSpanNoBinding && CommandBand.DetectionSpanNoBinding.Contains("crossing coverage")
-            && CommandBand.DetectionSpanNoBinding.Contains("controller's Connections tab"), "A detection span says where its tracks are set: " + CommandBand.NoBindingReason(span));
+        Assert(CommandBand.NoBindingReason(span) == "Edit it on its crossing controller", "A detection span says where its tracks are set: " + CommandBand.NoBindingReason(span));
         // A span whose operations text differs still gets the span reason; a span no controller holds does not.
         Assert(CommandBand.NoBindingReason(Row(span.Identity.Path, "Track span", Crossing, "changed")) == CommandBand.DetectionSpanNoBinding, "The holder, not the message text, decides");
         foreach (var row in new[] { looseSpan, controller, mast, bell, board, null })
             Assert(CommandBand.NoBindingReason(row) == CommandBand.NoTrackBinding, "Another object without a binding names the families whose binding the patcher edits");
-        Assert(CommandBand.NoTrackBinding.Contains("editable track bindings"), "The reason claims only editable bindings, since other objects hold track locations too");
-        Assert(CommandBand.Sentence(CommandBand.DetectionSpanNoBinding) == CommandBand.DetectionSpanNoBinding && CommandBand.Sentence(CommandBand.NoTrackBinding) == CommandBand.NoTrackBinding, "Each reason is plain sentences");
+        Assert(CommandBand.NoTrackBinding == "Only markers, mileposts and pads have one", "The reason names the families with editable track bindings");
+        Assert(CommandBand.Sentence(CommandBand.DetectionSpanNoBinding) == "Edit it on its crossing controller." && CommandBand.Sentence(CommandBand.NoTrackBinding) == "Only markers, mileposts and pads have one.", "Each reason forms a plain sentence");
         Assert(CommandBand.HoldsMarker(StarterPlacements.Family) && !CommandBand.HoldsMarker("Track span") && !CommandBand.HoldsMarker(null), "The marker families are one list");
     }
 
@@ -502,13 +501,13 @@ static class ExistingEquipmentTests {
             var operations = row.Operations;
             Assert(!CommandBand.EditableStructure(row.Identity.Structure) && CommandBand.Refusal(operations) == reason, "The entry cannot be edited and states its refusal under Supported edits: " + operations);
             var shown = CommandBand.EditReason(operations);
-            Assert(shown == CommandBand.Sentence(reason) && shown.Contains(row == mast ? "'power'" : "controller is disabled"), "The reason the disabled controls give is the concrete refusal: " + shown);
+            Assert(shown == (row == mast ? "Its structure isn't supported" : "Its crossing controller is disabled"), "The disabled controls give the short reason for the refusal: " + shown);
             var equipment = CommandBand.RefusedEquipment(row.Family, operations);
             Assert(equipment, "The entry is a refused mast or bell, which links to the guide's refusal reasons");
             var edits = SupportedEdits.Of(row);
             foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
                 Assert(SupportedEdits.ModeBlock(edits, mode, false) == shown, "Placement mode " + mode + " is disabled with the reason: " + SupportedEdits.ModeBlock(edits, mode, false));
-            Assert(CommandBand.Tooltip("Enter a position in map coordinates and a rotation in degrees.", shown) == "Unavailable: " + shown, "Numeric's tooltip gives the reason: " + CommandBand.Tooltip("Enter a position in map coordinates and a rotation in degrees.", shown));
+            Assert(CommandBand.Tooltip("Enter a position in map coordinates and a rotation in degrees.", shown) == shown + ".", "Numeric's tooltip gives the reason: " + CommandBand.Tooltip("Enter a position in map coordinates and a rotation in degrees.", shown));
             // The rotation fields and Enabled take the inspector's edit block, which for an object that cannot be edited is this reason.
             Assert(SupportedEdits.ReasonOf(edits, SupportedEdits.Move) == shown && CommandBand.InspectorEditBlock(false, operations) == shown, "Rotation and Enabled are disabled with the same reason: " + CommandBand.InspectorEditBlock(false, operations));
         }

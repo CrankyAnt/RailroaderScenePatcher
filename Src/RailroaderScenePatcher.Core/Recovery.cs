@@ -141,9 +141,9 @@ namespace RailroaderScenePatcher.Core {
         }
         // One line for the message area, read as one label followed by plain sentences, as every refusal in the message
         // area reads: the action with its heading, the problem, what remains and the correction.
-        public string Line(string action) {
+        public string Line(string action, string problem = null) {
             if (equipmentCleanup != EquipmentCleanupContext.None) return EquipmentCleanupText.For(equipmentCleanup);
-            var detail = Kind == FailureKind.Blocked ? "" : Problem;
+            var detail = Kind == FailureKind.Blocked ? "" : problem ?? Problem;
             if (Kind == FailureKind.Restored || Kind == FailureKind.AwaitingOutput || Kind == FailureKind.IncompleteCleanup) {
                 const string reason = " Reason: ";
                 var start = detail.IndexOf(reason, StringComparison.Ordinal);

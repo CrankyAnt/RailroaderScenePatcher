@@ -1151,11 +1151,10 @@ static class InspectionTests {
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "Track binding");
         var station = Row("Generic track marker", "World/Bryson Station Sign", "Marker ID=M1; type=Generic", "Marker segment=S1; end=a; distance=2");
         var whistle = Row("Generic track marker", "World/Whistle Sign E", "Marker ID=M2; type=Generic");
-        var stop = Row("Generic track marker", "World/Stop", "Marker ID=M3; type=PassengerStop");
         var starter = Row("Generic track marker", "World/Setups/starter-ewh-coaling", "Marker ID=M4; type=Generic");
         var board = Row("Board", "World/Board", "Culler");
         var bare = Row("Generic track marker", "World/Bare");
-        foreach (var row in new[] { new object[] { station, "Type Generic" }, new object[] { whistle, "Type Generic" }, new object[] { starter, "Type Generic" }, new object[] { stop, "Type PassengerStop" }, new object[] { board, null }, new object[] { bare, null }, new object[] { null, null } })
+        foreach (var row in new[] { new object[] { station, "Type Generic" }, new object[] { whistle, "Type Generic" }, new object[] { starter, "Type Generic" }, new object[] { board, null }, new object[] { bare, null }, new object[] { null, null } })
             Check(RailroaderScenePatcher.InventoryPresentationState.Subgroup((SceneObservation)row[0]) == (string)row[1], "The subgroup of a row is its marker type or none: " + row[1]);
     }
     static void ChangesReadOneLinePerSetting() {

@@ -72,10 +72,9 @@ namespace RailroaderScenePatcher {
         internal static string Clear(bool inspected, bool pending) => inspected || pending ? null : "Nothing is inspected and no world choice is pending.";
         // The tooltip of a control: what it does while it can be used, and otherwise only why it cannot now. The
         // description is left out of a disabled control's tooltip, since it applies only while the control can be used;
-        // the tooltip's title still names the control. The reason follows the one label Unavailable: as a plain sentence
-        // (Sentence), without a label of its own.
+        // the tooltip's title still names the control. The short reason is one plain sentence without a prefix.
         internal static string Tooltip(string description, string reason) =>
-            String.IsNullOrEmpty(reason) ? description : "Unavailable: " + Sentence(reason);
+            String.IsNullOrEmpty(reason) ? description : Sentence(reason);
         // The labels a reason can carry where it is stored or shown on its own: under Supported edits, or in the
         // reason of a binding that cannot be set.
         static readonly string[] ReasonLabels = { "Not editable: ", "Not yet supported: ", "Not editable as a group: ", "Track binding unavailable: ", "Pad binding unavailable: " };
@@ -149,10 +148,10 @@ namespace RailroaderScenePatcher {
         // not exactly one active car placement reads the marker. readers are the marker's reader lines. The reasons are
         // the ones the engine refuses a wreck setting with.
         internal static string WreckReason(string setupsError, IReadOnlyList<string> readers) {
-            if (setupsError != null) return Sentence(StarterPlacements.UnreadableReason(setupsError));
+            if (setupsError != null) return EditReasons.Setups;
             var count = readers?.Count ?? 0;
-            return count == 1 ? null : count == 0 ? Sentence(StarterPlacements.NoReader)
-                : Sentence(StarterPlacements.SeveralReaders(readers.Select(StarterPlacements.PlaceOf).ToArray()));
+            return count == 1 ? null : count == 0 ? EditReasons.NoReader
+                : EditReasons.SeveralReaders;
         }
         // Why the guided task that sets Start derailed cannot start, or null: it fits only a starter placement marker, and
         // there only where the inspector's checkbox can be used (WreckReason).
@@ -175,7 +174,7 @@ namespace RailroaderScenePatcher {
         // about the object; the footer says what it means for an edit now (SharedPathBlock).
         const string SharedPathTail = " objects have this hierarchy path, and a scene patch file names an object by its path";
         internal static string SharedPath(int holders) => holders > 1 ? holders + SharedPathTail : null;
-        internal const string SharedPathBlock = "This object can't be edited while another object has the same hierarchy path.";
+        internal const string SharedPathBlock = "Another object shares its hierarchy path";
         // The Track group line of the Object tab. An object without edits is told what its activity follows, not what
         // Disable and Clear activity would do.
         internal static string TrackGroup(bool editable) => editable
@@ -184,7 +183,7 @@ namespace RailroaderScenePatcher {
         // Why the activity control cannot run, or null. The patcher refuses an explicit enable of an object whose activity
         // follows its track group, so Enable is inactive with that reason beforehand; Disable stays available.
         internal static string ActivityReason(bool enable, bool followsGroup) => enable && followsGroup ? GroupEnableReason : null;
-        internal const string GroupEnableReason = "The track group controls this object's activity. Use Clear activity to let the object follow its group again.";
+        internal const string GroupEnableReason = "Clear activity returns it to its track group";
         // Whether the open help closes on a tab switch: the help of a tab that is no longer the open tab. The help of
         // the outliner or of the window stays.
         internal static bool ClosesHelp(string openRegion, string tab, IEnumerable<string> tabs) {
@@ -693,10 +692,10 @@ namespace RailroaderScenePatcher {
         // The tooltip of a Replacement ID field: what the ID does, beside the instruction that stands below the field.
         internal const string ReplacementIdTip = "The game registers this marker's track location under this ID. A replacement ID repairs a duplicate marker ID. The patcher doesn't check Lua scripts or other mods that look up markers by ID.";
         internal static string MarkerIdUnavailable(string family, bool generic, string underlying, int sharers, bool hasValue) =>
-            !generic ? ReplacementMarkerIds.NotSupportedFor(family)
+            !generic ? EditReasons.Replacement
             : hasValue ? null
-            : underlying == null ? "The marker ID could not be read."
-            : sharers == 0 ? "Only this marker holds marker ID " + underlying + ", so it doesn't need a replacement ID." : null;
+            : underlying == null ? EditReasons.CurrentId
+            : sharers == 0 ? EditReasons.UniqueId : null;
         // Why Set replacement ID is unavailable: the general reason first, then an empty field, a reserved prefix, a space at either end
         // or the marker's current ID.
         internal static string MarkerIdSetReason(string block, string text, string current) {
@@ -715,7 +714,7 @@ namespace RailroaderScenePatcher {
         // A construction controller on an object of its own, Ela Bridge Scenery: its construction segments are its only edit.
         internal const string ConstructionSceneryFamily = "Bridge construction scenery";
         internal const string ConstructionSceneryOperations = "Set this controller's construction segments. Its position has no effect in the game. It stays enabled because it controls which parts of the bridge the game shows.";
-        internal const string ControllerNoPlacement = ConstructionSceneryScene.NoPlacement, ControllerNoActivity = ConstructionSceneryScene.NoActivity;
+        internal const string ControllerNoPlacement = "Its placement has no effect in the game", ControllerNoActivity = "The game needs it to show bridge parts";
         // The amber warning for an object that an explicit disable holds off against its construction controller, on the
         // Object tab and in the footer's message area.
         internal const string ConstructionHoldWarning = GameSwitchActivity.ConstructionHoldWarning;
@@ -800,7 +799,7 @@ namespace RailroaderScenePatcher {
         internal static bool IsAddedFamily(string family) => family == AddedEquipmentFamily || family == AddedBellFamily;
         // Where added equipment is edited, one sentence for its supported edits and for why it cannot be edited as an
         // object of its own.
-        internal const string AddedEquipmentReason = "To edit or remove this added equipment, use its crossing controller's Connections tab.";
+        internal const string AddedEquipmentReason = EditReasons.Crossing;
         internal static string AddedEquipmentOperations(string name) => name + ". " + AddedEquipmentReason;
         // Why an object of the family is inspection only, or null when a supported operation covers it: a supported kind,
         // or an added light, gate or bell, which its crossing edits.
@@ -823,16 +822,13 @@ namespace RailroaderScenePatcher {
         // A value that is not set reads as a dash.
         internal static string RunningLine(IReadOnlyList<string> labels, IReadOnlyList<string> values, string unit) =>
             String.Join("  ", labels.Select((label, i) => (HasBoxLabels(labels) ? label + " " : "") + (i < values.Count && !String.IsNullOrWhiteSpace(values[i]) ? values[i].Trim() : "-"))) + (unit == null ? "" : " (" + unit + ")");
-        // Why the inspected object cannot be edited, as the yellow message and every "Unavailable:" tooltip give it:
+        // Why the inspected object cannot be edited, as the yellow message and each disabled tooltip give it:
         // the object's own reason, which the Object tab shows under Supported edits, and not a pointer to that tab. It is
-        // one plain sentence: the message's source and the tooltip's Unavailable: are its only label.
+        // one short reason; the tooltip adds its final full stop.
         internal static string EditReason(string operations) {
-            var own = operations?.Trim();
-            if (own != null && own.EndsWith(". " + AddedEquipmentReason, StringComparison.Ordinal)) return AddedEquipmentReason;
-            // Supported edits says why the object has no edits; the footer says what holds an edit back now.
-            if (own != null && own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) && own.TrimEnd('.').EndsWith(SharedPathTail, StringComparison.Ordinal)) return SharedPathBlock;
-            if (String.IsNullOrEmpty(own) || !(own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) || own.StartsWith(NotYetSupportedPrefix, StringComparison.Ordinal) || own.StartsWith(NotEditableAsGroupPrefix, StringComparison.Ordinal))) return "This object cannot be edited here.";
-            return Sentence(own);
+            if (String.IsNullOrWhiteSpace(operations)) return EditReasons.State;
+            if (operations.EndsWith(". " + AddedEquipmentReason, StringComparison.Ordinal)) return AddedEquipmentReason;
+            return EditReasons.Short(operations);
         }
         const string NotYetSupportedPrefix = "Not yet supported: ", NotEditableAsGroupPrefix = "Not editable as a group: ";
         // The Inspection only line of a row tooltip and of the state line: one label, and the reason as one plain sentence.
@@ -925,14 +921,14 @@ namespace RailroaderScenePatcher {
         // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
         internal static string RoleCaption(string role) => CircuitCoverage.RoleCaption(role);
         // A road bridge does not follow track: move the road natively, then the bridge onto it.
-        internal const string RoadBridgeNoFollow = RailroaderScenePatcher.Core.SceneObjectRules.RoadBridgeNoFollowing + " Move the road in the native map editor, then move the bridge onto it.";
+        internal const string RoadBridgeNoFollow = EditReasons.Fixed;
         // A rail bridge uses fixed placement. Move the track in the native map editor, then move the bridge onto it.
-        internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.SceneObjectRules.RailBridgeNoFollowing + " Move the track in the native map editor, then move the bridge onto it.";
+        internal const string RailBridgeNoFollow = EditReasons.Fixed;
         // Why Follow is inactive for an existing crossing mast or bell: the capability covers fixed placement and activity.
-        internal const string EquipmentNoFollow = ExistingEquipmentScene.NoFollowing + ".";
+        internal const string EquipmentNoFollow = EditReasons.Fixed;
         // Why the rotation of an existing crossing bell cannot be set, or null for any other object: the bell is a
         // sound source at a point. Its position stays editable.
-        internal const string BellNoRotation = "A bell's sound has no direction, so rotation does not apply to it. You can still set its position.";
+        internal const string BellNoRotation = "A bell's sound has no direction";
         internal static string RotationBlock(string structure) => structure == ExistingEquipmentScene.BellStructure ? BellNoRotation : null;
         // Why a track span is inspection only, or null: a detection span, which a crossing controller holds in a
         // circuit, is a supported kind whose edit is crossing coverage on its controller; any other span has no edit.
@@ -975,8 +971,8 @@ namespace RailroaderScenePatcher {
         // task; the inspector shows such an object no Track binding section. A detection span, the one object a crossing
         // controller holds (its inventory entry names that holder), takes its tracks from the controller's crossing
         // coverage; any other object names the families whose binding the patcher edits.
-        internal const string DetectionSpanNoBinding = "A detection span's tracks come from its controller's crossing coverage. To change which tracks it detects, edit the coverage on its controller's Connections tab.";
-        internal const string NoTrackBinding = "Only track markers, mileposts, and crossing pads have editable track bindings.";
+        internal const string DetectionSpanNoBinding = EditReasons.Crossing;
+        internal const string NoTrackBinding = "Only markers, mileposts and pads have one";
         internal static string NoBindingReason(SceneObservation entry) => entry?.HolderPath != null ? DetectionSpanNoBinding : NoTrackBinding;
         // The guide link offered for a mast or bell that does not conform to its pattern: its label and the guide page
         // with the anchor of the refusal reasons.
@@ -989,9 +985,9 @@ namespace RailroaderScenePatcher {
         // edits it. The placement fields, the rotation fields and Enabled are then disabled with that reason.
         internal static string InspectorEditBlock(bool editable, string operations) => editable ? null : EditReason(operations);
         // Why Enabled cannot be set for equipment that a culler of the game switches itself.
-        internal const string EquipmentSwitched = "The game's culler enables and disables this object based on camera distance. It would override a saved Enabled setting, so the patcher cannot keep that setting applied";
+        internal const string EquipmentSwitched = EditReasons.Camera;
         // Why Follow is inactive for a milepost: the milepost capability covers fixed placement, activity and the binding.
-        internal const string MilepostNoFollow = "Mileposts use fixed placement. Set the track binding under Connections.";
+        internal const string MilepostNoFollow = EditReasons.Fixed;
         // A target confirmed in the world and not yet used is the one green relation: the relations it would replace,
         // the followed and the bound track, are not drawn beside it, and return once it is used or withdrawn.
         internal static bool ShowsCurrentRelations(bool confirmedShown) => !confirmedShown;
@@ -999,7 +995,7 @@ namespace RailroaderScenePatcher {
         // moves the pad only when it changes that binding. None of the four does: Numeric and Gizmo write the pad object's
         // placement, Snap writes that placement once from a track, and Follow keeps that placement relative to a track
         // without binding the marker to it. The binding is set under Connections.
-        internal const string PadFollowsTrack = "A crossing pad follows its track: its geometry is generated along its track binding. Bind it to another track under Connections.";
+        internal const string PadFollowsTrack = "Placed by its track binding";
         // What a milepost's Supported edits says: placement, activity and binding as separate settings, and what stays unchanged.
         internal const string MilepostOperations = "Move, rotate, enable, or disable the milepost. You can also set, replace, or detach its track binding. The model and displayed mile value stay the same.";
         // What a crossing pad's Supported edits says: its binding and its activity, and no placement of its own.

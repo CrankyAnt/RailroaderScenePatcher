@@ -81,8 +81,8 @@ static class CommandBandTests {
             "A group that no ticket covers reads Not editable as a group with its reason: " + settled);
         Check(settled.IndexOf("yet", StringComparison.OrdinalIgnoreCase) < 0 && CommandBand.Refusal(settled) == null,
             "Its reason promises no later support and is no refusal of a supported family: " + settled);
-        Check(CommandBand.EditReason(settled) == SceneObjectRules.TrackMarkerReason && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + SceneObjectRules.TrackMarkerReason
-            && CommandBand.Tooltip("Does something.", settled) == "Unavailable: " + SceneObjectRules.TrackMarkerReason,
+        Check(CommandBand.EditReason(settled) == "It holds track markers; edit them one by one" && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + SceneObjectRules.TrackMarkerReason
+            && CommandBand.Tooltip("Does something.", CommandBand.EditReason(settled)) == "It holds track markers; edit them one by one.",
             "The message, the Inspection only line and the tooltip give the reason without its label: " + CommandBand.Tooltip("Does something.", settled));
         var spawn = Verdict("Alarka Spawn", new Node("Spawn").With("Character.SpawnPoint"));
         Check(spawn.Ticket == null && CommandBand.GroupInspectionOnly(spawn, family) == "Not editable as a group: " + SceneObjectRules.SpawnPointReason,
@@ -214,14 +214,13 @@ static class CommandBandTests {
         var lower = CommandBand.SaveRefusalAlert(false, "the original scene patch file or its backup changed after fresh start");
         Check(lower.Value.Message == "Nothing was saved. The original scene patch file or its backup changed after fresh start.", "The reason reads as one sentence: " + lower.Value.Message);
     }
-    // A tooltip of a control that cannot be used carries one label, Unavailable:, and the reason after it as one plain
-    // sentence: a reason's own label, such as Not editable: or Track binding unavailable:, is not repeated after it.
+    // A tooltip of a control that cannot be used gives its reason as one plain sentence, without a label.
     // The footer's amber Editing line ends each edit block with a full stop, as its tooltip does, and keeps the text as it
     // stands: a block that already ends a sentence keeps its ending, and a label is not stripped.
     static void EditingLinesEndWithAFullStop() {
         Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications) == PatchEditingSession.SeveralModifications.TrimEnd('.') + ".",
             "The several-modifications block ends with a full stop: " + CommandBand.EditingLine(PatchEditingSession.SeveralModifications));
-        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications).EndsWith(CommandBand.Tooltip("x", PatchEditingSession.SeveralModifications).Substring("Unavailable: ".Length), StringComparison.Ordinal),
+        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications).EndsWith(CommandBand.Tooltip("x", PatchEditingSession.SeveralModifications), StringComparison.Ordinal),
             "The footer line ends as the tooltip does");
         Check(CommandBand.EditingLine("Confirm or cancel the world selection to edit.") == "Confirm or cancel the world selection to edit.", "A block that ends a sentence keeps one full stop");
         Check(CommandBand.EditingLine("Ready?") == "Ready?" && CommandBand.EditingLine(" Stop! ") == "Stop!", "A question or exclamation keeps its mark");
@@ -236,27 +235,27 @@ static class CommandBandTests {
         var blocked = CommandBand.NotEditable(StarterPlacements.ObjectSettings);
         foreach (var row in new[] {
             new[] { blocked, starter },
-            new[] { CommandBand.EditReason(blocked), starter },
-            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of(StarterPlacements.Family, StarterPlacementScene.Structure, blocked)), CommandBand.GizmoMode, false), starter },
+            new[] { CommandBand.EditReason(blocked), "Has no effect on where cars start." },
+            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of(StarterPlacements.Family, StarterPlacementScene.Structure, blocked)), CommandBand.GizmoMode, false), "Has no effect on where cars start." },
             new[] { StarterPlacements.NoDetach, StarterPlacements.NoDetach + "." },
             new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
             new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
-            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Track span", null, CommandBand.NotYetSupported("the Track span family"))), CommandBand.SnapMode, false), "The Track span family cannot be edited." },
+            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Track span", null, CommandBand.NotYetSupported("the Track span family"))), CommandBand.SnapMode, false), "No edit for this family." },
             new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects have this hierarchy path, and a scene patch file names an object by its path." },
             new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
             new[] { "Inspect an object first.", "Inspect an object first." },
             new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
-            new[] { CommandBand.WreckReason(null, new string[0]), StarterPlacements.NoReader + "." },
+            new[] { CommandBand.WreckReason(null, new string[0]), "No new-game car placement reads it." },
             new[] { CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no", StarterPlacements.ReaderPrefix + "ewh-diesel, car placement 1 of 1: cars rr/gb-gondola3; wreck: no" }),
-                "2 new-game car placements read this marker (setup ewh-steam, car placement 3 of 3; setup ewh-diesel, car placement 1 of 1); a starter placement can change only one car placement, so it cannot be used for this marker." },
+                "Several new-game car placements read it." },
             new[] { CommandBand.WreckReason("placements unavailable", new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }),
-                "The new-game setups could not be read, so starter placement markers cannot be identified: placements unavailable." },
+                "The new-game setups can't be read." },
         }) {
             var tooltip = CommandBand.Tooltip("Does something.", row[0]);
-            Check(tooltip == "Unavailable: " + row[1], "The tooltip gives the reason as one plain sentence: " + tooltip);
-            var reason = tooltip.Substring("Unavailable: ".Length);
+            Check(tooltip == row[1], "The tooltip gives the reason as one plain sentence: " + tooltip);
+            var reason = tooltip;
             Check(new[] { "Not editable:", "Not yet supported:", "binding unavailable:", "Unavailable:" }.All(label => reason.IndexOf(label, StringComparison.OrdinalIgnoreCase) < 0)
-                && (Char.IsUpper(reason[0]) || Char.IsDigit(reason[0])) && reason.EndsWith(".", StringComparison.Ordinal), "One label per tooltip, the reason a sentence: " + tooltip);
+                && (Char.IsUpper(reason[0]) || Char.IsDigit(reason[0])) && reason.EndsWith(".", StringComparison.Ordinal), "The tooltip has no label and the reason is a sentence: " + tooltip);
             Check(CommandBand.Tooltip(null, row[0]) == tooltip, "Without a description the tooltip is the same: " + CommandBand.Tooltip(null, row[0]));
         }
     }
@@ -345,7 +344,7 @@ static class CommandBandTests {
             Check(CommandBand.HidesTooltip((bool)row[0], (bool)row[1], (bool)row[2]) == (bool)row[3], "The tooltip, " + row[4]);
         Check(CommandBand.Clear(false, false) == "Nothing is inspected and no world choice is pending.", "Clear is disabled only when nothing is inspected and no world choice is pending");
         Check(CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo, or snap. Changes that were made stay.", CommandBand.Clear(false, false))
-            == "Unavailable: Nothing is inspected and no world choice is pending.", "The disabled Clear gives only why it cannot be used");
+            == "Nothing is inspected and no world choice is pending.", "The disabled Clear gives only why it cannot be used");
         Check(CommandBand.Focus(false) == "Inspect an object first." && CommandBand.CopyId(false) == "Inspect an object first.", "Focus and Copy ID are disabled when nothing is inspected, with that reason");
         Check(CommandBand.CopyId(true, "Invalid JSON. The scene patch file is protected from overwrite.") == "Invalid JSON. The scene patch file is protected from overwrite."
             && CommandBand.CopyId(false, "Invalid JSON.") == "Inspect an object first.", "Copy ID is disabled with the session's refusal while the scene patch file cannot be read, and asks for an inspection first");
@@ -446,9 +445,9 @@ static class CommandBandTests {
     // An enabled control says what it does; a disabled one only why it cannot be used now.
     static void ADisabledControlKeepsItsDescription() {
         Check(CommandBand.Tooltip("Move the object with the native gizmo.", null) == "Move the object with the native gizmo.", "An enabled control shows its description");
-        Check(CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first.") == "Unavailable: Inspect an object first.",
+        Check(CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first.") == "Inspect an object first.",
             "A disabled control shows only the reason, without its description");
-        Check(CommandBand.Tooltip(null, "Inspect an object first.") == "Unavailable: Inspect an object first." && CommandBand.Tooltip("", null) == "", "Without a description the reason reads the same");
+        Check(CommandBand.Tooltip(null, "Inspect an object first.") == "Inspect an object first." && CommandBand.Tooltip("", null) == "", "Without a description the reason reads the same");
         Check(CommandBand.CandidateDetailsReason(0) == "Click a marking or track in the world first." && CommandBand.CandidateDetailsReason(1) == null && CommandBand.CandidateDetailsReason(3) == null,
             "The details of a world choice open only once something was clicked");
         Check(CommandBand.NotEditable("the marker is inside a crossing") == "Not editable: the marker is inside a crossing", "An object of a supported family that cannot be edited keeps its own reason");
@@ -456,20 +455,20 @@ static class CommandBandTests {
         Check(CommandBand.InspectionOnly(CommandBand.AddedEquipmentFamily, false) == null && CommandBand.InspectionOnly("Crossing light", false).StartsWith("Not yet supported: ", StringComparison.Ordinal)
             && CommandBand.InspectionOnly("Crossing light", true) == null, "An added light or gate is not inspection only; another family without an edit is");
         var operations = CommandBand.AddedEquipmentOperations("Signal 1 (added)");
-        Check(operations.Contains("Connections tab") && CommandBand.Refusal(operations) == null && !operations.StartsWith("Not yet supported", StringComparison.Ordinal), "Its supported edits name the crossing's Connections tab: " + operations);
+        Check(operations == "Signal 1 (added). Edit it on its crossing controller" && CommandBand.Refusal(operations) == null, "Its supported edits name the crossing controller: " + operations);
         // An added bell is a supported family of its own, edited on its crossing's Connections tab as well.
         var bellOperations = CommandBand.AddedEquipmentOperations("Brass bell (added)");
         Check(CommandBand.InspectionOnly(CommandBand.AddedBellFamily, false) == null && CommandBand.IsAddedFamily(CommandBand.AddedBellFamily) && !CommandBand.IsAddedFamily("Crossing bell")
-            && bellOperations.StartsWith("Brass bell (added).", StringComparison.Ordinal) && bellOperations.Contains("Connections tab") && CommandBand.Refusal(bellOperations) == null,
+            && bellOperations == "Brass bell (added). Edit it on its crossing controller" && CommandBand.Refusal(bellOperations) == null,
             "An added bell is not inspection only and names where it is edited: " + bellOperations);
         // A hierarchy path that more than one object holds: no edit, with the reason under Supported edits.
         Check(CommandBand.SharedPath(1) == null && CommandBand.SharedPath(0) == null, "A path one object holds can be edited");
         Check(CommandBand.SharedPath(2) == "2 objects have this hierarchy path, and a scene patch file names an object by its path"
             && CommandBand.Refusal(CommandBand.NotEditable(CommandBand.SharedPath(2))) == CommandBand.SharedPath(2), "A path two objects hold reads Not editable with its reason");
-        // Supported edits says this about the object; the footer says what it means for an edit now, in other words.
-        Check(CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))) == "This object can't be edited while another object has the same hierarchy path."
+        // Supported edits and the footer use the same short reason.
+        Check(CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))) == "Another object shares its hierarchy path"
             && CommandBand.InspectorEditBlock(false, CommandBand.NotEditable(CommandBand.SharedPath(3))) == CommandBand.SharedPathBlock && !CommandBand.SharedPathBlock.Contains(CommandBand.SharedPath(2)),
-            "The footer does not repeat the sentence of Supported edits for a shared path: " + CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))));
+            "The footer repeats the short reason for a shared path: " + CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))));
         // A file path shows from the game folder, or from the mod's own folder when the mod lies elsewhere; never from the drive.
         Check(CommandBand.ShownPath(@"D:\Games\Railroader\Mods\MyMap\Data\scene-patches.json", @"D:\Games\Railroader") == "Mods/MyMap/Data/scene-patches.json"
             && CommandBand.ShownPath(@"C:\Work\ModDev\MyMap\Data\scene-patches.json", @"D:\Games\Railroader") == "MyMap/Data/scene-patches.json"
@@ -548,23 +547,21 @@ static class CommandBandTests {
             "A single value repeats no label: " + CommandBand.RunningLine(new[] { "ID" }, new[] { "Myyi" }, null));
         // The reason an object cannot be edited is its own, wherever it is given, as one plain sentence.
         foreach (var row in new[] {
-            new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
-            new[] { CommandBand.NotEditable("the marker is inside a crossing"), "The marker is inside a crossing." },
+            new[] { CommandBand.NotYetSupported("the Milepost family"), "No edit for this family" },
+            new[] { CommandBand.NotEditable("the marker is inside a crossing"), "Its structure isn't supported" },
             new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", CommandBand.SharedPathBlock },
-            new[] { "Fixed placement and activity", "This object cannot be edited here." }, new[] { null, "This object cannot be edited here." }, new[] { " ", "This object cannot be edited here." } })
+            new[] { "Fixed placement and activity", "Uses fixed placement" }, new[] { null, "Its state couldn't be read" }, new[] { " ", "Its state couldn't be read" } })
             Check(CommandBand.EditReason(row[0]) == row[1], "The editing message gives the object's own reason: " + row[1] + " / " + CommandBand.EditReason(row[0]));
         Check(!CommandBand.EditReason(CommandBand.NotYetSupported("x")).Contains("Object tab"), "The editing message does not send the user to another tab");
         // An added light, gate or bell is edited on its crossing controller's Connections tab: its editing message and the
-        // Unavailable: tooltips of its disabled controls name that route, not the generic fallback.
-        Check(CommandBand.AddedEquipmentOperations("Brass bell (added)") == "Brass bell (added). " + CommandBand.EditReason(CommandBand.AddedEquipmentOperations("Brass bell (added)")),
-            "The supported edits of added equipment and its editing message give the route in the same sentence: " + CommandBand.AddedEquipmentOperations("Brass bell (added)"));
+        // The disabled controls name the same route as Supported edits.
         foreach (var name in new[] { "Brass bell (added)", "Signal 1 (added)" })
-            Check(CommandBand.EditReason(CommandBand.AddedEquipmentOperations(name)) == "To edit or remove this added equipment, use its crossing controller's Connections tab.",
+            Check(CommandBand.EditReason(CommandBand.AddedEquipmentOperations(name)) == "Edit it on its crossing controller",
                 "The editing message of added equipment names its edit route: " + CommandBand.EditReason(CommandBand.AddedEquipmentOperations(name)));
         // No placement mode moves a crossing pad: each is inactive for a pad, with the one reason.
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
             Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Crossing pad marker", CrossingPadScene.Structure, CommandBand.PadOperations)), mode, false) == CommandBand.PadFollowsTrack, "Placement mode " + mode + " is inactive for a crossing pad");
-        Check(CommandBand.PadFollowsTrack.Contains("follows its track") && CommandBand.PadFollowsTrack.Contains("under Connections"), "The reason says the pad follows its track and where to bind it");
+        Check(CommandBand.PadFollowsTrack == "Placed by its track binding", "The reason says what places the pad");
         Check(CommandBand.PadOperations.StartsWith("The pad moves only when you change its track location.", StringComparison.Ordinal) && !CommandBand.PadOperations.Contains("fixed placement") && CommandBand.PadOperations.Contains("Enable or disable it separately."), "A pad's Supported edits promises no placement");
         // An edit whose fields hold the current values is disabled.
         foreach (var row in new[] {
@@ -702,7 +699,7 @@ static class CommandBandTests {
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode }) {
             Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Generic track marker", TrackMarkerScene.Structure, "Fixed placement")), mode, true) == null, "Mode " + mode + " is open for an object that can be edited");
             Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Crossing pad marker", CrossingPadScene.Structure, "x")), mode, false) == CommandBand.PadFollowsTrack, "Mode " + mode + " is inactive for a pad");
-            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Milepost", null, why)), mode, true) == (mode == CommandBand.NumericMode ? null : "The Milepost family cannot be edited."), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Milepost", null, why)), mode, true) == (mode == CommandBand.NumericMode ? null : "No edit for this family"), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
         }
         Check(CommandBand.ShowsCurrentRelations(false) && !CommandBand.ShowsCurrentRelations(true), "A confirmed target that is not yet used is the one green relation");
         // A candidate among several offers carries one number everywhere.
