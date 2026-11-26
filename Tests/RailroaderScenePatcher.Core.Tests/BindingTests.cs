@@ -61,7 +61,7 @@ class FakeMarkerInspection : IInspectionScene {
     public IEnumerable<string> MapIds => world.MapIds;
     public IEnumerable<SceneObservation> Discover() => world.Objects.SelectMany(o => o.Value.Select(target => {
         var m = (FakeMarker)target;
-        return new SceneObservation(m, new TargetIdentity("BushnellWhittier", o.Key, "Track.TrackMarker", TrackMarkerScene.Structure), "Track marker", m.Active,
+        return new SceneObservation(m, new TargetIdentity("BushnellWhittier", o.Key, "Track.TrackMarker", TrackMarkerScene.Structure), "Generic track marker", m.Active,
             world.Position(m), world.Rotation(m), new[] { "Marker segment=" + m.Segment + "; end=" + m.End + "; distance=" + m.Distance }, Array.Empty<string>(), Array.Empty<string>(), "binding");
     }));
 }

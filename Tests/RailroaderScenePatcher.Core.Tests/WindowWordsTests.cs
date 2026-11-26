@@ -24,6 +24,7 @@ static class WindowWordsTests {
         NoPavilionKindOrTrackRelativeFamily();
         GroupTooltipsSayTheyMeanSceneObjects();
         HelpTermsUseTheWindowsWords();
+        NoTrackMarkerFamily();
         Console.WriteLine("PASS: window words group and part");
     }
 
@@ -87,6 +88,29 @@ static class WindowWordsTests {
         Check(files.Any(f => f.EndsWith("/PatchEngine.cs", StringComparison.Ordinal)) && files.Any(f => f.EndsWith("/ScenePatcherLayout.cs", StringComparison.Ordinal)), "the check reads the window's and the core's sources");
         var hits = files.SelectMany(f => Hits(f, "baked scenery", "scenery group", "scenery part")).ToArray();
         Check(hits.Length == 0, "no window or Log text says baked scenery, scenery group or scenery part:\n" + String.Join("\n", hits));
+    }
+
+    // The family of the Generic track markers that no more specific family claims is Generic track marker. No window
+    // text, and neither the glossary nor a guide, names a family "Track marker": the bare name is the outliner category
+    // only, which keeps it. A sentence about one marker, such as "Track marker M4 is not on the track", names no family.
+    static void NoTrackMarkerFamily() {
+        var root = Root();
+        var bare = new System.Text.RegularExpressions.Regex(@"\bTrack marker\b(?! [A-Za-z0-9{]| $)");
+        var code = Directory.GetFiles(Path.Combine(root, "Src"), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar) && !f.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar))
+            .SelectMany(f => Literals(File.ReadAllText(f)).Select(l => new { File = Path.GetFileName(f), Text = l })).ToArray();
+        Check(code.Any(l => l.Text == SceneFamilies.TrackMarker), "the window names the family " + SceneFamilies.TrackMarker);
+        var hits = code.Where(l => (bare.IsMatch(l.Text) || l.Text.IndexOf("Track marker family", StringComparison.Ordinal) >= 0)
+            && !(l.File == "SceneClassification.cs" && l.Text == "Track marker")).Select(l => l.File + ": \"" + l.Text + "\"").ToArray();
+        Check(hits.Length == 0, "no window text names a family Track marker; only the category constant says Track marker:\n" + String.Join("\n", hits));
+        var family = new System.Text.RegularExpressions.Regex(@"(?<![Gg]eneric )(\*\*|`)?Track marker(\*\*|`)? family");
+        var docs = new[] { Path.Combine(root, "GLOSSARY.md") }.Concat(Directory.GetFiles(Path.Combine(root, "docs", "guides"), "*.md", SearchOption.AllDirectories)).ToArray();
+        var docHits = docs.SelectMany(f => File.ReadAllLines(f).Where(l => family.IsMatch(l)).Select(l => Path.GetFileName(f) + ": " + l)).ToArray();
+        Check(docHits.Length == 0, "neither the glossary nor a guide names a family Track marker:\n" + String.Join("\n", docHits));
+        var glossary = File.ReadAllText(Path.Combine(root, "GLOSSARY.md"));
+        var entry = glossary.Substring(glossary.IndexOf("**Family**", StringComparison.Ordinal));
+        entry = entry.Substring(0, entry.IndexOf("\n**", 2, StringComparison.Ordinal) < 0 ? entry.Length : entry.IndexOf("\n**", 2, StringComparison.Ordinal));
+        Check(entry.Contains("Generic track marker"), "the glossary's Family entry names the family Generic track marker");
     }
 
     static void NoPavilionKindOrTrackRelativeFamily() {

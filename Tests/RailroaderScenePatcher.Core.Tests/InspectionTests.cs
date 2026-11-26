@@ -21,7 +21,7 @@ static class InspectionTests {
         var fixture = new Fixture();
         fixture.Objects.Add(new SceneObservation(new object(), new TargetIdentity("scene", "World/Board", "Culler"), "Location sign", false,
             new double[] { 12, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new[] { "Culling registration", "Terrain mask" }, new string[0], "Inspection only"));
-        fixture.Objects.Add(new SceneObservation(new object(), new TargetIdentity("scene", "World/Sign", "Marker"), "Track marker", true,
+        fixture.Objects.Add(new SceneObservation(new object(), new TargetIdentity("scene", "World/Sign", "Marker"), "Generic track marker", true,
             new double[] { 14, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { "Segment missing-segment: missing" }, new[] { "Track-relative placement" }, new[] { "Broken binding" }, "Inspection only"));
         var inventory = new SceneInventory(fixture);
         inventory.Refresh();
@@ -147,7 +147,7 @@ static class InspectionTests {
             } finally { Ended++; }
         }
     }
-    static SceneObservation Thing(object handle, string path, bool active = true) => new SceneObservation(handle, new TargetIdentity("scene", path, "Marker"), "Track marker", active,
+    static SceneObservation Thing(object handle, string path, bool active = true) => new SceneObservation(handle, new TargetIdentity("scene", path, "Marker"), "Generic track marker", active,
         new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Inspection only");
     static SceneObservation Changed(SceneObservation o) => Thing(o.Handle, o.Identity.Path, !o.Active);
     static bool Refused(Action action) { try { action(); return false; } catch (InvalidOperationException) { return true; } }
@@ -209,7 +209,7 @@ static class InspectionTests {
         PartScene Parts(out SceneInventory inventory, out Part widget, out Part sign, out Part holder, out Part board) {
             var scene = new PartScene();
             scene.Parts.Add(widget = new Part { Name = "Widget" });
-            scene.Parts.Add(sign = new Part { Name = "Sign", Family = "Track marker" });
+            scene.Parts.Add(sign = new Part { Name = "Sign", Family = "Generic track marker" });
             scene.Parts.Add(holder = new Part { Name = "Holder", Refers = sign });
             scene.Parts.Add(board = new Part { Name = "Board", Family = "Location sign" });
             inventory = new SceneInventory(scene); inventory.Refresh();
@@ -260,7 +260,7 @@ static class InspectionTests {
         checkedInventory.AdvanceFreshnessCheck(() => true);
         Check(checkedInventory.IsStale && checkedInventory.StaleReason.Contains("Sign"), "A changed value names its observation: " + checkedInventory.StaleReason);
         parts = Parts(out checkedInventory, out widget, out sign, out holder, out board);
-        parts.Parts.Add(new Part { Name = "Late", Family = "Track marker", Gone = false });
+        parts.Parts.Add(new Part { Name = "Late", Family = "Generic track marker", Gone = false });
         checkedInventory.CheckFreshness();
         Check(checkedInventory.IsStale && checkedInventory.StaleReason.Contains("3 observations instead of 2"), "The one-call check names its reason as well: " + checkedInventory.StaleReason);
         // A stopped reference walk reads no further owner; classification and observation continue.
@@ -502,8 +502,8 @@ static class InspectionTests {
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], problems, "Inspection only", displayName: displayName);
         var fixture = new Fixture();
         fixture.Objects.Add(Entry("World/Board", "Location sign"));
-        fixture.Objects.Add(Entry("World/Sign", "Track marker", "Added Alpha", "Broken binding"));
-        fixture.Objects.Add(Entry("World/Post", "Track marker", "Added Zulu", "Segment missing"));
+        fixture.Objects.Add(Entry("World/Sign", "Generic track marker", "Added Alpha", "Broken binding"));
+        fixture.Objects.Add(Entry("World/Post", "Generic track marker", "Added Zulu", "Segment missing"));
         fixture.Objects.Add(Entry("World/Bridges/Ela", "Bridge"));
         var inventory = new SceneInventory(fixture); inventory.Refresh();
         Func<SceneObservation, bool> changed = entry => entry.Identity.Path == "World/Board" || entry.Identity.Path == "World/Post";
@@ -519,7 +519,7 @@ static class InspectionTests {
         Check(RailroaderScenePatcher.InventoryPresentationState.Rows(null, "", problems, changed).Count == 0, "A missing inventory has no rows");
         // The Disabled filter lists the objects whose own active flag is off: not one that is inactive through a parent.
         var switched = new Fixture();
-        SceneObservation Flagged(string path, bool active, bool? enabled) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Component"), "Track marker", active,
+        SceneObservation Flagged(string path, bool active, bool? enabled) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Component"), "Generic track marker", active,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Inspection only", null, enabled);
         switched.Objects.Add(Flagged("World/On", true, null));
         switched.Objects.Add(Flagged("World/Off", false, null));
@@ -1047,6 +1047,13 @@ static class InspectionTests {
         Check(BindingRules.Need("Flare", false, false) == BindingNeed.Never, "A flare marker has no binding problem");
         Check(!BindingRules.Listed("Signal", false, false) && !BindingRules.Listed("Generic", true, false) && !BindingRules.Listed("Generic", false, true) && BindingRules.Listed("Generic", false, false) && BindingRules.Listed("Crossing", false, false),
             "Signals, native map objects and the builder photo marker are not listed");
+        // A crossing pad's marker is a Crossing pad marker and a Generic marker a Generic track marker. A marker of
+        // another type that no other family claims is not listed: on the base map every Crossing marker is a crossing
+        // pad and flares exist only at runtime.
+        Check(SceneFamilies.OfMarker("Generic", false) == "Generic track marker" && SceneFamilies.OfMarker("Crossing", true) == "Crossing pad marker" && SceneFamilies.OfMarker("Generic", true) == "Crossing pad marker",
+            "A Generic marker is a Generic track marker and a crossing pad's marker a Crossing pad marker");
+        foreach (var other in new[] { "Signal", "Crossing", "Flare", "PassengerStop" })
+            Check(SceneFamilies.OfMarker(other, false) == null, "A track marker of type " + other + " that no other family claims is not listed");
         string Problem(BindingNeed need, bool enabled, string segment, bool? resolves) => BindingRules.Problem(need, enabled, "Marker", segment, resolves);
         // An inactive object is never a problem.
         foreach (var need in new[] { BindingNeed.Never, BindingNeed.Optional, BindingNeed.Required })
@@ -1090,11 +1097,11 @@ static class InspectionTests {
         var none = new string[0];
         const string reason = "Not yet supported: the patcher has no edit for the Milepost family yet";
         var fixture = new Fixture();
-        fixture.Objects.Add(Entry("World/Sign", "Track marker", new[] { "Marker broken binding: missing segment Sgone" }));
+        fixture.Objects.Add(Entry("World/Sign", "Generic track marker", new[] { "Marker broken binding: missing segment Sgone" }));
         fixture.Objects.Add(Entry("World/Post 1", "Milepost", new[] { "Marker broken binding: missing segment S9" }, reason));
         fixture.Objects.Add(Entry("World/Board", "Location sign", none, null, true, new[] { "Direct-reference scan incomplete: 2 unreadable fields" }));
         fixture.Objects.Add(Entry("World/Span", "Track span", none, "Not yet supported: the patcher has no edit for the Track span family yet", false));
-        fixture.Objects.Add(Entry("World/Refused", "Track marker", none));
+        fixture.Objects.Add(Entry("World/Refused", "Generic track marker", none));
         var inventory = new SceneInventory(fixture); inventory.Refresh();
         string[] Paths(RailroaderScenePatcher.OutlinerFilter filter, string search = "") => RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, search, filter, null).Select(e => e.Identity.Path).ToArray();
         var all = RailroaderScenePatcher.OutlinerFilter.All;
@@ -1134,7 +1141,7 @@ static class InspectionTests {
         Check(ReferenceEquals(state.CurrentSelection(doubled, second), doubled.Entries[1]) && ReferenceEquals(state.CurrentSelection(doubled, first), doubled.Entries[0]), "After a refresh the inspected one of the two is found again by what it reads");
         // The state is part of what an inspection pins and of the stale reason.
         Check(Entry("World/X", "Milepost", none, reason).Difference(Entry("World/X", "Milepost", none, "Not yet supported: other")) == "supported edits"
-            && Entry("World/X", "Track marker", none, null, true, new[] { "a" }).Difference(Entry("World/X", "Track marker", none, null, true, new[] { "b" })).StartsWith("notes: ", StringComparison.Ordinal), "A changed note names itself in the stale reason");
+            && Entry("World/X", "Generic track marker", none, null, true, new[] { "a" }).Difference(Entry("World/X", "Generic track marker", none, null, true, new[] { "b" })).StartsWith("notes: ", StringComparison.Ordinal), "A changed note names itself in the stale reason");
     }
 
     // The Changes tab lists what a modification changes, one line per setting, with the value without it.
@@ -1142,12 +1149,12 @@ static class InspectionTests {
     static void SubgroupsFollowTheGame() {
         SceneObservation Row(string family, string path, params string[] bindings) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Marker"), family, true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "Track binding");
-        var station = Row("Track marker", "World/Bryson Station Sign", "Marker ID=M1; type=Generic", "Marker segment=S1; end=a; distance=2");
-        var whistle = Row("Track marker", "World/Whistle Sign E", "Marker ID=M2; type=Generic");
-        var stop = Row("Track marker", "World/Stop", "Marker ID=M3; type=PassengerStop");
-        var starter = Row("Track marker", "World/Setups/starter-ewh-coaling", "Marker ID=M4; type=Generic");
+        var station = Row("Generic track marker", "World/Bryson Station Sign", "Marker ID=M1; type=Generic", "Marker segment=S1; end=a; distance=2");
+        var whistle = Row("Generic track marker", "World/Whistle Sign E", "Marker ID=M2; type=Generic");
+        var stop = Row("Generic track marker", "World/Stop", "Marker ID=M3; type=PassengerStop");
+        var starter = Row("Generic track marker", "World/Setups/starter-ewh-coaling", "Marker ID=M4; type=Generic");
         var board = Row("Board", "World/Board", "Culler");
-        var bare = Row("Track marker", "World/Bare");
+        var bare = Row("Generic track marker", "World/Bare");
         foreach (var row in new[] { new object[] { station, "Type Generic" }, new object[] { whistle, "Type Generic" }, new object[] { starter, "Type Generic" }, new object[] { stop, "Type PassengerStop" }, new object[] { board, null }, new object[] { bare, null }, new object[] { null, null } })
             Check(RailroaderScenePatcher.InventoryPresentationState.Subgroup((SceneObservation)row[0]) == (string)row[1], "The subgroup of a row is its marker type or none: " + row[1]);
     }
@@ -1164,7 +1171,7 @@ static class InspectionTests {
         Check(Lines(new ObjectState(null, null), before) == "" && PatchEditingSession.ChangeLines(null, before).Count == 0, "No setting gives no line");
         // A target refusal names what differed.
         var sign = new object();
-        SceneObservation Marker(double x, bool active, object handle = null) => new SceneObservation(handle ?? sign, new TargetIdentity("scene", "World/Sign", "Marker"), "Track marker", active,
+        SceneObservation Marker(double x, bool active, object handle = null) => new SceneObservation(handle ?? sign, new TargetIdentity("scene", "World/Sign", "Marker"), "Generic track marker", active,
             new double[] { x, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Track binding");
         Check(InspectedTarget.Changed(Marker(1, true), Marker(5, true)) == "Inspected target changed (position). Refresh and inspect again." && InspectedTarget.Changed(Marker(1, true), Marker(1, false)) == "Inspected target changed (activity). Refresh and inspect again."
             && InspectedTarget.Changed(Marker(1, true), null) == "Inspected target changed (missing). Refresh and inspect again."

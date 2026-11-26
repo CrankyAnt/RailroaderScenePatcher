@@ -183,7 +183,7 @@ static class ReplacementMarkerIdTests {
     // object itself and objects without a marker ID stay as they were.
     static void AnIdEditReobservesTheHoldersOfBothIds() {
         SceneObservation Entry(object handle, string path, params string[] bindings) =>
-            new SceneObservation(handle, Marker(path), "Track marker", true, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "");
+            new SceneObservation(handle, Marker(path), "Generic track marker", true, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "");
         object yard = new object(), speed = new object(), other = new object(), sign = new object();
         var before = Entry(yard, YardPath, "Marker ID=Mg6m; type=Generic", "Marker segment=z5w8si; end=b; distance=78.7");
         var after = Entry(yard, YardPath, "Marker ID=Mg6m-yard; type=Generic", "Marker segment=z5w8si; end=b; distance=78.7");
@@ -374,7 +374,7 @@ static class ReplacementMarkerIdTests {
         // The guided task's Review step asks the session with its draft, stays in Review with the recovery, and keeps
         // Apply unavailable with the refusal until Back.
         var guided = new RailroaderScenePatcher.GuidedTaskState();
-        var target = new SceneObservation(new object(), yard, "Track marker", false, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
+        var target = new SceneObservation(new object(), yard, "Generic track marker", false, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
         guided.Start(RailroaderScenePatcher.GuidedTaskKind.MarkerId, target, new[] { "Mg6m" });
         guided.SetValues(new[] { "Mown" }); guided.Review();
         var refused = guided.CheckReview(w.Session.MarkerIdRefusal, "Click Back to correct the values.");
@@ -411,13 +411,13 @@ static class ReplacementMarkerIdTests {
     // reason for any marker that does not take one, and Set id and Clear id state why they cannot be used.
     static void MarkerIdRowStatesItsReasons() {
         // A milepost and a starter placement marker are native track markers of type Generic too, so the reason names the
-        // families instead of the marker type.
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false) == "Only objects in the Track marker family can have a replacement ID. This object is in the Milepost family.",
+        // families: the Generic track marker family, not the marker type alone.
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false) == "Only objects in the Generic track marker family can have a replacement ID. This object is in the Milepost family.",
             "A marker of another family keeps the row disabled with its reason: " + RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false));
-        Assert(ReplacementMarkerIds.NotSupported == "Only objects in the Track marker family can have a replacement ID." && !ReplacementMarkerIds.NotSupported.Contains("generic"),
-            "The refusal names the family, not the marker type Generic that a milepost also shows: " + ReplacementMarkerIds.NotSupported);
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Track marker", true, "Mown", 0, false) == "Only this marker holds marker ID Mown, so it doesn't need a replacement ID.", "A marker ID of its own needs no replacement");
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Track marker", true, "Mg6m", 1, false) == null && RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Track marker", true, "Mg6m", 0, true) == null,
+        Assert(ReplacementMarkerIds.NotSupported == "Only objects in the Generic track marker family can have a replacement ID." && ReplacementMarkerIds.NotSupported.Contains(SceneFamilies.TrackMarker + " family"),
+            "The refusal names the family Generic track marker, not the marker type Generic that a milepost also shows: " + ReplacementMarkerIds.NotSupported);
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mown", 0, false) == "Only this marker holds marker ID Mown, so it doesn't need a replacement ID.", "A marker ID of its own needs no replacement");
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mg6m", 1, false) == null && RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mg6m", 0, true) == null,
             "A shared native id offers the replacement ID, and a marker that already has one keeps the row");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "", "Mg6m") == ReplacementMarkerIds.Empty, "An empty field states the reason");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "flare:1", "Mg6m").StartsWith("Replacement ID flare:1 begins with flare:", StringComparison.Ordinal), "A reserved prefix states the reason");

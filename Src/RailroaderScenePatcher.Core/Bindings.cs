@@ -365,7 +365,7 @@ namespace RailroaderScenePatcher.Core {
         public static readonly IReadOnlyList<string> ReservedPrefixes = Array.AsReadOnly(new[] { "passengerStop:", "flare:" });
         public const string Empty = "The replacement ID is empty. " + WindowGuidance.EnterUnusedId;
         public const string NotAString = "The replacement ID must be a string.";
-        public const string NotSupported = "Only objects in the Track marker family can have a replacement ID.";
+        public const string NotSupported = "Only objects in the Generic track marker family can have a replacement ID.";
         // The reason the Connections tab gives for an object of another family. A milepost or a starter placement marker
         // is a native track marker of type Generic too, so the reason names the families.
         public static string NotSupportedFor(string family) => NotSupported + (String.IsNullOrWhiteSpace(family) ? "" : " This object is in the " + family + " family.");

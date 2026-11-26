@@ -168,10 +168,10 @@ static class SceneClassificationTests {
             Fiction("World/Large Scenery/Ela/Gooseneck Lamp", Baked, 9440, 7450, "Lights / Gooseneck Lamp @ Ela", Culler),
             Below("World/Large Scenery/Ela/Gooseneck Lamp/Bulb", "UnityEngine.Light"),
             // A new kind of sign in the game's sign container, a sign named after a place, and a location board for a new place.
-            Fiction("World/Signs/Whistle Post - Judson", "Track marker", -9050, -3020, "Sign / Whistle signs @ Judson", Marker, Relative, Culler),
-            Fiction("World/Signs/Derail Sign Hewitt", "Track marker", -13790, -8200, "Sign / Other signs @ Hewitt", Marker, Relative, Culler),
+            Fiction("World/Signs/Whistle Post - Judson", "Generic track marker", -9050, -3020, "Sign / Whistle signs @ Judson", Marker, Relative, Culler),
+            Fiction("World/Signs/Derail Sign Hewitt", "Generic track marker", -13790, -8200, "Sign / Other signs @ Hewitt", Marker, Relative, Culler),
             Fiction("World/Signs/Loc: Judson", "Location sign", -9100, -3100, "Sign / Location signs @ Judson", Culler, "Map.Runtime.MaskComponents.CircleMapMask"),
-            Fiction("World/Signs/Speed - Tunnel Curve", "Track marker", 16400, 2250, "Sign / Speed signs @ Wilmot", Marker, Relative, Culler),
+            Fiction("World/Signs/Speed - Tunnel Curve", "Generic track marker", 16400, 2250, "Sign / Speed signs @ Wilmot", Marker, Relative, Culler),
             // A milepost of a new line.
             Fiction("World/Mile Posts/M-12", "Milepost", 2000, -200, "Mileposts @ Cochran", Culler, Marker, Relative, "Helpers.MilePost"),
             // A new unprotected crossing in a Roads folder of a new place, and a protected one.

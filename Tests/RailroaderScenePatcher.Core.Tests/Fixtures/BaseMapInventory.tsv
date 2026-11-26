@@ -4,6 +4,8 @@
 #    map x, map z, the category before the generic rules (the category table for top scene objects, the family and
 #    name for others), and the expected
 #    category / kind @ place of the generic rules. A hyphen is an empty cell.
+# The markers that only inactive setups hold are context (K): the game never reads them, so the inventory lists them
+#    in no family. The family of the listed Generic track markers is Generic track marker.
 C	0	Audio.IntegerLoopingPlayer
 C	1	Character.SpawnPoint
 C	2	Helpers.Culling.RendererCuller
@@ -103,22 +105,22 @@ M	area	Whittier	12278	5770
 M	stop	Whittier	12255	5873
 M	area	Wilmot	16507	2281
 M	stop	Wilmot	16483	2296
-O	L	Setups/Starter Equipment Setup/starter-bc	4	Track marker	track-marker-v1	18369	242	Track marker	Track marker / Setup markers @ Barker's Creek
-O	L	Setups/Starter Equipment Setup/starter-br-coaling	4	Track marker	track-marker-v1	4174	5328	Track marker	Track marker / Setup markers @ Bryson
-O	L	Setups/Starter Equipment Setup/starter-dbs1	4	Track marker	track-marker-v1	21468	-1742	Track marker	Track marker / Setup markers @ Dillsboro
-O	L	Setups/Starter Equipment Setup/starter-dbs2	4	Track marker	track-marker-v1	21468	-1742	Track marker	Track marker / Setup markers @ Dillsboro
-O	L	Setups/Starter Equipment Setup/starter-dbtt2	4	Track marker	track-marker-v1	21468	-1742	Track marker	Track marker / Setup markers @ Dillsboro
-O	L	Setups/Starter Equipment Setup/starter-editor	4	Track marker	track-marker-v1	4469	5404	Track marker	Track marker / Setup markers @ Bryson
+O	K	Setups/Starter Equipment Setup/starter-bc	4	-	-	18369	242	-	-
+O	K	Setups/Starter Equipment Setup/starter-br-coaling	4	-	-	4174	5328	-	-
+O	K	Setups/Starter Equipment Setup/starter-dbs1	4	-	-	21468	-1742	-	-
+O	K	Setups/Starter Equipment Setup/starter-dbs2	4	-	-	21468	-1742	-	-
+O	K	Setups/Starter Equipment Setup/starter-dbtt2	4	-	-	21468	-1742	-	-
+O	K	Setups/Starter Equipment Setup/starter-editor	4	-	-	4469	5404	-	-
 O	L	Setups/Starter Equipment Setup/starter-ewh-btrk1	4	Starter placement marker	starter-placement-v1	12867	4594	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-btrk2	4	Starter placement marker	starter-placement-v1	12867	4594	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-btrk3	4	Starter placement marker	starter-placement-v1	12867	4594	Starter placement	Starter placement @ EWH Interchange
-O	L	Setups/Starter Equipment Setup/starter-ewh-coaling	4	Track marker	track-marker-v1	12652	4752	Track marker	Track marker / Setup markers @ Whittier
+O	K	Setups/Starter Equipment Setup/starter-ewh-coaling	4	-	-	12652	4752	-	-
 O	L	Setups/Starter Equipment Setup/starter-ewh-int2	4	Starter placement marker	starter-placement-v1	12859	4590	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-shed1	4	Starter placement marker	starter-placement-v1	12733	4682	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-shed2	4	Starter placement marker	starter-placement-v1	12794	4644	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-wreck	4	Starter placement marker	starter-placement-v1	12582	4885	Starter placement	Starter placement @ Whittier
 O	L	Setups/Starter Equipment Setup/starter-wh-l	4	Starter placement marker	starter-placement-v1	12499	4929	Starter placement	Starter placement @ Whittier
-O	L	Setups/Starter Equipment Setup/starter-wh-p	4	Track marker	track-marker-v1	12489	4907	Track marker	Track marker / Setup markers @ Whittier
+O	K	Setups/Starter Equipment Setup/starter-wh-p	4	-	-	12489	4907	-	-
 O	K	World/Builder Photo Setup	55	-	-	14699	3781	-	-
 O	K	World/Builder Photo Setup/Camera	53,54	-	-	14713	3798	-	-
 O	K	World/Builder Photo Setup/Marker	4	-	-	14699	3781	-	-
@@ -143,20 +145,20 @@ O	K	World/Large Scenery/Alarka Jct/Alarka Jct Station/Station/Foundation	26	-	-	
 O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected (1)/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	1620	1211	Grade crossing	Grade crossing @ Alarka Jct
 O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected (1)/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	1617	1216	Grade crossing	Grade crossing @ Alarka Jct
 O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected (1)/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	1623	1206	Grade crossing	Grade crossing @ Alarka Jct
-O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected (1)/Whistle Sign E	4,3	Track marker	track-marker-v1	1618	1231	Sign / Whistle signs	Sign / Whistle signs @ Alarka Jct
-O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected (1)/Whistle Sign W	4,3	Track marker	track-marker-v1	1623	1191	Sign / Whistle signs	Sign / Whistle signs @ Alarka Jct
+O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected (1)/Whistle Sign E	4,3	Generic track marker	track-marker-v1	1618	1231	Sign / Whistle signs	Sign / Whistle signs @ Alarka Jct
+O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected (1)/Whistle Sign W	4,3	Generic track marker	track-marker-v1	1623	1191	Sign / Whistle signs	Sign / Whistle signs @ Alarka Jct
 O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	1738	1430	Grade crossing	Grade crossing @ Alarka Jct
 O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	1742	1442	Grade crossing	Grade crossing @ Alarka Jct
 O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	1734	1419	Grade crossing	Grade crossing @ Alarka Jct
-O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected/Whistle Sign E	4,3	Track marker	track-marker-v1	1735	1450	Sign / Whistle signs	Sign / Whistle signs @ Alarka Jct
-O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected/Whistle Sign W	4,3	Track marker	track-marker-v1	1740	1410	Sign / Whistle signs	Sign / Whistle signs @ Alarka Jct
+O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	track-marker-v1	1735	1450	Sign / Whistle signs	Sign / Whistle signs @ Alarka Jct
+O	L	World/Large Scenery/Alarka Jct/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	track-marker-v1	1740	1410	Sign / Whistle signs	Sign / Whistle signs @ Alarka Jct
 O	L	World/Large Scenery/Alarka Jct/Tall Post Shade	2	Scene object	scene-object-v1	1733	1437	Lights	Lights / Tall Post Shade @ Alarka Jct
 O	L	World/Large Scenery/Alarka Jct/Tall Post Shade/Bulb	20,21	Child object	child-object-v1	1734	1437	-	-
 O	L	World/Large Scenery/Alarka Jct/Tall Post Shade/Spotlight Outdoor	22,23,24	Child object	child-object-v1	1734	1437	-	-
 O	L	World/Large Scenery/Alarka Jct/Tall Post Shade/Tall Post Shade	20,21	Child object	child-object-v1	1734	1437	-	-
 O	L	World/Large Scenery/Alarka Signs/Sign-Station	20,21	Scene object	scene-object-v1	1804	1087	Sign	Sign / Station signs @ Alarka Jct
-O	L	World/Large Scenery/Alarka Signs/Speed Sign	7,4,3,2	Track marker	track-marker-v1	1206	1177	Sign / Speed signs	Sign / Speed signs @ Robinson Branch
-O	L	World/Large Scenery/Alarka Signs/Yard Limit	4,3,2	Track marker	track-marker-v1	1179	1176	Sign / Yard limits	Sign / Yard limits @ Robinson Branch
+O	L	World/Large Scenery/Alarka Signs/Speed Sign	7,4,3,2	Generic track marker	track-marker-v1	1206	1177	Sign / Speed signs	Sign / Speed signs @ Robinson Branch
+O	L	World/Large Scenery/Alarka Signs/Yard Limit	4,3,2	Generic track marker	track-marker-v1	1179	1176	Sign / Yard limits	Sign / Yard limits @ Robinson Branch
 O	L	World/Large Scenery/Alarka/Alarka Depot	-	Scene object	scene-object-v1	4180	-3133	Station building	Station building / Depots @ Alarka
 O	L	World/Large Scenery/Alarka/Alarka Depot/Clock Ext Side Mount	-	Child object	child-object-v1	4186	-3132	-	-
 O	L	World/Large Scenery/Alarka/Alarka Depot/Clock Ext Side Mount/Clock 1 Base	36	Child object	child-object-v1	4186	-3132	-	-
@@ -738,8 +740,8 @@ O	L	World/Large Scenery/Bryson/Bryson Oil Crossing/Crossing Unprotected/Crossing
 O	L	World/Large Scenery/Bryson/Bryson Oil Crossing/Crossing Unprotected/Crossing Pad (1)	4,3,10	Crossing pad marker	crossing-pad-v1	3700	4549	Grade crossing	Grade crossing @ Bryson
 O	L	World/Large Scenery/Bryson/Bryson Oil Crossing/Crossing Unprotected/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	3712	4545	Grade crossing	Grade crossing @ Bryson
 O	L	World/Large Scenery/Bryson/Bryson Oil Crossing/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	3693	4555	Grade crossing	Grade crossing @ Bryson
-O	L	World/Large Scenery/Bryson/Bryson Oil Crossing/Crossing Unprotected/Whistle Sign E	4,3	Track marker	track-marker-v1	3832	4793	Sign / Whistle signs	Sign / Whistle signs @ Bryson
-O	L	World/Large Scenery/Bryson/Bryson Oil Crossing/Crossing Unprotected/Whistle Sign W	4,3	Track marker	track-marker-v1	3475	4371	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Large Scenery/Bryson/Bryson Oil Crossing/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	track-marker-v1	3832	4793	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Large Scenery/Bryson/Bryson Oil Crossing/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	track-marker-v1	3475	4371	Sign / Whistle signs	Sign / Whistle signs @ Bryson
 O	L	World/Large Scenery/Bryson/Bryson Oil/Tall Post Shade (5)	2	Child object	child-object-v1	3790	4550	-	-
 O	L	World/Large Scenery/Bryson/Bryson Oil/Tall Post Shade (5)/Bulb	20,21	Child object	child-object-v1	3791	4549	-	-
 O	L	World/Large Scenery/Bryson/Bryson Oil/Tall Post Shade (5)/Spotlight Outdoor	22,23,24	Child object	child-object-v1	3791	4549	-	-
@@ -769,9 +771,9 @@ O	L	World/Large Scenery/Bryson/Bryson Section House/TrainmanLantern/Lantern/Toru
 O	L	World/Large Scenery/Bryson/Bryson Section House/TrainmanLantern/Lantern/Vertical Wires	20,21	Child object	child-object-v1	3929	5105	-	-
 O	L	World/Large Scenery/Bryson/Bryson Section House/TrainmanLantern/Light	22,24	Child object	child-object-v1	3929	5105	-	-
 O	L	World/Large Scenery/Bryson/Bryson Signs	19	Scene object	-	4400	5345	Sign	Sign / Yard limits @ Bryson
-O	L	World/Large Scenery/Bryson/Bryson Signs/Speed Sign (2)	7,4,3,2	Track marker	track-marker-v1	5323	5736	Sign / Speed signs	Sign / Speed signs @ Bryson
-O	L	World/Large Scenery/Bryson/Bryson Signs/Yard Limit	4,3,2	Track marker	track-marker-v1	4957	5589	Sign / Yard limits	Sign / Yard limits @ Bryson
-O	L	World/Large Scenery/Bryson/Bryson Signs/Yard Limit (1)	4,3,2	Track marker	track-marker-v1	3904	4966	Sign / Yard limits	Sign / Yard limits @ Bryson
+O	L	World/Large Scenery/Bryson/Bryson Signs/Speed Sign (2)	7,4,3,2	Generic track marker	track-marker-v1	5323	5736	Sign / Speed signs	Sign / Speed signs @ Bryson
+O	L	World/Large Scenery/Bryson/Bryson Signs/Yard Limit	4,3,2	Generic track marker	track-marker-v1	4957	5589	Sign / Yard limits	Sign / Yard limits @ Bryson
+O	L	World/Large Scenery/Bryson/Bryson Signs/Yard Limit (1)	4,3,2	Generic track marker	track-marker-v1	3904	4966	Sign / Yard limits	Sign / Yard limits @ Bryson
 O	L	World/Large Scenery/Bryson/Bryson Tower Chance Clayton	-	Scene object	scene-object-v1	4374	5388	Railroad service building	Railroad service building / Tower Chance Clayton @ Bryson
 O	L	World/Large Scenery/Bryson/Bryson Tower Chance Clayton/Colliders	28,28,28,28	Child object	child-object-v1	4374	5388	-	-
 O	L	World/Large Scenery/Bryson/Bryson Tower Chance Clayton/Colliders/Steps	28	Child object	child-object-v1	4371	5388	-	-
@@ -896,8 +898,8 @@ O	L	World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 1 West	9	Tr
 O	L	World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 2 East	9	Track span	-	4387	5379	Grade crossing	Grade crossing @ Bryson
 O	L	World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 2 Island	9	Track span	-	4387	5379	Grade crossing	Grade crossing @ Bryson
 O	L	World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 2 West	9	Track span	-	4387	5379	Grade crossing	Grade crossing @ Bryson
-O	L	World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Whistle Sign E	4,3	Track marker	track-marker-v1	4598	5467	Sign / Whistle signs	Sign / Whistle signs @ Bryson
-O	L	World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Whistle Sign W	4,3	Track marker	track-marker-v1	4193	5302	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Whistle Sign E	4,3	Generic track marker	track-marker-v1	4598	5467	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Whistle Sign W	4,3	Generic track marker	track-marker-v1	4193	5302	Sign / Whistle signs	Sign / Whistle signs @ Bryson
 O	K	World/Large Scenery/Cochran	49	-	-	2000	-210	-	-
 O	L	World/Large Scenery/Cochran/Cochran flagstopstation	-	Scene object	scene-object-v1	2008	-209	Station building	Station building / Flag stop stations @ Cochran
 O	L	World/Large Scenery/Cochran/Cochran flagstopstation/Mask	26	Child object	child-object-v1	2006	-210	-	-
@@ -942,13 +944,13 @@ O	L	World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Crossing Pad (
 O	L	World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Crossing Pad (3)	4,3,10	Crossing pad marker	crossing-pad-v1	9448	7486	Grade crossing	Grade crossing @ Ela
 O	L	World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	9439	7449	Grade crossing	Grade crossing @ Ela
 O	L	World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	9435	7471	Grade crossing	Grade crossing @ Ela
-O	L	World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Whistle Sign E	4,3	Track marker	track-marker-v1	9741	7273	Sign / Whistle signs	Sign / Whistle signs @ Ela
-O	L	World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Whistle Sign W	4,3	Track marker	track-marker-v1	9057	7592	Sign / Whistle signs	Sign / Whistle signs @ Ela
+O	L	World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Whistle Sign E	4,3	Generic track marker	track-marker-v1	9741	7273	Sign / Whistle signs	Sign / Whistle signs @ Ela
+O	L	World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Whistle Sign W	4,3	Generic track marker	track-marker-v1	9057	7592	Sign / Whistle signs	Sign / Whistle signs @ Ela
 O	L	World/Large Scenery/Ela/Ela Bridge	2	Bridge	bridge-colliders-v1	8616	7275	Bridge / Rail bridges	Bridge / Rail bridges @ Ela
 O	L	World/Large Scenery/Ela/Ela Bridge Scenery	5	Bridge construction scenery	bridge-construction-scenery-v1	8617	7278	Bridge / Rail bridges	Bridge / Rail bridges @ Ela
 O	L	World/Large Scenery/Ela/Signs	-	Scene object	-	9257	7558	Sign	Sign / Station signs @ Ela
-O	L	World/Large Scenery/Ela/Signs/Station Sign	4,3	Track marker	track-marker-v1	8889	7593	Sign / Station signs	Sign / Station signs @ Ela
-O	L	World/Large Scenery/Ela/Signs/Station Sign (1)	4,3	Track marker	track-marker-v1	9957	7037	Sign / Station signs	Sign / Station signs @ Ela
+O	L	World/Large Scenery/Ela/Signs/Station Sign	4,3	Generic track marker	track-marker-v1	8889	7593	Sign / Station signs	Sign / Station signs @ Ela
+O	L	World/Large Scenery/Ela/Signs/Station Sign (1)	4,3	Generic track marker	track-marker-v1	9957	7037	Sign / Station signs	Sign / Station signs @ Ela
 O	L	World/Large Scenery/Ela/flagstopstation	-	Scene object	scene-object-v1	9565	7413	Station building	Station building / Flag stop stations @ Ela
 O	L	World/Large Scenery/Ela/flagstopstation/Mask	26	Child object	child-object-v1	9564	7411	-	-
 O	L	World/Large Scenery/Ela/flagstopstation/Sign-Station Synchronized	7	Child object	child-object-v1	9567	7412	-	-
@@ -961,10 +963,10 @@ O	L	World/Large Scenery/Ela/flagstopstation/Spotlight Outdoor (3)	22,23,24	Child
 O	K	World/Large Scenery/Ela/flagstopstation/Station	57	-	-	9565	7413	-	-
 O	K	World/Large Scenery/Ela/flagstopstation/Station/Decking	26	-	-	9564	7410	-	-
 O	K	World/Large Scenery/Ela/flagstopstation/Station/Foundation	26	-	-	9565	7413	-	-
-O	L	World/Large Scenery/Global Signs/Station Sign HW-E	4,3	Track marker	track-marker-v1	2590	3602	Sign / Station signs	Sign / Station signs @ Hemingway
-O	L	World/Large Scenery/Global Signs/Station Sign HW-W	4,3	Track marker	track-marker-v1	2472	2727	Sign / Station signs	Sign / Station signs @ Hemingway
+O	L	World/Large Scenery/Global Signs/Station Sign HW-E	4,3	Generic track marker	track-marker-v1	2590	3602	Sign / Station signs	Sign / Station signs @ Hemingway
+O	L	World/Large Scenery/Global Signs/Station Sign HW-W	4,3	Generic track marker	track-marker-v1	2472	2727	Sign / Station signs	Sign / Station signs @ Hemingway
 O	K	World/Large Scenery/Hemingway	49	-	-	2820	3060	-	-
-O	L	World/Large Scenery/Hemingway/Hemingway flagstopstation	3,4	Track marker	track-marker-v1	2841	3069	Track marker	Station building / Flag stop stations @ Hemingway
+O	L	World/Large Scenery/Hemingway/Hemingway flagstopstation	3,4	Generic track marker	track-marker-v1	2841	3069	Track marker	Station building / Flag stop stations @ Hemingway
 O	L	World/Large Scenery/Hewitt/Mine 1	-	Scene object	scene-object-v1	-13770	-8218	Industry building	Industry building / Mine @ Hewitt
 O	L	World/Large Scenery/Hewitt/Mine 1/Cube	20,21,28	Child object	child-object-v1	-13817	-8195	-	-
 O	L	World/Large Scenery/Hewitt/Mine 1/Cube (1)	20,21,28	Child object	child-object-v1	-13806	-8210	-	-
@@ -975,8 +977,8 @@ O	L	World/Large Scenery/Nantahala/Crossing Unprotected/Crossing Pad	4,3,10	Cross
 O	L	World/Large Scenery/Nantahala/Crossing Unprotected/Crossing Pad (1)	4,3,10	Crossing pad marker	crossing-pad-v1	-15587	-10581	Grade crossing	Grade crossing @ Nantahala
 O	L	World/Large Scenery/Nantahala/Crossing Unprotected/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	-15594	-10582	Grade crossing	Grade crossing @ Nantahala
 O	L	World/Large Scenery/Nantahala/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	-15577	-10584	Grade crossing	Grade crossing @ Nantahala
-O	L	World/Large Scenery/Nantahala/Crossing Unprotected/Whistle Sign E	4,3	Track marker	track-marker-v1	-15347	-10283	Sign / Whistle signs	Sign / Whistle signs @ Nantahala
-O	L	World/Large Scenery/Nantahala/Crossing Unprotected/Whistle Sign W	4,3	Track marker	track-marker-v1	-15741	-10737	Sign / Whistle signs	Sign / Whistle signs @ Nantahala
+O	L	World/Large Scenery/Nantahala/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	track-marker-v1	-15347	-10283	Sign / Whistle signs	Sign / Whistle signs @ Nantahala
+O	L	World/Large Scenery/Nantahala/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	track-marker-v1	-15741	-10737	Sign / Whistle signs	Sign / Whistle signs @ Nantahala
 O	L	World/Large Scenery/Nantahala/Nantahala Station	-	Scene object	scene-object-v1	-15586	-10599	Station building	Station building / Stations @ Nantahala
 O	L	World/Large Scenery/Nantahala/Nantahala Station/Mask	26	Child object	child-object-v1	-15587	-10598	-	-
 O	L	World/Large Scenery/Nantahala/Nantahala Station/Sign-Station Synchronized	7	Child object	child-object-v1	-15588	-10601	-	-
@@ -1053,8 +1055,8 @@ O	K	World/Large Scenery/Robinson Gap Mine/Coal Loader/Model	19	-	-	1318	2189	-	-
 O	K	World/Large Scenery/Robinson Gap Mine/Coal Loader/Model/MineLoader	40,41	-	-	1322	2195	-	-
 O	L	World/Large Scenery/Robinson Gap Mine/Coal Loader/Model/Spotlight Outdoor	22,23,24	Child object	child-object-v1	1318	2192	-	-
 O	K	World/Large Scenery/Sylva	49	-	-	24630	-920	-	-
-O	L	World/Large Scenery/Sylva/Speed Sign Sylva Wye	7,4,3,2	Track marker	-	25091	-911	Sign / Speed signs	Sign / Speed signs @ Sylva
-O	L	World/Large Scenery/Sylva/Speed Sign Sylva Wye	7,4,3,2	Track marker	-	25303	-499	Sign / Speed signs	Sign / Speed signs @ Sylva
+O	L	World/Large Scenery/Sylva/Speed Sign Sylva Wye	7,4,3,2	Generic track marker	-	25091	-911	Sign / Speed signs	Sign / Speed signs @ Sylva
+O	L	World/Large Scenery/Sylva/Speed Sign Sylva Wye	7,4,3,2	Generic track marker	-	25303	-499	Sign / Speed signs	Sign / Speed signs @ Sylva
 O	L	World/Large Scenery/Sylva/Sylva Culled	19	Scene object	scene-object-v1	25261	-567	Industry building	Industry building @ Sylva
 O	L	World/Large Scenery/Sylva/Sylva Culled/Pavilion	-	Child object	child-object-v1	25171	-623	-	-
 O	L	World/Large Scenery/Sylva/Sylva Culled/Pavilion/Cube.001	20,21	Child object	child-object-v1	25171	-623	-	-
@@ -1146,7 +1148,7 @@ O	L	World/Large Scenery/Sylva/Sylva Paperboard/Pulpwood Piles/Pile (5)	31	Child 
 O	L	World/Large Scenery/Sylva/Sylva Paperboard/Pulpwood Piles/Pile (6)	31	Child object	child-object-v1	25083	-650	-	-
 O	L	World/Large Scenery/Sylva/Sylva Paperboard/Pulpwood Piles/Pile (7)	31	Child object	child-object-v1	25104	-648	-	-
 O	L	World/Large Scenery/Sylva/Sylva Signs	-	Scene object	-	0	0	Sign	Sign / Yard limits @ Brooks
-O	L	World/Large Scenery/Sylva/Sylva Signs/Yard Limit Trackside	4,3,2	Track marker	track-marker-v1	24333	-922	Sign / Yard limits	Sign / Yard limits @ Sylva
+O	L	World/Large Scenery/Sylva/Sylva Signs/Yard Limit Trackside	4,3,2	Generic track marker	track-marker-v1	24333	-922	Sign / Yard limits	Sign / Yard limits @ Sylva
 O	K	World/Large Scenery/Topton	49	-	-	-18980	-15220	-	-
 O	L	World/Large Scenery/Topton/Topton Station	-	Scene object	scene-object-v1	-18963	-15227	Station building	Station building / Stations @ Topton
 O	L	World/Large Scenery/Topton/Topton Station/Mask	26	Child object	child-object-v1	-18962	-15228	-	-
@@ -1501,8 +1503,8 @@ O	L	World/Rivers/Fontana Lake (2)	20,29,21,2	Scene object	scene-object-v1	-4478	
 O	L	World/Roads Andrews/Crossing Unprotected - Robbinsville/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	-29223	-19827	Grade crossing	Grade crossing @ Andrews
 O	L	World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	-29230	-19822	Grade crossing	Grade crossing @ Andrews
 O	L	World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	-29217	-19832	Grade crossing	Grade crossing @ Andrews
-O	L	World/Roads Andrews/Crossing Unprotected - Robbinsville/Whistle Sign E	4,3	Track marker	track-marker-v1	-29001	-19798	Sign / Whistle signs	Sign / Whistle signs @ Andrews
-O	L	World/Roads Andrews/Crossing Unprotected - Robbinsville/Whistle Sign W	4,3	Track marker	track-marker-v1	-29365	-19847	Sign / Whistle signs	Sign / Whistle signs @ Andrews
+O	L	World/Roads Andrews/Crossing Unprotected - Robbinsville/Whistle Sign E	4,3	Generic track marker	track-marker-v1	-29001	-19798	Sign / Whistle signs	Sign / Whistle signs @ Andrews
+O	L	World/Roads Andrews/Crossing Unprotected - Robbinsville/Whistle Sign W	4,3	Generic track marker	track-marker-v1	-29365	-19847	Sign / Whistle signs	Sign / Whistle signs @ Andrews
 O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks	14,15,16,17	Grade crossing controller	crossing-coverage-v1	-29921	-20053	Grade crossing	Grade crossing @ Andrews
 O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Crossing Bell	0	Crossing bell	existing-crossing-bell-v1	-29921	-20053	Grade crossing	Grade crossing @ Andrews
 O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	-29919	-20055	Grade crossing	Grade crossing @ Andrews
@@ -1515,8 +1517,8 @@ O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Track 1 West	9	Track span	
 O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Track 2 East	9	Track span	-	-29921	-20053	Grade crossing	Grade crossing @ Andrews
 O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Track 2 Island	9	Track span	-	-29921	-20053	Grade crossing	Grade crossing @ Andrews
 O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Track 2 West	9	Track span	-	-29921	-20053	Grade crossing	Grade crossing @ Andrews
-O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Whistle Sign E	4,3	Track marker	track-marker-v1	-29582	-19880	Sign / Whistle signs	Sign / Whistle signs @ Andrews
-O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Whistle Sign W	4,3	Track marker	track-marker-v1	-30078	-20141	Sign / Whistle signs	Sign / Whistle signs @ Andrews
+O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Whistle Sign E	4,3	Generic track marker	track-marker-v1	-29582	-19880	Sign / Whistle signs	Sign / Whistle signs @ Andrews
+O	L	World/Roads Andrews/Grade Crossing Setup 2 Tracks/Whistle Sign W	4,3	Generic track marker	track-marker-v1	-30078	-20141	Sign / Whistle signs	Sign / Whistle signs @ Andrews
 O	L	World/Roads Barkers/1932 Chevy Truck LP	-	Scene object	scene-object-v1	18417	179	Other	Road scenery / 1932 Chevy Truck LP @ Barker's Creek
 O	L	World/Roads Barkers/1932 Chevy Truck LP/Cube.002	20,21	Child object	child-object-v1	18419	180	-	-
 O	L	World/Roads Barkers/1932 Chevy Truck LP/Cube.004	20,21	Child object	child-object-v1	18415	179	-	-
@@ -1524,8 +1526,8 @@ O	L	World/Roads Barkers/1932 Chevy Truck LP/Cube.010	20,21	Child object	child-ob
 O	L	World/Roads Barkers/Crossing Unprotected/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	18426	183	Grade crossing	Grade crossing @ Barker's Creek
 O	L	World/Roads Barkers/Crossing Unprotected/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	18427	189	Grade crossing	Grade crossing @ Barker's Creek
 O	L	World/Roads Barkers/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	18423	177	Grade crossing	Grade crossing @ Barker's Creek
-O	L	World/Roads Barkers/Crossing Unprotected/Whistle Sign E	4,3	Track marker	track-marker-v1	18694	-141	Sign / Whistle signs	Sign / Whistle signs @ Barker's Creek
-O	L	World/Roads Barkers/Crossing Unprotected/Whistle Sign W	4,3	Track marker	track-marker-v1	18091	629	Sign / Whistle signs	Sign / Whistle signs @ Barker's Creek
+O	L	World/Roads Barkers/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	track-marker-v1	18694	-141	Sign / Whistle signs	Sign / Whistle signs @ Barker's Creek
+O	L	World/Roads Barkers/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	track-marker-v1	18091	629	Sign / Whistle signs	Sign / Whistle signs @ Barker's Creek
 O	L	World/Roads Bryson/Concrete Road Bridge - 20m	26,2	Scene object	scene-object-v1	5093	5701	Bridge	Bridge / Road bridges @ Bryson
 O	L	World/Roads Bryson/Concrete Road Bridge - 20m/Collider Deck	28	Child object	child-object-v1	5093	5701	-	-
 O	L	World/Roads Bryson/Concrete Road Bridge - 20m/Collider Side	28	Child object	child-object-v1	5093	5701	-	-
@@ -1549,13 +1551,13 @@ O	L	World/Roads Bryson/Concrete Road Bridge - 20m/Road Bridge Support (2)	20,21	
 O	L	World/Roads Bryson/Crossing Unprotected (1)/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	5072	5700	Grade crossing	Grade crossing @ Bryson
 O	L	World/Roads Bryson/Crossing Unprotected (1)/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	5081	5704	Grade crossing	Grade crossing @ Bryson
 O	L	World/Roads Bryson/Crossing Unprotected (1)/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	5067	5696	Grade crossing	Grade crossing @ Bryson
-O	L	World/Roads Bryson/Crossing Unprotected (1)/Whistle Sign E	4,3	Track marker	track-marker-v1	5068	5722	Sign / Whistle signs	Sign / Whistle signs @ Bryson
-O	L	World/Roads Bryson/Crossing Unprotected (1)/Whistle Sign W	4,3	Track marker	track-marker-v1	5073	5682	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Crossing Unprotected (1)/Whistle Sign E	4,3	Generic track marker	track-marker-v1	5068	5722	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Crossing Unprotected (1)/Whistle Sign W	4,3	Generic track marker	track-marker-v1	5073	5682	Sign / Whistle signs	Sign / Whistle signs @ Bryson
 O	L	World/Roads Bryson/Crossing Unprotected/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	4499	5451	Grade crossing	Grade crossing @ Bryson
 O	L	World/Roads Bryson/Crossing Unprotected/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	4508	5463	Grade crossing	Grade crossing @ Bryson
 O	L	World/Roads Bryson/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	4486	5438	Grade crossing	Grade crossing @ Bryson
-O	L	World/Roads Bryson/Crossing Unprotected/Whistle Sign E	4,3	Track marker	track-marker-v1	4498	5473	Sign / Whistle signs	Sign / Whistle signs @ Bryson
-O	L	World/Roads Bryson/Crossing Unprotected/Whistle Sign W	4,3	Track marker	track-marker-v1	4503	5433	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	track-marker-v1	4498	5473	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	track-marker-v1	4503	5433	Sign / Whistle signs	Sign / Whistle signs @ Bryson
 O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Crossing Pad	4,3,10	Crossing pad marker	-	6676	5474	Grade crossing	Grade crossing @ Bryson
 O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Crossing Pad	4,3,10	Crossing pad marker	-	6924	5505	Grade crossing	Grade crossing @ Bryson
 O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Crossing Pad	4,3,10	Crossing pad marker	-	5350	5747	Grade crossing	Grade crossing @ Bryson
@@ -1565,12 +1567,12 @@ O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Sign-Crossing0 (1)	2	Sc
 O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	5332	5749	Grade crossing	Grade crossing @ Bryson
 O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	6659	5472	Grade crossing	Grade crossing @ Bryson
 O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	6911	5505	Grade crossing	Grade crossing @ Bryson
-O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign E	4,3	Track marker	-	6913	5504	Sign / Whistle signs	Sign / Whistle signs @ Bryson
-O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign E	4,3	Track marker	-	7179	5582	Sign / Whistle signs	Sign / Whistle signs @ Bryson
-O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign E	4,3	Track marker	-	5680	5737	Sign / Whistle signs	Sign / Whistle signs @ Bryson
-O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign W	4,3	Track marker	-	6383	5651	Sign / Whistle signs	Sign / Whistle signs @ Bryson
-O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign W	4,3	Track marker	-	6697	5463	Sign / Whistle signs	Sign / Whistle signs @ Bryson
-O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign W	4,3	Track marker	-	5156	5700	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	-	6913	5504	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	-	7179	5582	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	-	5680	5737	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	-	6383	5651	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	-	6697	5463	Sign / Whistle signs	Sign / Whistle signs @ Bryson
+O	L	World/Roads Bryson/Old River Rd/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	-	5156	5700	Sign / Whistle signs	Sign / Whistle signs @ Bryson
 O	L	World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m	26,2	Scene object	scene-object-v1	7355	5467	Bridge	Bridge / Road bridges @ Gov Island
 O	L	World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m/Break L (1)	20,21	Child object	child-object-v1	7356	5487	-	-
 O	L	World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m/Break L (10)	20,21	Child object	child-object-v1	7354	5446	-	-
@@ -1620,22 +1622,22 @@ O	L	World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Signal 2/Signal 2	6	
 O	L	World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Track 1 East	9	Track span	-	7378	5611	Grade crossing	Grade crossing @ Gov Island
 O	L	World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Track 1 Island	9	Track span	-	7378	5611	Grade crossing	Grade crossing @ Gov Island
 O	L	World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Track 1 West	9	Track span	-	7378	5611	Grade crossing	Grade crossing @ Gov Island
-O	L	World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Whistle Sign E	4,3	Track marker	track-marker-v1	7799	5806	Sign / Whistle signs	Sign / Whistle signs @ Gov Island
-O	L	World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Whistle Sign W	4,3	Track marker	track-marker-v1	7006	5535	Sign / Whistle signs	Sign / Whistle signs @ Gov Island
+O	L	World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Whistle Sign E	4,3	Generic track marker	track-marker-v1	7799	5806	Sign / Whistle signs	Sign / Whistle signs @ Gov Island
+O	L	World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Whistle Sign W	4,3	Generic track marker	track-marker-v1	7006	5535	Sign / Whistle signs	Sign / Whistle signs @ Gov Island
 O	K	World/Roads Dillsboro/Bridge Smoke Decal Projector	51,52	-	-	22033	-1577	-	-
 O	K	World/Roads Dillsboro/Bridge Smoke Decal Projector (1)	51,52	-	-	22823	-1044	-	-
 O	L	World/Roads Dillsboro/Crossing Unprotected - Depot/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	22334	-1441	Grade crossing	Grade crossing @ Dillsboro
 O	L	World/Roads Dillsboro/Crossing Unprotected - Depot/Crossing Pad (1)	4,3,10	Crossing pad marker	crossing-pad-v1	22332	-1436	Grade crossing	Grade crossing @ Dillsboro
 O	L	World/Roads Dillsboro/Crossing Unprotected - Depot/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	22325	-1434	Grade crossing	Grade crossing @ Dillsboro
 O	L	World/Roads Dillsboro/Crossing Unprotected - Depot/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	22341	-1442	Grade crossing	Grade crossing @ Dillsboro
-O	L	World/Roads Dillsboro/Crossing Unprotected - Depot/Whistle Sign E	4,3	Track marker	track-marker-v1	22470	-1364	Sign / Whistle signs	Sign / Whistle signs @ Dillsboro
-O	L	World/Roads Dillsboro/Crossing Unprotected - Depot/Whistle Sign W	4,3	Track marker	track-marker-v1	22196	-1507	Sign / Whistle signs	Sign / Whistle signs @ Dillsboro
+O	L	World/Roads Dillsboro/Crossing Unprotected - Depot/Whistle Sign E	4,3	Generic track marker	track-marker-v1	22470	-1364	Sign / Whistle signs	Sign / Whistle signs @ Dillsboro
+O	L	World/Roads Dillsboro/Crossing Unprotected - Depot/Whistle Sign W	4,3	Generic track marker	track-marker-v1	22196	-1507	Sign / Whistle signs	Sign / Whistle signs @ Dillsboro
 O	L	World/Roads Dillsboro/Crossing Unprotected - Webster/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	22185	-1509	Grade crossing	Grade crossing @ Dillsboro
 O	L	World/Roads Dillsboro/Crossing Unprotected - Webster/Crossing Pad (1)	4,3,10	Crossing pad marker	crossing-pad-v1	22183	-1503	Grade crossing	Grade crossing @ Dillsboro
 O	L	World/Roads Dillsboro/Crossing Unprotected - Webster/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	22178	-1501	Grade crossing	Grade crossing @ Dillsboro
 O	L	World/Roads Dillsboro/Crossing Unprotected - Webster/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	22191	-1513	Grade crossing	Grade crossing @ Dillsboro
-O	L	World/Roads Dillsboro/Crossing Unprotected - Webster/Whistle Sign E	4,3	Track marker	track-marker-v1	22293	-1450	Sign / Whistle signs	Sign / Whistle signs @ Dillsboro
-O	L	World/Roads Dillsboro/Crossing Unprotected - Webster/Whistle Sign W	4,3	Track marker	track-marker-v1	22063	-1568	Sign / Whistle signs	Sign / Whistle signs @ Dillsboro
+O	L	World/Roads Dillsboro/Crossing Unprotected - Webster/Whistle Sign E	4,3	Generic track marker	track-marker-v1	22293	-1450	Sign / Whistle signs	Sign / Whistle signs @ Dillsboro
+O	L	World/Roads Dillsboro/Crossing Unprotected - Webster/Whistle Sign W	4,3	Generic track marker	track-marker-v1	22063	-1568	Sign / Whistle signs	Sign / Whistle signs @ Dillsboro
 O	L	World/Roads Dillsboro/Dillsboro Haywood Road Bridge	26,2	Scene object	scene-object-v1	22635	-1166	Bridge	Bridge / Road bridges @ Dillsboro
 O	L	World/Roads Dillsboro/Dillsboro Haywood Road Bridge/Collider Deck	28	Child object	child-object-v1	22635	-1166	-	-
 O	L	World/Roads Dillsboro/Dillsboro Haywood Road Bridge/Collider Side	28	Child object	child-object-v1	22635	-1166	-	-
@@ -1795,23 +1797,23 @@ O	L	World/Roads Rhodo/Crossing Unprotected - Rhodo/Crossing Pad	4,3,10	Crossing 
 O	L	World/Roads Rhodo/Crossing Unprotected - Rhodo/Crossing Pad (1)	4,3,10	Crossing pad marker	crossing-pad-v1	-22990	-17993	Grade crossing	Grade crossing @ Rhodo
 O	L	World/Roads Rhodo/Crossing Unprotected - Rhodo/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	-22994	-17989	Grade crossing	Grade crossing @ Rhodo
 O	L	World/Roads Rhodo/Crossing Unprotected - Rhodo/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	-22984	-18008	Grade crossing	Grade crossing @ Rhodo
-O	L	World/Roads Rhodo/Crossing Unprotected - Rhodo/Whistle Sign E	4,3	Track marker	track-marker-v1	-22672	-17612	Sign / Whistle signs	Sign / Whistle signs @ Rhodo
-O	L	World/Roads Rhodo/Crossing Unprotected - Rhodo/Whistle Sign W	4,3	Track marker	track-marker-v1	-23185	-18252	Sign / Whistle signs	Sign / Whistle signs @ Rhodo
+O	L	World/Roads Rhodo/Crossing Unprotected - Rhodo/Whistle Sign E	4,3	Generic track marker	track-marker-v1	-22672	-17612	Sign / Whistle signs	Sign / Whistle signs @ Rhodo
+O	L	World/Roads Rhodo/Crossing Unprotected - Rhodo/Whistle Sign W	4,3	Generic track marker	track-marker-v1	-23185	-18252	Sign / Whistle signs	Sign / Whistle signs @ Rhodo
 O	L	World/Roads Sylva/Crossing Unprotected - Allen (1)/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	25065	-919	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Crossing Unprotected - Allen (1)/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	25060	-919	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Crossing Unprotected - Allen (1)/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	25071	-921	Grade crossing	Grade crossing @ Sylva
-O	L	World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E	4,3	Track marker	track-marker-v1	25201	-778	Sign / Whistle signs	Sign / Whistle signs @ Sylva
-O	L	World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign W	4,3	Track marker	track-marker-v1	24857	-937	Sign / Whistle signs	Sign / Whistle signs @ Sylva
+O	L	World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E	4,3	Generic track marker	track-marker-v1	25201	-778	Sign / Whistle signs	Sign / Whistle signs @ Sylva
+O	L	World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign W	4,3	Generic track marker	track-marker-v1	24857	-937	Sign / Whistle signs	Sign / Whistle signs @ Sylva
 O	L	World/Roads Sylva/Crossing Unprotected Wye (1)/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	25328	-846	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Crossing Unprotected Wye (1)/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	25331	-839	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Crossing Unprotected Wye (1)/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	25326	-852	Grade crossing	Grade crossing @ Sylva
-O	L	World/Roads Sylva/Crossing Unprotected Wye (1)/Whistle Sign E	4,3	Track marker	track-marker-v1	25292	-691	Sign / Whistle signs	Sign / Whistle signs @ Sylva
-O	L	World/Roads Sylva/Crossing Unprotected Wye (1)/Whistle Sign W	4,3	Track marker	track-marker-v1	25371	-903	Sign / Whistle signs	Sign / Whistle signs @ Sylva
+O	L	World/Roads Sylva/Crossing Unprotected Wye (1)/Whistle Sign E	4,3	Generic track marker	track-marker-v1	25292	-691	Sign / Whistle signs	Sign / Whistle signs @ Sylva
+O	L	World/Roads Sylva/Crossing Unprotected Wye (1)/Whistle Sign W	4,3	Generic track marker	track-marker-v1	25371	-903	Sign / Whistle signs	Sign / Whistle signs @ Sylva
 O	L	World/Roads Sylva/Crossing Unprotected Wye/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	25284	-884	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Crossing Unprotected Wye/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	25283	-878	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Crossing Unprotected Wye/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	25285	-890	Grade crossing	Grade crossing @ Sylva
-O	L	World/Roads Sylva/Crossing Unprotected Wye/Whistle Sign E	4,3	Track marker	track-marker-v1	25148	-892	Sign / Whistle signs	Sign / Whistle signs @ Sylva
-O	L	World/Roads Sylva/Crossing Unprotected Wye/Whistle Sign W	4,3	Track marker	track-marker-v1	25362	-909	Sign / Whistle signs	Sign / Whistle signs @ Sylva
+O	L	World/Roads Sylva/Crossing Unprotected Wye/Whistle Sign E	4,3	Generic track marker	track-marker-v1	25148	-892	Sign / Whistle signs	Sign / Whistle signs @ Sylva
+O	L	World/Roads Sylva/Crossing Unprotected Wye/Whistle Sign W	4,3	Generic track marker	track-marker-v1	25362	-909	Sign / Whistle signs	Sign / Whistle signs @ Sylva
 O	L	World/Roads Sylva/Grade Crossing - Allen	14,15,16,17	Grade crossing controller	crossing-coverage-v1	24644	-940	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Grade Crossing - Allen/Crossing Bell	0	Crossing bell	existing-crossing-bell-v1	24644	-940	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Grade Crossing - Allen/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	24664	-936	Grade crossing	Grade crossing @ Sylva
@@ -1824,8 +1826,8 @@ O	L	World/Roads Sylva/Grade Crossing - Allen/Track 1 West	9	Track span	-	24644	-
 O	L	World/Roads Sylva/Grade Crossing - Allen/Track 2 East	9	Track span	-	24644	-940	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Grade Crossing - Allen/Track 2 Island	9	Track span	-	24644	-940	Grade crossing	Grade crossing @ Sylva
 O	L	World/Roads Sylva/Grade Crossing - Allen/Track 2 West	9	Track span	-	24644	-940	Grade crossing	Grade crossing @ Sylva
-O	L	World/Roads Sylva/Grade Crossing - Allen/Whistle Sign E	4,3	Track marker	track-marker-v1	24826	-931	Sign / Whistle signs	Sign / Whistle signs @ Sylva
-O	L	World/Roads Sylva/Grade Crossing - Allen/Whistle Sign W	4,3	Track marker	track-marker-v1	24513	-939	Sign / Whistle signs	Sign / Whistle signs @ Sylva
+O	L	World/Roads Sylva/Grade Crossing - Allen/Whistle Sign E	4,3	Generic track marker	track-marker-v1	24826	-931	Sign / Whistle signs	Sign / Whistle signs @ Sylva
+O	L	World/Roads Sylva/Grade Crossing - Allen/Whistle Sign W	4,3	Generic track marker	track-marker-v1	24513	-939	Sign / Whistle signs	Sign / Whistle signs @ Sylva
 O	L	World/Roads Sylva/Sylva Road Bridge	26,2	Scene object	scene-object-v1	24997	-956	Bridge	Bridge / Road bridges @ Sylva
 O	L	World/Roads Sylva/Sylva Road Bridge 20m	26,2	Scene object	scene-object-v1	24690	-871	Bridge	Bridge / Road bridges @ Sylva
 O	L	World/Roads Sylva/Sylva Road Bridge 20m (1)	26,2	Scene object	scene-object-v1	25362	-839	Bridge	Bridge / Road bridges @ Sylva
@@ -1899,14 +1901,14 @@ O	L	World/Roads Topton/Crossing Unprotected - Locust/Crossing Pad	4,3,10	Crossin
 O	L	World/Roads Topton/Crossing Unprotected - Locust/Crossing Pad (1)	4,3,10	Crossing pad marker	crossing-pad-v1	-18952	-15219	Grade crossing	Grade crossing @ Topton
 O	L	World/Roads Topton/Crossing Unprotected - Locust/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	-18960	-15219	Grade crossing	Grade crossing @ Topton
 O	L	World/Roads Topton/Crossing Unprotected - Locust/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	-18941	-15221	Grade crossing	Grade crossing @ Topton
-O	L	World/Roads Topton/Crossing Unprotected - Locust/Whistle Sign E	4,3	Track marker	track-marker-v1	-18781	-14896	Sign / Whistle signs	Sign / Whistle signs @ Topton
-O	L	World/Roads Topton/Crossing Unprotected - Locust/Whistle Sign W	4,3	Track marker	track-marker-v1	-19072	-15477	Sign / Whistle signs	Sign / Whistle signs @ Topton
+O	L	World/Roads Topton/Crossing Unprotected - Locust/Whistle Sign E	4,3	Generic track marker	track-marker-v1	-18781	-14896	Sign / Whistle signs	Sign / Whistle signs @ Topton
+O	L	World/Roads Topton/Crossing Unprotected - Locust/Whistle Sign W	4,3	Generic track marker	track-marker-v1	-19072	-15477	Sign / Whistle signs	Sign / Whistle signs @ Topton
 O	L	World/Roads Topton/Crossing Unprotected - Robbinsville/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	-18222	-14992	Grade crossing	Grade crossing @ Topton
 O	L	World/Roads Topton/Crossing Unprotected - Robbinsville/Crossing Pad (1)	4,3,10	Crossing pad marker	crossing-pad-v1	-18222	-14997	Grade crossing	Grade crossing @ Topton
 O	L	World/Roads Topton/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	-18226	-14989	Grade crossing	Grade crossing @ Topton
 O	L	World/Roads Topton/Crossing Unprotected - Robbinsville/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	-18217	-15000	Grade crossing	Grade crossing @ Topton
-O	L	World/Roads Topton/Crossing Unprotected - Robbinsville/Whistle Sign E	4,3	Track marker	track-marker-v1	-17996	-14966	Sign / Whistle signs	Sign / Whistle signs @ Topton
-O	L	World/Roads Topton/Crossing Unprotected - Robbinsville/Whistle Sign W	4,3	Track marker	track-marker-v1	-18456	-15020	Sign / Whistle signs	Sign / Whistle signs @ Topton
+O	L	World/Roads Topton/Crossing Unprotected - Robbinsville/Whistle Sign E	4,3	Generic track marker	track-marker-v1	-17996	-14966	Sign / Whistle signs	Sign / Whistle signs @ Topton
+O	L	World/Roads Topton/Crossing Unprotected - Robbinsville/Whistle Sign W	4,3	Generic track marker	track-marker-v1	-18456	-15020	Sign / Whistle signs	Sign / Whistle signs @ Topton
 O	L	World/Roads Whittier/Concrete Road Bridge - 20m	26,2	Scene object	scene-object-v1	12119	5485	Bridge	Bridge / Road bridges @ Whittier
 O	L	World/Roads Whittier/Concrete Road Bridge - 20m/Collider Deck	28	Child object	child-object-v1	12119	5485	-	-
 O	L	World/Roads Whittier/Concrete Road Bridge - 20m/Collider Side	28	Child object	child-object-v1	12119	5485	-	-
@@ -1930,30 +1932,30 @@ O	L	World/Roads Whittier/Concrete Road Bridge - 20m/Road Bridge Support (2)	20,2
 O	L	World/Roads Whittier/Crossing Unprotected - Saw Mill/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	12292	4993	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Saw Mill/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	12292	4999	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Saw Mill/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	12292	4987	Grade crossing	Grade crossing @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected - Saw Mill/Whistle Sign E	4,3	Track marker	track-marker-v1	12600	4737	Sign / Whistle signs	Sign / Whistle signs @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected - Saw Mill/Whistle Sign W	4,3	Track marker	track-marker-v1	12126	5469	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected - Saw Mill/Whistle Sign E	4,3	Generic track marker	track-marker-v1	12600	4737	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected - Saw Mill/Whistle Sign W	4,3	Generic track marker	track-marker-v1	12126	5469	Sign / Whistle signs	Sign / Whistle signs @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Stenzel/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	12214	5815	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Stenzel/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	12211	5824	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Stenzel/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	12218	5810	Grade crossing	Grade crossing @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected - Stenzel/Whistle Sign E	4,3	Track marker	-	12230	5841	Sign / Whistle signs	Sign / Whistle signs @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected - Stenzel/Whistle Sign W	4,3	Track marker	track-marker-v1	12259	5746	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected - Stenzel/Whistle Sign E	4,3	Generic track marker	-	12230	5841	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected - Stenzel/Whistle Sign W	4,3	Generic track marker	track-marker-v1	12259	5746	Sign / Whistle signs	Sign / Whistle signs @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Wye (1)/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	12137	5586	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Wye (1)/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	12135	5596	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Wye (1)/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	12136	5568	Grade crossing	Grade crossing @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected - Wye (1)/Whistle Sign E	4,3	Track marker	track-marker-v1	11922	5500	Sign / Whistle signs	Sign / Whistle signs @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected - Wye (1)/Whistle Sign W	4,3	Track marker	track-marker-v1	12163	5643	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected - Wye (1)/Whistle Sign E	4,3	Generic track marker	track-marker-v1	11922	5500	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected - Wye (1)/Whistle Sign W	4,3	Generic track marker	track-marker-v1	12163	5643	Sign / Whistle signs	Sign / Whistle signs @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Wye (2)/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	12119	5423	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Wye (2)/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	12113	5440	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected - Wye (2)/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	12127	5395	Grade crossing	Grade crossing @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected - Wye (2)/Whistle Sign E	4,3	Track marker	track-marker-v1	12113	5533	Sign / Whistle signs	Sign / Whistle signs @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected - Wye (2)/Whistle Sign W	4,3	Track marker	track-marker-v1	12148	5367	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected - Wye (2)/Whistle Sign E	4,3	Generic track marker	track-marker-v1	12113	5533	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected - Wye (2)/Whistle Sign W	4,3	Generic track marker	track-marker-v1	12148	5367	Sign / Whistle signs	Sign / Whistle signs @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected/Crossing Pad	4,3,10	Crossing pad marker	crossing-pad-v1	12247	5852	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected/Crossing Pad (1)	4,3,10	Crossing pad marker	crossing-pad-v1	12241	5853	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected/Crossing Pad (2)	4,3,10	Crossing pad marker	crossing-pad-v1	12237	5856	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	12260	5851	Grade crossing	Grade crossing @ Whittier
 O	L	World/Roads Whittier/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	12232	5852	Grade crossing	Grade crossing @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected/Whistle Sign E	4,3	Track marker	track-marker-v1	12132	5508	Sign / Whistle signs	Sign / Whistle signs @ Whittier
-O	L	World/Roads Whittier/Crossing Unprotected/Whistle Sign W	4,3	Track marker	track-marker-v1	12340	6140	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	track-marker-v1	12132	5508	Sign / Whistle signs	Sign / Whistle signs @ Whittier
+O	L	World/Roads Whittier/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	track-marker-v1	12340	6140	Sign / Whistle signs	Sign / Whistle signs @ Whittier
 O	L	World/Roads Whittier/Whittier Road Bridge	26,2	Scene object	scene-object-v1	12340	5811	Bridge	Bridge / Road bridges @ Whittier
 O	L	World/Roads Whittier/Whittier Road Bridge/Collider Deck	28	Child object	child-object-v1	12340	5811	-	-
 O	L	World/Roads Whittier/Whittier Road Bridge/Collider Side	28	Child object	child-object-v1	12340	5811	-	-
@@ -1995,8 +1997,8 @@ O	L	World/Roads Wilmot/Crossing Unprotected/Crossing Pad	4,3,10	Crossing pad mar
 O	L	World/Roads Wilmot/Crossing Unprotected/Crossing Pad (1)	4,3,10	Crossing pad marker	crossing-pad-v1	16513	2310	Grade crossing	Grade crossing @ Wilmot
 O	L	World/Roads Wilmot/Crossing Unprotected/Sign-Crossing0 (1)	2	Scene object	scene-object-v1	16508	2315	Grade crossing	Grade crossing @ Wilmot
 O	L	World/Roads Wilmot/Crossing Unprotected/Sign-Crossing0 (2)	2	Scene object	scene-object-v1	16513	2288	Grade crossing	Grade crossing @ Wilmot
-O	L	World/Roads Wilmot/Crossing Unprotected/Whistle Sign E	4,3	Track marker	track-marker-v1	16189	2281	Sign / Whistle signs	Sign / Whistle signs @ Wilmot
-O	L	World/Roads Wilmot/Crossing Unprotected/Whistle Sign W	4,3	Track marker	track-marker-v1	16884	2252	Sign / Whistle signs	Sign / Whistle signs @ Wilmot
+O	L	World/Roads Wilmot/Crossing Unprotected/Whistle Sign E	4,3	Generic track marker	track-marker-v1	16189	2281	Sign / Whistle signs	Sign / Whistle signs @ Wilmot
+O	L	World/Roads Wilmot/Crossing Unprotected/Whistle Sign W	4,3	Generic track marker	track-marker-v1	16884	2252	Sign / Whistle signs	Sign / Whistle signs @ Wilmot
 O	L	World/Roads Wilmot/Wilmot Road Bridge	26,2	Scene object	scene-object-v1	16525	2385	Bridge	Bridge / Road bridges @ Wilmot
 O	L	World/Roads Wilmot/Wilmot Road Bridge/Collider Deck	28	Child object	child-object-v1	16525	2385	-	-
 O	L	World/Roads Wilmot/Wilmot Road Bridge/Collider Side	28	Child object	child-object-v1	16525	2385	-	-
@@ -2088,36 +2090,36 @@ O	L	World/Signs/Loc: Whittier E	2,18,7	Location sign	location-sign-v1	12191	5693
 O	L	World/Signs/Loc: Whittier W	2,18,7	Location sign	location-sign-v1	12036	6361	Sign / Location signs	Sign / Location signs @ Whittier
 O	L	World/Signs/Loc: Wilmot	2,18,7	Location sign	-	16377	2296	Sign / Location signs	Sign / Location signs @ Wilmot
 O	L	World/Signs/Loc: Wilmot	2,18,7	Location sign	-	16664	2294	Sign / Location signs	Sign / Location signs @ Wilmot
-O	L	World/Signs/Sign Begin CTC Andrews	4,3,2	Track marker	track-marker-v1	-28887	-19791	Sign / CTC signs	Sign / CTC signs @ Andrews
-O	L	World/Signs/Sign Begin CTC Sylva	4,3,2	Track marker	track-marker-v1	24339	-916	Sign / CTC signs	Sign / CTC signs @ Sylva
-O	L	World/Signs/Sign Sylva Circuit	4,3,2	Track marker	track-marker-v1	24337	-912	Sign / CTC signs	Sign / CTC signs @ Sylva
-O	L	World/Signs/Speed - Alarka Branch	7,4,3,2	Track marker	-	2286	-1678	Sign / Speed signs	Sign / Speed signs @ Alarka
-O	L	World/Signs/Speed - Alarka Branch	7,4,3,2	Track marker	-	1859	775	Sign / Speed signs	Sign / Speed signs @ Alarka Jct
-O	L	World/Signs/Speed - Alarka Copper	7,4,3,2	Track marker	track-marker-v1	4353	-3280	Sign / Speed signs	Sign / Speed signs @ Alarka
-O	L	World/Signs/Speed - Before Ela	7,4,3,2	Track marker	-	10585	6549	Sign / Speed signs	Sign / Speed signs @ Ela
-O	L	World/Signs/Speed - Before Ela	7,4,3,2	Track marker	-	10130	6835	Sign / Speed signs	Sign / Speed signs @ Ela
-O	L	World/Signs/Speed - Bryson Horseshoe	7,4,3,2	Track marker	-	1861	3766	Sign / Speed signs	Sign / Speed signs @ Bryson
-O	L	World/Signs/Speed - Bryson Horseshoe	7,4,3,2	Track marker	-	1679	3999	Sign / Speed signs	Sign / Speed signs @ Bryson
-O	L	World/Signs/Speed - Bryson Horseshoe Above	7,4,3,2	Track marker	-	2357	3876	Sign / Speed signs	Sign / Speed signs @ Bryson
-O	L	World/Signs/Speed - Bryson Horseshoe Above	7,4,3,2	Track marker	-	2005	3922	Sign / Speed signs	Sign / Speed signs @ Bryson
-O	L	World/Signs/Speed - Bryson Trestle	7,4,3,2	Track marker	-	1994	4602	Sign / Speed signs	Sign / Speed signs @ Bryson
-O	L	World/Signs/Speed - Bryson Trestle	7,4,3,2	Track marker	-	2350	4699	Sign / Speed signs	Sign / Speed signs @ Bryson
-O	L	World/Signs/Speed - Connelly Entry E	7,4,3,2	Track marker	track-marker-v1	12130	5411	Sign / Speed signs	Sign / Speed signs @ Connelly Creek
-O	L	World/Signs/Speed - Connelly Entry W	7,4,3,2	Track marker	track-marker-v1	12154	5620	Sign / Speed signs	Sign / Speed signs @ Connelly Creek
-O	L	World/Signs/Speed - Ela Bridge	7,4,3,2	Track marker	-	8688	7432	Sign / Speed signs	Sign / Speed signs @ Ela
-O	L	World/Signs/Speed - Ela Bridge	7,4,3,2	Track marker	-	8685	6842	Sign / Speed signs	Sign / Speed signs @ Ela
-O	L	World/Signs/Speed - Fontana South Curve	7,4,3,2	Track marker	track-marker-v1	-6496	-3752	Sign / Speed signs	Sign / Speed signs @ Wesser
-O	L	World/Signs/Speed - Fontana South Curve (1)	7,4,3,2	Track marker	track-marker-v1	-7117	-3951	Sign / Speed signs	Sign / Speed signs @ Wesser
-O	L	World/Signs/Speed - Fontana South Curve (2)	7,4,3,2	Track marker	track-marker-v1	-12039	-5732	Sign / Speed signs	Sign / Speed signs @ Hewitt
-O	L	World/Signs/Speed - Fontana South Curve (3)	7,4,3,2	Track marker	track-marker-v1	-12326	-6535	Sign / Speed signs	Sign / Speed signs @ Hewitt
-O	L	World/Signs/Speed - Rhodo-ish	7,4,3,2	Track marker	track-marker-v1	-23190	-18248	Sign / Speed signs	Sign / Speed signs @ Rhodo
-O	L	World/Signs/Speed - Rhodo-ish (1)	7,4,3,2	Track marker	track-marker-v1	-24838	-18588	Sign / Speed signs	Sign / Speed signs @ Rhodo
-O	L	World/Signs/Speed - Twin Coves West	7,4,3,2	Track marker	-	-3729	1398	Sign / Speed signs	Sign / Speed signs @ Brooks
-O	L	World/Signs/Speed - Twin Coves West	7,4,3,2	Track marker	-	-1982	851	Sign / Speed signs	Sign / Speed signs @ Brooks
-O	L	World/Signs/Speed - Wesser WE	7,4,3,2	Track marker	track-marker-v1	-8695	-5515	Sign / Speed signs	Sign / Speed signs @ Wesser
-O	L	World/Signs/Speed - Wesser WW	7,4,3,2	Track marker	track-marker-v1	-9394	-5566	Sign / Speed signs	Sign / Speed signs @ Wesser
-O	L	World/Signs/Yard Limit Alarka	4,3,2	Track marker	track-marker-v1	3869	-2847	Sign / Yard limits	Sign / Yard limits @ Alarka
-O	L	World/Signs/Yard Limit Andrews	4,3,2	Track marker	track-marker-v1	-28885	-19784	Sign / Yard limits	Sign / Yard limits @ Andrews
+O	L	World/Signs/Sign Begin CTC Andrews	4,3,2	Generic track marker	track-marker-v1	-28887	-19791	Sign / CTC signs	Sign / CTC signs @ Andrews
+O	L	World/Signs/Sign Begin CTC Sylva	4,3,2	Generic track marker	track-marker-v1	24339	-916	Sign / CTC signs	Sign / CTC signs @ Sylva
+O	L	World/Signs/Sign Sylva Circuit	4,3,2	Generic track marker	track-marker-v1	24337	-912	Sign / CTC signs	Sign / CTC signs @ Sylva
+O	L	World/Signs/Speed - Alarka Branch	7,4,3,2	Generic track marker	-	2286	-1678	Sign / Speed signs	Sign / Speed signs @ Alarka
+O	L	World/Signs/Speed - Alarka Branch	7,4,3,2	Generic track marker	-	1859	775	Sign / Speed signs	Sign / Speed signs @ Alarka Jct
+O	L	World/Signs/Speed - Alarka Copper	7,4,3,2	Generic track marker	track-marker-v1	4353	-3280	Sign / Speed signs	Sign / Speed signs @ Alarka
+O	L	World/Signs/Speed - Before Ela	7,4,3,2	Generic track marker	-	10585	6549	Sign / Speed signs	Sign / Speed signs @ Ela
+O	L	World/Signs/Speed - Before Ela	7,4,3,2	Generic track marker	-	10130	6835	Sign / Speed signs	Sign / Speed signs @ Ela
+O	L	World/Signs/Speed - Bryson Horseshoe	7,4,3,2	Generic track marker	-	1861	3766	Sign / Speed signs	Sign / Speed signs @ Bryson
+O	L	World/Signs/Speed - Bryson Horseshoe	7,4,3,2	Generic track marker	-	1679	3999	Sign / Speed signs	Sign / Speed signs @ Bryson
+O	L	World/Signs/Speed - Bryson Horseshoe Above	7,4,3,2	Generic track marker	-	2357	3876	Sign / Speed signs	Sign / Speed signs @ Bryson
+O	L	World/Signs/Speed - Bryson Horseshoe Above	7,4,3,2	Generic track marker	-	2005	3922	Sign / Speed signs	Sign / Speed signs @ Bryson
+O	L	World/Signs/Speed - Bryson Trestle	7,4,3,2	Generic track marker	-	1994	4602	Sign / Speed signs	Sign / Speed signs @ Bryson
+O	L	World/Signs/Speed - Bryson Trestle	7,4,3,2	Generic track marker	-	2350	4699	Sign / Speed signs	Sign / Speed signs @ Bryson
+O	L	World/Signs/Speed - Connelly Entry E	7,4,3,2	Generic track marker	track-marker-v1	12130	5411	Sign / Speed signs	Sign / Speed signs @ Connelly Creek
+O	L	World/Signs/Speed - Connelly Entry W	7,4,3,2	Generic track marker	track-marker-v1	12154	5620	Sign / Speed signs	Sign / Speed signs @ Connelly Creek
+O	L	World/Signs/Speed - Ela Bridge	7,4,3,2	Generic track marker	-	8688	7432	Sign / Speed signs	Sign / Speed signs @ Ela
+O	L	World/Signs/Speed - Ela Bridge	7,4,3,2	Generic track marker	-	8685	6842	Sign / Speed signs	Sign / Speed signs @ Ela
+O	L	World/Signs/Speed - Fontana South Curve	7,4,3,2	Generic track marker	track-marker-v1	-6496	-3752	Sign / Speed signs	Sign / Speed signs @ Wesser
+O	L	World/Signs/Speed - Fontana South Curve (1)	7,4,3,2	Generic track marker	track-marker-v1	-7117	-3951	Sign / Speed signs	Sign / Speed signs @ Wesser
+O	L	World/Signs/Speed - Fontana South Curve (2)	7,4,3,2	Generic track marker	track-marker-v1	-12039	-5732	Sign / Speed signs	Sign / Speed signs @ Hewitt
+O	L	World/Signs/Speed - Fontana South Curve (3)	7,4,3,2	Generic track marker	track-marker-v1	-12326	-6535	Sign / Speed signs	Sign / Speed signs @ Hewitt
+O	L	World/Signs/Speed - Rhodo-ish	7,4,3,2	Generic track marker	track-marker-v1	-23190	-18248	Sign / Speed signs	Sign / Speed signs @ Rhodo
+O	L	World/Signs/Speed - Rhodo-ish (1)	7,4,3,2	Generic track marker	track-marker-v1	-24838	-18588	Sign / Speed signs	Sign / Speed signs @ Rhodo
+O	L	World/Signs/Speed - Twin Coves West	7,4,3,2	Generic track marker	-	-3729	1398	Sign / Speed signs	Sign / Speed signs @ Brooks
+O	L	World/Signs/Speed - Twin Coves West	7,4,3,2	Generic track marker	-	-1982	851	Sign / Speed signs	Sign / Speed signs @ Brooks
+O	L	World/Signs/Speed - Wesser WE	7,4,3,2	Generic track marker	track-marker-v1	-8695	-5515	Sign / Speed signs	Sign / Speed signs @ Wesser
+O	L	World/Signs/Speed - Wesser WW	7,4,3,2	Generic track marker	track-marker-v1	-9394	-5566	Sign / Speed signs	Sign / Speed signs @ Wesser
+O	L	World/Signs/Yard Limit Alarka	4,3,2	Generic track marker	track-marker-v1	3869	-2847	Sign / Yard limits	Sign / Yard limits @ Alarka
+O	L	World/Signs/Yard Limit Andrews	4,3,2	Generic track marker	track-marker-v1	-28885	-19784	Sign / Yard limits	Sign / Yard limits @ Andrews
 O	K	World/Track	43,44,45,46	-	-	0	0	-	-
 O	K	World/USGS Markers/Barkers Creek	50	-	-	18403	207	-	-
 O	K	World/USGS Markers/Cowee Tunnel Outlet 	50	-	-	20319	-531	-	-

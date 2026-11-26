@@ -12,7 +12,7 @@ namespace RailroaderScenePatcher.Core {
     // Each text is one or more whole sentences, each ending with a period, and is appended after a space.
     public static class WindowGuidance {
         // Scene objects.
-        public const string EditTrackMarkersIndividually = "Edit its track markers individually in the Track marker family.";
+        public const string EditTrackMarkersIndividually = "Edit its track markers individually in the Generic track marker family.";
         public const string EditSpawnPointsIndividually = "Edit its spawn points individually in the Spawn point family.";
         public const string RemovePadMarkerId = "Remove padMarkerId from this target.";
         public const string EditCulledParts = "Edit the parts it holds directly.";

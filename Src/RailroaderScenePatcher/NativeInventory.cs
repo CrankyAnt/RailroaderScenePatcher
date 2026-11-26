@@ -252,8 +252,9 @@ namespace RailroaderScenePatcher {
                 // the builder photo marker. A milepost's marker is part of the Milepost row.
                 if (!BindingRules.Listed(MarkerKind(c), Get(go, MapObject) != null, PhotoMarkers().Contains(c)) || Get(go, Milepost) != null) return null;
                 // A marker an active setup's car placement holds is a starter placement marker; one only inactive
-                // setups hold is never read and stays out of the inventory. A marker no setup holds keeps its kind.
-                return starters.Family(c, Get(go, "Track.TrackCurveMeshBuilder") != null ? "Crossing pad marker" : "Track marker");
+                // setups hold is never read and stays out of the inventory. A marker no setup holds keeps its kind: a crossing
+                // pad's marker or a Generic track marker; a marker of another type is not listed.
+                return starters.Family(c, SceneFamilies.OfMarker(MarkerKind(c), Get(go, "Track.TrackCurveMeshBuilder") != null));
             }
             // A span the game builds from the map's operations data is not serialized and stays with the native map
             // editor; the spans this patcher adds for a crossing are listed.
@@ -274,7 +275,7 @@ namespace RailroaderScenePatcher {
         }
         // The families other than the scene object with child objects family whose capability moves the scene ground masks at and
         // below its object.
-        static bool MovesGroundMasks(string family) => family == "Track marker" || family == "Bridge" || family == "Milepost" || family == "Crossing pad marker"
+        static bool MovesGroundMasks(string family) => family == SceneFamilies.TrackMarker || family == "Bridge" || family == "Milepost" || family == "Crossing pad marker"
             || family == StationMapIconRules.Family || family == SpawnPoints.Family;
         // The discovery in one piece: the stepped walk without its pauses, so both read the scene in the same order.
         public IEnumerable<SceneObservation> Discover() => Steps(boardRefusal, true).Where(observation => observation != null);
@@ -631,8 +632,8 @@ namespace RailroaderScenePatcher {
             var bridge = family == "Bridge";
             string bridgeRefusal = null;
             if (bridge) Read(() => bridgeRefusal = BridgeWorld.PatternProblem(go));
-            var marked = family == "Track marker";
-            string markerRefusal = marked ? "Track marker editing is unavailable" : null;
+            var marked = family == SceneFamilies.TrackMarker;
+            string markerRefusal = marked ? "Generic track marker editing is unavailable" : null;
             if (marked) Read(() => markerRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
                 : TrackMarkerWorld.Problem(go, markerReferrers, setups));
             var markerEditable = marked && markerRefusal == null;
@@ -684,13 +685,13 @@ namespace RailroaderScenePatcher {
             var scenery = family == CommandBand.ConstructionSceneryFamily;
             string sceneryRefusal = scenery ? ConstructionSegmentNative.Problem : null;
             // A kind no supported family covers is inspection only, which is another state than an object of a supported
-            // family that cannot be edited: a marker of another type than Generic, and every family without an edit.
-            // A starter placement marker is a supported kind with its own workflow.
+            // family that cannot be edited: a Generic track marker whose type could not be read, and every family without
+            // an edit. A starter placement marker is a supported kind with its own workflow.
             var starter = family == StarterPlacements.Family;
             string only = null;
             if (marked) Read(() => {
                 var type = MarkerKind(marker);
-                if (type != "Generic") only = CommandBand.NotYetSupported("track markers of type " + type);
+                if (type != "Generic") only = CommandBand.NotYetSupported(type == null ? "track markers of an unknown type" : "track markers of type " + type);
             });
             else if (part) { }
             else if (topObject) only = CommandBand.GroupInspectionOnly(verdict, family);

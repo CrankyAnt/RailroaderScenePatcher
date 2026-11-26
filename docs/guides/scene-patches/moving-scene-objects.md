@@ -23,7 +23,7 @@ A group contains only the objects saved below its top scene object in the scene.
 
 Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
-Groups containing track markers or spawn points are also marked `inspection only` and can't move as a whole. Edit their markers in the **Track marker** family and their spawn points in the **Spawn point** family. A group marked `inspection only` stays under its category in the outliner. A group that fits no category stands under **Unclassified**. These groups list no parts.
+Groups containing track markers or spawn points are also marked `inspection only` and can't move as a whole. Edit their markers in the **Generic track marker** family and their spawn points in the **Spawn point** family. A group marked `inspection only` stays under its category in the outliner. A group that fits no category stands under **Unclassified**. These groups list no parts.
 
 ## Which parts are listed
 
@@ -111,7 +111,7 @@ In Railroader 0.6.3, these buildings' masks also flatten the ground under them t
 
 If the game's ground mask members are unavailable in a build, the group is refused with `The game's ground mask members are unavailable, so you can't move, enable, or disable this group or its parts.`
 
-Hemingway flagstopstation is not a group. Its Generic track marker stands on the root of the building, so the object stays in the **Track marker** family. Moving its marker also moves its ground mask, which flattens the ground, as with the station groups. On its **Object** tab, **Dependencies** names the object that holds the mask, because the **Track marker** family has no parts. Moving any other track marker object also moves the masks on that object or its children. This includes a mask on a `Loc:` location sign that moves with its parent. When you edit the location sign itself, the **Location sign** family moves its mask.
+Hemingway flagstopstation is not a group. Its Generic track marker stands on the root of the building, so the object stays in the **Generic track marker** family. Moving its marker also moves its ground mask, which flattens the ground, as with the station groups. On its **Object** tab, **Dependencies** names the object that holds the mask, because the **Generic track marker** family has no parts. Moving any other track marker object also moves the masks on that object or its children. This includes a mask on a `Loc:` location sign that moves with its parent. When you edit the location sign itself, the **Location sign** family moves its mask.
 
 The game's progression switches the `Cochran flagstopstation`, `Alarka Depot`, and `Alarka Jct Station` groups and the track marker on `Hemingway flagstopstation` on and off when the map loads and whenever industries change. Without a disable, the game controls this activity. If you disable an object, it stays off even when progression would switch it on. The **Object** tab and footer's message area show an amber warning explaining that your disable keeps the object off despite progression.
 
