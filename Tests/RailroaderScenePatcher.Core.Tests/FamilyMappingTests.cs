@@ -8,7 +8,7 @@ using RailroaderScenePatcher.Core;
 
 // The family names of the base-map inventory after the families were named by the family rule: each family value and
 // each label the window shows for it changes only by the mapping below, and no other family changes. The counts are
-// those of the base-map fixture before the rename.
+// those of the base-map fixture before the rename, less the markers only inactive setups hold, which no family lists.
 static class FamilyMappingTests {
     static void Check(bool value, string message) { if (!value) throw new Exception("Family mapping: " + message); }
 
@@ -18,13 +18,14 @@ static class FamilyMappingTests {
     const string FormerSceneObjects = "(former family of the scene objects with child objects)";
     // The former names stand as placeholders: the retired names appear nowhere in the code.
     const string LocationSignsBefore = "(former family of the location signs)", StarterPlacementsBefore = "(former family of the starter placement markers)",
-        ControllersBefore = "(former family of the grade crossing controllers)";
+        ControllersBefore = "(former family of the grade crossing controllers)", GenericMarkersBefore = "(former family of the generic track markers)";
     static readonly Dictionary<string, string> Renamed = new Dictionary<string, string> {
         [LocationSignsBefore] = "Location sign", [StarterPlacementsBefore] = "Starter placement marker", [ControllersBefore] = "Grade crossing controller",
+        [GenericMarkersBefore] = "Generic track marker",
     };
     // The families of the base-map fixture that keep their names, with their row counts.
     static readonly Dictionary<string, int> Kept = new Dictionary<string, int> {
-        ["Track marker"] = 111, ["Milepost"] = 54, ["Crossing pad marker"] = 47, ["Spawn point"] = 22, ["Track span"] = 21, ["Station map icon"] = 15,
+        ["Milepost"] = 54, ["Crossing pad marker"] = 47, ["Spawn point"] = 22, ["Track span"] = 21, ["Station map icon"] = 15,
         ["Crossing mast"] = 8, ["Crossing bell"] = 4, ["Bridge"] = 1, ["Bridge construction scenery"] = 1,
     };
 
@@ -62,7 +63,9 @@ static class FamilyMappingTests {
         Check(SceneFamilies.CrossingMast == "Crossing mast" && SceneFamilies.CrossingBell == "Crossing bell" && SceneFamilies.Bridge == "Bridge"
             && SceneFamilies.BridgeConstruction == "Bridge construction scenery" && SceneFamilies.AddedEquipment == "Added light or gate",
             "the families with no game class of their own keep their names");
-        Check(SceneFamilies.TrackMarker == "Track marker" && SceneFamilies.Milepost == "Milepost" && SceneFamilies.CrossingPad == "Crossing pad marker"
+        Check(SceneFamilies.TrackMarker == "Generic track marker", "the family of the Generic track markers that no more specific family claims is Generic track marker");
+        Check(SceneClassification.TrackMarker == "Track marker", "the outliner category Track marker keeps its name; only its family is renamed");
+        Check(SceneFamilies.Milepost == "Milepost" && SceneFamilies.CrossingPad == "Crossing pad marker"
             && SceneFamilies.SpawnPoint == "Spawn point" && SceneFamilies.TrackSpan == "Track span" && SceneFamilies.StationMapIcon == "Station map icon",
             "the families already named by the family rule keep their names");
         Check(SceneClassification.StarterPlacement == "Starter placement", "the outliner category Starter placement keeps its name; only its family is renamed");
@@ -93,10 +96,20 @@ static class FamilyMappingTests {
             && signs.Count(o => o.Structure == LocationSigns.Structure) == 8 && signs.Count(o => o.Structure == null) == 47,
             "the 55 Loc: rows, 8 with location-sign-v1 and 47 without a structure id, are Location sign by family value");
         Check(Count(StarterPlacementsBefore) == 8 && byFormer[StarterPlacementsBefore].All(o => o.Family == "Starter placement marker"), "the 8 starter placement rows are Starter placement marker");
+        Check(Count(GenericMarkersBefore) == 103 && byFormer[GenericMarkersBefore].All(o => o.Family == "Generic track marker" && o.Structure != StarterPlacementScene.Structure),
+            "the 103 generic track marker rows are Generic track marker, got " + Count(GenericMarkersBefore));
         Check(Count(ControllersBefore) == 4 && byFormer[ControllersBefore].All(o => o.Family == "Grade crossing controller"), "the 4 crossing controller rows are Grade crossing controller");
         foreach (var pair in Kept) Check(Count(pair.Key) == pair.Value, "the kept family " + pair.Key + " holds " + pair.Value + " rows, got " + Count(pair.Key));
         Check(byFormer.Keys.All(k => k == FormerSceneObjects || Renamed.ContainsKey(k) || Kept.ContainsKey(k)), "no other family appears");
-        Check(listed.Length == 1547 + 55 + 8 + 4 + Kept.Values.Sum(), "the fixture lists the same number of objects as before: " + listed.Length);
+        Check(listed.Length == 1547 + 55 + 8 + 4 + 103 + Kept.Values.Sum(), "the fixture lists the same number of objects as before, less the 8 markers only inactive setups hold: " + listed.Length);
+        // The markers of the base game's Starter Equipment Setup that only inactive setups hold: the game never reads
+        // them, so they are listed in no family, the Generic track marker family included.
+        var unused = new[] { "starter-bc", "starter-br-coaling", "starter-dbs1", "starter-dbs2", "starter-dbtt2", "starter-editor", "starter-ewh-coaling", "starter-wh-p" }
+            .Select(n => "Setups/Starter Equipment Setup/" + n).ToArray();
+        var found = map.Objects.Where(o => unused.Contains(o.Path)).ToArray();
+        Check(found.Length == unused.Length && found.All(o => !o.Listed && o.Family == null), "the 8 markers only inactive setups hold are in the fixture and not listed: "
+            + String.Join(", ", found.Where(o => o.Listed).Select(o => o.Path + " (" + o.Family + ")")));
+        Check(!listed.Any(o => o.Family == SceneFamilies.TrackMarker && o.Path.StartsWith("Setups/", StringComparison.Ordinal)), "no marker below Setups is listed in the Generic track marker family");
     }
 
     // Each family name the window shows for a listed object of the base map: sentence case with spaces, Milepost one
@@ -104,8 +117,8 @@ static class FamilyMappingTests {
     static void ShownFamiliesAreInSentenceCase() {
         var map = new BaseMapFixture();
         var shown = map.Observations(out _).Select(CommandBand.ShownFamily).Distinct().OrderBy(f => f, StringComparer.Ordinal).ToArray();
-        var expected = new[] { "Bridge", "Bridge construction scenery", "Crossing bell", "Crossing mast", "Crossing pad marker", "Grade crossing controller", "Group", "Location sign", "Milepost", "Part",
-            "Spawn point", "Starter placement marker", "Station map icon", "Track marker", "Track span" };
+        var expected = new[] { "Bridge", "Bridge construction scenery", "Crossing bell", "Crossing mast", "Crossing pad marker", "Generic track marker", "Grade crossing controller", "Group", "Location sign",
+            "Milepost", "Part", "Spawn point", "Starter placement marker", "Station map icon", "Track span" };
         Check(shown.SequenceEqual(expected), "the window shows these family names for the base map: " + String.Join(", ", shown));
         var sentence = new System.Text.RegularExpressions.Regex("^[A-Z][a-z]+( [a-z]+)*$");
         Check(shown.All(f => sentence.IsMatch(f)), "each family name shown is in sentence case with spaces: " + String.Join(", ", shown.Where(f => !sentence.IsMatch(f))));

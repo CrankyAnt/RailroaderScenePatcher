@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher {
         // Whether the object holds a track binding: a track marker or a milepost, whose binding is optional, or a crossing
         // pad, whose binding is required. Only these have the track binding edit and the Track binding section, also
         // when the patcher refuses them; every other object has neither.
-        internal static bool HoldsBinding(string family) => family == "Track marker" || family == "Milepost" || family == "Crossing pad marker";
+        internal static bool HoldsBinding(string family) => family == SceneFamilies.TrackMarker || family == "Milepost" || family == "Crossing pad marker";
         // Whether the object's activity follows its track group, by its binding lines.
         internal static bool FollowsGroup(SceneObservation entry) => entry != null && entry.Bindings.Any(b => b.IndexOf("follows track group", StringComparison.OrdinalIgnoreCase) >= 0 || b.IndexOf("targetActiveFollowsTrackGroup=True", StringComparison.OrdinalIgnoreCase) >= 0);
         // Whether the object holds the construction-segment relationship: the Ela construction controller, or a rail

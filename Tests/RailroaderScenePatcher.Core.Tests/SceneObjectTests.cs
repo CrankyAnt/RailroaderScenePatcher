@@ -707,7 +707,7 @@ static class SceneObjectTests {
         // family, so no ticket covers the group.
         var signs = At(SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Signs", new Node("Yard Limit").With("Track.TrackMarker").Solid().Family()))))), "World/Large Scenery/Bryson/Bryson Signs");
         Assert(signs?.Disposition == GroupDisposition.InspectionOnly && signs.Ticket == null && signs.ReasonIsSentence &&
-            signs.Reason == "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Track marker family.", "A group with track markers states why it is left out, without a ticket: " + signs?.Reason + " " + signs?.Ticket);
+            signs.Reason == "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Generic track marker family.", "A group with track markers states why it is left out, without a ticket: " + signs?.Reason + " " + signs?.Ticket);
         ResearchHierarchy();
     }
     // The paths, components and physical presence recorded for the level4 scene of the base-game map

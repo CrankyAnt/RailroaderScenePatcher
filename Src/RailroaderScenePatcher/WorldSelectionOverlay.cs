@@ -396,7 +396,7 @@ namespace RailroaderScenePatcher {
         // The component facts of a group, read from the family the inventory gave an object: a crossing controller
         // anchors a grade-crossing setup, a track marker that is no crossing pad is, below that controller's root, a
         // whistle sign, and a track span there is a detection span that the controller manages.
-        const string ControllerFamily = "Grade crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span", ConstructionFamily = "Bridge construction scenery", PadFamily = "Crossing pad marker";
+        const string ControllerFamily = "Grade crossing controller", MarkerFamily = SceneFamilies.TrackMarker, SpanFamily = "Track span", ConstructionFamily = "Bridge construction scenery", PadFamily = "Crossing pad marker";
         // The inventory snapshot, set by the owner: a group holds inventory objects, whatever a choice offers, so
         // Select in world and a choice for a scene patch file show one crossing the same way.
         internal Func<IReadOnlyList<SceneObservation>> Inventory;

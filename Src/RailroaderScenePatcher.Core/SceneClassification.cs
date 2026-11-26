@@ -22,12 +22,18 @@ namespace RailroaderScenePatcher.Core {
     // The families the inventory lists objects in, by their names: one place for the code that asks which family an
     // object is in. A family is the object's technical kind, which its edits follow.
     public static class SceneFamilies {
-        public const string SceneObject = SceneObjectRules.Family, ChildObject = SceneObjectRules.ChildFamily, TrackMarker = "Track marker", Milepost = "Milepost", LocationSign = "Location sign",
+        public const string SceneObject = SceneObjectRules.Family, ChildObject = SceneObjectRules.ChildFamily, TrackMarker = "Generic track marker", Milepost = "Milepost", LocationSign = "Location sign",
             CrossingController = ObjectMarkingGeometry.ControllerFamily, CrossingPad = "Crossing pad marker", CrossingMast = ExistingEquipmentScene.MastFamily, CrossingBell = ExistingEquipmentScene.BellFamily,
             TrackSpan = FocusTarget.Span, AddedEquipment = "Added light or gate", AddedBell = "Added bell", Bridge = SceneObjectCategories.BridgeFamily, BridgeConstruction = SceneObjectCategories.ConstructionFamily,
             SpawnPoint = SpawnPoints.Family, StarterPlacement = StarterPlacements.Family, StationMapIcon = StationMapIconRules.Family;
         // The families of a crossing's own objects: its controller, its equipment and its detection spans.
         public static readonly IReadOnlyList<string> Crossing = Array.AsReadOnly(new[] { CrossingController, CrossingMast, CrossingBell, CrossingPad, TrackSpan, AddedEquipment, AddedBell });
+        // The family of a track marker that neither a milepost nor a starter placement claims, by the game's marker
+        // type: a crossing pad's marker is a Crossing pad marker, a Generic marker a Generic track marker. A marker of
+        // another type, such as Signal, Crossing, Flare or PassengerStop, is not listed. A marker whose type could not be
+        // read stays a Generic track marker, so the inventory shows it with the reason it cannot be edited.
+        public static string OfMarker(string markerType, bool crossingPad) =>
+            crossingPad ? CrossingPad : markerType == null || markerType == "Generic" ? TrackMarker : null;
     }
 
     // What an object is, decided from what it provides: its components, the components and names below it, its own
@@ -36,8 +42,9 @@ namespace RailroaderScenePatcher.Core {
     // construction is recognised without a change here.
     public static class SceneClassification {
         // The categories of the families whose objects are a kind of their own: each is named as its family, except
-        // Starter placement, whose family is Starter placement marker.
-        public const string TrackMarker = SceneFamilies.TrackMarker, SpawnPoint = SceneFamilies.SpawnPoint, StarterPlacement = "Starter placement", StationMapIcon = SceneFamilies.StationMapIcon;
+        // Starter placement, whose family is Starter placement marker, and Track marker, whose family is Generic track
+        // marker.
+        public const string TrackMarker = "Track marker", SpawnPoint = SceneFamilies.SpawnPoint, StarterPlacement = "Starter placement", StationMapIcon = SceneFamilies.StationMapIcon;
         // The category of the mileposts, which has no kinds.
         public const string Mileposts = "Mileposts";
         public const string LocationSigns = "Location signs", LocationMarkers = "Location markers", OtherSigns = "Other signs", SetupMarkers = "Setup markers";
@@ -181,7 +188,7 @@ namespace RailroaderScenePatcher.Core {
             if (Has(own, MilepostComponent)) return new SceneClass(Mileposts, null);
             // An object outside World is game setup, not scenery: its name says nothing about what stands in the world.
             if (path == null || !path.StartsWith(World, StringComparison.Ordinal))
-                return SceneFamilies.Crossing.Contains(family) ? new SceneClass(SceneObjectCategories.GradeCrossing, null) : new SceneClass(family ?? TrackMarker, family == SceneFamilies.TrackMarker ? SetupMarkers : null, family != null);
+                return SceneFamilies.Crossing.Contains(family) ? new SceneClass(SceneObjectCategories.GradeCrossing, null) : new SceneClass(family == null || family == SceneFamilies.TrackMarker ? TrackMarker : family, family == SceneFamilies.TrackMarker ? SetupMarkers : null, family != null);
             if (SceneObjectRules.InFamilies(family)) return OfGroup(path, own, atOrBelow, namesBelow, stripPlaces);
             var found = ByComponents(own, null) ?? ByName(name, stripPlaces);
             // What stands below a crossing belongs to it: its masts, its bell, its pads and its detection spans.

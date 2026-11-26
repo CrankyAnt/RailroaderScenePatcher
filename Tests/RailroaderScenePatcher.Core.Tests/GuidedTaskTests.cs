@@ -8,7 +8,7 @@ using RailroaderScenePatcher.Core;
 
 static class GuidedTaskTests {
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
-    static SceneObservation Target(string path) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Marker"), "Track marker", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
+    static SceneObservation Target(string path) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Marker"), "Generic track marker", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
     internal static void Run() {
         CrossingControllerCannotMoveOrChangeActivity();
         StartingPinsTheTargetAndCopiesValues();
@@ -158,7 +158,7 @@ static class GuidedTaskTests {
     }
     static void SharedHandleDoesNotIdentifyAComponent() {
         var first = Target("first");
-        var other = new SceneObservation(first.Handle, new TargetIdentity("scene", "first", "Other"), "Track marker", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
+        var other = new SceneObservation(first.Handle, new TargetIdentity("scene", "first", "Other"), "Generic track marker", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
         var state = new GuidedTaskState(); state.Start(GuidedTaskKind.Placement, first, new[] { "draft" });
         Check(!state.Select(other) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft", "A different component on the same handle cannot replace the pinned target");
     }

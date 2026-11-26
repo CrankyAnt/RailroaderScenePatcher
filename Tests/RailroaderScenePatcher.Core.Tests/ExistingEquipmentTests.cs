@@ -468,7 +468,7 @@ static class ExistingEquipmentTests {
             Assert(!SupportedEdits.HoldsBinding(row.Family) && CommandBand.CurrentBindings(row).Length == 0, "A " + row.Family + " without a marker has no Track binding section");
         // The span's own track locations are observed bindings, not a current binding.
         Assert(CommandBand.CurrentBindings(span).Length == 0, "A detection span's track locations stay out of Current binding");
-        var refusedMarker = Row("World/Marker", "Track marker", operations: CommandBand.NotEditable("type Siding"));
+        var refusedMarker = Row("World/Marker", "Generic track marker", operations: CommandBand.NotEditable("type Siding"));
         var refusedPad = Row("World/Pad", "Crossing pad marker", operations: CommandBand.NotEditable("refused"));
         var refusedMilepost = Row("World/Milepost", "Milepost", operations: CommandBand.NotEditable("refused"));
         foreach (var row in new[] { refusedMarker, refusedPad, refusedMilepost })

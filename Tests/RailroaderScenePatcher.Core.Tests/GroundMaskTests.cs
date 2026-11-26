@@ -599,7 +599,7 @@ static class GroundMaskTests {
             family + ": a failed rebuild restores the holder and the registration: " + failed.Error);
     }
 
-    // Hemingway: the track marker stands on the station's root, so the object stays in the Track marker family, and
+    // Hemingway: the track marker stands on the station's root, so the object stays in the Generic track marker family, and
     // that family handles the mask below it: a move rebuilds the mask, a flattening one included.
     static void MarkerRootGainsTheMaskHandling() {
         const string path = "World/Large Scenery/Hemingway/Hemingway flagstopstation";
@@ -618,7 +618,7 @@ static class GroundMaskTests {
     // Any generic track marker object that holds a ground mask, not only Hemingway's, moves it with the marker.
     static void GenericMarkerMovesItsMask() {
         const string path = "World/Signs/Sign-Whistle Masked";
-        HeldMaskFollowsItsHolder("Track marker", masks => {
+        HeldMaskFollowsItsHolder("Generic track marker", masks => {
             var world = new FakeMarkerWorld(); var marker = new FakeMarker { Id = "Mw1x", Segment = "S9sc", End = "a", Distance = 46.52 };
             world.Objects[path] = new List<object> { marker }; world.Load(marker); world.Relative(marker);
             return (marker, new TrackMarkerScene(world, Capability.Unchecked, masks));

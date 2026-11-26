@@ -60,7 +60,7 @@ static class StarterPlacementTests {
     // marker in its own family, and each marker carries an inspection note that says why; the Refresh reports it once.
     static void UnreadableSetupsAreVisible() {
         var unreadable = StarterSetups.Unreadable("placements unavailable");
-        Check(unreadable.Error == "placements unavailable" && unreadable.Use(Wreck) == StarterUse.None && unreadable.Family(Wreck, "Track marker") == "Track marker",
+        Check(unreadable.Error == "placements unavailable" && unreadable.Use(Wreck) == StarterUse.None && unreadable.Family(Wreck, "Generic track marker") == "Generic track marker",
             "Unreadable setups classify no marker as a starter placement marker");
         Check(StarterPlacements.Unreadable("placements unavailable") == "Inspection unavailable: the new-game setups could not be read, so starter placement markers cannot be identified: placements unavailable"
             && BindingRules.IsNote(StarterPlacements.Unreadable("x")), "The note names the starter setups and is an inspection note");
@@ -68,7 +68,7 @@ static class StarterPlacementTests {
         scene.Markers.Add(new KeyValuePair<Marker, object[]>(Wreck, new object[] { false, "", (bool?)false }));
         scene.Markers.Add(new KeyValuePair<Marker, object[]>(Sign, new object[] { true, "S2", (bool?)true }));
         var inventory = new SceneInventory(scene); inventory.Refresh();
-        Check(inventory.Entries.All(e => e.Family == "Track marker" && e.Problems.Count == 0 && e.Notes.SequenceEqual(new[] { StarterPlacements.Unreadable("placements unavailable") })),
+        Check(inventory.Entries.All(e => e.Family == "Generic track marker" && e.Problems.Count == 0 && e.Notes.SequenceEqual(new[] { StarterPlacements.Unreadable("placements unavailable") })),
             "Every marker stays listed in its own family with the note and no problem: " + String.Join(" | ", inventory.Entries.Select(e => e.Family + "/" + String.Join(",", e.Notes))));
         Check(new StarterSetups(null).Error == null && new StarterSetups(null).Reading(Wreck, "Generic", false).Note == null, "Readable setups add no note");
     }
@@ -82,7 +82,7 @@ static class StarterPlacementTests {
         public IEnumerable<SceneObservation> Discover() {
             foreach (var pair in Markers) {
                 var marker = pair.Key; var enabled = (bool)pair.Value[0]; var segment = (string)pair.Value[1]; var resolves = (bool?)pair.Value[2];
-                var family = Setups.Family(marker, "Track marker");
+                var family = Setups.Family(marker, "Generic track marker");
                 if (family == null) continue;
                 var starter = family == StarterPlacements.Family;
                 var bindings = new List<string> { "Marker ID=" + marker.Name + "; type=Generic", "Marker segment=" + segment + "; end=b; distance=45" };
@@ -162,7 +162,7 @@ static class StarterPlacementTests {
             "Focus on a starter placement marker without a track point is refused with its reason");
         Check(FocusTarget.Point(StarterPlacements.Family, objectPosition, null, out refusal) == null && refusal == StarterPlacements.NoTrackPoint,
             "An unread track point is no track point");
-        Check(FocusTarget.Point("Track marker", objectPosition, new[] { trackPoint }, out refusal).SequenceEqual(objectPosition) && refusal == null,
+        Check(FocusTarget.Point("Generic track marker", objectPosition, new[] { trackPoint }, out refusal).SequenceEqual(objectPosition) && refusal == null,
             "Focus on another object lands on its object position");
         // The command band disables Focus with that reason before it is clicked.
         Check(RailroaderScenePatcher.CommandBand.Focus(true, StarterPlacements.NoTrackPoint) == StarterPlacements.NoTrackPoint
@@ -194,9 +194,9 @@ static class StarterPlacementTests {
     static void FamilyFollowsTheActiveSetups() {
         var setups = Setups();
         foreach (var used in new[] { Wreck, Shed, Hopper })
-            Check(setups.Use(used) == StarterUse.Used && setups.Family(used, "Track marker") == StarterPlacements.Family, "A marker an active setup holds is in the Starter placement family: " + used);
-        Check(setups.Use(Retired) == StarterUse.Unused && setups.Family(Retired, "Track marker") == null, "A marker only an inactive setup holds stays out of the inventory");
-        Check(setups.Use(Sign) == StarterUse.None && setups.Family(Sign, "Track marker") == "Track marker", "A marker no setup holds keeps its own family");
+            Check(setups.Use(used) == StarterUse.Used && setups.Family(used, "Generic track marker") == StarterPlacements.Family, "A marker an active setup holds is in the Starter placement family: " + used);
+        Check(setups.Use(Retired) == StarterUse.Unused && setups.Family(Retired, "Generic track marker") == null, "A marker only an inactive setup holds stays out of the inventory");
+        Check(setups.Use(Sign) == StarterUse.None && setups.Family(Sign, "Generic track marker") == "Generic track marker", "A marker no setup holds keeps its own family");
         Check(StarterPlacements.Family == "Starter placement marker", "The family is named Starter placement marker");
     }
 }

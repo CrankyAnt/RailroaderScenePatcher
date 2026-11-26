@@ -100,7 +100,7 @@ static class OutlinerGroupingTests {
     public static void Run() {
         var scene = new Inventory();
         var dealer = Entry(Dealer, Baked, 4410, 5410, "Industry building");
-        var yardLimit = Entry(Signs + "/Yard Limit", "Track marker", 4300, 5300);
+        var yardLimit = Entry(Signs + "/Yard Limit", "Generic track marker", 4300, 5300);
         var board = Entry("World/Signs/Loc: Connelly", "Location sign", 12040, 5565, problems: new[] { "The board's mask is missing" });
         var shed = Entry("World/Large Scenery/Sylva/Sylva Shed", Baked, 25020, -820, only: "This group contains a map icon, which the patcher can't move with the group.");
         var iconSigns = Entry("World/Large Scenery/Sylva/Depot Signs", Baked, 25030, -830, "Sign", only: "This group contains a map icon, which the patcher can't move with the group.");
@@ -122,7 +122,7 @@ static class OutlinerGroupingTests {
             Entry(Allen + "/Signal 1 copy", SceneFamilies.AddedEquipment, 25104, -704, displayName: "Signal 1 (added)"), Entry(Allen + "/Brass bell", SceneFamilies.AddedBell, 25105, -705, displayName: "Brass bell (added)"),
             // A crossing without one: its crossing object is one node; its whistle sign is a sign.
             Entry(Stenzel + "/Sign-Crossing0 (2)", Baked, 12310, 5812, "Grade crossing"), Entry(Stenzel + "/Sign-Crossing0 (1)", Baked, 12310, 5810, "Grade crossing"),
-            Entry(Stenzel + "/Crossing Pad", "Crossing pad marker", 12310, 5814), Entry(Stenzel + "/Whistle Sign E", "Track marker", 12400, 5900),
+            Entry(Stenzel + "/Crossing Pad", "Crossing pad marker", 12310, 5814), Entry(Stenzel + "/Whistle Sign E", "Generic track marker", 12400, 5900),
             board,
             Entry("World/Mile Posts/T-10", "Milepost", 4500, 5500), Entry("World/Mile Posts/T-2", "Milepost", 4510, 5510), Entry("World/Mile Posts/T-11", "Milepost", 25200, -600), Entry("World/Mile Posts/T-12", "Milepost", 25210, -610),
             // A native track span no controller holds has no row.

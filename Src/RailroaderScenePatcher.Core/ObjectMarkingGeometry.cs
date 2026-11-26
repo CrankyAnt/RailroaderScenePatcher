@@ -561,7 +561,7 @@ namespace RailroaderScenePatcher.Core {
         // (Complexes.Of), and its detection spans, which are invisible; the masts with their gates, the bell
         // and the pads count. Everything below another object framed whole counts.
         public static bool WholeCounts(string family, IEnumerable<string> families) =>
-            family != ControllerFamily || families == null || !families.Any(f => f == "Track marker" || f == "Track span");
+            family != ControllerFamily || families == null || !families.Any(f => f == SceneFamilies.TrackMarker || f == "Track span");
         // Where a marker with a frame stands on screen, from its world point projected to x and y: on that point
         // whenever it lies in front of the camera, also outside the frame's rectangle or the view, so it stays on its
         // world point as the camera zooms and turns; the center of the visible part of a frame larger than the view

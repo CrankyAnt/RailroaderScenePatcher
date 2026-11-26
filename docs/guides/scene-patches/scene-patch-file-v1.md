@@ -79,7 +79,7 @@ The [scene object inventory](inspect-scene-objects.md) supplies observed identif
 
 `markerId` applies only to a generic track marker with the target structure `track-marker-v1`.
 
-Any other target, such as a crossing pad, a milepost, a starter placement marker, or an object that is not a marker, fails the modification before it changes anything, with `Only objects in the Track marker family can have a replacement ID.` The object's other modifications still apply.
+Any other target, such as a crossing pad, a milepost, a starter placement marker, or an object that is not a marker, fails the modification before it changes anything, with `Only objects in the Generic track marker family can have a replacement ID.` The object's other modifications still apply.
 
 The value must follow these rules, which the engine checks before it changes anything:
 

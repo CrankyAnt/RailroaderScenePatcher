@@ -700,7 +700,7 @@ static class CommandBandTests {
         // Placement modes per object: a pad has none, an object that cannot be edited keeps Numeric only.
         var why = CommandBand.NotYetSupported("the Milepost family");
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode }) {
-            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Track marker", TrackMarkerScene.Structure, "Fixed placement")), mode, true) == null, "Mode " + mode + " is open for an object that can be edited");
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Generic track marker", TrackMarkerScene.Structure, "Fixed placement")), mode, true) == null, "Mode " + mode + " is open for an object that can be edited");
             Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Crossing pad marker", CrossingPadScene.Structure, "x")), mode, false) == CommandBand.PadFollowsTrack, "Mode " + mode + " is inactive for a pad");
             Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Milepost", null, why)), mode, true) == (mode == CommandBand.NumericMode ? null : "The Milepost family cannot be edited."), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
         }
@@ -757,11 +757,11 @@ static class CommandBandTests {
     // with it, and a cut falls on the family.
     static void ChoiceLabelsLeadWithWhatTellsThemApart() {
         var offered = new[] {
-            "Track marker: World/Large Scenery/Whittier/Whittier Signs/wh-e-water",
-            "Track marker: World/Large Scenery/Whittier/Whittier Signs/wh-e-whistle [inactive]",
+            "Generic track marker: World/Large Scenery/Whittier/Whittier Signs/wh-e-water",
+            "Generic track marker: World/Large Scenery/Whittier/Whittier Signs/wh-e-whistle [inactive]",
             "Location sign: World/Signs/Loc: Walker Branch" };
-        Check(CommandBand.ChoiceLabel(offered[0], offered) == "wh-e-water (Track marker)", "The name comes first: " + CommandBand.ChoiceLabel(offered[0], offered));
-        Check(CommandBand.ChoiceLabel(offered[1], offered) == "wh-e-whistle [inactive] (Track marker)", "An inactive object says so after its name: " + CommandBand.ChoiceLabel(offered[1], offered));
+        Check(CommandBand.ChoiceLabel(offered[0], offered) == "wh-e-water (Generic track marker)", "The name comes first: " + CommandBand.ChoiceLabel(offered[0], offered));
+        Check(CommandBand.ChoiceLabel(offered[1], offered) == "wh-e-whistle [inactive] (Generic trac...", "An inactive object says so after its name, and a cut falls on the family: " + CommandBand.ChoiceLabel(offered[1], offered));
         Check(CommandBand.ChoiceLabel(offered[2], offered) == "Loc: Walker Branch (Location sign)", "A colon inside a name stays in the name: " + CommandBand.ChoiceLabel(offered[2], offered));
         var twins = new[] { "Crossing pad marker: World/Roads Wilmot/Crossing Unprotected/Crossing Pad", "Crossing pad marker: World/Roads Sylva/Crossing Unprotected (1)/Crossing Pad" };
         Check(CommandBand.ChoiceLabel(twins[0], twins) == "Crossing Unprotected/Crossing Pad (Cr..." && CommandBand.ChoiceLabel(twins[1], twins) == "Crossing Unprotected (1)/Crossing Pad...",

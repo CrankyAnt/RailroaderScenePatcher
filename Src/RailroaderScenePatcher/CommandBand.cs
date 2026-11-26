@@ -947,7 +947,7 @@ namespace RailroaderScenePatcher {
         // The families whose objects hold a track marker, and so a track binding, whether or not the adapter accepts
         // the object: a refused one keeps its binding fields, disabled with its own reason.
         internal static bool HoldsMarker(string family) =>
-            family == StarterPlacements.Family || family == "Track marker" || family == "Crossing pad marker" || family == "Milepost";
+            family == StarterPlacements.Family || family == SceneFamilies.TrackMarker || family == "Crossing pad marker" || family == "Milepost";
         // The label of a track location registered under a marker's ID, as the inventory lists it.
         internal const string ListedTrackLocation = "Named location:";
         // The binding line of a track location registered under a marker's ID: the location in the one shown form

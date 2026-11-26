@@ -249,7 +249,7 @@ Wilmot | Wilmot Station | Group | Station building";
             Entry("World/Large Scenery/Almond/Almond Road Bridge", "Bridge", "Road bridges"),
             Entry(Bryson + "Bryson Depot", "Station building"),
             Entry("World/Large Scenery/Sylva/New Pond", only: "not yet supported"),
-            Entry("World/Sign", family: "Track marker"),
+            Entry("World/Sign", family: "Generic track marker"),
         });
         var inventory = new SceneInventory(scene); inventory.Refresh();
         // A search that matches only a part still shows the part under its group, never as a loose row.
@@ -275,7 +275,7 @@ Wilmot | Wilmot Station | Group | Station building";
         var span = At(verdicts, "World/Large Scenery/Newtown/Plate Girder Bridge Span");
         Check(span?.Category == "Bridge" && span.Subcategory == "Rail bridges", "a rail bridge in a new town stands under Bridge / Rail bridges");
         string Of(string family, string path) => SceneClassification.Of(family, path, new string[0], new string[0], new string[0]).ToString();
-        Check(Of("Bridge", "World/Large Scenery/Ela/Span") == "Bridge / Rail bridges" && Of("Bridge construction scenery", "World/Large Scenery/Ela/Scenery") == "Bridge / Rail bridges" && Of("Track marker", "World/Large Scenery/Ela/Marker") == "Track marker",
+        Check(Of("Bridge", "World/Large Scenery/Ela/Span") == "Bridge / Rail bridges" && Of("Bridge construction scenery", "World/Large Scenery/Ela/Scenery") == "Bridge / Rail bridges" && Of("Generic track marker", "World/Large Scenery/Ela/Marker") == "Track marker",
             "the bridge and the construction controller of a rail bridge construction stand under Bridge / Rail bridges by their family, whatever their names");
         BridgeEditsDoNotFollowTheCategory();
     }
@@ -306,7 +306,7 @@ Wilmot | Wilmot Station | Group | Station building";
     static void SelectGroupFindsTheGroup() {
         const string Dealer = "World/Large Scenery/Bryson/Bryson Coal Dealer";
         var scene = new Inventory();
-        var group = Entry(Dealer, "Industry building"); var part = Entry(Dealer + "/Heap", groupPath: Dealer); var sign = Entry("World/Sign", family: "Track marker");
+        var group = Entry(Dealer, "Industry building"); var part = Entry(Dealer + "/Heap", groupPath: Dealer); var sign = Entry("World/Sign", family: "Generic track marker");
         scene.Objects.AddRange(new[] { part, group, sign });
         var inventory = new SceneInventory(scene); inventory.Refresh();
         Check(ReferenceEquals(InventoryPresentationState.GroupOf(inventory, part), group), "a part's group is the top scene object's entry");
