@@ -79,12 +79,16 @@ static class SceneClassificationTests {
         // A track marker on a station building is that station.
         ["Track marker -> Station building"] = new[] { "World/Large Scenery/Hemingway/Hemingway flagstopstation" },
     };
+    // Mileposts left Sign for a category of their own: every row of the Milepost family, by the fixture's family column.
+    static Dictionary<string, string[]> Known(BaseMapFixture map) => KnownChanges.Concat(new[] { new KeyValuePair<string, string[]>("Sign -> Mileposts",
+        map.Objects.Where(o => o.Listed && o.Family == "Milepost").Select(o => o.Path).ToArray()) }).ToDictionary(p => p.Key, p => p.Value);
     static void ChangesAreTheKnownOnes(BaseMapFixture map) {
         var changes = map.Objects.Where(o => o.Listed && !o.ChildObject).Select(o => new { o.Path, From = o.Today.Split(new[] { " / " }, StringSplitOptions.None)[0], To = map.ClassOf(o).Category })
             .Where(c => c.From != c.To).GroupBy(c => c.From + " -> " + c.To).ToDictionary(g => g.Key, g => g.Select(c => c.Path).ToArray());
         if (Environment.GetEnvironmentVariable("RSP_FIXTURE_READOUT") == "1") foreach (var change in changes) Console.WriteLine("CHANGE " + change.Key + " (" + change.Value.Length + "): " + String.Join(", ", change.Value));
-        var unknown = changes.Where(c => !KnownChanges.TryGetValue(c.Key, out var paths) || !paths.OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(c.Value.OrderBy(p => p, StringComparer.Ordinal))).Select(c => c.Key + " (" + c.Value.Length + "): " + String.Join(", ", c.Value.Take(5))).ToArray();
-        Check(unknown.Length == 0 && changes.Count == KnownChanges.Count, "the categories that change are the known ones; unexpected: " + String.Join(" | ", unknown));
+        var known = Known(map);
+        var unknown = changes.Where(c => !known.TryGetValue(c.Key, out var paths) || !paths.OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(c.Value.OrderBy(p => p, StringComparer.Ordinal))).Select(c => c.Key + " (" + c.Value.Length + "): " + String.Join(", ", c.Value.Take(5))).ToArray();
+        Check(unknown.Length == 0 && changes.Count == known.Count, "the categories that change are the known ones; unexpected: " + String.Join(" | ", unknown));
     }
 
     // Expectations that do not come from the rules' own output: the kind of every bridge by its name, the kind of
@@ -97,13 +101,19 @@ static class SceneClassificationTests {
             string kind = null;
             if (o.TopSceneObject && o.Today == "Bridge") kind = name.Contains("Road Bridge") ? "Road bridges" : "Rail bridges";
             else if (name.StartsWith("Loc: ", StringComparison.Ordinal)) kind = "Location signs";
-            else if (o.Family == "Milepost") kind = "Mileposts";
+            else if (o.Family == "Milepost") { if (found.Category != "Mileposts" || found.Kind != null) wrong.Add(o.Path + ": " + found + ", expected Mileposts without a kind"); continue; }
             else if (name.StartsWith("Whistle Sign", StringComparison.Ordinal)) kind = "Whistle signs";
             else if (name.StartsWith("Speed", StringComparison.Ordinal)) kind = "Speed signs";
             else if (name.StartsWith("Yard Limit", StringComparison.Ordinal)) kind = "Yard limits";
             if (kind != null && found.Kind != kind) wrong.Add(o.Path + ": kind " + found.Kind + ", expected " + kind);
             if (kind != null && found.Category != (kind.EndsWith("bridges", StringComparison.Ordinal) ? "Bridge" : "Sign")) wrong.Add(o.Path + ": category " + found.Category);
         }
+        // The pavilions of Sylva and Connelly are industry buildings without a kind: there is no Pavilion kind.
+        foreach (var path in new[] { "World/Large Scenery/Sylva/Sylva Culled", "World/Large Scenery/Whittier/Connelly Culled" }) {
+            var found = map.ClassOf(map.Objects.Single(o => o.Path == path));
+            if (found.Category != SceneObjectCategories.IndustryBuilding || found.Kind != null) wrong.Add(path + ": " + found + ", expected Industry building without a kind");
+        }
+        Check(!map.Objects.Where(o => o.Listed && !o.ChildObject).Any(o => map.ClassOf(o).Kind == "Pavilion"), "no listed object has the Pavilion kind");
         Check(wrong.Count == 0, "bridges and signs take the kind their names say: " + String.Join(" | ", wrong.Take(10)));
         // The towns of the map data: an object in a town's folder stands at that town, unless its own name or a folder
         // between names another place, or it stands far from the town.
@@ -163,7 +173,7 @@ static class SceneClassificationTests {
             Fiction("World/Signs/Loc: Judson", "Location sign", -9100, -3100, "Sign / Location signs @ Judson", Culler, "Map.Runtime.MaskComponents.CircleMapMask"),
             Fiction("World/Signs/Speed - Tunnel Curve", "Track marker", 16400, 2250, "Sign / Speed signs @ Wilmot", Marker, Relative, Culler),
             // A milepost of a new line.
-            Fiction("World/Mile Posts/M-12", "Milepost", 2000, -200, "Sign / Mileposts @ Cochran", Culler, Marker, Relative, "Helpers.MilePost"),
+            Fiction("World/Mile Posts/M-12", "Milepost", 2000, -200, "Mileposts @ Cochran", Culler, Marker, Relative, "Helpers.MilePost"),
             // A new unprotected crossing in a Roads folder of a new place, and a protected one.
             Fiction("World/Roads Judson/Crossing Unprotected - Mill Road/Sign-Crossing0 (1)", Baked, -9010, -3010, "Grade crossing @ Judson", Culler),
             Fiction("World/Roads Judson/Crossing Unprotected - Mill Road/Crossing Pad", "Crossing pad marker", -9010, -3012, "Grade crossing @ Judson", Marker, Relative, "Track.TrackCurveMeshBuilder"),
@@ -175,7 +185,7 @@ static class SceneClassificationTests {
             Fiction("World/Large Scenery/Judson/Judson Lumber Mill", Baked, -9030, -2980, "Industry building / Lumber Mill @ Judson"),
             Below("World/Large Scenery/Judson/Judson Lumber Mill/Shed", Mesh),
             // A building named after its place alone is what it holds.
-            Fiction("World/Large Scenery/Judson/Judson Culled", Baked, -9040, -2970, "Industry building / Pavilion @ Judson", "Helpers.SimpleCuller"),
+            Fiction("World/Large Scenery/Judson/Judson Culled", Baked, -9040, -2970, "Industry building @ Judson", "Helpers.SimpleCuller"),
             Below("World/Large Scenery/Judson/Judson Culled/Pavilion", Mesh), Below("World/Large Scenery/Judson/Judson Culled/Pavilion (1)", Mesh),
             // A road bridge, a rail bridge and a railroad service building of a new make.
             Fiction("World/Roads Hewitt/Hewitt Road Bridge 30m", Baked, -13700, -8100, "Bridge / Road bridges @ Hewitt", Culler, "Map.Runtime.MaskComponents.RectangleMapMask"),

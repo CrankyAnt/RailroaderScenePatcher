@@ -280,10 +280,10 @@ namespace RailroaderScenePatcher {
         // for the debug summary (SceneObjectChecks.Summary) that compares the listed and unlisted top scene objects and parts.
         internal static IEnumerable<KeyValuePair<string, string>> Report() =>
             Verdicts().Select(p => new KeyValuePair<string, string>(p.Key.scene.name + "/" + p.Value.Path,
-                (p.Value.Disposition == GroupDisposition.Group ? "Listed as a scenery group" : p.Value.Disposition == GroupDisposition.InspectionOnly ? "Listed for inspection only" : p.Value.Disposition == GroupDisposition.ExistingFamily ? ExistingFamilyReport(p.Key) : "No scenery group row in the outliner. The patcher offers no group edits for this object") +
+                (p.Value.Disposition == GroupDisposition.Group ? "Listed as a group" : p.Value.Disposition == GroupDisposition.InspectionOnly ? "Listed for inspection only" : p.Value.Disposition == GroupDisposition.ExistingFamily ? ExistingFamilyReport(p.Key) : "No group row in the outliner. The patcher offers no group edits for this object") +
                 Reason(p.Value.Reason) + (p.Value.Category == null ? "" : ". Category: " + p.Value.Category + (p.Value.Subcategory == null ? "" : " / " + p.Value.Subcategory))))
                 .Concat(partVerdicts.Where(p => p.Key != null).Select(p => new KeyValuePair<string, string>(p.Key.scene.name + "/" + p.Value.Path,
-                    (p.Value.Disposition == PartDisposition.Part ? "Listed as a scenery part" : p.Value.Disposition == PartDisposition.ExistingFamily ? ExistingFamilyReport(p.Key, true) : "Not listed as a scenery part") +
+                    (p.Value.Disposition == PartDisposition.Part ? "Listed as a part" : p.Value.Disposition == PartDisposition.ExistingFamily ? ExistingFamilyReport(p.Key, true) : "Not listed as a part") +
                     Reason(p.Value.Reason))));
         // The same candidates and parts for the inventory (ICheckedObjectsScene): null for an object that is listed, as a
         // group, for inspection only, as a part or through its own object family, otherwise the rule's reason.
@@ -291,8 +291,8 @@ namespace RailroaderScenePatcher {
             Verdicts().Values.Select(v => v.Disposition == GroupDisposition.Group || v.Disposition == GroupDisposition.InspectionOnly || v.Disposition == GroupDisposition.ExistingFamily ? null : v.Reason ?? v.Disposition.ToString())
                 .Concat(partVerdicts.Where(p => p.Key != null).Select(p => p.Value.Disposition == PartDisposition.NotListed ? p.Value.Reason ?? p.Value.Disposition.ToString() : null)).ToArray();
         static string ExistingFamilyReport(GameObject go, bool inGroup = false) =>
-            (inGroup ? "Moves with its scenery group. Listed for inspection and supported edits through its own object family instead of as a scenery part. Gets its own outliner row, except for native track spans, which have no row. Object family: " :
-                "Listed for inspection and supported edits through its existing object family instead of as a scenery group. Gets its own outliner row, except for native track spans, which have no row. Object family: ") + String.Join(", ",
+            (inGroup ? "Moves with its group. Listed for inspection and supported edits through its own object family instead of as a part. Gets its own outliner row, except for native track spans, which have no row. Object family: " :
+                "Listed for inspection and supported edits through its existing object family instead of as a group. Gets its own outliner row, except for native track spans, which have no row. Object family: ") + String.Join(", ",
             go.GetComponents<Component>().Where(c => c != null).Select(NativeInventory.FamilyOf).Where(f => f != null).Distinct().OrderBy(f => f, StringComparer.Ordinal));
         // A reason that is a sentence keeps one full stop before the clause that follows it.
         static string Reason(string reason) => reason == null ? "" : ". Reason: " + reason.TrimEnd('.');

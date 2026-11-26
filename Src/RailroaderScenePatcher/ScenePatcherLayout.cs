@@ -799,7 +799,7 @@ namespace RailroaderScenePatcher {
             foreach (var line in runtimeLong ? selected.RuntimeState : HierarchyDependencies.ShortForm(selected.Identity.Scene, selected.Identity.Path, selected.RuntimeState)) PlainLabel(builder, Breakable(line));
         }
         // Select group and Select controller: each inspects the object that holds the inspected one.
-        Act SelectGroupAct() => Slot("Select group", "Inspect the group that this part belongs to.",
+        Act SelectGroupAct() => Slot("Select group", CommandBand.SelectGroupTip,
             InventoryPresentationState.GroupOf(inventory, selected) == null ? "the object list does not include this part's group; click Refresh" : null,
             () => InspectHolder(InventoryPresentationState.GroupOf(inventory, selected)));
         Act SelectControllerAct() => Slot("Select controller", "Inspect the crossing controller that holds this detection span. Set crossing coverage on its Connections tab.",
@@ -1933,7 +1933,7 @@ namespace RailroaderScenePatcher {
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
                     new[] { "Search", "Matches names, paths, families, binding IDs, dependencies, and problems, and each object's category, kind, place, and crossing." },
-                    new[] { "By category", "The first view icon. Lists objects by what they are: category, then kind, then place. A category shows kinds when its objects share them, such as Rail bridges and Road bridges under Bridge, or Speed signs and Mileposts under Sign." },
+                    new[] { "By category", "The first view icon. Lists objects by what they are: category, then kind, then place. A category shows kinds when its objects share them, such as Rail bridges and Road bridges under Bridge, or Speed signs and Whistle signs under Sign." },
                     new[] { "By place", "The second view icon. Lists objects by the place they stand at, with the same categories and kinds under each place. Without a search or filter, every place the game names is listed, also one without objects." },
                     new[] { "Place", "The place an object's name or hierarchy path names, or else the nearest place the game names." },
                     new[] { "Changed", "Objects this mod changes, marked *. An object whose modification is refused is marked × instead. Its Changes tab gives the reason." },
@@ -1967,8 +1967,8 @@ namespace RailroaderScenePatcher {
                     new[] { "Gizmo", "The native map editor's gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the placement and follow the drag." },
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
-                    new[] { "Bridges and boards", "A bridge moves as a whole, and the scenery of its track stays in place. The terrain output of a board or a ground mask regenerates after the move." },
-                    new[] { "Scene objects", "Moving a group also moves its parts. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
+                    new[] { "Bridges and location signs", "A bridge moves as a whole, and the scenery of its track stays in place. The terrain output of a location sign or a ground mask regenerates after the move." },
+                    new[] { "Groups and parts", "Moving a group also moves its parts. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
                     new[] { "Spawn points", "The game reads a spawn point's current location each time a player starts, is rescued, or teleports. A disabled spawn point isn't offered, except by a start setup that names it." } },
                 Guides = new[] { new[] { "Fixed placement", RecoveryGuidance.NumericPlacementGuide }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
                     new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Location signs", "moving-location-signs.md" }, new[] { "Scene objects", "moving-scene-objects.md" }, new[] { "Spawn points", "moving-spawn-points.md" },

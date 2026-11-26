@@ -255,7 +255,6 @@ namespace RailroaderScenePatcher {
                 // setups hold is never read and stays out of the inventory. A marker no setup holds keeps its kind.
                 return starters.Family(c, Get(go, "Track.TrackCurveMeshBuilder") != null ? "Crossing pad marker" : "Track marker");
             }
-            if (type == Relative && Get(go, Marker) == null) return "Track-relative scene object";
             // A span the game builds from the map's operations data is not serialized and stays with the native map
             // editor; the spans this patcher adds for a crossing are listed.
             if (type == Span) return SceneObjectRules.SpanListed(!Transient(c.transform, null), c.transform.root.name == CrossingCoverageWorld.RootName) ? "Track span" : null;

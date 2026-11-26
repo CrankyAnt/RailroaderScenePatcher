@@ -14,6 +14,8 @@ namespace RailroaderScenePatcher.Core {
         // The kind inside the category, or null for a category without kinds.
         public string Kind { get; }
         public bool Recognised { get; }
+        // A rule decided that the object has no kind, so no kind is taken from its name either.
+        internal bool KindDecided { get; set; }
         public override string ToString() => Kind == null ? Category : Category + " / " + Kind;
     }
 
@@ -36,7 +38,9 @@ namespace RailroaderScenePatcher.Core {
         // The categories of the families whose objects are a kind of their own: each is named as its family, except
         // Starter placement, whose family is Starter placement marker.
         public const string TrackMarker = SceneFamilies.TrackMarker, SpawnPoint = SceneFamilies.SpawnPoint, StarterPlacement = "Starter placement", StationMapIcon = SceneFamilies.StationMapIcon;
-        public const string LocationSigns = "Location signs", LocationMarkers = "Location markers", Mileposts = "Mileposts", OtherSigns = "Other signs", SetupMarkers = "Setup markers";
+        // The category of the mileposts, which has no kinds.
+        public const string Mileposts = "Mileposts";
+        public const string LocationSigns = "Location signs", LocationMarkers = "Location markers", OtherSigns = "Other signs", SetupMarkers = "Setup markers";
         public const string ProtectedCrossings = "Crossings with signals", UnprotectedCrossings = "Crossings without signals";
         public const string LakeSurfaces = "Lake surfaces", StoragePiles = "Storage piles", LogPonds = "Log ponds";
         public const string LocPrefix = "Loc:";
@@ -44,16 +48,17 @@ namespace RailroaderScenePatcher.Core {
             CarLoader = "RollingStock.CarContentSwapper", StorageSynchronizer = "Scenery.BulkIndustryStorageSynchronizer", Light = "UnityEngine.Light";
 
         // One word rule: a word the game's names use for a kind of object, the category it stands for, and the kind
-        // inside that category. A rule without a kind takes the object's type name (TypeName) as its kind.
+        // inside that category. A rule without a kind takes the object's type name (TypeName) as its kind, unless it
+        // gives no kind at all (Kindless), as a milepost and a pavilion do.
         sealed class NameRule {
-            internal NameRule(string pattern, string category, string kind = null) { Pattern = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant); Category = category; Kind = kind; }
-            internal readonly Regex Pattern; internal readonly string Category, Kind;
+            internal NameRule(string pattern, string category, string kind = null, bool kindless = false) { Pattern = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant); Category = category; Kind = kind; Kindless = kindless; }
+            internal readonly Regex Pattern; internal readonly string Category, Kind; internal readonly bool Kindless;
         }
         // In order: the first rule whose word the name holds decides. A crossing and a sign come first, because their
         // names also hold the word of what they stand at, as "Speed - Ela Bridge" and "Sign-Station" do.
         static readonly NameRule[] NameRules = {
             new NameRule(@"\bcrossing", SceneObjectCategories.GradeCrossing),
-            new NameRule(@"\bmile\s*posts?\b", SceneObjectCategories.Sign, Mileposts),
+            new NameRule(@"\bmile\s*posts?\b", Mileposts, kindless: true),
             new NameRule(@"\b(speed(\s*sign)?|speedlimit)\b", SceneObjectCategories.Sign, "Speed signs"),
             new NameRule(@"\byard\s+limit\b", SceneObjectCategories.Sign, "Yard limits"),
             new NameRule(@"\b(station\s+signs?|sign[-_\s]*station)\b", SceneObjectCategories.Sign, "Station signs"),
@@ -69,7 +74,9 @@ namespace RailroaderScenePatcher.Core {
             new NameRule(@"\bplatforms?\b", SceneObjectCategories.Platform),
             new NameRule(@"\b(roundhouse|turntable|tower|section\s+house|tool\s+house|engine\s+house|sand\s+house|water\s+tank|coaling)\b", SceneObjectCategories.RailroadServiceBuilding),
             new NameRule(@"\b(shade|spotlight|spot\s+light|lamps?|lanterns?|lights?)\b", SceneObjectCategories.Lights),
-            new NameRule(@"\b(mine|mill|elevator|dealer|oil|coal|loader|quarry|tannery|lumber|factory|plant|warehouse|pavilions?|shed|supply|works)\b", SceneObjectCategories.IndustryBuilding),
+            new NameRule(@"\b(mine|mill|elevator|dealer|oil|coal|loader|quarry|tannery|lumber|factory|plant|warehouse|shed|supply|works)\b", SceneObjectCategories.IndustryBuilding),
+            // A pavilion is an industry building of no kind of its own.
+            new NameRule(@"\bpavilions?\b", SceneObjectCategories.IndustryBuilding, kindless: true),
         };
         static readonly Regex Ordinal = new Regex(@"(\s*\(\d+\)|(?<![xX])\s+\d+)\z"), Culled = new Regex(@"\s+culled\z", RegexOptions.IgnoreCase), Edge = new Regex(@"\A[\s\-:,&]+|[\s\-:,&]+\z"),
             Crossing = new Regex(@"\bcrossing", RegexOptions.IgnoreCase), Spaces = new Regex(@"\s{2,}");
@@ -96,9 +103,10 @@ namespace RailroaderScenePatcher.Core {
         // What an object's own name says it is, or null when its name holds none of the words.
         public static SceneClass ByName(string name, Func<string, string> stripPlaces = null) {
             if (String.IsNullOrEmpty(name)) return null;
-            foreach (var rule in NameRules) if (rule.Pattern.IsMatch(name)) return new SceneClass(rule.Category, rule.Kind ?? KindOf(rule.Category, name, stripPlaces));
-            return null;
+            var rule = RuleOf(name);
+            return rule == null ? null : new SceneClass(rule.Category, rule.Kindless ? null : rule.Kind ?? KindOf(rule.Category, name, stripPlaces)) { KindDecided = rule.Kindless };
         }
+        static NameRule RuleOf(string name) => String.IsNullOrEmpty(name) ? null : NameRules.FirstOrDefault(rule => rule.Pattern.IsMatch(name));
         // A grade crossing has no kinds by name: its kind comes from what it holds (signals or none).
         static string KindOf(string category, string name, Func<string, string> stripPlaces) =>
             category == SceneObjectCategories.GradeCrossing ? null : TypeName(name, stripPlaces);
@@ -122,13 +130,14 @@ namespace RailroaderScenePatcher.Core {
             var votes = (namesBelow ?? Enumerable.Empty<string>()).Select(name => new { Name = name, Class = ByName(name) })
                 .Where(v => v.Class != null && v.Class.Category != SceneObjectCategories.GradeCrossing).ToArray();
             // A lamp or a sign is a fixture of what it stands on: it counts only where nothing else is named.
-            var structures = votes.Where(v => v.Class.Category != SceneObjectCategories.Lights && v.Class.Category != SceneObjectCategories.Sign).ToArray();
+            var structures = votes.Where(v => v.Class.Category != SceneObjectCategories.Lights && v.Class.Category != SceneObjectCategories.Sign && v.Class.Category != Mileposts).ToArray();
             if (structures.Length != 0) votes = structures;
             if (votes.Length != 0) {
                 var category = votes.GroupBy(v => v.Class.Category).OrderByDescending(g => g.Count()).ThenBy(g => Array.FindIndex(NameRules, r => r.Category == g.Key)).First();
-                var kind = category.GroupBy(v => v.Class.Kind != null && NameRules.Any(r => r.Kind == v.Class.Kind) ? v.Class.Kind : TypeName(v.Name, stripPlaces))
+                var kind = category.GroupBy(v => v.Class.KindDecided ? null : v.Class.Kind != null && NameRules.Any(r => r.Kind == v.Class.Kind) ? v.Class.Kind : TypeName(v.Name, stripPlaces))
                     .Where(g => g.Key != null).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase).Select(g => g.Key).FirstOrDefault();
-                return new SceneClass(category.Key, kind);
+                // A category that only kindless names stand for gives no kind, and the object takes none from its own name.
+                return new SceneClass(category.Key, kind) { KindDecided = kind == null && category.All(v => v.Class.KindDecided) };
             }
             return Has(atOrBelow, Light) ? new SceneClass(SceneObjectCategories.Lights, null) : null;
         }
@@ -155,7 +164,7 @@ namespace RailroaderScenePatcher.Core {
             // A name that says no more than its category, as Platform does, leaves the kind to what the group holds.
             if ((found.Kind == null || String.Equals(found.Kind, found.Category, StringComparison.OrdinalIgnoreCase)) && found.Recognised
                 && ByContent(namesBelow, atOrBelow, stripPlaces) is SceneClass content && content.Category == found.Category && content.Kind != null) return content;
-            return found.Kind != null || !found.Recognised ? found : new SceneClass(found.Category, TypeName(name, stripPlaces));
+            return found.Kind != null || !found.Recognised || found.KindDecided ? found : new SceneClass(found.Category, TypeName(name, stripPlaces));
         }
 
         // Any listed object. family is the technical family the inventory lists it in, which its edits follow; the
@@ -169,7 +178,7 @@ namespace RailroaderScenePatcher.Core {
             if (Has(own, MapIcon) || family == SceneFamilies.StationMapIcon) return new SceneClass(StationMapIcon, null);
             if (Has(own, SpawnPointComponent) || family == SceneFamilies.SpawnPoint) return new SceneClass(SpawnPoint, null);
             if (family == SceneFamilies.StarterPlacement) return new SceneClass(StarterPlacement, null);
-            if (Has(own, MilepostComponent)) return new SceneClass(SceneObjectCategories.Sign, Mileposts);
+            if (Has(own, MilepostComponent)) return new SceneClass(Mileposts, null);
             // An object outside World is game setup, not scenery: its name says nothing about what stands in the world.
             if (path == null || !path.StartsWith(World, StringComparison.Ordinal))
                 return SceneFamilies.Crossing.Contains(family) ? new SceneClass(SceneObjectCategories.GradeCrossing, null) : new SceneClass(family ?? TrackMarker, family == SceneFamilies.TrackMarker ? SetupMarkers : null, family != null);
@@ -185,7 +194,7 @@ namespace RailroaderScenePatcher.Core {
         // What the technical family says when the object itself says nothing more.
         static SceneClass OfFamily(string family) {
             switch (family) {
-                case SceneFamilies.Milepost: return new SceneClass(SceneObjectCategories.Sign, Mileposts);
+                case SceneFamilies.Milepost: return new SceneClass(Mileposts, null);
                 case SceneFamilies.LocationSign: return new SceneClass(SceneObjectCategories.Sign, OtherSigns);
                 // The bridge and the construction controller of a rail bridge construction stand with the other rail bridges.
                 case SceneFamilies.Bridge: case SceneFamilies.BridgeConstruction: return new SceneClass(SceneObjectCategories.Bridge, SceneObjectCategories.RailBridges);

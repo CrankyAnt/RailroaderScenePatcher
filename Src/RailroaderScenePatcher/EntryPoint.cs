@@ -359,7 +359,7 @@ namespace RailroaderScenePatcher {
                 // Existing masts and bells take their transforms, cullers and own culling from the group world, with their
                 // crossing controller as the group; one set of fixed placements gives each crossing one culling plan.
                 try {
-                    if (groupWorld == null) throw new InvalidOperationException("the patcher couldn't prepare to control when moved scenery parts are shown");
+                    if (groupWorld == null) throw new InvalidOperationException("the patcher couldn't prepare to control when moved parts are shown");
                     var held = new PartHolds();
                     capabilities.Add(ExistingEquipmentScene.Masts(new CrossingDeviceWorld(groupWorld, false), held));
                     capabilities.Add(ExistingEquipmentScene.Bells(new CrossingDeviceWorld(groupWorld, true, equipmentWorld?.ReconfigureBell, equipmentWorld == null ? "the patcher couldn't prepare crossing equipment" : equipmentWorld.BellsUnavailable), held));

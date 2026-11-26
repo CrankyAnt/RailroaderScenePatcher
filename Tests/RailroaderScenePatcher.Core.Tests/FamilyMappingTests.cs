@@ -32,6 +32,7 @@ static class FamilyMappingTests {
         CodeNamesFollowTheMapping();
         FixtureFamiliesChangeOnlyByTheMapping();
         ShownFamiliesChangeOnlyByTheMapping();
+        ShownFamiliesAreInSentenceCase();
         Console.WriteLine("PASS: family values and labels change only by the family mapping");
     }
 
@@ -47,7 +48,8 @@ static class FamilyMappingTests {
     // The label the mapping gives for a former label and structure.
     static string Mapped(string formerShown, string structure) {
         if (formerShown == CommandBand.PartFamily) return CommandBand.PartFamily;
-        if (formerShown == FormerSceneObjects) return structure == ChildObjects.Structure ? SceneObjectRules.ChildFamily : SceneObjectRules.Family;
+        // The window calls a top scene object, the top of a complex, a Group.
+        if (formerShown == FormerSceneObjects) return structure == ChildObjects.Structure ? SceneObjectRules.ChildFamily : CommandBand.GroupFamily;
         return Renamed.TryGetValue(formerShown, out var now) ? now : formerShown;
     }
 
@@ -97,6 +99,19 @@ static class FamilyMappingTests {
         Check(listed.Length == 1547 + 55 + 8 + 4 + Kept.Values.Sum(), "the fixture lists the same number of objects as before: " + listed.Length);
     }
 
+    // Each family name the window shows for a listed object of the base map: sentence case with spaces, Milepost one
+    // word, and neither "complex" nor "child object".
+    static void ShownFamiliesAreInSentenceCase() {
+        var map = new BaseMapFixture();
+        var shown = map.Observations(out _).Select(CommandBand.ShownFamily).Distinct().OrderBy(f => f, StringComparer.Ordinal).ToArray();
+        var expected = new[] { "Bridge", "Bridge construction scenery", "Crossing bell", "Crossing mast", "Crossing pad marker", "Grade crossing controller", "Group", "Location sign", "Milepost", "Part",
+            "Spawn point", "Starter placement marker", "Station map icon", "Track marker", "Track span" };
+        Check(shown.SequenceEqual(expected), "the window shows these family names for the base map: " + String.Join(", ", shown));
+        var sentence = new System.Text.RegularExpressions.Regex("^[A-Z][a-z]+( [a-z]+)*$");
+        Check(shown.All(f => sentence.IsMatch(f)), "each family name shown is in sentence case with spaces: " + String.Join(", ", shown.Where(f => !sentence.IsMatch(f))));
+        Check(!shown.Any(f => f.IndexOf("complex", StringComparison.OrdinalIgnoreCase) >= 0 || f.IndexOf("child object", StringComparison.OrdinalIgnoreCase) >= 0), "no family name shown says complex or child object");
+    }
+
     static void ShownFamiliesChangeOnlyByTheMapping() {
         var map = new BaseMapFixture();
         var rows = map.Observations(out var source);
@@ -111,6 +126,7 @@ static class FamilyMappingTests {
         Check(wrong.Count == 0, wrong.Count + " rows show another family label than the mapping gives: " + String.Join("; ", wrong.Take(5)));
         Check(rows.Where(r => r.Family == SceneObjectRules.ChildFamily).All(r => r.GroupPath != null && CommandBand.ShownFamily(r) == CommandBand.PartFamily),
             "a child object still shows as Part, the window word for a child object");
+        Check(rows.Where(r => r.Family == SceneObjectRules.Family).All(r => CommandBand.ShownFamily(r) == CommandBand.GroupFamily), "a top scene object shows as Group, the window word for a complex");
         var holders = OutlinerGrouping.SignContainers(rows).Select(r => r.Identity.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
         Check(holders.SequenceEqual(new[] { "World/Large Scenery/Bryson/Bryson Signs", "World/Large Scenery/Ela/Signs", "World/Large Scenery/Sylva/Sylva Signs" }),
             "the three sign holders in the Scene object family stay unlisted in the outliner: " + String.Join(", ", holders));

@@ -83,7 +83,7 @@ static class OutlinerGroupingTests {
             // The tooltip carries the reason, in both views, and says where the row stands.
             foreach (var (built, view) in new[] { (tree, "by category"), (byPlace, "by place") }) {
                 var tip = OutlinerGrouping.Tooltip(built, swing, false, null);
-                Check(tip == "Swing Bridge\n" + Bryson + "Swing Bridge\nBridge / Rail bridges\nPlace: Bryson\n" + CommandBand.InspectionOnlyLine(GroupReason), view + ": the tooltip gives the place in the tree and the reason (got " + tip + ")");
+                Check(tip == "Swing Bridge\n" + Bryson + "Swing Bridge\nGroup of scene objects, not a track group\nBridge / Rail bridges\nPlace: Bryson\n" + CommandBand.InspectionOnlyLine(GroupReason), view + ": the tooltip gives the place in the tree and the reason (got " + tip + ")");
                 Check(OutlinerGrouping.Tooltip(built, stand, false, null).EndsWith("\n" + CommandBand.InspectionOnlyLine(FamilyReason), StringComparison.Ordinal)
                     && OutlinerGrouping.Tooltip(built, stand, false, null).Contains("\nUnclassified\nPlace: Sylva\n"), view + ": an unclassified inspection-only object's tooltip names Unclassified, its place and its reason");
                 Check(!OutlinerGrouping.Tooltip(built, girder, false, null).Contains("Inspection only"), view + ": an editable object's tooltip gives no reason");
@@ -102,8 +102,8 @@ static class OutlinerGroupingTests {
         var dealer = Entry(Dealer, Baked, 4410, 5410, "Industry building");
         var yardLimit = Entry(Signs + "/Yard Limit", "Track marker", 4300, 5300);
         var board = Entry("World/Signs/Loc: Connelly", "Location sign", 12040, 5565, problems: new[] { "The board's mask is missing" });
-        var shed = Entry("World/Large Scenery/Sylva/Sylva Shed", Baked, 25020, -820, only: "This group contains a map icon, which the patcher can't move with a group.");
-        var iconSigns = Entry("World/Large Scenery/Sylva/Depot Signs", Baked, 25030, -830, "Sign", only: "This group contains a map icon, which the patcher can't move with a group.");
+        var shed = Entry("World/Large Scenery/Sylva/Sylva Shed", Baked, 25020, -820, only: "This group contains a map icon, which the patcher can't move with the group.");
+        var iconSigns = Entry("World/Large Scenery/Sylva/Depot Signs", Baked, 25030, -830, "Sign", only: "This group contains a map icon, which the patcher can't move with the group.");
         scene.Objects.AddRange(new[] {
             Entry(Dealer + "/Heap", Baked, 4411, 5411, groupPath: Dealer), dealer,
             Entry(Bryson + "Tall Post Shade (1)", Baked, 4420, 5420, "Lights"), Entry(Bryson + "Tall Post Shade", Baked, 4430, 5430, "Lights"),
@@ -136,7 +136,7 @@ static class OutlinerGroupingTests {
             OutlinerGrouping.ByPlace = false;
             var all = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.All, null, null);
             var tree = OutlinerGrouping.Build(all, inventory.Entries, "", false, null);
-            Check(tree.Tops.Select(t => t.Label).SequenceEqual(new[] { "Grade crossing", "Industry building", "Lights", "Sign" }), "the categories stand in alphabetical order (got " + Shape(tree.Tops) + ")");
+            Check(tree.Tops.Select(t => t.Label).SequenceEqual(new[] { "Grade crossing", "Industry building", "Lights", "Mileposts", "Sign" }), "the categories stand in alphabetical order (got " + Shape(tree.Tops) + ")");
             Check(Shape(new[] { tree.Tops[1] }) == "[Industry building]{[Bryson]{Bryson Coal Dealer{Heap}} [Sylva]{Sylva Shed}}", "a group lists its parts beneath it, under its place (got " + Shape(new[] { tree.Tops[1] }) + ")");
             Check(Shape(new[] { tree.Tops[2] }) == "[Lights]{[Bryson]{Tall Post Shade Tall Post Shade Tall Post Shade (1)} [Sylva]{Tall Post Shade}}", "a category with one kind lists its objects by place, by name, and two objects of one name stand side by side (got " + Shape(new[] { tree.Tops[2] }) + ")");
             var twins = Find(tree.Tops[2].Children, "Bryson").Children.Where(n => n.Label == "Tall Post Shade").ToArray();
@@ -151,12 +151,15 @@ static class OutlinerGroupingTests {
             Check(Find(tree.Tops, "Bryson Signs") == null && Find(tree.Tops, "Span-a") == null && OutlinerGrouping.HiddenCount(inventory.Entries) == 2, "a sign container and a native track span have no row");
             Check(tree.Listed == inventory.Entries.Count - 2 && OutlinerGrouping.Summary(tree, inventory.Entries) == tree.Listed + " of " + tree.Listed + " objects", "the count line counts the rows of the tree (got " + OutlinerGrouping.Summary(tree, inventory.Entries) + ")");
             Check(tree.Unplaced == 0, "no object stands in a catch-all node");
-            // Sign shows kinds, because half of its objects share their kind: the mileposts, in the order of their numbers.
-            var sign = tree.Tops[3];
-            Check(sign.Children.Select(c => c.Label).SequenceEqual(new[] { "Location signs", "Mileposts", "Other signs", "Whistle signs", "Yard limits" }), "Sign holds its kinds (got " + Shape(sign.Children) + ")");
-            Check(Shape(new[] { Find(sign.Children, "Mileposts") }) == "[Mileposts]{[Bryson]{T-2 T-10} [Sylva]{T-11 T-12}}", "mileposts stand by place, in the order of their numbers (got " + Shape(new[] { Find(sign.Children, "Mileposts") }) + ")");
-            Check(Shape(new[] { Find(sign.Children, "Location signs") }) == "[Location signs]{[Connelly Creek]{Loc: Connelly}}", "a Loc: board is a location sign at the place it names, under the game's name of that place");
-            Check(Shape(new[] { Find(sign.Children, "Yard limits") }) == "[Yard limits]{[Bryson]{Yard Limit}}" && Find(sign.Children, "Whistle Sign E") != null, "a sign in a sign container and a whistle sign at a crossing are signs of their own");
+            // Mileposts are a category of their own, by place, in the order of their numbers; none stands under Sign.
+            var mileposts = tree.Tops.Single(t => t.Label == "Mileposts");
+            Check(Shape(new[] { mileposts }) == "[Mileposts]{[Bryson]{T-2 T-10} [Sylva]{T-11 T-12}}", "mileposts stand by place, in the order of their numbers (got " + Shape(new[] { mileposts }) + ")");
+            var sign = tree.Tops.Single(t => t.Label == "Sign");
+            Check(Find(sign.Children, "T-2") == null && Find(sign.Children, "Mileposts") == null, "no milepost stands under Sign (got " + Shape(sign.Children) + ")");
+            // Without the mileposts no kind of Sign is shared, so Sign lists its signs by place alone.
+            Check(sign.Children.All(c => c.Key.Contains("/" + OutlineTree.PlaceKey)), "Sign without mileposts lists its signs by place (got " + Shape(sign.Children) + ")");
+            Check(Shape(new[] { Find(sign.Children, "Connelly Creek") }) == "[Connelly Creek]{Loc: Connelly}", "a Loc: board is a location sign at the place it names, under the game's name of that place");
+            Check(Find(Find(sign.Children, "Bryson").Children, "Yard Limit") != null && Find(sign.Children, "Whistle Sign E") != null, "a sign in a sign container and a whistle sign at a crossing are signs of their own");
             // Crossings: the controller is the row that holds its equipment; a crossing without one is one node.
             var controller = Find(tree.Tops, "Grade Crossing - Allen");
             Check(controller?.Row != null && controller.Children.Select(c => c.Label).SequenceEqual(new[] { "Signal 1", "Signal 1 (added)", "Brass bell (added)", "Crossing Pad", "Track 1 East" }) && controller.Count == 6, "a crossing controller holds its mast, the added light and bell, its pad and its detection span (got " + (controller == null ? "none" : Shape(controller.Children)) + ")");
@@ -170,7 +173,7 @@ static class OutlinerGroupingTests {
             OutlinerGrouping.ByPlace = true;
             var byPlace = OutlinerGrouping.Build(all, inventory.Entries, "", false, null);
             Check(byPlace.Tops.Select(t => t.Label + ":" + t.Count).SequenceEqual(new[] { "Bryson:8", "Connelly Creek:1", "Log Camp:0", "Sylva:11", "Whittier:4" }), "every place is a top-level node, also without objects (got " + String.Join(", ", byPlace.Tops.Select(t => t.Label + ":" + t.Count)) + ")");
-            Check(byPlace.Tops[0].Children.Select(c => c.Label).SequenceEqual(new[] { "Industry building", "Lights", "Sign" }), "a place holds its categories in alphabetical order");
+            Check(byPlace.Tops[0].Children.Select(c => c.Label).SequenceEqual(new[] { "Industry building", "Lights", "Mileposts", "Sign" }), "a place holds its categories in alphabetical order");
             Check(OutlineTree.Violations(byPlace.Tops, true, byPlace.Tops.Select(t => t.Label)).Count == 0 && OutlineTree.Violations(tree.Tops, false, byPlace.Tops.Select(t => t.Label)).Count == 0, "both views keep the rules of the tree");
 
             // A search matches what the outliner shows of an object: its kind, its place under any of its names.
@@ -190,13 +193,14 @@ static class OutlinerGroupingTests {
             Check(problems.SequenceEqual(new[] { board }) && changed.SequenceEqual(new[] { dealer }) && OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, null, null).Count == 0, "Problems and Changed show the objects with a problem and the objects this mod changes");
             Check(OutlinerGrouping.Rows(null, "", OutlinerFilter.All, null, null).Count == 0, "without an inventory there are no rows");
 
-            // The tooltip of a row: its name, path, where the outliner lists it, and what its markers mean. No family.
+            // The tooltip of a row: its name, path, that it is a group of scene objects, where the outliner lists it, and
+            // what its markers mean. No family.
             var tip = OutlinerGrouping.Tooltip(tree, dealer, changed: true, failure: null);
-            Check(tip == "Bryson Coal Dealer\n" + Dealer + "\nIndustry building\nPlace: Bryson\n" + OutlinerGrouping.ChangedLine, "a changed group's tooltip says where it stands and why it is changed (got " + tip + ")");
+            Check(tip == "Bryson Coal Dealer\n" + Dealer + "\nGroup of scene objects\nIndustry building\nPlace: Bryson\n" + OutlinerGrouping.ChangedLine, "a changed group's tooltip says where it stands and why it is changed (got " + tip + ")");
             Check(!tip.Contains(Baked) && OutlinerGrouping.ChangedLine.Contains("scene patch file"), "the tooltip names no family, and Changed names the scene patch file");
             var boardTip = OutlinerGrouping.Tooltip(tree, board, false, null);
-            Check(boardTip == "Loc: Connelly\nWorld/Signs/Loc: Connelly\nSign / Location signs\nPlace: Connelly Creek\nProblem: The board's mask is missing", "a tooltip lists each problem on its own line (got " + boardTip + ")");
-            Check(OutlinerGrouping.FolderTooltip(tree.Tops[2]) == "Lights\n4 objects" && OutlinerGrouping.FolderTooltip(Find(sign.Children, "Location signs")) == "Location signs\n1 object", "a folder's tooltip gives its name and its count");
+            Check(boardTip == "Loc: Connelly\nWorld/Signs/Loc: Connelly\nSign\nPlace: Connelly Creek\nProblem: The board's mask is missing", "a tooltip lists each problem on its own line (got " + boardTip + ")");
+            Check(OutlinerGrouping.FolderTooltip(tree.Tops[2]) == "Lights\n4 objects" && OutlinerGrouping.FolderTooltip(Find(sign.Children, "Connelly Creek")) == "Connelly Creek\n1 object", "a folder's tooltip gives its name and its count");
             // Fit measures every row of the tree with its depth.
             var labels = OutlinerGrouping.FitLabels();
             Check(labels.Any(l => l.Key == "(1) Industry building" && l.Value == 0) && labels.Any(l => l.Key == "Heap" && l.Value == 3), "Fit takes each row's text and depth");

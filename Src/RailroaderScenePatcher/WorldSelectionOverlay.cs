@@ -334,7 +334,7 @@ namespace RailroaderScenePatcher {
         }
 
         internal bool OverLabel(Vector2 pointer, IReadOnlyList<Rect> uiBounds) =>
-            labels.Any(label => label.Label.Contains(pointer)) && !uiBounds.Any(bounds => bounds.Contains(pointer));
+            labels.Any(label => label.Candidate != null && label.Label.Contains(pointer)) && !uiBounds.Any(bounds => bounds.Contains(pointer));
 
         internal SelectionCandidate[] Pick(SpatialCandidate[] candidates, Camera camera, Vector3 origin, Vector2 pointer,
             IReadOnlyList<Rect> uiBounds, SelectionCandidate chosen, out bool listRow, out bool isCrossingSetup) {
@@ -345,7 +345,7 @@ namespace RailroaderScenePatcher {
             budget.Begin();
             if (covered.Any(r => r.Contains(pointer))) return Array.Empty<SelectionCandidate>();
             lastPick = pointer;
-            var labelHits = labels.Where(s => s.Label.Contains(pointer)).ToArray();
+            var labelHits = labels.Where(s => s.Candidate != null && s.Label.Contains(pointer)).ToArray();
             var shapes = ProjectAll(candidates, camera, origin, out var measured);
             var groups = Groups(candidates, measured, camera, origin, chosen, inspectedMark);
             OwnFrames(candidates, shapes, measured, groups, camera, origin);
@@ -379,7 +379,8 @@ namespace RailroaderScenePatcher {
         // A complex that shows as one square marker: its objects among the candidates, as indices, those
         // of them that show on their own, those its choice list leaves out (its detection spans), what the group
         // shows and its one marking, or null when it is not in view.
-        sealed class ShownGroup { internal int[] Members; internal int[] Own; internal int[] Unlisted; internal GroupShows Shows; internal Shape Shape; internal ComplexKind Kind; }
+        // Text is what its square marker says under the pointer: the group's name and that it is a group of scene objects.
+        sealed class ShownGroup { internal int[] Members; internal int[] Own; internal int[] Unlisted; internal GroupShows Shows; internal Shape Shape; internal ComplexKind Kind; internal string Text; }
         // The groups that show as one from this camera, for each candidate whether its group stands for it, the
         // candidates that show their own frame at their group's frame distance (Complexes.OwnFrameDistance).
         // The inspected object has its frame at any distance.
@@ -548,7 +549,9 @@ namespace RailroaderScenePatcher {
                 var ownDistance = Complexes.OwnFrameDistance(marking.Shows);
                 if (ownDistance > ObjectMarkingGeometry.FrameDistance) layout.OwnAtGroupDistance.AddRange(own);
                 var unlisted = indices.Where((i, k) => i >= 0 && !listed[k]).ToArray();
-                shown.Add(new ShownGroup { Members = members, Own = own, Unlisted = unlisted, Shows = marking.Shows, Shape = GroupShape(marking, camera), Kind = groups[g].Kind });
+                var top = groups[g].Stands < 0 ? null : objects[groups[g].Stands].Observation;
+                var text = CommandBand.GroupMarkerText(top?.DisplayName ?? (root != null ? root.name : null), CommandBand.TrackSide(groups[g].Kind, top?.Category, top?.Bridge ?? BridgeKind.None));
+                shown.Add(new ShownGroup { Members = members, Own = own, Unlisted = unlisted, Shows = marking.Shows, Shape = GroupShape(marking, camera), Kind = groups[g].Kind, Text = text });
             }
             layout.Shown = shown.ToArray();
             return layout;
@@ -621,7 +624,7 @@ namespace RailroaderScenePatcher {
         internal static readonly Color Gold = Tone(CommandBand.WorldMark.Inspected);
         // A current relation of the inspected object: green, more saturated under the pointer.
         void Relation(List<Shape> shapes, SpatialCandidate relation, string label, Camera camera, Vector3 origin, Vector2 pointer) {
-            if (relation == null || relation.Points.Length == 0 || shapes.Any(s => s.Text != null && s.Candidate.Choice.Matches(relation.Choice))) return;
+            if (relation == null || relation.Points.Length == 0 || shapes.Any(s => s.Text != null && s.Candidate != null && s.Candidate.Choice.Matches(relation.Choice))) return;
             var shape = Project(relation, camera, origin);
             if (shape == null) return;
             shape.Color = Tone(CommandBand.RelationMark(shape.Contains(pointer)));
@@ -657,7 +660,8 @@ namespace RailroaderScenePatcher {
             // candidates of one spot. Over a window or a label it marks nothing by that rule; a label marks its own.
             var projected = ProjectAll(candidates, camera, origin, out var measured);
             var overUi = covered.Any(r => r.Contains(pointer));
-            var labelHit = overUi ? null : labels.FirstOrDefault(label => label.Label.Contains(pointer));
+            // A group marker's label is no candidate's: the pointer over it keeps the hover of its group.
+            var labelHit = overUi ? null : labels.FirstOrDefault(label => label.Candidate != null && label.Label.Contains(pointer));
             labels.Clear();
             var groups = Groups(candidates, measured, camera, origin, pending?.Candidate, source);
             OwnFrames(candidates, projected, measured, groups, camera, origin);
@@ -707,10 +711,12 @@ namespace RailroaderScenePatcher {
                 bool open = pending != null && several && group.Members.Any(m => groups.Hidden[m] && pending.Offers.Contains(candidates[m].Choice));
                 group.Shape.Color = Tone(CommandBand.CandidateMark(open && !hovered, hovered));
                 group.Shape.Detailed = open || hovered;
+                // Under the pointer the square marker says what it stands for, as a tooltip does.
+                group.Shape.Text = hovered && !open ? group.Text : null;
                 shapes.Add(group.Shape);
             }
             if (source != null && source.Points.Length > 0) {
-                var marked = shapes.FirstOrDefault(s => s.Text != null && s.Candidate.Choice.Matches(source.Choice));
+                var marked = shapes.FirstOrDefault(s => s.Text != null && s.Candidate != null && s.Candidate.Choice.Matches(source.Choice));
                 // The inspected object keeps its frame and marker at any camera distance and while culling hides it.
                 var shape = Project(source, camera, origin, Double.PositiveInfinity, out _);
                 if (marked != null) {

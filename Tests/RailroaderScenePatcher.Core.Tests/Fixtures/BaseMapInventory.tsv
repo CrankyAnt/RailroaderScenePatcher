@@ -1055,7 +1055,7 @@ O	L	World/Large Scenery/Robinson Gap Mine/Coal Loader/Model/Spotlight Outdoor	22
 O	K	World/Large Scenery/Sylva	49	-	-	24630	-920	-	-
 O	L	World/Large Scenery/Sylva/Speed Sign Sylva Wye	7,4,3,2	Track marker	-	25091	-911	Sign / Speed signs	Sign / Speed signs @ Sylva
 O	L	World/Large Scenery/Sylva/Speed Sign Sylva Wye	7,4,3,2	Track marker	-	25303	-499	Sign / Speed signs	Sign / Speed signs @ Sylva
-O	L	World/Large Scenery/Sylva/Sylva Culled	19	Scene object	scene-object-v1	25261	-567	Industry building	Industry building / Pavilion @ Sylva
+O	L	World/Large Scenery/Sylva/Sylva Culled	19	Scene object	scene-object-v1	25261	-567	Industry building	Industry building @ Sylva
 O	L	World/Large Scenery/Sylva/Sylva Culled/Pavilion	-	Child object	child-object-v1	25171	-623	-	-
 O	L	World/Large Scenery/Sylva/Sylva Culled/Pavilion/Cube.001	20,21	Child object	child-object-v1	25171	-623	-	-
 O	L	World/Large Scenery/Sylva/Sylva Culled/Pavilion/Cube.002	20,21	Child object	child-object-v1	25171	-623	-	-
@@ -1161,7 +1161,7 @@ O	K	World/Large Scenery/Topton/Topton Station/Station	57	-	-	-18963	-15227	-	-
 O	K	World/Large Scenery/Topton/Topton Station/Station/Decking	26	-	-	-18960	-15228	-	-
 O	K	World/Large Scenery/Topton/Topton Station/Station/Foundation	26	-	-	-18963	-15227	-	-
 O	L	World/Large Scenery/Whittier/Connelly	-	Scene object	scene-object-v1	11349	3986	Storage display	Storage display / Storage piles @ Connelly Creek
-O	L	World/Large Scenery/Whittier/Connelly Culled	19	Scene object	scene-object-v1	12570	2484	Industry building	Industry building / Pavilion @ Connelly Creek
+O	L	World/Large Scenery/Whittier/Connelly Culled	19	Scene object	scene-object-v1	12570	2484	Industry building	Industry building @ Connelly Creek
 O	L	World/Large Scenery/Whittier/Connelly Culled/Pavilion	-	Child object	child-object-v1	12655	2383	-	-
 O	L	World/Large Scenery/Whittier/Connelly Culled/Pavilion/Cube.001	20,21	Child object	child-object-v1	12655	2383	-	-
 O	L	World/Large Scenery/Whittier/Connelly Culled/Pavilion/Cube.002	20,21	Child object	child-object-v1	12655	2383	-	-
@@ -1420,60 +1420,60 @@ O	K	World/Map Labels/Whittier	11,12,56	-	-	12383	5956	-	-
 O	K	World/Map Labels/Whittier/Label	11,47,48	-	-	12383	5956	-	-
 O	K	World/Map Labels/Wilmot	11,12,56	-	-	16514	2445	-	-
 O	K	World/Map Labels/Wilmot/Label	11,47,48	-	-	16514	2445	-	-
-O	L	World/Mile Posts/T-45.1 Origin	2,7,4,3,8	Milepost	milepost-v1	25581	364	Sign / Mileposts	Sign / Mileposts @ Sylva
-O	L	World/Mile Posts/T-46 Origin	2,7,4,3,8	Milepost	milepost-v1	25003	-915	Sign / Mileposts	Sign / Mileposts @ Sylva
-O	L	World/Mile Posts/T-47	2,7,4,3,8	Milepost	milepost-v1	23406	-1036	Sign / Mileposts	Sign / Mileposts @ Dillsboro
-O	L	World/Mile Posts/T-48	2,7,4,3,8	Milepost	milepost-v1	21988	-1594	Sign / Mileposts	Sign / Mileposts @ Dillsboro
-O	L	World/Mile Posts/T-49	2,7,4,3,8	Milepost	milepost-v1	20751	-1000	Sign / Mileposts	Sign / Mileposts @ Cowee
-O	L	World/Mile Posts/T-50	2,7,4,3,8	Milepost	milepost-v1	19455	-439	Sign / Mileposts	Sign / Mileposts @ Barker's Creek
-O	L	World/Mile Posts/T-51	2,7,4,3,8	Milepost	milepost-v1	18219	435	Sign / Mileposts	Sign / Mileposts @ Barker's Creek
-O	L	World/Mile Posts/T-52	2,7,4,3,8	Milepost	milepost-v1	18078	1819	Sign / Mileposts	Sign / Mileposts @ Barker's Creek
-O	L	World/Mile Posts/T-53	2,7,4,3,8	Milepost	milepost-v1	17487	2185	Sign / Mileposts	Sign / Mileposts @ Wilmot
-O	L	World/Mile Posts/T-54	2,7,4,3,8	Milepost	milepost-v1	15908	2248	Sign / Mileposts	Sign / Mileposts @ Thomas Valley
-O	L	World/Mile Posts/T-55	2,7,4,3,8	Milepost	milepost-v1	15007	3426	Sign / Mileposts	Sign / Mileposts @ Thomas Valley
-O	L	World/Mile Posts/T-56	2,7,4,3,8	Milepost	milepost-v1	13718	4249	Sign / Mileposts	Sign / Mileposts @ Whittier
-O	L	World/Mile Posts/T-57	2,7,4,3,8	Milepost	milepost-v1	12329	4954	Sign / Mileposts	Sign / Mileposts @ Whittier
-O	L	World/Mile Posts/T-58	2,7,4,3,8	Milepost	milepost-v1	12133	6358	Sign / Mileposts	Sign / Mileposts @ Whittier
-O	L	World/Mile Posts/T-59	2,7,4,3,8	Milepost	milepost-v1	10535	6567	Sign / Mileposts	Sign / Mileposts @ Ela
-O	L	World/Mile Posts/T-60	2,7,4,3,8	Milepost	milepost-v1	9373	7480	Sign / Mileposts	Sign / Mileposts @ Ela
-O	L	World/Mile Posts/T-61	2,7,4,3,8	Milepost	milepost-v1	8639	6645	Sign / Mileposts	Sign / Mileposts @ Gov Island
-O	L	World/Mile Posts/T-62	2,7,4,3,8	Milepost	milepost-v1	7378	5601	Sign / Mileposts	Sign / Mileposts @ Gov Island
-O	L	World/Mile Posts/T-63	2,7,4,3,8	Milepost	milepost-v1	5873	5706	Sign / Mileposts	Sign / Mileposts @ Walker
-O	L	World/Mile Posts/T-64	2,7,4,3,8	Milepost	milepost-v1	4361	5380	Sign / Mileposts	Sign / Mileposts @ Bryson
-O	L	World/Mile Posts/T-65	2,7,4,3,8	Milepost	milepost-v1	3338	4280	Sign / Mileposts	Sign / Mileposts @ Bryson
-O	L	World/Mile Posts/T-66	2,7,4,3,8	Milepost	milepost-v1	1981	4585	Sign / Mileposts	Sign / Mileposts @ Hemingway
-O	L	World/Mile Posts/T-67	2,7,4,3,8	Milepost	milepost-v1	2110	4002	Sign / Mileposts	Sign / Mileposts @ Hemingway
-O	L	World/Mile Posts/T-68	2,7,4,3,8	Milepost	milepost-v1	2677	2841	Sign / Mileposts	Sign / Mileposts @ Hemingway
-O	L	World/Mile Posts/T-69	2,7,4,3,8	Milepost	milepost-v1	1745	1533	Sign / Mileposts	Sign / Mileposts @ Alarka Jct
-O	L	World/Mile Posts/T-70	2,7,4,3,8	Milepost	milepost-v1	463	1081	Sign / Mileposts	Sign / Mileposts @ Robinson Branch
-O	L	World/Mile Posts/T-71	2,7,4,3,8	Milepost	milepost-v1	-1084	842	Sign / Mileposts	Sign / Mileposts @ Brooks
-O	L	World/Mile Posts/T-72	2,7,4,3,8	Milepost	milepost-v1	-2360	1316	Sign / Mileposts	Sign / Mileposts @ Brooks
-O	L	World/Mile Posts/T-73	2,7,4,3,8	Milepost	milepost-v1	-3698	1457	Sign / Mileposts	Sign / Mileposts @ Brooks
-O	L	World/Mile Posts/T-74	2,7,4,3,8	Milepost	milepost-v1	-5067	924	Sign / Mileposts	Sign / Mileposts @ McClain
-O	L	World/Mile Posts/T-75	2,7,4,3,8	Milepost	milepost-v1	-6353	293	Sign / Mileposts	Sign / Mileposts @ McClain
-O	L	World/Mile Posts/T-76	2,7,4,3,8	Milepost	milepost-v1	-6354	-1254	Sign / Mileposts	Sign / Mileposts @ Almond
-O	L	World/Mile Posts/T-77	2,7,4,3,8	Milepost	milepost-v1	-6147	-2731	Sign / Mileposts	Sign / Mileposts @ Almond
-O	L	World/Mile Posts/T-78	2,7,4,3,8	Milepost	milepost-v1	-6687	-4180	Sign / Mileposts	Sign / Mileposts @ Wesser
-O	L	World/Mile Posts/T-79	2,7,4,3,8	Milepost	milepost-v1	-7948	-4304	Sign / Mileposts	Sign / Mileposts @ Wesser
-O	L	World/Mile Posts/T-80	2,7,4,3,8	Milepost	milepost-v1	-8695	-5522	Sign / Mileposts	Sign / Mileposts @ Wesser
-O	L	World/Mile Posts/T-81	2,7,4,3,8	Milepost	milepost-v1	-10088	-5601	Sign / Mileposts	Sign / Mileposts @ Wesser
-O	L	World/Mile Posts/T-82	2,7,4,3,8	Milepost	milepost-v1	-11547	-5222	Sign / Mileposts	Sign / Mileposts @ Wesser
-O	L	World/Mile Posts/T-83	2,7,4,3,8	Milepost	milepost-v1	-12275	-6369	Sign / Mileposts	Sign / Mileposts @ Hewitt
-O	L	World/Mile Posts/T-84	2,7,4,3,8	Milepost	milepost-v1	-13125	-7650	Sign / Mileposts	Sign / Mileposts @ Hewitt
-O	L	World/Mile Posts/T-85	2,7,4,3,8	Milepost	milepost-v1	-14339	-8676	Sign / Mileposts	Sign / Mileposts @ Hewitt
-O	L	World/Mile Posts/T-86	2,7,4,3,8	Milepost	milepost-v1	-15118	-10019	Sign / Mileposts	Sign / Mileposts @ Nantahala
-O	L	World/Mile Posts/T-87	2,7,4,3,8	Milepost	milepost-v1	-16266	-11135	Sign / Mileposts	Sign / Mileposts @ Nantahala
-O	L	World/Mile Posts/T-88	2,7,4,3,8	Milepost	milepost-v1	-17218	-12279	Sign / Mileposts	Sign / Mileposts @ Graham County Railroad
-O	L	World/Mile Posts/T-89	2,7,4,3,8	Milepost	milepost-v1	-18006	-13624	Sign / Mileposts	Sign / Mileposts @ Graham County Railroad
-O	L	World/Mile Posts/T-90	2,7,4,3,8	Milepost	milepost-v1	-18789	-14907	Sign / Mileposts	Sign / Mileposts @ Topton
-O	L	World/Mile Posts/T-91	2,7,4,3,8	Milepost	milepost-v1	-19764	-16140	Sign / Mileposts	Sign / Mileposts @ Topton
-O	L	World/Mile Posts/T-92	2,7,4,3,8	Milepost	milepost-v1	-20951	-17169	Sign / Mileposts	Sign / Mileposts @ Rhodo
-O	L	World/Mile Posts/T-93	2,7,4,3,8	Milepost	milepost-v1	-22391	-17159	Sign / Mileposts	Sign / Mileposts @ Rhodo
-O	L	World/Mile Posts/T-94	2,7,4,3,8	Milepost	milepost-v1	-23436	-18388	Sign / Mileposts	Sign / Mileposts @ Rhodo
-O	L	World/Mile Posts/T-95	2,7,4,3,8	Milepost	milepost-v1	-24846	-18604	Sign / Mileposts	Sign / Mileposts @ Rhodo
-O	L	World/Mile Posts/T-96	2,7,4,3,8	Milepost	milepost-v1	-26223	-19308	Sign / Mileposts	Sign / Mileposts @ Andrews
-O	L	World/Mile Posts/T-97	2,7,4,3,8	Milepost	milepost-v1	-27416	-20300	Sign / Mileposts	Sign / Mileposts @ Andrews
-O	L	World/Mile Posts/T-98	2,7,4,3,8	Milepost	milepost-v1	-28952	-19792	Sign / Mileposts	Sign / Mileposts @ Andrews
+O	L	World/Mile Posts/T-45.1 Origin	2,7,4,3,8	Milepost	milepost-v1	25581	364	Sign / Mileposts	Mileposts @ Sylva
+O	L	World/Mile Posts/T-46 Origin	2,7,4,3,8	Milepost	milepost-v1	25003	-915	Sign / Mileposts	Mileposts @ Sylva
+O	L	World/Mile Posts/T-47	2,7,4,3,8	Milepost	milepost-v1	23406	-1036	Sign / Mileposts	Mileposts @ Dillsboro
+O	L	World/Mile Posts/T-48	2,7,4,3,8	Milepost	milepost-v1	21988	-1594	Sign / Mileposts	Mileposts @ Dillsboro
+O	L	World/Mile Posts/T-49	2,7,4,3,8	Milepost	milepost-v1	20751	-1000	Sign / Mileposts	Mileposts @ Cowee
+O	L	World/Mile Posts/T-50	2,7,4,3,8	Milepost	milepost-v1	19455	-439	Sign / Mileposts	Mileposts @ Barker's Creek
+O	L	World/Mile Posts/T-51	2,7,4,3,8	Milepost	milepost-v1	18219	435	Sign / Mileposts	Mileposts @ Barker's Creek
+O	L	World/Mile Posts/T-52	2,7,4,3,8	Milepost	milepost-v1	18078	1819	Sign / Mileposts	Mileposts @ Barker's Creek
+O	L	World/Mile Posts/T-53	2,7,4,3,8	Milepost	milepost-v1	17487	2185	Sign / Mileposts	Mileposts @ Wilmot
+O	L	World/Mile Posts/T-54	2,7,4,3,8	Milepost	milepost-v1	15908	2248	Sign / Mileposts	Mileposts @ Thomas Valley
+O	L	World/Mile Posts/T-55	2,7,4,3,8	Milepost	milepost-v1	15007	3426	Sign / Mileposts	Mileposts @ Thomas Valley
+O	L	World/Mile Posts/T-56	2,7,4,3,8	Milepost	milepost-v1	13718	4249	Sign / Mileposts	Mileposts @ Whittier
+O	L	World/Mile Posts/T-57	2,7,4,3,8	Milepost	milepost-v1	12329	4954	Sign / Mileposts	Mileposts @ Whittier
+O	L	World/Mile Posts/T-58	2,7,4,3,8	Milepost	milepost-v1	12133	6358	Sign / Mileposts	Mileposts @ Whittier
+O	L	World/Mile Posts/T-59	2,7,4,3,8	Milepost	milepost-v1	10535	6567	Sign / Mileposts	Mileposts @ Ela
+O	L	World/Mile Posts/T-60	2,7,4,3,8	Milepost	milepost-v1	9373	7480	Sign / Mileposts	Mileposts @ Ela
+O	L	World/Mile Posts/T-61	2,7,4,3,8	Milepost	milepost-v1	8639	6645	Sign / Mileposts	Mileposts @ Gov Island
+O	L	World/Mile Posts/T-62	2,7,4,3,8	Milepost	milepost-v1	7378	5601	Sign / Mileposts	Mileposts @ Gov Island
+O	L	World/Mile Posts/T-63	2,7,4,3,8	Milepost	milepost-v1	5873	5706	Sign / Mileposts	Mileposts @ Walker
+O	L	World/Mile Posts/T-64	2,7,4,3,8	Milepost	milepost-v1	4361	5380	Sign / Mileposts	Mileposts @ Bryson
+O	L	World/Mile Posts/T-65	2,7,4,3,8	Milepost	milepost-v1	3338	4280	Sign / Mileposts	Mileposts @ Bryson
+O	L	World/Mile Posts/T-66	2,7,4,3,8	Milepost	milepost-v1	1981	4585	Sign / Mileposts	Mileposts @ Hemingway
+O	L	World/Mile Posts/T-67	2,7,4,3,8	Milepost	milepost-v1	2110	4002	Sign / Mileposts	Mileposts @ Hemingway
+O	L	World/Mile Posts/T-68	2,7,4,3,8	Milepost	milepost-v1	2677	2841	Sign / Mileposts	Mileposts @ Hemingway
+O	L	World/Mile Posts/T-69	2,7,4,3,8	Milepost	milepost-v1	1745	1533	Sign / Mileposts	Mileposts @ Alarka Jct
+O	L	World/Mile Posts/T-70	2,7,4,3,8	Milepost	milepost-v1	463	1081	Sign / Mileposts	Mileposts @ Robinson Branch
+O	L	World/Mile Posts/T-71	2,7,4,3,8	Milepost	milepost-v1	-1084	842	Sign / Mileposts	Mileposts @ Brooks
+O	L	World/Mile Posts/T-72	2,7,4,3,8	Milepost	milepost-v1	-2360	1316	Sign / Mileposts	Mileposts @ Brooks
+O	L	World/Mile Posts/T-73	2,7,4,3,8	Milepost	milepost-v1	-3698	1457	Sign / Mileposts	Mileposts @ Brooks
+O	L	World/Mile Posts/T-74	2,7,4,3,8	Milepost	milepost-v1	-5067	924	Sign / Mileposts	Mileposts @ McClain
+O	L	World/Mile Posts/T-75	2,7,4,3,8	Milepost	milepost-v1	-6353	293	Sign / Mileposts	Mileposts @ McClain
+O	L	World/Mile Posts/T-76	2,7,4,3,8	Milepost	milepost-v1	-6354	-1254	Sign / Mileposts	Mileposts @ Almond
+O	L	World/Mile Posts/T-77	2,7,4,3,8	Milepost	milepost-v1	-6147	-2731	Sign / Mileposts	Mileposts @ Almond
+O	L	World/Mile Posts/T-78	2,7,4,3,8	Milepost	milepost-v1	-6687	-4180	Sign / Mileposts	Mileposts @ Wesser
+O	L	World/Mile Posts/T-79	2,7,4,3,8	Milepost	milepost-v1	-7948	-4304	Sign / Mileposts	Mileposts @ Wesser
+O	L	World/Mile Posts/T-80	2,7,4,3,8	Milepost	milepost-v1	-8695	-5522	Sign / Mileposts	Mileposts @ Wesser
+O	L	World/Mile Posts/T-81	2,7,4,3,8	Milepost	milepost-v1	-10088	-5601	Sign / Mileposts	Mileposts @ Wesser
+O	L	World/Mile Posts/T-82	2,7,4,3,8	Milepost	milepost-v1	-11547	-5222	Sign / Mileposts	Mileposts @ Wesser
+O	L	World/Mile Posts/T-83	2,7,4,3,8	Milepost	milepost-v1	-12275	-6369	Sign / Mileposts	Mileposts @ Hewitt
+O	L	World/Mile Posts/T-84	2,7,4,3,8	Milepost	milepost-v1	-13125	-7650	Sign / Mileposts	Mileposts @ Hewitt
+O	L	World/Mile Posts/T-85	2,7,4,3,8	Milepost	milepost-v1	-14339	-8676	Sign / Mileposts	Mileposts @ Hewitt
+O	L	World/Mile Posts/T-86	2,7,4,3,8	Milepost	milepost-v1	-15118	-10019	Sign / Mileposts	Mileposts @ Nantahala
+O	L	World/Mile Posts/T-87	2,7,4,3,8	Milepost	milepost-v1	-16266	-11135	Sign / Mileposts	Mileposts @ Nantahala
+O	L	World/Mile Posts/T-88	2,7,4,3,8	Milepost	milepost-v1	-17218	-12279	Sign / Mileposts	Mileposts @ Graham County Railroad
+O	L	World/Mile Posts/T-89	2,7,4,3,8	Milepost	milepost-v1	-18006	-13624	Sign / Mileposts	Mileposts @ Graham County Railroad
+O	L	World/Mile Posts/T-90	2,7,4,3,8	Milepost	milepost-v1	-18789	-14907	Sign / Mileposts	Mileposts @ Topton
+O	L	World/Mile Posts/T-91	2,7,4,3,8	Milepost	milepost-v1	-19764	-16140	Sign / Mileposts	Mileposts @ Topton
+O	L	World/Mile Posts/T-92	2,7,4,3,8	Milepost	milepost-v1	-20951	-17169	Sign / Mileposts	Mileposts @ Rhodo
+O	L	World/Mile Posts/T-93	2,7,4,3,8	Milepost	milepost-v1	-22391	-17159	Sign / Mileposts	Mileposts @ Rhodo
+O	L	World/Mile Posts/T-94	2,7,4,3,8	Milepost	milepost-v1	-23436	-18388	Sign / Mileposts	Mileposts @ Rhodo
+O	L	World/Mile Posts/T-95	2,7,4,3,8	Milepost	milepost-v1	-24846	-18604	Sign / Mileposts	Mileposts @ Rhodo
+O	L	World/Mile Posts/T-96	2,7,4,3,8	Milepost	milepost-v1	-26223	-19308	Sign / Mileposts	Mileposts @ Andrews
+O	L	World/Mile Posts/T-97	2,7,4,3,8	Milepost	milepost-v1	-27416	-20300	Sign / Mileposts	Mileposts @ Andrews
+O	L	World/Mile Posts/T-98	2,7,4,3,8	Milepost	milepost-v1	-28952	-19792	Sign / Mileposts	Mileposts @ Andrews
 O	L	World/POIs/Alarka	1	Spawn point	spawn-point-v1	4195	-3139	Spawn point	Spawn point @ Alarka
 O	L	World/POIs/Alarka Jct	1	Spawn point	spawn-point-v1	1759	1366	Spawn point	Spawn point @ Alarka Jct
 O	L	World/POIs/Almond	1	Spawn point	spawn-point-v1	-6323	-1336	Spawn point	Spawn point @ Almond
