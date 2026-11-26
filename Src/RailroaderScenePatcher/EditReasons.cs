@@ -44,6 +44,7 @@ namespace RailroaderScenePatcher {
             if (Has("can't share control of this object's activity")) return "Progression or a map feature switches it";
             if (Has("culler") && (Has("camera distance") || Has("switches this part"))) return Camera;
             if (Has("track group controls this object's activity")) return CommandBand.GroupEnableReason;
+            if (Has("pad's activity follows a track group")) return "Its activity follows a track group";
             if (Has("construction controller switches the bridge's parts on or off regardless")) return CommandBand.ControllerNoPlacement;
             if (Has("This controller switches the bridge's parts on or off as construction progresses")) return CommandBand.ControllerNoActivity;
             if (Has("fixed placement")) return Fixed;
@@ -56,6 +57,7 @@ namespace RailroaderScenePatcher {
             if (Has("contains a construction controller")) return "It holds a construction controller";
             if (Has("Use the milepost's own settings")) return "Edit it on its milepost";
             if (Has("Edit this marker through its crossing pad")) return "Edit it on its crossing pad";
+            if (Has("set the construction segments on its group")) return "Edit it on its group";
             if (Has("This path names a group, not a part")) return "Edit the group as a whole instead";
             if (Has("only carries a simple culler")) return "Edit the parts it holds directly";
             if (Has("only holds other groups")) return "Edit the groups it holds instead";
@@ -90,7 +92,8 @@ namespace RailroaderScenePatcher {
             "Station click spots are native map data", "It holds a construction controller", Family,
             "Edit the group as a whole instead", "Edit the parts it holds directly", "Edit the groups it holds instead",
             "Not supported on this game build", "Its parent object must be active", "Its attached object is out of date",
-            "Its crossing controller is disabled", "Edit it on its milepost", "Edit it on its crossing pad"
+            "Its crossing controller is disabled", "Edit it on its milepost", "Edit it on its crossing pad",
+            "Its activity follows a track group", "Edit it on its group"
         };
     }
 }

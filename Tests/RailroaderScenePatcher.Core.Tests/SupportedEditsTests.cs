@@ -90,6 +90,8 @@ static class SupportedEditsTests {
             ["The pad builder has no mesh container or mesh profile; native generation cannot produce its geometry"] = "Its structure isn't supported",
             ["Use the milepost's own settings to edit it"] = "Edit it on its milepost",
             ["Edit this marker through its crossing pad"] = "Edit it on its crossing pad",
+            ["The pad's activity follows a track group; the crossing-pad operation does not support group-driven activity"] = "Its activity follows a track group",
+            ["Only the Ela Bridge Scenery construction controller has construction segments of its own. For another rail bridge, set the construction segments on its group."] = "Edit it on its group",
             [SceneObjectRules.TrackMarkerReason] = "It holds track markers; edit them one by one",
             [SceneObjectRules.SpawnPointReason] = "It holds spawn points; edit them one by one",
             [SceneObjectRules.MapIconReason] = "It holds a map icon; edit it separately",
