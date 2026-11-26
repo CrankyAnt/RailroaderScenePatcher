@@ -215,7 +215,7 @@ namespace RailroaderScenePatcher {
         // The inventory line of the panel. Edits are refused while the inventory is missing or stale, because pinning
         // refuses then; changed definitions alone refuse no edit.
         internal static string Notice(SceneInventory inventory, bool definitionsStale) {
-            if (inventory != null && !inventory.IsStale && !definitionsStale) return "The inventory is up to date. You can inspect objects and start edits.";
+            if (inventory != null && !inventory.IsStale && !definitionsStale) return "The inventory is up to date. You can inspect and edit objects.";
             var refuses = inventory == null || inventory.IsStale;
             return (inventory == null ? "inspection is unavailable" : inventory.IsStale ? inventory.StaleReason : "the supplied definitions changed or were not read") +
                 ". Click Refresh to update the inventory." + (refuses ? " Edits are refused until then." : "");

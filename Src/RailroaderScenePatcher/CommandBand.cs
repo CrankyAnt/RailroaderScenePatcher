@@ -672,7 +672,7 @@ namespace RailroaderScenePatcher {
             ? "Show the short form, with paths relative to this object and grouped per object."
             : "Show the full lines, with each component's scene and full path.";
         // The Detected problems section of a stale inventory: its problems are those of the last refresh.
-        internal const string StaleProblems = "The inventory is stale, so these problems might be out of date. Click Refresh to check them again.";
+        internal const string StaleProblems = "These problems are from the last refresh and might be out of date. Click Refresh to check them again.";
         // A detected problem as the Object tab shows it. On a marker whose replacement ID repaired a duplicate marker ID,
         // the binding rule's own problem for a bound segment that doesn't resolve, a missing segment or an empty binding
         // (BindingRules.Problem with resolves false for the marker's need, activity and bound segment), is told in plain
@@ -900,7 +900,7 @@ namespace RailroaderScenePatcher {
         // The Inventory line of Session details: what the last full read of the scene was. It stays until the next
         // full read, so it says that it is about that read; edits since then are on the Changes tab.
         internal static string InventoryRead(bool inspectedGone) =>
-            "The last full read covered the inventory and the supplied definitions. Reading applies no changes." + (inspectedGone ? " The inspected object is no longer present." : "");
+            "The last full read included the inventory and the supplied definitions. It made no changes." + (inspectedGone ? " The inspected object is no longer present." : "");
         // The distance scrolled from the top of a region that brings a control into view: a control above the view is
         // shown at the view's top, one below it is shown with its top as high as it fits, and one in view stays where it
         // is. The distances are from the top of the scrolled content; the result stays within what the region scrolls.

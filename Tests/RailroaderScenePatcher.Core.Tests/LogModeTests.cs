@@ -253,7 +253,7 @@ static class LogModeTests {
             [EditingFailure.GizmoCleanup] = "The patcher couldn't confirm removal of the gizmo's temporary changes. Reload the Map Editor. x",
             [EditingFailure.GizmoRestore] = "x",
             [EditingFailure.GizmoPreview] = "The gizmo drag failed: x",
-            [EditingFailure.GizmoUnavailable] = "The gizmo couldn't be shown: x",
+            [EditingFailure.GizmoUnavailable] = "The patcher couldn't show the gizmo: x",
             [EditingFailure.HookUnavailable] = "Map Editor reload hook unavailable",
             [EditingFailure.HistoryTracking] = "The patcher couldn't track an Undo or Redo history change in the Map Editor: x",
             [EditingFailure.ChromeRefresh] = "The Map Editor title and Save button couldn't be updated: x",

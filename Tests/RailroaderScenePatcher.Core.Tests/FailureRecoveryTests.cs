@@ -180,7 +180,7 @@ static class FailureRecoveryTests {
         var incomplete = RecoveryGuidance.For(w.Session.Edit(P, At(80), null), "Track binding", "Set binding", CrossingPadScene.Structure);
         w.Scene.RefuseState = null;
         Assert(incomplete.Kind == FailureKind.IncompleteCleanup && incomplete.Guide == "rebinding-crossing-pads.md" && incomplete.Correction == "Cleanup remains unverified. Click Recheck or reload the Map Editor." && incomplete.Line("Track binding").Contains("What remains: Position: now 80, 2, 3, before 5, 2, 3."), "An incomplete cleanup names what remains and Recheck: " + incomplete.Line("Track binding"));
-        Assert(stale.Kind == FailureKind.Refused && stale.Guide == "placing-bridges.md" && stale.Correction.StartsWith("Nothing changed. Refresh", StringComparison.Ordinal), "A stale target asks for a refresh and links the capability guide");
+        Assert(stale.Kind == FailureKind.Refused && stale.Guide == "placing-bridges.md" && stale.Correction.StartsWith("Nothing changed. Click Refresh", StringComparison.Ordinal), "A stale target asks for a refresh and links the capability guide");
         foreach (var guidance in new[] { restored, incomplete, stale })
             Assert(!guidance.Correction.Contains("JSON") && !guidance.Correction.Contains("scene-patches.json"), "Scene patch editing guidance corrects through the editor, not the file: " + guidance.Correction);
         // Each panel action opens the guide of the operation it ran: the place, the action and the target's capability decide.

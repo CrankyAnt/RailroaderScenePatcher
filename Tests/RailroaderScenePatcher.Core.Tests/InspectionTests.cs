@@ -280,7 +280,7 @@ static class InspectionTests {
         Check(notice == "not yet scanned. Click Refresh to update the inventory. " + refused && Refused(() => inventory.Pin(null)), "An unscanned inventory refuses edits and says so: " + notice);
         inventory.Refresh();
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, false);
-        Check(notice == "The inventory is up to date. You can inspect objects and start edits.", "A current inventory with current definitions is a snapshot: " + notice);
+        Check(notice == "The inventory is up to date. You can inspect and edit objects.", "A current inventory with current definitions is a snapshot: " + notice);
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, true);
         Check(notice == "the supplied definitions changed or were not read. Click Refresh to update the inventory." && inventory.Pin(inventory.Entries.Single()) != null,
             "Changed definitions alone are named as stale without a refusal the pin does not make: " + notice);

@@ -333,7 +333,7 @@ static class RecoveryTests {
         gone.Scene.Objects["p"] = new List<object>();
         var missing = gone.Session.Edit(P, At(150), null);
         var none = RecoveryGuidance.For(missing, "Placement", "Placement", null);
-        Assert(!missing.Applied && missing.Error.StartsWith(PatchEngine.TargetMissing, StringComparison.Ordinal) && none.Correction == "Nothing changed. Refresh the inventory, then inspect the object again.",
+        Assert(!missing.Applied && missing.Error.StartsWith(PatchEngine.TargetMissing, StringComparison.Ordinal) && none.Correction == "Nothing changed. Click Refresh, then inspect the object again.",
             "A target without a match asks for a refresh: " + missing.Error + " | " + none?.Correction);
         var twin = new World(Doc(""));
         twin.Scene.Objects["p"].Add(new Box { Position = new[] { 1.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } });

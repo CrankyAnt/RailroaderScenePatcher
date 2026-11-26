@@ -93,7 +93,7 @@ namespace RailroaderScenePatcher {
                     Line(row, Literal(name), "Scene marker", name, RowHeight).EqualFlexibleWidth(0);
                     Button(row, "Select", () => SelectSharer(name)).Inactive(entry == null)
                         .Tooltip("Select scene marker", CommandBand.Tooltip("Inspect this scene marker. Its Connections tab can give it the replacement ID instead.",
-                            entry != null ? null : name == ReplacementMarkerIds.ForeignOwner ? "This registration belongs to an object that isn't a scene marker." : "The inventory doesn't include this scene marker. Click Refresh."));
+                            entry != null ? null : name == ReplacementMarkerIds.ForeignOwner ? "This registration belongs to an object that isn't a scene marker." : "This scene marker isn't in the inventory. Click Refresh."));
                 }).ChildrenKeepHeight().Height(RowHeight);
             }
         }

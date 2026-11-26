@@ -118,8 +118,8 @@ namespace RailroaderScenePatcher.Core {
         public const string RemoveIdMember = "Remove the id member: the key of a modification is its ID.";
         public const string RefreshAndInspect = "Refresh and inspect again.";
         public const string RefreshInventoryAndInspect = "Refresh the inventory and inspect the object first.";
-        public const string RefreshAndRepeat = "Refresh the inventory, inspect the object again, and repeat the action.";
-        public const string RefreshThenInspect = "Refresh the inventory, then inspect the object again.";
+        public const string RefreshAndRepeat = "Click Refresh, inspect the object again, then repeat the action.";
+        public const string RefreshThenInspect = "Click Refresh, then inspect the object again.";
         public const string ClickRefreshAndInspect = "Click Refresh and inspect it again.";
         public const string CheckOutlinerOrTracks = "Check scene objects in the outliner or tracks in the Map Editor.";
 

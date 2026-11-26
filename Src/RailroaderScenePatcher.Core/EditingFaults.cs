@@ -63,7 +63,7 @@ namespace RailroaderScenePatcher.Core {
                 case EditingFailure.FileCheck: return "Could not check the scene patch file: " + detail;
                 case EditingFailure.GizmoRestore: return detail;
                 case EditingFailure.GizmoPreview: return "The gizmo drag failed: " + detail;
-                case EditingFailure.GizmoUnavailable: return "The gizmo couldn't be shown: " + detail;
+                case EditingFailure.GizmoUnavailable: return "The patcher couldn't show the gizmo: " + detail;
                 case EditingFailure.GizmoCleanup: return "The patcher couldn't confirm removal of the gizmo's temporary changes. " + WindowGuidance.ReloadMapEditor + " " + detail;
                 case EditingFailure.HistoryTracking: return "The patcher couldn't track an Undo or Redo history change in the Map Editor: " + detail;
                 case EditingFailure.ChromeRefresh: return "The Map Editor title and Save button couldn't be updated: " + detail;

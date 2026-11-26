@@ -371,7 +371,7 @@ namespace RailroaderScenePatcher {
             if (failure != null) lines.Add(CommandBand.FailureTooltipLine(failure.Value));
             else if (changed) lines.Add(ChangedLine);
             if (item.Problems.Count != 0) {
-                if (equipment) lines.Add("Detected problems: " + item.Problems.Count + ". The Detected problems section of the Object tab lists them.");
+                if (equipment) lines.Add("Detected problems: " + item.Problems.Count + ". See Detected problems on the Object tab.");
                 else lines.AddRange(item.Problems.Select(problem => "Problem: " + problem));
             }
             return String.Join("\n", lines).Replace("<", "\\u003c").Replace(">", "\\u003e");

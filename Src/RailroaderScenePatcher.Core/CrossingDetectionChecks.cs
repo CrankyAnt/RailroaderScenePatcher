@@ -74,7 +74,7 @@ namespace RailroaderScenePatcher.Core {
             if (structure != CrossingCoverageScene.Structure) refusal = coverageRefusal ?? sharedPath ?? NoCoverageEdit;
             return true;
         }
-        public const string NoCoverageEdit = "No crossing coverage edit applies to it";
+        public const string NoCoverageEdit = "The patcher has no crossing coverage edit for this controller";
 
         // The findings of one circuit: a missing role (Missing circuit index role), a span that could not be read (a
         // note), the existing check for an end without an existing segment (CircuitSpanProblems.Unresolved), then the

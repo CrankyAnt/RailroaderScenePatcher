@@ -281,8 +281,8 @@ static class CommandBandTests {
         // A window saved at its minimum of 660 by 410 has a content of 636 by 364 inside a frame of 24 by 46.
         Check(CommandBand.RestoredContent(636, 660, 24) == 636 && CommandBand.RestoredContent(364, 410, 46) == 364, "A content size saved at the minimum window is restored as saved, not raised to the window's minimum");
         Check(CommandBand.RestoredContent(900, 660, 24) == 900 && CommandBand.RestoredContent(100, 660, 24) == 636, "A larger saved size stays, and a smaller one is raised to the minimum window's content");
-        Check(CommandBand.LampTooltip(CommandBand.Inventory(false), "The inventory is up to date. You can inspect objects and start edits.") ==
-            ("Current", "The inventory is up to date. You can inspect objects and start edits."), "The Current tooltip body gives the next available actions.");
+        Check(CommandBand.LampTooltip(CommandBand.Inventory(false), "The inventory is up to date. You can inspect and edit objects.") ==
+            ("Current", "The inventory is up to date. You can inspect and edit objects."), "The Current tooltip body gives the next available actions.");
         var scene = new Scene();
         var inventory = new SceneInventory(scene);
         inventory.Refresh();

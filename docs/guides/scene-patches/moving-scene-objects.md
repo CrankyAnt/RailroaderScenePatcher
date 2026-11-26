@@ -298,13 +298,13 @@ If any check finds a difference, the modification fails and the patcher restores
 
 Grass and other terrain detail under a group come from the terrain and its masks. A native map mask, such as `br-house-track` under Bryson House Track, keeps the ground clear at the group's original position. After a move, grass grows through the group at its new position until you move or add the mask in the native map editor. A scene ground mask is different: the scene saves it, and the patcher moves it with its holder, as described in [buildings with ground masks](#buildings-with-ground-masks). Native masks in `Map.json` stay where they are.
 
-When you move a group whose ground mask flattens the ground, the ground at the old and the new position returns exactly to its earlier height after **Undo** and after **Remove modification**.
+In Railroader 0.6.3, terrain heights were measured after moving a group with a flattening ground mask. After both **Undo** and **Remove modification**, the ground at the old and new positions returned exactly to its earlier height.
 
 A mask whose shape crosses a terrain tile border is tracked only on the tile of its center. A depot mask is 10.2 m by 26.9 m, with up to 16 m of falloff, so its footprint can cross such a border. **Retry** asks the game again only for the tile of the center, and the terrain output on any other tile of the shape is not tracked. Location signs and road bridges behave the same way, so **Changes** can report completion while a neighboring tile is still rebuilding.
 
 Without the game's ground mask members, the groups that hold a mask are refused, but the Hemingway marker is not refused and would move without its mask. This is a limit of this version.
 
-The game draws none of the base-game map's lake surfaces from a static batch, so you can move each of them. The logs of a moved log pond follow it.
+You can move each lake surface on the base-game map because the game draws none of them from a static batch. The logs of a moved log pond follow it.
 
 The patcher cannot move the soot decals under a road bridge. At Dillsboro Road Bridge 1, the soot disappears when no bridge stands above the track.
 
