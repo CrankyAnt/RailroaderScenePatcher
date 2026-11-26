@@ -62,10 +62,10 @@ static class CommandBandTests {
         Check(CommandBand.PreviewReport("Coverage", new string[0]) == "Coverage preview completed. Click Apply to apply it.", "A preview without lines asks for the click only");
         // Apply of a coverage form waits for a preview, and stays inactive with the reason after a preview that changes nothing.
         Check(CommandBand.CoverageApplyBlock(false, false) == "Click Preview first." && CommandBand.CoverageApplyBlock(false, true) == "Click Preview first."
-            && CommandBand.CoverageApplyBlock(true, false) == null && CommandBand.CoverageApplyBlock(true, true) == "The object has this value already.",
+            && CommandBand.CoverageApplyBlock(true, false) == null && CommandBand.CoverageApplyBlock(true, true) == "The object already has this value.",
             "Apply is inactive before a preview and after a preview that changes nothing: " + CommandBand.CoverageApplyBlock(true, true));
         var unchanged = CommandBand.PreviewReport("Coverage", null, true);
-        Check(unchanged == "Coverage preview completed. The object has this value already." && !unchanged.Contains(WindowGuidance.ApplyPreview),
+        Check(unchanged == "Coverage preview completed. The object already has this value." && !unchanged.Contains(WindowGuidance.ApplyPreview),
             "A preview whose edit changes nothing says so and does not ask for Apply: " + unchanged);
     }
     // A group left out under a settled rule that needs no ticket, such as a group that holds track markers, is not
@@ -615,10 +615,10 @@ static class CommandBandTests {
         // The result of an edit says what happened.
         foreach (var row in new[] {
             new object[] { false, false, null, "Enable completed." },
-            new object[] { true, false, null, "The object has this value already." },
+            new object[] { true, false, null, "The object already has this value." },
             new object[] { false, true, null, "Enable completed. The value equals the object's value without this mod, so the modification no longer sets it." },
             new object[] { false, false, "Enable did something else.", "Enable did something else." },
-            new object[] { true, true, "x", "The object has this value already." } })
+            new object[] { true, true, "x", "The object already has this value." } })
             Check(CommandBand.EditResult("Enable", (bool)row[0], (bool)row[1], (string)row[2]) == (string)row[3], "An edit's result reads: " + row[3]);
         // An unchanged result names no label of its own: the footer and the log line each put the place's label before
         // it once, also where the action differs from the place.
@@ -626,7 +626,7 @@ static class CommandBandTests {
             var result = CommandBand.EditResult(row[1], true, false, null);
             var footer = row[0] + " " + CommandBand.WithoutSource(row[0], result);
             var line = CommandBand.LogLine(row[0], "World/Crossings/Bryson Everett", result);
-            Check(footer == row[0] + " The object has this value already." && line == "[" + row[0] + "] World/Crossings/Bryson Everett: The object has this value already.",
+            Check(footer == row[0] + " The object already has this value." && line == "[" + row[0] + "] World/Crossings/Bryson Everett: The object already has this value.",
                 "An unchanged " + row[1] + " states its result once, without a second label: " + footer + " | " + line);
         }
         // A crossing detection problem names its own repair route, Edit circuit or Edit detection addition, and offers no
