@@ -34,6 +34,8 @@ namespace RailroaderScenePatcher.Core {
         // Why the group takes no placement now, or null. Checked before any change.
         internal string Refusal(object group) => world.Refusal(group) ?? world.PlacementRefusal(group);
         internal object Capture(object group) { holds.Remember(world, group); return world.Observe(group); }
+        internal Placement PartInMap(object group, Placement recorded) => holds.InMap(world, group, recorded);
+        internal Placement RecordPart(object group, Placement inMap) => holds.Recorded(world, group, inMap);
         // Whether the group stands at the placement already.
         internal bool At(object group, Placement placement) => GroupChecks.SamePlacement(world.Observe(group).Root.Placement, placement);
         // The objects that stay, topmost only: an object below another one that stays keeps its place in that object.

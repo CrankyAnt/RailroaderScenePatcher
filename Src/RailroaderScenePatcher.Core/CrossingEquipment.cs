@@ -66,7 +66,7 @@ namespace RailroaderScenePatcher.Core {
         public string Id { get; }
         public string Pattern { get; }
         public EquipmentSource Source { get; }
-        // The fixed placement of the copy's root in map coordinates.
+        // The placement of the copy's root, in the coordinate frame of the caller.
         public Placement Placement { get; }
         // The supplying mod's identifier.
         public string Scope { get; }
@@ -477,17 +477,32 @@ namespace RailroaderScenePatcher.Core {
         // Whether the desired state would remove a wrapper without its copy that the read state does not show, so a
         // Recheck that finds both states equal still applies it.
         bool EquipmentLeftover(object target, ObjectState desired);
+        Placement EquipmentInMap(object target, Placement recorded);
+        Placement RecordEquipment(object target, Placement inMap);
     }
     // The equipment part of a crossing: converges the additions a controller owns on a complete set.
     internal sealed class CrossingEquipmentPart {
         readonly ICrossingEquipmentWorld world;
-        internal CrossingEquipmentPart(ICrossingEquipmentWorld world) { this.world = world; }
+        readonly WholeMove setup;
+        internal CrossingEquipmentPart(ICrossingEquipmentWorld world, WholeMove setup) { this.world = world; this.setup = setup; }
+        internal Placement InMap(object controller, Placement recorded) => setup == null || recorded == null ? recorded : setup.PartInMap(controller, recorded);
+        internal Placement Recorded(object controller, Placement inMap) => setup == null || inMap == null ? inMap : setup.RecordPart(controller, inMap);
         // A wrapper whose copy or player is gone. It counts as not built, as an addition that was never built does.
         bool Stale(object addition) => world.Present(addition) && !world.Built(addition);
         bool StaleAt(List<object> owned, EquipmentAddition addition) => owned.Any(a => Stale(a) && EquipmentAddition.SameBuild(world.Describe(a), addition));
         // The built additions; a wrapper without its copy is left out.
-        internal CrossingEquipment Observed(object controller, List<object> owned) =>
+        CrossingEquipment ObservedInMap(List<object> owned) =>
             new CrossingEquipment(owned.Where(a => world.Present(a) && world.Built(a)).Select(a => world.Describe(a).At(world.Placement(a))), true);
+        internal CrossingEquipment Observed(object controller, List<object> owned) =>
+            new CrossingEquipment(ObservedInMap(owned).Additions.Select(a => a.At(Recorded(controller, a.Placement))), true);
+        // The wrapper is a child of the controller. Verify that the native move carried it along with the setup.
+        internal bool Carried(object controller, List<object> owned, CrossingEquipment before) {
+            var after = ObservedInMap(owned);
+            return before.Additions.Count == after.Additions.Count && before.Additions.All(want => {
+                var now = after.Find(want.Key);
+                return now != null && EquipmentAddition.SameBuild(now, want) && GroupChecks.SamePlacement(now.Placement, InMap(controller, want.Placement));
+            });
+        }
         internal void Adopt(object controller, List<object> owned) {
             foreach (var addition in world.Owned(controller) ?? Array.Empty<object>()) if (!owned.Any(o => ReferenceEquals(o, addition))) owned.Add(addition);
         }
@@ -567,12 +582,13 @@ namespace RailroaderScenePatcher.Core {
                 }
                 var want = desired.Find(record.Key);
                 if (want == null || kept.Contains(record.Key) || !EquipmentAddition.SameBuild(record, want)) { Retire(owned, addition); continue; }
-                if (!EquipmentAddition.SamePlacement(world.Placement(addition), want.Placement)) world.SetPlacement(addition, want.Placement);
+                var inMap = InMap(controller, want.Placement);
+                if (!EquipmentAddition.SamePlacement(world.Placement(addition), inMap)) world.SetPlacement(addition, inMap);
                 kept.Add(record.Key);
             }
             foreach (var want in desired.Additions.Where(a => !kept.Contains(a.Key))) {
                 var source = Source(controller, want, stale.Contains(want.Key));
-                var built = world.Construct(controller, source, want) ?? throw new InvalidOperationException("Equipment " + want.Id + " was not constructed");
+                var built = world.Construct(controller, source, want.At(InMap(controller, want.Placement))) ?? throw new InvalidOperationException("Equipment " + want.Id + " was not constructed");
                 owned.Add(built);
                 var problem = world.Problem(built);
                 if (problem != null) throw new InvalidOperationException("Equipment " + want.Id + " failed validation: " + problem);
@@ -594,8 +610,9 @@ namespace RailroaderScenePatcher.Core {
         internal string Verify(object controller, List<object> owned, CrossingEquipment desired) {
             // A stale wrapper the set cleared and that still stands is owned state the change did not remove.
             var left = owned.FirstOrDefault(a => Stale(a) && Clears(a, desired));
-            var observed = Observed(controller, owned);
-            foreach (var want in desired.Additions) {
+            var observed = ObservedInMap(owned);
+            foreach (var recorded in desired.Additions) {
+                var want = recorded.At(InMap(controller, recorded.Placement));
                 var now = observed.Find(want.Key);
                 if (now == null) { Diagnose(controller, want, null, "Requested equipment is missing"); return "equipment " + want.Id + " is missing"; }
                 if (!EquipmentAddition.Same(now, want)) { Diagnose(controller, want, now, "Equipment differs from the requested equipment"); return "equipment " + want.Id + " differs from the mod's source or placement"; }

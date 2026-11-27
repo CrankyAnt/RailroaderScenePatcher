@@ -207,7 +207,7 @@ namespace RailroaderScenePatcher {
         public void SetPlacement(object group, Placement placement) => groups.SetPlacement(Device(group, "crossing controller"), placement);
         // The objects below the controller that keep their map placement when the setup moves as a whole: each track
         // marker, a crossing pad or a whistle sign, whose place its track binding sets, and each detection span.
-        // Equipment the patcher added is no part of the observation; the crossing capability keeps its placement.
+        // Added equipment moves with the controller. The crossing capability verifies its placement separately.
         public IReadOnlyList<object> Stays(object group) {
             var root = Device(group, "crossing controller");
             var kept = new List<object>();

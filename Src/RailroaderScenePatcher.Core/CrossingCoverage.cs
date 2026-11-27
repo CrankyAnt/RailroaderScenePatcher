@@ -293,7 +293,7 @@ namespace RailroaderScenePatcher.Core {
         // Without an equipment world the crossing-equipment relationship is refused; without a whole move, a placement.
         public CrossingCoverageScene(ICrossingCoverageWorld world, Capability capability, ICrossingEquipmentWorld equipment = null, WholeMove setup = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.setup = setup;
-            if (equipment != null) this.equipment = new CrossingEquipmentPart(equipment);
+            if (equipment != null) this.equipment = new CrossingEquipmentPart(equipment, setup);
         }
         // The terrain output that follows a ground mask of the setup after a whole move, by the crossing controller.
         public DependentOutput Output(object target) => setup?.Output(target) ?? DependentOutput.None;
@@ -313,6 +313,8 @@ namespace RailroaderScenePatcher.Core {
         }
         // The initialization and culling state of one addition, or null when it is not present.
         public string EquipmentStatus(object target, string scope, string id) => equipment?.Status(BaselineOf(target).Equipment, scope ?? "", id);
+        public Placement EquipmentInMap(object target, Placement recorded) => equipment == null ? recorded : equipment.InMap(target, recorded);
+        public Placement RecordEquipment(object target, Placement inMap) => equipment == null ? inMap : equipment.Recorded(target, inMap);
         public bool EquipmentLeftover(object target, ObjectState desired) {
             if (equipment == null || desired?.Equipment == null) return false;
             var baseline = BaselineOf(target);
@@ -537,17 +539,11 @@ namespace RailroaderScenePatcher.Core {
                 if (difference != null) throw new InvalidOperationException("Applied crossing equipment did not verify: " + difference);
             }
         }
-        // The whole move of the setup. Equipment the patcher added stands below the controller at a fixed placement of
-        // its own, in map coordinates: it keeps that placement whichever scene patch file moves the setup and in whatever
-        // order.
         void MoveSetup(object target, Baseline baseline, Placement placement) {
-            var kept = equipment?.Observed(target, baseline.Equipment);
+            var before = equipment?.Observed(target, baseline.Equipment);
             setup.Move(target, placement);
-            var back = kept == null ? null : EquipmentChange(target, baseline, kept);
-            if (back == null) return;
-            equipment.Write(target, baseline.Equipment, back);
-            var difference = equipment.Verify(target, baseline.Equipment, back);
-            if (difference != null) throw new InvalidOperationException("Added crossing equipment did not keep its placement: " + difference);
+            if (before != null && !equipment.Carried(target, baseline.Equipment, before))
+                throw new InvalidOperationException("Added crossing equipment did not move with the setup");
         }
         public bool Restore(object target, object snapshot) {
             try {

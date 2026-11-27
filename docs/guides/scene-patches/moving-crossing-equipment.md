@@ -39,11 +39,12 @@ To move a crossing's masts and bell together, move the setup through its crossin
 2. On the **Placement** tab, choose **Numeric**, **Gizmo**, or **Snap**, as for a mast. **Follow** is unavailable because a grade-crossing setup uses fixed placement.
 3. Check the result in the world.
 
-The masts, with their lights and gates, and the bell move and rotate together. They keep their placement relative to each other and to the controller, including a mast or bell that you moved on its own. These objects stay where they are:
+The masts, lights, gates, and bells move and rotate together, including equipment added by a mod. They keep their placement relative to the controller, including a mast or bell that you moved on its own. To move one added light, gate, or bell, edit it on the controller's **Connections** tab.
+
+These objects stay where they are:
 
 - The crossing pads and the whistle signs. Their track bindings set their places. To move a pad, see [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md).
 - The detection spans. The crossing still detects trains on the same tracks. To change them, see [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md).
-- Lights, gates, and bells that a mod added to the crossing. Each stays at the placement that its addition records. To move one, edit it on the controller's **Connections** tab.
 
 The road and the track are native map data, so they don't move either.
 

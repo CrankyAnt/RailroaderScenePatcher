@@ -973,8 +973,13 @@ namespace RailroaderScenePatcher.Core {
         public CrossingEquipment Equipment(TargetIdentity target) {
             var resolved = engine.ResolveUnique(target);
             scene.Preflight(resolved);
-            return scene.Read(resolved).Equipment ?? throw new InvalidOperationException("This object has no crossing equipment");
+            var recorded = scene.Read(resolved).Equipment ?? throw new InvalidOperationException("This object has no crossing equipment");
+            return EquipmentInMap(resolved, recorded);
         }
+        EquipmentAddition EquipmentInMap(object target, EquipmentAddition addition) =>
+            scene is ICrossingEquipmentScene equipment ? addition.At(equipment.EquipmentInMap(target, addition.Placement)) : addition;
+        CrossingEquipment EquipmentInMap(object target, CrossingEquipment recorded) =>
+            recorded == null ? null : new CrossingEquipment(recorded.Additions.Select(a => EquipmentInMap(target, a)), recorded.Complete);
         // The choices offered for the crossing, each with a usable, fixed source identity.
         public IReadOnlyList<SourceCandidate> EquipmentSources(TargetIdentity target) => EquipmentSources(target, out _);
         public IReadOnlyList<SourceCandidate> EquipmentSources(TargetIdentity target, out IReadOnlyList<SourceCandidate> details) {
@@ -1026,7 +1031,7 @@ namespace RailroaderScenePatcher.Core {
             foreach (var addition in modEquipment.Additions) {
                 var built = observed?.Find(addition.Key);
                 var problem = built != null ? null : refusals[addition.Key] ?? stopped ?? "it is not built in this world; Recheck builds it";
-                entries.Add(new EquipmentEntry(addition, built, problem));
+                entries.Add(new EquipmentEntry(EquipmentInMap(resolved, addition), built == null ? null : EquipmentInMap(resolved, built), problem));
             }
             return entries;
         }
@@ -1088,7 +1093,7 @@ namespace RailroaderScenePatcher.Core {
                 if (value == null) candidate.Remove(key); else candidate[key] = value;
                 var current = scene.Read(resolved).Equipment;
                 var desired = engine.Desired(candidate, resolved, scenePatchFileKey).Equipment;
-                return new EquipmentPreview(CrossingEquipment.Describe(current, desired, displayName), null);
+                return new EquipmentPreview(CrossingEquipment.Describe(EquipmentInMap(resolved, current), EquipmentInMap(resolved, desired), displayName), null);
             } catch (Exception e) { return new EquipmentPreview(Array.Empty<string>(), PatcherLog.Reason(e)); }
         }
         // The modification with one entry of its crossing equipment set or, for a null addition, removed. An entry is keyed by
@@ -1103,7 +1108,12 @@ namespace RailroaderScenePatcher.Core {
             var relationships = value["relationships"] as JObject ?? new JObject();
             var entries = relationships["crossingEquipment"] as JObject ?? new JObject();
             if (addition == null && entries.Property(key) == null) throw new InvalidOperationException("Equipment " + key + " is not an addition of the active scene patch file");
-            if (addition == null) entries.Remove(key); else entries[key] = EquipmentJson(addition);
+            if (addition == null) entries.Remove(key);
+            else {
+                var inMap = PatchEngine.CheckPlacement(addition.Placement?.Position, addition.Placement?.Rotation);
+                var recorded = scene is ICrossingEquipmentScene equipment ? equipment.RecordEquipment(engine.ResolveUnique(target), inMap) : inMap;
+                entries[key] = EquipmentJson(addition.At(recorded));
+            }
             // An object that lost its last entry leaves the scene patch file: crossingEquipment is never written empty.
             if (entries.Count == 0) relationships.Remove("crossingEquipment"); else if (entries.Parent == null) relationships["crossingEquipment"] = entries;
             if (!relationships.HasValues) value.Remove("relationships"); else if (relationships.Parent == null) value["relationships"] = relationships;

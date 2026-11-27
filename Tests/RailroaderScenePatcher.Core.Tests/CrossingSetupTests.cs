@@ -32,7 +32,11 @@ static class CrossingSetupTests {
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
 
     // The group world of the crossings, which names what stays when a setup moves as a whole.
-    sealed class Groups : FakeGroupWorld, IWholeMoveWorld {
+    sealed class Groups : FakeGroupWorld, IWholeMoveWorld, IFrameWorld {
+        public readonly HashSet<object> ModObjects = new HashSet<object>();
+        public object FrameAbove(object handle) => null;
+        public object ModObjectOf(object handle) => ModObjects.Contains(handle) ? handle : null;
+        public Placement PlacementOf(object handle) => Observe(handle).Root.Placement;
         public readonly HashSet<object> Staying = new HashSet<object>();
         public IReadOnlyList<object> Stays(object group) => ((FakeGroup)group).Parts.Where(Staying.Contains).Cast<object>().ToArray();
         // What stands below a controller beside its parts moves with it, as the wrapper of added equipment does: told
@@ -138,12 +142,14 @@ static class CrossingSetupTests {
             f.World.Objects[identity.Path] = new List<object> { copy };
             f.Crossings.Of[copy] = new FakeCrossing();
             f.Crossings.Made.Add(copy);
+            f.World.ModObjects.Add(copy);
             f.World.SetActive(copy, true);
             return copy;
         }
         public void Remove(object modObject) {
             foreach (var pair in f.World.Objects.Where(p => p.Value.Contains(modObject)).ToArray()) f.World.Objects.Remove(pair.Key);
             f.Crossings.Of.Remove(modObject); f.Crossings.Made.Remove(modObject);
+            f.World.ModObjects.Remove(modObject);
         }
     }
     // The crossing stands at map 1100, 10, 20. Its culler has a 30 m sphere and lists the object above each mast. Its
@@ -163,6 +169,7 @@ static class CrossingSetupTests {
         public Fixture() {
             Crossings = new Crossings(World); Equipment = new Equipment(World, Crossings);
             Equipment.Inner.Device(Mast1Path);
+            Equipment.Inner.Bell();
             Controller.Parts.Clear(); Controller.Cullers.Clear();
             Outer1 = Controller.Add(new FakePart { Id = "Signal 1#1", Offset = new[] { -6.0, 0, 4 }, Empty = true });
             Mast1 = Controller.Add(new FakePart { Id = "Signal 1/Signal 1#2", Offset = new[] { -6.0, 0, 4 }, Parent = Outer1 });
@@ -220,7 +227,9 @@ static class CrossingSetupTests {
         RotatingTheSetupTurnsThemAboutTheSetup();
         PadsSpansAndDetectionStayAfterAWholeMove();
         AMastWithItsOwnPlacementMovesWithTheSetup();
-        AddedEquipmentKeepsItsFixedPlacement();
+        AddedEquipmentMovesWithTheSetup();
+        EditingAddedEquipmentUsesMapCoordinates();
+        AddedBellMovesWithADuplicatedSetup();
         AMovedSetupKeepsItsCulling();
         RefusalsLeaveSceneAndFileUnchanged();
         AFailureAfterMutationRestoresTheSetup();
@@ -285,9 +294,7 @@ static class CrossingSetupTests {
         Assert(Near(f.At(f.Mast2), new[] { 1106.0, 10, 19 }) && SameTurn(f.Facing(f.Mast2), Quarter) && Near(f.At(f.Bell), Shifted) && f.Kept(), "The other mast and the bell move with the setup: " + f.Where());
     }
 
-    // A light or gate the patcher added stands at the fixed placement its addition records, in map coordinates: it
-    // keeps that placement when the setup moves, in the scene and in the file, and a failed move returns it too.
-    static void AddedEquipmentKeepsItsFixedPlacement() {
+    static void AddedEquipmentMovesWithTheSetup() {
         var f = new Fixture(); var session = f.Session(out var store, out var editor);
         var at = new[] { 1108.0, 10, 30 };
         var added = session.AddEquipment(ControllerId(), new EquipmentAddition("extra", EquipmentAddition.LightGatePattern, new EquipmentSource(SceneName, Mast1Path), new Placement(at, Identity)));
@@ -295,22 +302,72 @@ static class CrossingSetupTests {
         var extra = f.Equipment.Inner.Live(f.Crossing).Single();
         var moved = session.Edit(ControllerId(), new Placement(Shifted, Quarter), null);
         Assert(moved.Applied && f.Together(Shifted, 90) && f.Kept(), "The setup moves and turns as a whole: " + moved.Error + " " + f.Where());
-        Assert(Near(extra.Position, at) && SameTurn(extra.Rotation, Identity) && f.Equipment.Inner.Live(f.Crossing).Single() == extra, "The added light keeps its fixed placement and is not rebuilt: " + N(extra.Position));
-        var recorded = session.Equipment(ControllerId()).Additions.Single();
-        Assert(Near(recorded.Placement.Position, at) && SameTurn(recorded.Placement.Rotation, Identity), "The file still records that placement: " + N(recorded.Placement.Position));
+        var carried = new[] { 1120.0, 10, 17 };
+        Assert(Near(extra.Position, carried) && SameTurn(extra.Rotation, Quarter) && f.Equipment.Inner.Live(f.Crossing).Single() == extra, "The added light moves and rotates with the setup: " + N(extra.Position));
+        var recorded = JObject.Parse(session.ScenePatchFileText)["modifications"].First.First["relationships"]["crossingEquipment"]["extra"]["placement"];
+        Assert(Near(recorded["position"].Values<double>().ToArray(), at) && SameTurn(recorded["rotation"].Values<double>().ToArray(), Identity), "The file keeps the placement at the setup's map placement: " + recorded);
         editor.Undo();
-        Assert(f.Together(Home) && Near(extra.Position, at), "Undo returns the setup and leaves the added light: " + f.Where() + " " + N(extra.Position));
+        Assert(f.Together(Home) && Near(extra.Position, at) && SameTurn(extra.Rotation, Identity), "Undo returns the setup and the added light: " + f.Where() + " " + N(extra.Position));
+        editor.Redo();
+        Assert(f.Together(Shifted, 90) && Near(extra.Position, carried) && SameTurn(extra.Rotation, Quarter), "Redo moves the equipment with the setup again");
+        editor.Undo();
         f.World.SkipCullingRefresh = true;
         var failed = session.Edit(ControllerId(), new Placement(new[] { 1500.0, 10, 20 }, Identity), null);
         Assert(!failed.Applied && f.Together(Home) && f.Kept() && Near(extra.Position, at), "A failed move returns the setup and the added light: " + failed.Error + " " + N(extra.Position));
-        // Another mod moves the setup; the light this mod added keeps its placement in a fresh world, whichever applies first.
+        // Another mod moves the setup. Both load orders produce the same layout.
         Assert(editor.Save() == null, "Save writes the file");
         foreach (var first in new[] { "author/pack", "other/pack" }) {
             var fresh = new Fixture();
             foreach (var mod in first == "author/pack" ? new[] { "author/pack", "other/pack" } : new[] { "other/pack", "author/pack" })
                 Assert(fresh.Engine.Apply(mod == "author/pack" ? store.Patch : Doc(Move("theirs", Shifted, Quarter)), mod).Outcomes.Values.All(o => o.Applied), mod + " applies in a fresh world");
-            Assert(fresh.Together(Shifted, 90) && Near(fresh.Equipment.Inner.Live(fresh.Crossing).Single().Position, at), "With " + first + " first, the added light stands at its recorded placement beside the moved setup");
+            var reloaded = fresh.Equipment.Inner.Live(fresh.Crossing).Single();
+            Assert(fresh.Together(Shifted, 90) && Near(reloaded.Position, carried) && SameTurn(reloaded.Rotation, Quarter), "With " + first + " first, the added light moves and rotates with the setup");
         }
+    }
+
+    static void EditingAddedEquipmentUsesMapCoordinates() {
+        var f = new Fixture(); var session = f.Session(out var store, out var editor);
+        Assert(session.Edit(ControllerId(), new Placement(Shifted, Quarter), null).Applied, "The setup moves before equipment is added");
+        var requested = new[] { 1117.0, 12, 21 };
+        var addition = new EquipmentAddition("extra", EquipmentAddition.LightGatePattern, new EquipmentSource(SceneName, Mast1Path), new Placement(requested, Quarter));
+        Assert(session.PreviewEquipment(ControllerId(), addition, null).Error == null, "The map placement can be previewed");
+        var added = session.AddEquipment(ControllerId(), addition);
+        Assert(added.Applied, "The requested light and gate can be added: " + added.Error);
+        var extra = f.Equipment.Inner.Live(f.Crossing).Single();
+        var recorded = new[] { 1104.0, 12, 27 };
+        Assert(Near(extra.Position, requested) && SameTurn(extra.Rotation, Quarter), "The copy is built at the entered map placement");
+        Assert(Near(session.EquipmentEntries(ControllerId()).Single().Addition.Placement.Position, requested), "The Edit form reads the current map placement");
+        Assert(editor.Save() == null, "The crossing placement and its equipment save together");
+        var equipment = JObject.Parse(store.Patch)["modifications"].First.First["relationships"]["crossingEquipment"]["extra"]["placement"];
+        Assert(Near(equipment["position"].Values<double>().ToArray(), recorded) && SameTurn(equipment["rotation"].Values<double>().ToArray(), Identity), "The file stores the placement at the setup's map placement: " + equipment);
+        var fresh = new Fixture();
+        Assert(fresh.Engine.Apply(store.Patch, "author/pack").Outcomes.Values.All(o => o.Applied), "The complete crossing modification reloads");
+        var reloaded = fresh.Equipment.Inner.Live(fresh.Crossing).Single();
+        Assert(Near(reloaded.Position, requested) && SameTurn(reloaded.Rotation, Quarter), "Reload reproduces the entered map placement");
+    }
+
+    static void AddedBellMovesWithADuplicatedSetup() {
+        var f = new Fixture(); var session = f.Session(out var store, out var editor);
+        var built = new[] { 5200.0, 14, 5900 }; var moved = new[] { 5230.0, 14, 5910 };
+        var placed = session.PlaceModObject(ControllerId(), new Placement(built, Identity));
+        Assert(placed.Applied, "The crossing can be duplicated: " + placed.Error);
+        var copy = f.Copy(placed.Target);
+        var requested = new[] { 5203.0, 15, 5905 };
+        var added = session.AddEquipment(placed.Target, new EquipmentAddition("bell", EquipmentAddition.BellPattern,
+            EquipmentSource.ForDefinition(FakeEquipmentWorld.CrossingBell), new Placement(requested, Identity)));
+        Assert(added.Applied, "The duplicate can take an added bell: " + added.Error);
+        f.Equipment.Inner.FinishLoads();
+        var bell = f.Equipment.Inner.Live(f.Crossings.Of[copy]).Single();
+        var turn = session.Edit(placed.Target, new Placement(moved, Quarter), null);
+        var expected = new[] { 5235.0, 15, 5907 };
+        Assert(turn.Applied && Near(bell.Position, expected) && SameTurn(bell.Rotation, Quarter) && bell.AudioLoaded && f.Kept(built, copy), "The bell moves and rotates with the duplicate and keeps its player: " + turn.Error);
+        Assert(editor.Save() == null, "The duplicate and its equipment save together");
+        var equipment = JObject.Parse(store.Patch)["modifications"].First.First["relationships"]["crossingEquipment"]["bell"]["placement"];
+        Assert(Near(equipment["position"].Values<double>().ToArray(), new[] { 3.0, 1, 5 }), "The file records the bell at the duplicate's origin: " + equipment);
+        var fresh = new Fixture();
+        Assert(fresh.Engine.Apply(store.Patch, "author/pack").Outcomes.Values.All(o => o.Applied), "The duplicate reloads with its bell");
+        var reloaded = fresh.Equipment.Inner.Live(fresh.Crossings.Of[fresh.Copy(placed.Target)]).Single();
+        Assert(Near(reloaded.Position, expected) && SameTurn(reloaded.Rotation, Quarter) && !fresh.Equipment.Inner.Live(fresh.Crossing).Any(), "The reloaded bell belongs to the moved duplicate");
     }
 
     // The crossing's culler follows the setup. A mast with its own placement moves with the setup: inside the culler's
