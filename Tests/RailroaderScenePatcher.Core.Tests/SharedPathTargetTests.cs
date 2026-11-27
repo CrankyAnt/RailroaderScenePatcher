@@ -202,10 +202,11 @@ static class SharedPathTargetTests {
         public string WorldKey => "shared paths";
         public RailroaderScenePatcher.ObjectFacts Facts(SceneObservation entry) => new RailroaderScenePatcher.ObjectFacts();
         public double[] Bounds(SceneObservation entry) => null;
+        public double[] Displacement(SceneObservation entry) => null;
         public IEnumerable<PlaceSource> PlaceSources(IReadOnlyList<SceneObservation> entries, List<string> notes) => new[] {
-            new PlaceSource(PlaceSourceKind.MapData, "Alarka", new[] { 4144.0, -3108 }), new PlaceSource(PlaceSourceKind.MapData, "Cochran", new[] { 2084.0, -288 }),
-            new PlaceSource(PlaceSourceKind.MapData, "Alarka Jct", new[] { 1604.0, 1659 }), new PlaceSource(PlaceSourceKind.MapData, "McClain", new[] { -6660.0, -176 }),
-            new PlaceSource(PlaceSourceKind.MapData, "Hemingway", new[] { 2833.0, 3075 }), new PlaceSource(PlaceSourceKind.MapData, "Wilmot", new[] { 16507.0, 2281 }) };
+            new PlaceSource(PlaceSourceKind.MapDataArea, "Alarka", new[] { 4144.0, -3108 }), new PlaceSource(PlaceSourceKind.MapDataArea, "Cochran", new[] { 2084.0, -288 }),
+            new PlaceSource(PlaceSourceKind.MapDataArea, "Alarka Jct", new[] { 1604.0, 1659 }), new PlaceSource(PlaceSourceKind.MapDataArea, "McClain", new[] { -6660.0, -176 }),
+            new PlaceSource(PlaceSourceKind.MapDataArea, "Hemingway", new[] { 2833.0, 3075 }), new PlaceSource(PlaceSourceKind.MapDataArea, "Wilmot", new[] { 16507.0, 2281 }) };
     }
     static SceneObservation Marker(string path, double x, double z, double[] game = null, string markerId = null) =>
         new SceneObservation(new object(), new TargetIdentity("s", path, TargetKeys.MarkerComponent, TrackMarkerScene.Structure) { MarkerId = markerId }, "Generic track marker", true, new[] { x, 600, z }, new double[] { 0, 0, 0, 1 },

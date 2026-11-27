@@ -43,6 +43,28 @@ namespace RailroaderScenePatcher {
         }
 
         public double[] Bounds(SceneObservation entry) => Bounds(entry?.Handle as GameObject);
+        public double[] Displacement(SceneObservation entry) => Displacement((entry?.Handle as GameObject)?.transform);
+        // How far an object stands from where the map placed it: from the key read before this mod changed it
+        // (TargetKeyCache), its own or else that of the nearest object above it that was moved, since a moved group
+        // moves what it holds. Null when no such key shows a move.
+        static double[] Displacement(Transform t) {
+            for (var at = t; at != null; at = at.parent) {
+                var key = TargetKeyCache.Known(at.gameObject);
+                if (key?.MapPosition == null) continue;
+                var now = NativeInventory.MapPosition(at);
+                if (!Finite(now.x, now.z)) return null;
+                double dx = now.x - key.MapPosition[0], dz = now.z - key.MapPosition[1];
+                // A centimetre or less is the rounding of map coordinates, no move.
+                if (Math.Abs(dx) > 0.01 || Math.Abs(dz) > 0.01) return new[] { dx, dz };
+            }
+            return null;
+        }
+        // Where the map put an object as map x/z: its centre now, less how far it was moved.
+        static double[] Placed(GameObject go) {
+            var at = Bounds(go);
+            var by = at == null ? null : Displacement(go.transform);
+            return by == null ? at : new[] { at[0] - by[0], at[1] - by[1] };
+        }
         // The centre of the presence-giving renderers below an object. A renderer that is off or inactive counts by its
         // mesh's bounds, unless it is statically batched, whose mesh spans the whole batch; then by its transform.
         static double[] Bounds(GameObject go) {
@@ -74,14 +96,14 @@ namespace RailroaderScenePatcher {
             // The game's map data: the areas and passenger stops of the operations data.
             var ops = Ops(notes);
             if (ops == null) notes.Add("the game's operations data is not loaded");
-            else { ReadOps(ops, "Areas", "Position", sources, notes); ReadOps(ops, "AllPassengerStops", "CenterPoint", sources, notes); }
+            else { ReadOps(ops, "Areas", "Position", PlaceSourceKind.MapDataArea, sources, notes); ReadOps(ops, "AllPassengerStops", "CenterPoint", PlaceSourceKind.MapDataPassengerStop, sources, notes); }
             try { ReadUnlisted(entries, sources); }
             catch (Exception e) when (!(e is OutOfMemoryException)) { notes.Add("the scenes could not be read: " + e.GetBaseException().Message); }
             return sources;
         }
         // One list of the operations data (areas or passenger stops): each item's name and position. One unreadable item
         // never drops the rest. Area.Position and TrackSpan.GetCenterPoint are map positions.
-        static void ReadOps(object ops, string listMember, string positionMember, List<PlaceSource> sources, List<string> notes) {
+        static void ReadOps(object ops, string listMember, string positionMember, PlaceSourceKind kind, List<PlaceSource> sources, List<string> notes) {
             IEnumerable items;
             try { items = Native.Read(ops, listMember) as IEnumerable; }
             catch (Exception e) when (!(e is OutOfMemoryException)) { notes.Add(listMember + " could not be read: " + e.GetBaseException().Message); return; }
@@ -91,12 +113,12 @@ namespace RailroaderScenePatcher {
                     name = Native.Read(item, "name") as string;
                     double[] at = null;
                     if (Native.Read(item, positionMember) is Vector3 p && Finite(p.x, p.z)) at = new double[] { p.x, p.z };
-                    if (!String.IsNullOrWhiteSpace(name)) sources.Add(new PlaceSource(PlaceSourceKind.MapData, name.Trim(), at));
+                    if (!String.IsNullOrWhiteSpace(name)) sources.Add(new PlaceSource(kind, name.Trim(), at));
                 } catch (Exception e) when (!(e is OutOfMemoryException)) { notes.Add(listMember + " " + (name ?? "?") + " could not be read: " + e.GetBaseException().Message); }
             }
         }
         // Every scene object outside kept-out roots and runtime objects that names a place and that the inventory does
-        // not list: the folders of the map labels, and Loc: objects.
+        // not list: the folders of the map labels, and Loc: objects, each where the map put it.
         static void ReadUnlisted(IReadOnlyList<SceneObservation> entries, List<PlaceSource> sources) {
             var listed = new HashSet<string>(entries.Select(e => e.Identity.Path), StringComparer.Ordinal);
             for (var s = 0; s < UnityEngine.SceneManagement.SceneManager.sceneCount; s++) {
@@ -109,7 +131,7 @@ namespace RailroaderScenePatcher {
                         var label = t.parent != null && t.parent.name == SceneObjectRules.MapLabels && t.name != SceneObjectRules.StationIcons;
                         if (!label && !t.name.StartsWith(SceneClassification.LocPrefix, StringComparison.Ordinal)) continue;
                         var path = BoardScene.PathOf(t);
-                        if (!listed.Contains(path)) sources.AddRange(ScenePlaces.SourcesOf(path, Bounds(t.gameObject)));
+                        if (!listed.Contains(path)) sources.AddRange(ScenePlaces.SourcesOf(path, Placed(t.gameObject)));
                     }
                 }
             }

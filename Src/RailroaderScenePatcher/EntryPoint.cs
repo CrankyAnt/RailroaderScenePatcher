@@ -382,7 +382,7 @@ namespace RailroaderScenePatcher {
             context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
             native = new NativeInventory(g => scene == null ? "Location sign editing is unavailable" : scene.Refusal(g));
             OutlinerGrouping.Scene = new OutlinerScene();
-            capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds, Keys = TargetKeyCache.Of };
+            capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds, Keys = TargetKeyCache.Of, Resolved = target => TargetKeyCache.Of(target) };
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             // A new game reads its start spawn point before the world load, so the spawn point capability is ready with the runtime.

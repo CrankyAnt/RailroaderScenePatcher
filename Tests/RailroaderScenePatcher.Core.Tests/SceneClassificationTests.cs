@@ -19,6 +19,7 @@ static class SceneClassificationTests {
         EveryListedObjectHasItsExpectedOutcome(map);
         NothingLandsInACatchAll(map);
         ChangesAreTheKnownOnes(map);
+        PlaceChangesAreTheKnownOnes(map);
         OutcomesMatchWhatTheNamesSay(map);
         PlacesFallTogether(map);
         FictionalObjects();
@@ -27,7 +28,7 @@ static class SceneClassificationTests {
 
     static void Readout(BaseMapFixture map) {
         foreach (var place in map.Places.All.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
-            Console.WriteLine("PLACE " + place.Name + " [" + place.From + "] names: " + String.Join("; ", place.Names) + " points: " + String.Join(" ", place.Points.Select(p => Math.Round(p[0]) + "," + Math.Round(p[1]))));
+            Console.WriteLine("PLACE " + place.Name + " [" + place.From + "] names: " + String.Join("; ", place.Names) + " points (" + place.PointsFrom + "): " + String.Join(" ", place.Points.Select(p => Math.Round(p[0]) + "," + Math.Round(p[1]))));
         foreach (var o in map.Objects.Where(o => o.Listed && !o.ChildObject)) {
             var named = map.Places.NamedInPath(o.Path).FirstOrDefault(); var nearest = map.Places.Nearest(o.At);
             Console.WriteLine("ROW " + o.Path + " | " + o.Family + " | today " + o.Today + " | " + map.Outcome(o) + " | named " + (named?.Name ?? "-") + " " + Math.Round(map.Places.Distance(named, o.At)) + " nearest " + nearest?.Name + " " + Math.Round(map.Places.Distance(nearest, o.At)));
@@ -91,6 +92,74 @@ static class SceneClassificationTests {
         Check(unknown.Length == 0 && changes.Count == known.Count, "the categories that change are the known ones; unexpected: " + String.Join(" | ", unknown));
     }
 
+    // Every listed object whose place differs from the one it had when a place stood at the points of all its
+    // sources, now that it stands where its most reliable source puts it (ScenePlaces.PositionOrder). Each change is
+    // named by path and map position, since objects can share a path, with the place before and after and why.
+    // Before, each of these objects stood nearest a point of its place that came from a less reliable source, such as
+    // a Loc: board, a station map icon or the objects of a folder; the distances are to the nearest point of the
+    // place before and after. A path's place counts within 3000 metres (ScenePlaces.NameReach).
+    static readonly (string Why, string From, string To, (string Path, double X, double Z)[] Objects)[] KnownPlaceChanges = {
+        // 54 to 338 metres from a point of Whittier before; now 501 to 803 metres from the EWH Interchange map label,
+        // which is nearer than the Whittier map label.
+        ("Whittier stands at its map label, farther from these objects than EWH Interchange", "Whittier", "EWH Interchange", new[] {
+            ("Setups/Starter Equipment Setup/starter-ewh-wreck", 12582.0, 4885.0), ("Setups/Starter Equipment Setup/starter-wh-l", 12499.0, 4929.0),
+            ("World/Mile Posts/T-56", 13718.0, 4249.0), ("World/Mile Posts/T-57", 12329.0, 4954.0) }),
+        // 715 metres from a point of Alarka Jct before; now 1018 metres from the Robinson Branch Loc: board. Its path names no place.
+        ("Alarka Jct stands at its map label, farther than the Robinson Branch Loc: board", "Alarka Jct", "Robinson Branch", new[] { ("World/Large Scenery/Robinson Gap Mine/Coal Loader", 1318.0, 2189.0) }),
+        // The sign holder at the map origin, which has no row in the outliner, stands 24 km from Sylva, which its path
+        // names: 1521 metres from a point of Brooks before; now 1688 metres from the Robinson Branch Loc: board.
+        ("Brooks stands at its map label, farther than the Robinson Branch Loc: board", "Brooks", "Robinson Branch", new[] { ("World/Large Scenery/Sylva/Sylva Signs", 0.0, 0.0) }),
+        // 918 metres from a point of Dillsboro before; now 1153 metres from a Sylva map label.
+        ("Dillsboro stands at its map label, farther than Sylva", "Dillsboro", "Sylva", new[] { ("World/Mile Posts/T-47", 23406.0, -1036.0) }),
+        // 1164 metres from a point of Barker's Creek before; now 1556 metres from the Cowee map label.
+        ("Barker's Creek stands at its map label, farther than Cowee", "Barker's Creek", "Cowee", new[] { ("World/Mile Posts/T-50", 19455.0, -439.0) }),
+        // 568 metres from the Walker Branch Loc: board before; Walker has no map label and now stands at its area. Now
+        // 1325 metres from the Bryson map label.
+        ("Walker stands at its area, farther than Bryson", "Walker", "Bryson", new[] { ("World/Mile Posts/T-63", 5873.0, 5706.0) }),
+        // The milepost stood 809 metres from a point of Bryson; now 1293 metres from the Hemingway map label. The
+        // Horseshoe speed signs between Bryson and Hemingway stood 2103 to 2367 metres from a point of Bryson, within
+        // the reach of the name in their path; now 3017 to 3261 metres from the Bryson map label, beyond it, and 1284 to
+        // 1583 metres from the Hemingway map label. The other Horseshoe Above sign stands 2752 metres from Bryson's
+        // label and stays at Bryson.
+        ("Bryson stands at its map label, farther than Hemingway", "Bryson", "Hemingway", new[] {
+            ("World/Mile Posts/T-65", 3338.0, 4280.0), ("World/Signs/Speed - Bryson Horseshoe", 1861.0, 3766.0), ("World/Signs/Speed - Bryson Horseshoe", 1679.0, 3999.0),
+            ("World/Signs/Speed - Bryson Horseshoe Above", 2005.0, 3922.0) }),
+        // 2700 metres from a point of Andrews before; now 3459 metres from the Rhodo map label.
+        ("Andrews stands at its map label, farther than Rhodo", "Andrews", "Rhodo", new[] { ("World/Mile Posts/T-96", -26223.0, -19308.0) }),
+        // 2259 metres from a point of Wesser before; now 2390 metres from the Almond map label. Its path names no place.
+        ("Wesser stands at its map label, farther than Almond", "Wesser", "Almond", new[] { ("World/Signs/Speed - Fontana South Curve", -6496.0, -3752.0) }),
+    };
+    // The place an object had when a place stood at the points of all its sources, by the same choice by path and
+    // distance: a check of the snapshot, independent of ScenePlaces' position order.
+    static string PreviousPlace(BaseMapFixture map, BaseMapObject o) {
+        var points = new Dictionary<ScenePlace, List<double[]>>();
+        var sources = map.MapData.Concat(map.Objects.Where(x => !x.ChildObject).SelectMany(x => ScenePlaces.SourcesOf(x.Path, x.At)));
+        foreach (var g in sources.GroupBy(s => new { Tier = ScenePlaces.NameTier(s.Kind), Loc = s.Kind == PlaceSourceKind.LocBoard, s.Kind, Key = String.Join(" ", ScenePlaces.Tokens(s.Name)) })) {
+            var place = map.Places.All.FirstOrDefault(p => p.Names.Any(n => String.Join(" ", ScenePlaces.Tokens(n)) == g.Key.Key));
+            if (place == null) continue;
+            if (!points.TryGetValue(place, out var list)) points[place] = list = new List<double[]>();
+            // Before, the areas and passenger stops of one name were one source with one point at their middle.
+            var at = (ScenePlaces.NameTier(g.Key.Kind) == 0 ? sources.Where(s => ScenePlaces.NameTier(s.Kind) == 0 && String.Join(" ", ScenePlaces.Tokens(s.Name)) == g.Key.Key) : g).Select(s => s.At).ToArray();
+            if (g.Key.Loc) list.AddRange(at);
+            else { var xs = at.Select(p => p[0]).OrderBy(v => v).ToArray(); var zs = at.Select(p => p[1]).OrderBy(v => v).ToArray(); double Mid(double[] v) => v.Length % 2 == 1 ? v[v.Length / 2] : (v[v.Length / 2 - 1] + v[v.Length / 2]) / 2; var point = new[] { Mid(xs), Mid(zs) }; if (!list.Any(p => p[0] == point[0] && p[1] == point[1])) list.Add(point); }
+        }
+        double Distance(ScenePlace p) => p == null || !points.TryGetValue(p, out var list) || list.Count == 0 ? Double.PositiveInfinity : list.Min(q => Math.Sqrt((q[0] - o.At[0]) * (q[0] - o.At[0]) + (q[1] - o.At[1]) * (q[1] - o.At[1])));
+        var named = map.Places.NamedInPath(o.Path);
+        var near = named.FirstOrDefault(p => Distance(p) <= ScenePlaces.Close) ?? named.Where(p => Distance(p) <= ScenePlaces.NameReach).OrderBy(Distance).FirstOrDefault();
+        return (near ?? map.Places.All.OrderBy(Distance).First()).Name;
+    }
+    static void PlaceChangesAreTheKnownOnes(BaseMapFixture map) {
+        var changed = map.Objects.Where(o => o.Listed && !o.ChildObject).Select(o => new { o, From = PreviousPlace(map, o), To = map.Places.Of(o.Path, o.At)?.Name }).Where(c => c.From != c.To)
+            .Select(c => c.From + " -> " + c.To + ": " + c.o.Path + " @ " + c.o.At[0] + "," + c.o.At[1]).OrderBy(s => s, StringComparer.Ordinal).ToArray();
+        var known = KnownPlaceChanges.SelectMany(k => k.Objects.Select(x => k.From + " -> " + k.To + ": " + x.Path + " @ " + x.X + "," + x.Z)).OrderBy(s => s, StringComparer.Ordinal).ToArray();
+        Check(changed.SequenceEqual(known), "the places that change are the known ones; unexpected: " + String.Join(" | ", changed.Except(known)) + "; missing: " + String.Join(" | ", known.Except(changed)));
+        // The snapshot names each changed place: the expected column holds the new place of each of these objects.
+        foreach (var k in KnownPlaceChanges) foreach (var x in k.Objects) {
+            var row = map.Objects.Single(o => o.Listed && o.Path == x.Path && o.At[0] == x.X && o.At[1] == x.Z);
+            Check(row.Expected.EndsWith(" @ " + k.To, StringComparison.Ordinal), x.Path + " @ " + x.X + "," + x.Z + " is listed at " + k.To + " in the snapshot (" + k.Why + "), got " + row.Expected);
+        }
+    }
+
     // Expectations that do not come from the rules' own output: the kind of every bridge by its name, the kind of
     // every sign by the words of its name, the Loc: boards and the mileposts by their family, and the place of every
     // object that stands in a place folder and no farther than the rules' own reach from that place.
@@ -134,9 +203,9 @@ static class SceneClassificationTests {
         var names = map.Places.All.Select(p => p.Name).ToArray();
         Check(names.Distinct(StringComparer.OrdinalIgnoreCase).Count() == names.Length, "every place has one node");
         foreach (var a in map.Places.All) foreach (var b in map.Places.All) {
-            if (ReferenceEquals(a, b) || a.From == b.From) continue;
+            if (ReferenceEquals(a, b) || ScenePlaces.NameTier(a.From) == ScenePlaces.NameTier(b.From)) continue;
             var at = ScenePlaces.Tokens(a.Name); var bt = ScenePlaces.Tokens(b.Name);
-            Check(!(at.All(bt.Contains) && a.From < b.From) || map.Places.All.Count(p => p.From < b.From && ScenePlaces.Tokens(p.Name).All(bt.Contains)) > 1, b.Name + " holds the words of " + a.Name + " and is a place of its own only when two places fit");
+            Check(!(at.All(bt.Contains) && ScenePlaces.NameTier(a.From) < ScenePlaces.NameTier(b.From)) || map.Places.All.Count(p => ScenePlaces.NameTier(p.From) < ScenePlaces.NameTier(b.From) && ScenePlaces.Tokens(p.Name).All(bt.Contains)) > 1, b.Name + " holds the words of " + a.Name + " and is a place of its own only when two places fit");
         }
     }
 

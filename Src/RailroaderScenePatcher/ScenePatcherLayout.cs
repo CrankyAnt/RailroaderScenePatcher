@@ -68,6 +68,8 @@ namespace RailroaderScenePatcher {
         float outlinerWidth = OutlinerDefaultWidth;
         int placementMode;
         object revealed;
+        // The folders the revealed object stood in when it was revealed.
+        string revealedIn;
         readonly UIState<string> inspectorTab = new UIState<string>(ObjectTab);
         readonly UIOutlineViewState inventoryOutline = new UIOutlineViewState();
         readonly UIOutlineViewState filteredOutline = new UIOutlineViewState(true);
@@ -480,8 +482,10 @@ namespace RailroaderScenePatcher {
                     byKey[key] = item;
                     if (ReferenceEquals(selected, item)) {
                         selectedKey = key;
-                        // A newly inspected object is revealed once; afterwards its folder stays as the user leaves it.
-                        if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; foreach (var open in above) state.SetExpanded(open, true); }
+                        // A newly inspected object is revealed once; afterwards its folder stays as the user leaves it. An edit
+                        // that moves it to another place reveals it there.
+                        var folders = String.Join("\n", above);
+                        if (!ReferenceEquals(revealed, item.Handle) || revealedIn != folders) { revealed = item.Handle; revealedIn = folders; foreach (var open in above) state.SetExpanded(open, true); }
                     }
                     var changed = IsChanged(item); var added = IsAdded(item); var failure = CommandBand.ShownFailure(changed, changed ? FailureOf(item) : null);
                     // The native outline appends " *" and " +" to a name. Here the markers stand before the name, so

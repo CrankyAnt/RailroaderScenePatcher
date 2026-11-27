@@ -89,7 +89,7 @@ Use [world selection](select-world-targets.md) to find an object by its marking 
 
 ## Find and inspect an object
 
-Search by name, full hierarchy path, family, binding identifier, dependency, or detected problem. The inventory includes active and inactive loaded objects. The tree lists each object under its category and kind, or under its place in the **By place** view, in alphabetical order. For example, the Ela bridge and its construction controller stand under **Bridge** > **Rail bridges**. A newly inspected object's folders open once, so its row shows. Select the object's row in the outliner to inspect it.
+Search by name, full hierarchy path, family, binding identifier, dependency, or detected problem. The inventory includes active and inactive loaded objects. The tree lists each object under its category and kind, or under its place in the **By place** view, in alphabetical order. For example, the Ela bridge and its construction controller stand under **Bridge** > **Rail bridges**. A newly inspected object's folders open once, so its row shows. An object stands under the place its name or path names. When you move an object more than 500 meters from where the game placed it, the outliner lists it under the nearest place right after the edit, its new folders open, and it stays selected. Moving an object doesn't move a place. Select the object's row in the outliner to inspect it.
 
 Markers before the name show the object's state:
 

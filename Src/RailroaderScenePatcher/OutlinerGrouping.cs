@@ -20,8 +20,11 @@ namespace RailroaderScenePatcher {
         // Where the object stands as map x/z, from what it shows in the world, or null.
         double[] Bounds(SceneObservation entry);
         // The places the world names beside the listed objects: the game's map data, map labels, and Loc: objects the
-        // inventory does not list. notes takes what could not be read.
+        // inventory does not list, each where the map put it. notes takes what could not be read.
         IEnumerable<PlaceSource> PlaceSources(IReadOnlyList<SceneObservation> entries, List<string> notes);
+        // How far the object stands from where the map placed it, as map x/z (now minus then), or null when it stands
+        // where the map placed it or that is unknown.
+        double[] Displacement(SceneObservation entry);
     }
 
     // The outliner as one tree across families, by category or by place. The rules that decide category, kind and
@@ -148,14 +151,14 @@ namespace RailroaderScenePatcher {
         static string placesLine;
         // Per observation: an edit replaces the observation, so these never hold a verdict older than the object.
         static Dictionary<SceneObservation, ScenePlace> placeCache;
-        static Dictionary<SceneObservation, double[]> measured;
+        static Dictionary<SceneObservation, double[]> measured, placed;
         static Dictionary<SceneObservation, SceneClass> classCache;
         static Dictionary<SceneObservation, string> searchTags;
 
         // Refresh reads the places again.
         internal static void InvalidatePlaces() {
             cachedWorldKey = null; placesBuiltWithEntries = false; preparedEntries = null;
-            places = null; placeCache = null; measured = null; classCache = null; searchTags = null; kindsFrom = null; containersFrom = null;
+            places = null; placeCache = null; measured = null; placed = null; classCache = null; searchTags = null; kindsFrom = null; containersFrom = null;
         }
         static bool HasPosition(SceneObservation e) => e.Position != null && e.Position.Count >= 3;
         static bool Finite(double x, double z) => !Double.IsNaN(x) && !Double.IsNaN(z) && !Double.IsInfinity(x) && !Double.IsInfinity(z);
@@ -181,6 +184,19 @@ namespace RailroaderScenePatcher {
             if (result == null && HasPosition(e) && Finite(e.Position[0], e.Position[2])) result = new[] { e.Position[0], e.Position[2] };
             return measured[e] = result;
         }
+        // Where the map placed an object, as map x/z: where it stands less how far it was moved. An edit moves an object
+        // as a whole, so its shape moves with it.
+        static double[] Placed(SceneObservation e, Func<SceneObservation, double[]> trackPoint) {
+            if (e == null) return null;
+            if (placed.TryGetValue(e, out var known)) return known;
+            var at = Measure(e, trackPoint);
+            double[] by = null;
+            if (at != null && Scene != null) {
+                try { by = Scene.Displacement(e); }
+                catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("displacement", "The patcher couldn't read where the map placed an object. The outliner uses where the object stands now to find its place: " + ex.GetBaseException().Message); }
+            }
+            return placed[e] = at == null || by == null || by.Length < 2 || !Finite(by[0], by[1]) ? at : new[] { at[0] - by[0], at[1] - by[1] };
+        }
         static ObjectFacts FactsOf(SceneObservation e) {
             if (Scene == null) return new ObjectFacts();
             try { return Scene.Facts(e) ?? new ObjectFacts(); }
@@ -198,7 +214,7 @@ namespace RailroaderScenePatcher {
         static ScenePlace PlaceOf(SceneObservation e, Func<SceneObservation, double[]> trackPoint) {
             if (e == null) return null;
             if (placeCache.TryGetValue(e, out var cached)) return cached;
-            return placeCache[e] = places.Of(e.Identity.Path, Measure(e, trackPoint));
+            return placeCache[e] = places.Of(e.Identity.Path, Measure(e, trackPoint), Placed(e, trackPoint));
         }
         // Places are read once per loaded world, not per inventory snapshot, and at most once per outliner rebuild.
         static void Prepare(IReadOnlyList<SceneObservation> entries, Func<SceneObservation, double[]> trackPoint) {
@@ -215,7 +231,7 @@ namespace RailroaderScenePatcher {
                 return;
             }
             cachedWorldKey = worldKey; placesBuiltWithEntries = hasEntries; preparedEntries = entries;
-            placeCache = new Dictionary<SceneObservation, ScenePlace>(); measured = new Dictionary<SceneObservation, double[]>();
+            placeCache = new Dictionary<SceneObservation, ScenePlace>(); measured = new Dictionary<SceneObservation, double[]>(); placed = new Dictionary<SceneObservation, double[]>();
             classCache = new Dictionary<SceneObservation, SceneClass>(); searchTags = new Dictionary<SceneObservation, string>();
             var notes = new List<string>();
             var sources = new List<PlaceSource>();
@@ -224,19 +240,20 @@ namespace RailroaderScenePatcher {
                 try { sources.AddRange(Scene.PlaceSources(entries, notes)); }
                 catch (Exception e) when (!(e is OutOfMemoryException)) { notes.Add("The patcher couldn't read the world's places: " + e.GetBaseException().Message); }
             }
-            // What the listed objects name by their path and name: place folders, Roads folders, station map icons, Loc: boards.
-            foreach (var e in entries.Where(e => e.GroupPath == null && e.HolderPath == null)) sources.AddRange(ScenePlaces.SourcesOf(e.Identity.Path, Measure(e, trackPoint)));
+            // What the listed objects name by their path and name: place folders, Roads folders, station map icons, Loc:
+            // boards, each where the map placed it, so an edit moves no place.
+            foreach (var e in entries.Where(e => e.GroupPath == null && e.HolderPath == null)) sources.AddRange(ScenePlaces.SourcesOf(e.Identity.Path, Placed(e, trackPoint)));
             places = ScenePlaces.From(sources);
             NumberSharedPaths(entries);
             placesLine = String.Join(" | ", places.All.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).Select(p =>
-                p.Name + " [" + p.From + "] {" + String.Join("; ", p.Names) + "} " + String.Join(" ", p.Points.Select(at => "@" + Round(at[0]) + "," + Round(at[1])))))
+                p.Name + " [" + p.From + "] {" + String.Join("; ", p.Names) + "} " + String.Join(" ", p.Points.Select(at => "@" + Round(at[0]) + "," + Round(at[1]))) + (p.PointsFrom == null ? "" : " (" + p.PointsFrom + ")")))
                 + (notes.Count == 0 ? "" : " Problems reading places: " + String.Join("; ", notes));
         }
         // An edit replaces observations; drop the cached verdicts of the ones no longer listed.
         static void TrimObservationCaches(IReadOnlyList<SceneObservation> entries) {
             if (measured.Count <= entries.Count * 2 + 500) return;
             var live = new HashSet<SceneObservation>(entries);
-            foreach (var cache in new IDictionary[] { measured, placeCache, classCache, searchTags }) {
+            foreach (var cache in new IDictionary[] { measured, placed, placeCache, classCache, searchTags }) {
                 var stale = cache.Keys.Cast<SceneObservation>().Where(k => !live.Contains(k)).ToArray();
                 foreach (var key in stale) cache.Remove(key);
             }
@@ -353,8 +370,9 @@ namespace RailroaderScenePatcher {
             foreach (var u in b.Units) {
                 if (u.Row != null) u.Place = PlaceOf(u.Row, b.TrackPoint)?.Name;
                 else {
-                    var positions = u.Members.Select(m => Measure(m.Row, b.TrackPoint)).Where(p => p != null).ToArray();
-                    u.Place = places.Of(u.CrossingPath, positions.Length == 0 ? null : new[] { positions.Average(p => p[0]), positions.Average(p => p[1]) })?.Name;
+                    var members = u.Members.Where(m => Measure(m.Row, b.TrackPoint) != null).ToArray();
+                    double[] Mean(Func<SceneObservation, double[]> at) => members.Length == 0 ? null : new[] { members.Average(m => at(m.Row)[0]), members.Average(m => at(m.Row)[1]) };
+                    u.Place = places.Of(u.CrossingPath, Mean(r => Measure(r, b.TrackPoint)), Mean(r => Placed(r, b.TrackPoint)))?.Name;
                 }
                 if (u.Category == SceneObjectCategories.GradeCrossing) u.Kind = u.Row?.Family == ControllerFamily ? SceneClassification.ProtectedCrossings : SceneClassification.UnprotectedCrossings;
                 if (b.Diagnostics && u.Row?.InspectionOnly != null) b.Result.InspectionOnlyRows.Add(u.Node.Label + " (" + u.Row.Identity.Path + ") [" + u.Row.Family + "] under " + u.Category + ": " + u.Row.InspectionOnly);

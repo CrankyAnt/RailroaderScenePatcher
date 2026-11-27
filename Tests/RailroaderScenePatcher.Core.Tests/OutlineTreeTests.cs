@@ -92,7 +92,8 @@ static class OutlineTreeTests {
             Check(placeTops.Single(t => t.Label == "Log Camp").Count == 0 && placeTops.Count(t => t.Count == 0) == 1, "Log Camp is the one place without objects");
             Check(placeTops.Single(t => t.Label == "Connelly Creek").Count >= 5 && !All(placeTops).Any(n => n.Row == null && n.Label == "Connelly"), "Connelly Creek holds the Connelly objects, and no node is named Connelly");
             var whittier = placeTops.Single(t => t.Label == "Whittier");
-            Check(whittier.Children.Select(c => c.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Mileposts", "Sign", "Spawn point", "Starter placement", "Station building", "Station map icon", "Storage display" }),
+            // Whittier's starter placement markers stand nearer the EWH Interchange map label (SceneClassificationTests.KnownPlaceChanges).
+            Check(whittier.Children.Select(c => c.Label).SequenceEqual(new[] { "Bridge", "Grade crossing", "Industry building", "Lights", "Mileposts", "Sign", "Spawn point", "Station building", "Station map icon", "Storage display" }),
                 "the categories of a place are in alphabetical order (got " + String.Join(", ", whittier.Children.Select(c => c.Label)) + ")");
             // A search narrows the rows; the levels stay, and a place without matches is not shown.
             var lamps = entries.Where(e => e.Category == "Lights").ToArray();

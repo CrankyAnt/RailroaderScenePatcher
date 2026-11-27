@@ -38,8 +38,9 @@ namespace RailroaderScenePatcher.Core {
             if (places == null) return null;
             var chain = new List<double[]>();
             foreach (var name in names) {
-                var place = places.All.FirstOrDefault(p => String.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase) && p.Points.Count > 0);
-                if (place != null) chain.Add(place.Points[0]);
+                // The chain runs through the map data's positions of its places, where a place has them.
+                var place = places.All.FirstOrDefault(p => String.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase) && (p.MapDataPoint != null || p.Points.Count > 0));
+                if (place != null) chain.Add(place.MapDataPoint ?? place.Points[0]);
             }
             return chain.Count < 2 ? null : chain;
         }

@@ -118,8 +118,8 @@ O	K	Setups/Starter Equipment Setup/starter-ewh-coaling	4	-	-	12652	4752	-	-
 O	L	Setups/Starter Equipment Setup/starter-ewh-int2	4	Starter placement marker	starter-placement-v1	12859	4590	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-shed1	4	Starter placement marker	starter-placement-v1	12733	4682	Starter placement	Starter placement @ EWH Interchange
 O	L	Setups/Starter Equipment Setup/starter-ewh-shed2	4	Starter placement marker	starter-placement-v1	12794	4644	Starter placement	Starter placement @ EWH Interchange
-O	L	Setups/Starter Equipment Setup/starter-ewh-wreck	4	Starter placement marker	starter-placement-v1	12582	4885	Starter placement	Starter placement @ Whittier
-O	L	Setups/Starter Equipment Setup/starter-wh-l	4	Starter placement marker	starter-placement-v1	12499	4929	Starter placement	Starter placement @ Whittier
+O	L	Setups/Starter Equipment Setup/starter-ewh-wreck	4	Starter placement marker	starter-placement-v1	12582	4885	Starter placement	Starter placement @ EWH Interchange
+O	L	Setups/Starter Equipment Setup/starter-wh-l	4	Starter placement marker	starter-placement-v1	12499	4929	Starter placement	Starter placement @ EWH Interchange
 O	K	Setups/Starter Equipment Setup/starter-wh-p	4	-	-	12489	4907	-	-
 O	K	World/Builder Photo Setup	55	-	-	14699	3781	-	-
 O	K	World/Builder Photo Setup/Camera	53,54	-	-	14713	3798	-	-
@@ -1050,7 +1050,7 @@ O	L	World/Large Scenery/Rhodo/Rhodo Station/Spotlight Outdoor (3)	22,23,24	Child
 O	K	World/Large Scenery/Rhodo/Rhodo Station/Station	57	-	-	-22998	-18021	-	-
 O	K	World/Large Scenery/Rhodo/Rhodo Station/Station/Decking	26	-	-	-23001	-18019	-	-
 O	K	World/Large Scenery/Rhodo/Rhodo Station/Station/Foundation	26	-	-	-22998	-18021	-	-
-O	L	World/Large Scenery/Robinson Gap Mine/Coal Loader	25,15,16	Scene object	scene-object-v1	1318	2189	Other	Industry building / Coal Loader @ Alarka Jct
+O	L	World/Large Scenery/Robinson Gap Mine/Coal Loader	25,15,16	Scene object	scene-object-v1	1318	2189	Other	Industry building / Coal Loader @ Robinson Branch
 O	K	World/Large Scenery/Robinson Gap Mine/Coal Loader/Model	19	-	-	1318	2189	-	-
 O	K	World/Large Scenery/Robinson Gap Mine/Coal Loader/Model/MineLoader	40,41	-	-	1322	2195	-	-
 O	L	World/Large Scenery/Robinson Gap Mine/Coal Loader/Model/Spotlight Outdoor	22,23,24	Child object	child-object-v1	1318	2192	-	-
@@ -1147,7 +1147,7 @@ O	L	World/Large Scenery/Sylva/Sylva Paperboard/Pulpwood Piles/Pile (4)	31	Child 
 O	L	World/Large Scenery/Sylva/Sylva Paperboard/Pulpwood Piles/Pile (5)	31	Child object	child-object-v1	25121	-651	-	-
 O	L	World/Large Scenery/Sylva/Sylva Paperboard/Pulpwood Piles/Pile (6)	31	Child object	child-object-v1	25083	-650	-	-
 O	L	World/Large Scenery/Sylva/Sylva Paperboard/Pulpwood Piles/Pile (7)	31	Child object	child-object-v1	25104	-648	-	-
-O	L	World/Large Scenery/Sylva/Sylva Signs	-	Scene object	-	0	0	Sign	Sign / Yard limits @ Brooks
+O	L	World/Large Scenery/Sylva/Sylva Signs	-	Scene object	-	0	0	Sign	Sign / Yard limits @ Robinson Branch
 O	L	World/Large Scenery/Sylva/Sylva Signs/Yard Limit Trackside	4,3,2	Generic track marker	track-marker-v1	24333	-922	Sign / Yard limits	Sign / Yard limits @ Sylva
 O	K	World/Large Scenery/Topton	49	-	-	-18980	-15220	-	-
 O	L	World/Large Scenery/Topton/Topton Station	-	Scene object	scene-object-v1	-18963	-15227	Station building	Station building / Stations @ Topton
@@ -1424,25 +1424,25 @@ O	K	World/Map Labels/Wilmot	11,12,56	-	-	16514	2445	-	-
 O	K	World/Map Labels/Wilmot/Label	11,47,48	-	-	16514	2445	-	-
 O	L	World/Mile Posts/T-45.1 Origin	2,7,4,3,8	Milepost	milepost-v1	25581	364	Sign / Mileposts	Mileposts @ Sylva
 O	L	World/Mile Posts/T-46 Origin	2,7,4,3,8	Milepost	milepost-v1	25003	-915	Sign / Mileposts	Mileposts @ Sylva
-O	L	World/Mile Posts/T-47	2,7,4,3,8	Milepost	milepost-v1	23406	-1036	Sign / Mileposts	Mileposts @ Dillsboro
+O	L	World/Mile Posts/T-47	2,7,4,3,8	Milepost	milepost-v1	23406	-1036	Sign / Mileposts	Mileposts @ Sylva
 O	L	World/Mile Posts/T-48	2,7,4,3,8	Milepost	milepost-v1	21988	-1594	Sign / Mileposts	Mileposts @ Dillsboro
 O	L	World/Mile Posts/T-49	2,7,4,3,8	Milepost	milepost-v1	20751	-1000	Sign / Mileposts	Mileposts @ Cowee
-O	L	World/Mile Posts/T-50	2,7,4,3,8	Milepost	milepost-v1	19455	-439	Sign / Mileposts	Mileposts @ Barker's Creek
+O	L	World/Mile Posts/T-50	2,7,4,3,8	Milepost	milepost-v1	19455	-439	Sign / Mileposts	Mileposts @ Cowee
 O	L	World/Mile Posts/T-51	2,7,4,3,8	Milepost	milepost-v1	18219	435	Sign / Mileposts	Mileposts @ Barker's Creek
 O	L	World/Mile Posts/T-52	2,7,4,3,8	Milepost	milepost-v1	18078	1819	Sign / Mileposts	Mileposts @ Barker's Creek
 O	L	World/Mile Posts/T-53	2,7,4,3,8	Milepost	milepost-v1	17487	2185	Sign / Mileposts	Mileposts @ Wilmot
 O	L	World/Mile Posts/T-54	2,7,4,3,8	Milepost	milepost-v1	15908	2248	Sign / Mileposts	Mileposts @ Thomas Valley
 O	L	World/Mile Posts/T-55	2,7,4,3,8	Milepost	milepost-v1	15007	3426	Sign / Mileposts	Mileposts @ Thomas Valley
-O	L	World/Mile Posts/T-56	2,7,4,3,8	Milepost	milepost-v1	13718	4249	Sign / Mileposts	Mileposts @ Whittier
-O	L	World/Mile Posts/T-57	2,7,4,3,8	Milepost	milepost-v1	12329	4954	Sign / Mileposts	Mileposts @ Whittier
+O	L	World/Mile Posts/T-56	2,7,4,3,8	Milepost	milepost-v1	13718	4249	Sign / Mileposts	Mileposts @ EWH Interchange
+O	L	World/Mile Posts/T-57	2,7,4,3,8	Milepost	milepost-v1	12329	4954	Sign / Mileposts	Mileposts @ EWH Interchange
 O	L	World/Mile Posts/T-58	2,7,4,3,8	Milepost	milepost-v1	12133	6358	Sign / Mileposts	Mileposts @ Whittier
 O	L	World/Mile Posts/T-59	2,7,4,3,8	Milepost	milepost-v1	10535	6567	Sign / Mileposts	Mileposts @ Ela
 O	L	World/Mile Posts/T-60	2,7,4,3,8	Milepost	milepost-v1	9373	7480	Sign / Mileposts	Mileposts @ Ela
 O	L	World/Mile Posts/T-61	2,7,4,3,8	Milepost	milepost-v1	8639	6645	Sign / Mileposts	Mileposts @ Gov Island
 O	L	World/Mile Posts/T-62	2,7,4,3,8	Milepost	milepost-v1	7378	5601	Sign / Mileposts	Mileposts @ Gov Island
-O	L	World/Mile Posts/T-63	2,7,4,3,8	Milepost	milepost-v1	5873	5706	Sign / Mileposts	Mileposts @ Walker
+O	L	World/Mile Posts/T-63	2,7,4,3,8	Milepost	milepost-v1	5873	5706	Sign / Mileposts	Mileposts @ Bryson
 O	L	World/Mile Posts/T-64	2,7,4,3,8	Milepost	milepost-v1	4361	5380	Sign / Mileposts	Mileposts @ Bryson
-O	L	World/Mile Posts/T-65	2,7,4,3,8	Milepost	milepost-v1	3338	4280	Sign / Mileposts	Mileposts @ Bryson
+O	L	World/Mile Posts/T-65	2,7,4,3,8	Milepost	milepost-v1	3338	4280	Sign / Mileposts	Mileposts @ Hemingway
 O	L	World/Mile Posts/T-66	2,7,4,3,8	Milepost	milepost-v1	1981	4585	Sign / Mileposts	Mileposts @ Hemingway
 O	L	World/Mile Posts/T-67	2,7,4,3,8	Milepost	milepost-v1	2110	4002	Sign / Mileposts	Mileposts @ Hemingway
 O	L	World/Mile Posts/T-68	2,7,4,3,8	Milepost	milepost-v1	2677	2841	Sign / Mileposts	Mileposts @ Hemingway
@@ -1473,7 +1473,7 @@ O	L	World/Mile Posts/T-92	2,7,4,3,8	Milepost	milepost-v1	-20951	-17169	Sign / Mi
 O	L	World/Mile Posts/T-93	2,7,4,3,8	Milepost	milepost-v1	-22391	-17159	Sign / Mileposts	Mileposts @ Rhodo
 O	L	World/Mile Posts/T-94	2,7,4,3,8	Milepost	milepost-v1	-23436	-18388	Sign / Mileposts	Mileposts @ Rhodo
 O	L	World/Mile Posts/T-95	2,7,4,3,8	Milepost	milepost-v1	-24846	-18604	Sign / Mileposts	Mileposts @ Rhodo
-O	L	World/Mile Posts/T-96	2,7,4,3,8	Milepost	milepost-v1	-26223	-19308	Sign / Mileposts	Mileposts @ Andrews
+O	L	World/Mile Posts/T-96	2,7,4,3,8	Milepost	milepost-v1	-26223	-19308	Sign / Mileposts	Mileposts @ Rhodo
 O	L	World/Mile Posts/T-97	2,7,4,3,8	Milepost	milepost-v1	-27416	-20300	Sign / Mileposts	Mileposts @ Andrews
 O	L	World/Mile Posts/T-98	2,7,4,3,8	Milepost	milepost-v1	-28952	-19792	Sign / Mileposts	Mileposts @ Andrews
 O	L	World/POIs/Alarka	1	Spawn point	spawn-point-v1	4195	-3139	Spawn point	Spawn point @ Alarka
@@ -2098,17 +2098,17 @@ O	L	World/Signs/Speed - Alarka Branch	7,4,3,2	Generic track marker	-	1859	775	Si
 O	L	World/Signs/Speed - Alarka Copper	7,4,3,2	Generic track marker	track-marker-v1	4353	-3280	Sign / Speed signs	Sign / Speed signs @ Alarka
 O	L	World/Signs/Speed - Before Ela	7,4,3,2	Generic track marker	-	10585	6549	Sign / Speed signs	Sign / Speed signs @ Ela
 O	L	World/Signs/Speed - Before Ela	7,4,3,2	Generic track marker	-	10130	6835	Sign / Speed signs	Sign / Speed signs @ Ela
-O	L	World/Signs/Speed - Bryson Horseshoe	7,4,3,2	Generic track marker	-	1861	3766	Sign / Speed signs	Sign / Speed signs @ Bryson
-O	L	World/Signs/Speed - Bryson Horseshoe	7,4,3,2	Generic track marker	-	1679	3999	Sign / Speed signs	Sign / Speed signs @ Bryson
+O	L	World/Signs/Speed - Bryson Horseshoe	7,4,3,2	Generic track marker	-	1861	3766	Sign / Speed signs	Sign / Speed signs @ Hemingway
+O	L	World/Signs/Speed - Bryson Horseshoe	7,4,3,2	Generic track marker	-	1679	3999	Sign / Speed signs	Sign / Speed signs @ Hemingway
 O	L	World/Signs/Speed - Bryson Horseshoe Above	7,4,3,2	Generic track marker	-	2357	3876	Sign / Speed signs	Sign / Speed signs @ Bryson
-O	L	World/Signs/Speed - Bryson Horseshoe Above	7,4,3,2	Generic track marker	-	2005	3922	Sign / Speed signs	Sign / Speed signs @ Bryson
+O	L	World/Signs/Speed - Bryson Horseshoe Above	7,4,3,2	Generic track marker	-	2005	3922	Sign / Speed signs	Sign / Speed signs @ Hemingway
 O	L	World/Signs/Speed - Bryson Trestle	7,4,3,2	Generic track marker	-	1994	4602	Sign / Speed signs	Sign / Speed signs @ Bryson
 O	L	World/Signs/Speed - Bryson Trestle	7,4,3,2	Generic track marker	-	2350	4699	Sign / Speed signs	Sign / Speed signs @ Bryson
 O	L	World/Signs/Speed - Connelly Entry E	7,4,3,2	Generic track marker	track-marker-v1	12130	5411	Sign / Speed signs	Sign / Speed signs @ Connelly Creek
 O	L	World/Signs/Speed - Connelly Entry W	7,4,3,2	Generic track marker	track-marker-v1	12154	5620	Sign / Speed signs	Sign / Speed signs @ Connelly Creek
 O	L	World/Signs/Speed - Ela Bridge	7,4,3,2	Generic track marker	-	8688	7432	Sign / Speed signs	Sign / Speed signs @ Ela
 O	L	World/Signs/Speed - Ela Bridge	7,4,3,2	Generic track marker	-	8685	6842	Sign / Speed signs	Sign / Speed signs @ Ela
-O	L	World/Signs/Speed - Fontana South Curve	7,4,3,2	Generic track marker	track-marker-v1	-6496	-3752	Sign / Speed signs	Sign / Speed signs @ Wesser
+O	L	World/Signs/Speed - Fontana South Curve	7,4,3,2	Generic track marker	track-marker-v1	-6496	-3752	Sign / Speed signs	Sign / Speed signs @ Almond
 O	L	World/Signs/Speed - Fontana South Curve (1)	7,4,3,2	Generic track marker	track-marker-v1	-7117	-3951	Sign / Speed signs	Sign / Speed signs @ Wesser
 O	L	World/Signs/Speed - Fontana South Curve (2)	7,4,3,2	Generic track marker	track-marker-v1	-12039	-5732	Sign / Speed signs	Sign / Speed signs @ Hewitt
 O	L	World/Signs/Speed - Fontana South Curve (3)	7,4,3,2	Generic track marker	track-marker-v1	-12326	-6535	Sign / Speed signs	Sign / Speed signs @ Hewitt

@@ -7,10 +7,11 @@ using UnityEngine;
 
 namespace RailroaderScenePatcher {
     // The key of a scene object as the game gave it (TargetKeys): its marker ID, where it holds a track marker, and its
-    // map x/z. The key is read the first time the engine resolves the object or the inventory lists it. Both happen
-    // before this mod changes the object: the engine resolves a target before it applies anything to it, and an edit
-    // in the window starts from the listed object. A later move or replacement ID therefore leaves the key as it was,
-    // so the target keeps naming the same object. The key of an object leaves with the object.
+    // map x/z. The key is read the first time the engine resolves the object (SceneCapabilities.Resolved) or the
+    // inventory lists it. Both happen before this mod changes the object: the engine resolves a target before it
+    // applies anything to it, and an edit in the window starts from the listed object. A later move or replacement ID
+    // therefore leaves the key as it was, so the target keeps naming the same object, and its map x/z is where the map
+    // placed the object (OutlinerScene.Displacement). The key of an object leaves with the object.
     internal static class TargetKeyCache {
         static readonly ConditionalWeakTable<GameObject, TargetKey> keys = new ConditionalWeakTable<GameObject, TargetKey>();
         // The key of a resolved object: a GameObject, or a component on one. Null when it cannot be read.
@@ -28,6 +29,9 @@ namespace RailroaderScenePatcher {
             keys.Add(go, read);
             return read;
         }
+        // The key already read for an object, without reading one: null when neither the engine nor the inventory has
+        // met the object yet, so nothing of this mod has changed it.
+        internal static TargetKey Known(GameObject go) => go != null && keys.TryGetValue(go, out var known) ? known : null;
         static TargetKey Read(GameObject go) {
             string markerId = null;
             var marker = TrackMarkerWorld.Get(go, TargetKeys.MarkerComponent);

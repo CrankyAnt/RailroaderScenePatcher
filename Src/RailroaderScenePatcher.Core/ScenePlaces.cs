@@ -6,10 +6,11 @@ using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace RailroaderScenePatcher.Core {
-    // Where the game names a place, most trusted first: its map data (the areas and passenger stops of the
-    // operations data), a station map icon, a folder of a place below World/Large Scenery, a Roads folder, a map label
-    // and a Loc: board.
-    public enum PlaceSourceKind { MapData, StationMapIcon, SceneFolder, RoadsFolder, MapLabel, LocBoard }
+    // Where the game names a place, most trusted name first: its map data (the areas and passenger stops of the
+    // operations data, which name places as one source), a station map icon, a folder of a place below
+    // World/Large Scenery, a Roads folder, a map label and a Loc: board. Where a place stands follows another order
+    // (ScenePlaces.PositionOrder).
+    public enum PlaceSourceKind { MapDataArea, MapDataPassengerStop, StationMapIcon, SceneFolder, RoadsFolder, MapLabel, LocBoard }
 
     // One naming of a place by the game, with where it is in map x/z, or null.
     public sealed class PlaceSource {
@@ -26,11 +27,29 @@ namespace RailroaderScenePatcher.Core {
         public PlaceSourceKind From { get; }
         // Every name the game uses for the place, the place's own name first.
         public IReadOnlyList<string> Names => names;
-        // Where the game puts the place: one point per source that has one.
+        // Where the place stands: the points of its most reliable source kind that has one (ScenePlaces.PositionOrder),
+        // one point per source of that kind and one per Loc: board. Empty when no source has a position.
         public IReadOnlyList<double[]> Points => points;
+        // The kind of source the points come from, or null without points.
+        public PlaceSourceKind? PointsFrom { get; private set; }
+        // The middle of the place's positions in the game's map data (its areas and passenger stops), or null.
+        public double[] MapDataPoint { get; private set; }
         internal readonly List<string> names = new List<string>();
-        internal readonly List<double[]> points = new List<double[]>();
+        List<double[]> points = new List<double[]>();
         internal readonly List<string[]> tokens = new List<string[]>();
+        readonly Dictionary<PlaceSourceKind, List<double[]>> byKind = new Dictionary<PlaceSourceKind, List<double[]>>();
+        readonly List<double[]> mapData = new List<double[]>();
+        internal void Add(PlaceSourceKind kind, IEnumerable<double[]> at) {
+            if (!byKind.TryGetValue(kind, out var list)) byKind[kind] = list = new List<double[]>();
+            list.AddRange(at);
+        }
+        internal void AddMapData(IEnumerable<double[]> at) => mapData.AddRange(at);
+        internal void Settle() {
+            var kind = ScenePlaces.PositionOrder.Where(k => byKind.TryGetValue(k, out var list) && list.Count != 0).Cast<PlaceSourceKind?>().FirstOrDefault();
+            PointsFrom = kind;
+            points = kind == null ? new List<double[]>() : byKind[kind.Value];
+            MapDataPoint = mapData.Count == 0 ? null : ScenePlaces.Middle(mapData);
+        }
     }
 
     // The places of a map as the game itself names them, and the place of an object. Nothing here names a place: the
@@ -41,11 +60,25 @@ namespace RailroaderScenePatcher.Core {
     // Two names of one kind of source never fall together that way: the map data lists Alarka and Alarka Jct side by
     // side, so they are two places.
     //
-    // An object's place is the place its own name or hierarchy path names. Where the path names several places, as
+    // A place stands where its most reliable source puts it (PositionOrder): a map label, else an area of the game's
+    // map data, else one of its passenger stops, else its Loc: boards, a station map icon, the objects of its folder
+    // below World/Large Scenery and those of its Roads folder. A source that a scene patch edit can move gives the
+    // position the map gave it, never its current one: the caller passes that position.
+    //
+    // An object that stands more than Moved metres from where the map placed it takes the nearest place. Any other
+    // object takes the place its own name or hierarchy path names. Where the path names several places, as
     // World/Large Scenery/Whittier/Connelly does, the most specific name counts when the object stands close to that
     // place, and otherwise the named place it stands nearest to. An object whose path names no place, or that stands
     // far from every place its path names, takes the nearest place.
     public sealed class ScenePlaces {
+        // Beyond this distance, in metres, from where the map placed it, an object is listed where it now stands.
+        public const double Moved = 500;
+        // The sources of a place's position, most reliable first.
+        public static readonly IReadOnlyList<PlaceSourceKind> PositionOrder = Array.AsReadOnly(new[] {
+            PlaceSourceKind.MapLabel, PlaceSourceKind.MapDataArea, PlaceSourceKind.MapDataPassengerStop, PlaceSourceKind.LocBoard,
+            PlaceSourceKind.StationMapIcon, PlaceSourceKind.SceneFolder, PlaceSourceKind.RoadsFolder });
+        // The trust of a source's name, most trusted first: the areas and passenger stops of the map data are one source.
+        public static int NameTier(PlaceSourceKind kind) => kind <= PlaceSourceKind.MapDataPassengerStop ? 0 : (int)kind - 1;
         // Beyond this distance, in metres, from every point of a place its path names, that name does not count: a
         // name the game copied from elsewhere, such as Whittier Haywood Road Bridge at Nantahala.
         public const double NameReach = 3000;
@@ -67,26 +100,29 @@ namespace RailroaderScenePatcher.Core {
             var named = (sources ?? Enumerable.Empty<PlaceSource>()).Where(s => s != null && Tokens(s.Name).Length != 0)
                 .GroupBy(s => new { s.Kind, Key = String.Join(" ", Tokens(s.Name)) })
                 .Select(g => new { g.Key.Kind, Name = Whitespace.Replace(g.First().Name, " ").Trim(), Points = g.Where(s => Finite(s.At)).Select(s => s.At).ToArray() })
-                .OrderBy(g => g.Kind).ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+                .OrderBy(g => NameTier(g.Kind)).ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase).ThenBy(g => g.Kind).ToArray();
             foreach (var source in named) {
                 var tokens = Tokens(source.Name);
                 var place = found.places.FirstOrDefault(p => p.tokens.Any(t => t.SequenceEqual(tokens))) ?? found.Holder(tokens, source.Kind);
                 if (place == null) found.places.Add(place = new ScenePlace(source.Name, source.Kind));
                 if (!place.tokens.Any(t => t.SequenceEqual(tokens))) { place.tokens.Add(tokens); place.names.Add(source.Name); }
                 // A Loc: board stands at each end of its place, so each board is a point; every other source is one point.
-                if (source.Kind == PlaceSourceKind.LocBoard) place.points.AddRange(source.Points);
-                else if (source.Points.Length != 0) place.points.Add(new[] { Median(source.Points.Select(p => p[0])), Median(source.Points.Select(p => p[1])) });
+                if (source.Kind == PlaceSourceKind.LocBoard) place.Add(source.Kind, source.Points);
+                else if (source.Points.Length != 0) place.Add(source.Kind, new[] { Middle(source.Points) });
+                if (NameTier(source.Kind) == 0) place.AddMapData(source.Points);
             }
+            foreach (var place in found.places) place.Settle();
             return found;
         }
         // The more trusted place whose words a name holds, or that holds the words of the name: the one that shares
         // the most words, or none when two share as many.
         ScenePlace Holder(string[] tokens, PlaceSourceKind kind) {
-            var candidates = places.Where(p => p.From < kind).Select(p => new { Place = p, Shared = Contains(tokens, p.tokens[0]) ? p.tokens[0].Length : Contains(p.tokens[0], tokens) ? tokens.Length : 0 })
+            var candidates = places.Where(p => NameTier(p.From) < NameTier(kind)).Select(p => new { Place = p, Shared = Contains(tokens, p.tokens[0]) ? p.tokens[0].Length : Contains(p.tokens[0], tokens) ? tokens.Length : 0 })
                 .Where(c => c.Shared != 0).OrderByDescending(c => c.Shared).Take(2).ToArray();
             return candidates.Length == 0 || (candidates.Length == 2 && candidates[0].Shared == candidates[1].Shared) ? null : candidates[0].Place;
         }
         static bool Contains(string[] all, string[] some) => some.Length != 0 && some.All(all.Contains);
+        internal static double[] Middle(IReadOnlyCollection<double[]> points) => new[] { Median(points.Select(p => p[0])), Median(points.Select(p => p[1])) };
         static double Median(IEnumerable<double> values) {
             var s = values.OrderBy(v => v).ToArray();
             return s.Length % 2 == 1 ? s[s.Length / 2] : (s[s.Length / 2 - 1] + s[s.Length / 2]) / 2;
@@ -120,8 +156,11 @@ namespace RailroaderScenePatcher.Core {
             return name;
         }
 
+        static double Between(double[] a, double[] b) => Math.Sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]));
         public double Distance(ScenePlace place, double[] at) =>
-            place == null || !Finite(at) || place.points.Count == 0 ? Double.PositiveInfinity : place.points.Min(p => Math.Sqrt((p[0] - at[0]) * (p[0] - at[0]) + (p[1] - at[1]) * (p[1] - at[1])));
+            place == null || !Finite(at) || place.Points.Count == 0 ? Double.PositiveInfinity : place.Points.Min(p => Between(p, at));
+        // Whether an object that stands at map x/z stands more than Moved metres from placedAt, where the map placed it.
+        public static bool IsMoved(double[] at, double[] placedAt) => Finite(at) && Finite(placedAt) && Between(at, placedAt) > Moved;
         public ScenePlace Nearest(double[] at) {
             if (!Finite(at)) return null;
             ScenePlace best = null; var distance = Double.PositiveInfinity;
@@ -136,13 +175,15 @@ namespace RailroaderScenePatcher.Core {
             for (var i = segments.Length - 1; i >= 0; i--) { var place = Named(segments[i]); if (place != null && !found.Contains(place)) found.Add(place); }
             return found;
         }
-        // The place of an object at a hierarchy path that stands at map x/z, or null without a place and a position:
-        // of the places its path names, the most specific one it stands close to, else the one it stands nearest to
-        // within reach; else the nearest place of all. Without a position, or for a named place without one, the
-        // most specific name decides.
-        public ScenePlace Of(string path, double[] at) {
+        // The place of an object at a hierarchy path that stands at map x/z, or null without a place and a position.
+        // An object that stands more than Moved metres from placedAt, where the map placed it, takes the nearest place.
+        // Any other object takes, of the places its path names, the most specific one it stands close to, else the one
+        // it stands nearest to within reach; else the nearest place of all. Without a position, or for a named place
+        // without one, the most specific name decides.
+        public ScenePlace Of(string path, double[] at, double[] placedAt = null) {
+            if (IsMoved(at, placedAt) && Nearest(at) is ScenePlace now) return now;
             var named = NamedInPath(path);
-            if (named.Count != 0 && (!Finite(at) || named[0].points.Count == 0)) return named[0];
+            if (named.Count != 0 && (!Finite(at) || named[0].Points.Count == 0)) return named[0];
             var near = named.FirstOrDefault(p => Distance(p, at) <= Close) ?? named.Where(p => Distance(p, at) <= NameReach).OrderBy(p => Distance(p, at)).FirstOrDefault();
             return near ?? Nearest(at) ?? named.FirstOrDefault();
         }

@@ -320,6 +320,7 @@ class Program {
         SceneObjectTests.Run();
         SceneObjectCheckTests.Run();
         SceneObjectCategoryTests.Run();
+        ScenePlaceTests.Run();
         SceneClassificationTests.Run();
         FamilyMappingTests.Run();
         WindowWordsTests.Run();

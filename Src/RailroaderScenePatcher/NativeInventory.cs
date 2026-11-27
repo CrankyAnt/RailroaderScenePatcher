@@ -737,6 +737,8 @@ namespace RailroaderScenePatcher {
             // so under Supported edits and offers none.
             TargetIdentity keyed = null;
             double[] gamePosition = null;
+            // The listed object's key, before any edit in the window can move it: where the map placed it.
+            Read(() => TargetKeyCache.Of(go));
             Read(() => {
                 var path = BoardScene.PathOf(go.transform);
                 // A crossbuck that a pad marker ID identifies counts the crossbucks at its path that hold that id.

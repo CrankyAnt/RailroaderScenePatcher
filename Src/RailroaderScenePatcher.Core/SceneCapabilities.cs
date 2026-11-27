@@ -31,6 +31,8 @@ namespace RailroaderScenePatcher.Core {
         // The placeholder of a capability whose game functions are missing matches any key, so a keyed target of it
         // fails with that reason, as an unkeyed one does.
         public TargetKey KeyOf(object target) => target is Unavailable ? TargetKey.Any : Keys == null || target == null ? null : Keys(target);
+        // Supplied by the host: told of every object a capability resolves, before anything is applied to it.
+        public Action<object> Resolved { get; set; }
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) { return ReferenceEquals(a, b); }
             public int GetHashCode(object value) { return RuntimeHelpers.GetHashCode(value); }
@@ -68,7 +70,7 @@ namespace RailroaderScenePatcher.Core {
                 if (identity.PadMarkerId != null && !(capability is IPadMarkerIdentityScene)) continue;
                 foreach (var item in capability.Resolve(identity) ?? Array.Empty<object>()) {
                     // An object claimed by two capabilities appears twice and stays ambiguous.
-                    if (item != null) owners[item] = capability;
+                    if (item != null) { owners[item] = capability; Resolved?.Invoke(item); }
                     found.Add(item);
                 }
             }

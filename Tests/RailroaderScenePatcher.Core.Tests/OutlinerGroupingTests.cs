@@ -26,13 +26,18 @@ static class OutlinerGroupingTests {
     // The world beside the inventory: the game's map data, and the components of the one object whose category they decide.
     sealed class World : IOutlinerScene {
         public string WorldKey => "world";
+        // How far each object, by path, stands from where the map placed it, as map x/z.
+        public Dictionary<string, double[]> Moved = new Dictionary<string, double[]>();
+        public double[] Displacement(SceneObservation entry) => Moved.TryGetValue(entry.Identity.Path, out var by) ? by : null;
         public ObjectFacts Facts(SceneObservation entry) =>
             entry.Identity.Path.EndsWith("Loc: Connelly", StringComparison.Ordinal) ? new ObjectFacts { Own = new[] { SceneObjectRules.RendererCuller }, AtOrBelow = new[] { SceneObjectRules.RendererCuller } } : new ObjectFacts();
         public double[] Bounds(SceneObservation entry) => null;
         public IEnumerable<PlaceSource> PlaceSources(IReadOnlyList<SceneObservation> entries, List<string> notes) => new[] {
-            new PlaceSource(PlaceSourceKind.MapData, "Bryson", new[] { 4400.0, 5400 }), new PlaceSource(PlaceSourceKind.MapData, "Sylva", new[] { 25000.0, -800 }),
-            new PlaceSource(PlaceSourceKind.MapData, "Whittier", new[] { 12300.0, 5800 }), new PlaceSource(PlaceSourceKind.MapData, "Connelly Creek", new[] { 12500.0, 2500 }),
+            new PlaceSource(PlaceSourceKind.MapDataArea, "Bryson", new[] { 4400.0, 5400 }), new PlaceSource(PlaceSourceKind.MapDataArea, "Sylva", new[] { 25000.0, -800 }),
+            new PlaceSource(PlaceSourceKind.MapDataArea, "Whittier", new[] { 12300.0, 5800 }), new PlaceSource(PlaceSourceKind.MapDataArea, "Connelly Creek", new[] { 12500.0, 2500 }),
             new PlaceSource(PlaceSourceKind.MapLabel, "Log Camp", new[] { 7300.0, 4350 }),
+            // A place stands at its map label, as Connelly Creek does on the base map.
+            new PlaceSource(PlaceSourceKind.MapLabel, "Connelly", new[] { 11277.0, 3799 }),
         };
     }
     static string Shape(IEnumerable<OutlineNode> nodes) =>
@@ -93,6 +98,51 @@ static class OutlinerGroupingTests {
             Check(swing.Operations == GroupReason && stand.Operations == FamilyReason, "Supported edits on the Object tab gives the reason");
             Check(CommandBand.InspectionOnlyLine(GroupReason) == "Inspection only: Bridges with a moving span cannot be edited.",
                 "the Inspection only line holds the reason as one sentence (got " + CommandBand.InspectionOnlyLine(GroupReason) + ")");
+        } finally {
+            OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();
+        }
+    }
+    // A speed sign moved more than 500 metres is listed under the place where it now stands, right after the edit; one
+    // moved less than 500 metres keeps the place its path names. A moved Loc: board leaves its place where the map put
+    // the board: the place keeps the board's original position.
+    static void AMovedObjectIsListedWhereItNowStands() {
+        const string far = "World/Large Scenery/Bryson/Bryson Signs/Speed 40", near = "World/Large Scenery/Bryson/Bryson Signs/Speed 25", judson = "World/Signs/Loc: Judson", shed = "World/Rocks/Shed";
+        var scene = new Inventory();
+        var world = new World();
+        SceneObservation farSign = Entry(far, "Generic track marker", 4450, 5450), nearSign = Entry(near, "Generic track marker", 4500, 5500);
+        scene.Objects.AddRange(new[] { farSign, nearSign, Entry(judson, "Location sign", -9000, -3000), Entry(shed, Baked, -9100, -3000, "Road scenery") });
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        OutlinerGrouping.InvalidatePlaces();
+        OutlinerGrouping.Scene = world;
+        OutlinerGrouping.LogPending = false;
+        OutlinerGrouping.ByPlace = true;
+        string PlaceOf(OutlinerGrouping.Result tree, string label) => tree.Tops.FirstOrDefault(t => Find(t.Children, label) != null)?.Label;
+        OutlinerGrouping.Result Tree() => OutlinerGrouping.Build(OutlinerGrouping.Rows(inventory, "", OutlinerFilter.All, null, null), inventory.Entries, "", false, null);
+        try {
+            var before = Tree();
+            Check(PlaceOf(before, "Speed 40") == "Bryson" && PlaceOf(before, "Speed 25") == "Bryson" && PlaceOf(before, "Loc: Judson") == "Judson" && PlaceOf(before, "Shed") == "Judson",
+                "before the moves, the signs stand at Bryson and the shed beside the Judson board at Judson (got " + PlaceOf(before, "Speed 40") + ", " + PlaceOf(before, "Speed 25") + ", " + PlaceOf(before, "Loc: Judson") + ", " + PlaceOf(before, "Shed") + ")");
+            // The edits replace the observations of the moved objects, as an edit in the window does.
+            world.Moved[far] = new[] { 6800.0 - 4450, 4500.0 - 5450 };
+            world.Moved[near] = new[] { 400.0, 0 };
+            world.Moved[judson] = new[] { 34000.0, 2000 };
+            scene.Objects[0] = Entry(far, "Generic track marker", 6800, 4500); scene.Objects[1] = Entry(near, "Generic track marker", 4900, 5500);
+            scene.Objects[2] = Entry(judson, "Location sign", 25000, -1000);
+            inventory.Refresh();
+            var after = Tree();
+            // About 2560 metres from Bryson, within the reach of the name in its path, and about 520 metres from the Log Camp label.
+            Check(PlaceOf(after, "Speed 40") == "Log Camp", "a sign moved more than 500 metres is listed under the place where it now stands, whatever its path names (got " + PlaceOf(after, "Speed 40") + ")");
+            Check(PlaceOf(after, "Speed 25") == "Bryson", "a sign moved 400 metres keeps the place its path names (got " + PlaceOf(after, "Speed 25") + ")");
+            Check(PlaceOf(after, "Loc: Judson") == "Sylva", "the moved board itself is listed where it now stands (got " + PlaceOf(after, "Loc: Judson") + ")");
+            Check(PlaceOf(after, "Shed") == "Judson", "Judson stays where the map put its board: the shed beside the board's original position stays at Judson (got " + PlaceOf(after, "Shed") + ")");
+            Check(OutlinerGrouping.Tooltip(after, inventory.Entries[0], true, null).Contains("\nPlace: Log Camp"), "the moved sign's tooltip names its new place");
+            Check(Find(after.Tops, "Speed 40") != null, "the moved sign keeps the game's name");
+            // The world's places read again, as after Refresh or at the first open after a scene patch file moved the
+            // board at load: Judson still stands where the map put its board.
+            OutlinerGrouping.InvalidatePlaces();
+            var reread = Tree();
+            Check(PlaceOf(reread, "Shed") == "Judson" && PlaceOf(reread, "Loc: Judson") == "Sylva" && PlaceOf(reread, "Speed 40") == "Log Camp" && PlaceOf(reread, "Speed 25") == "Bryson",
+                "read again, the places keep the original positions of moved sources (got " + PlaceOf(reread, "Shed") + ", " + PlaceOf(reread, "Loc: Judson") + ", " + PlaceOf(reread, "Speed 40") + ", " + PlaceOf(reread, "Speed 25") + ")");
         } finally {
             OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();
         }
@@ -208,6 +258,7 @@ static class OutlinerGroupingTests {
             OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();
         }
         InspectionOnlyRowsStandUnderTheirCategory();
+        AMovedObjectIsListedWhereItNowStands();
         Console.WriteLine("PASS: outliner grouping");
     }
 }

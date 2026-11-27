@@ -44,7 +44,7 @@ sealed class BaseMapFixture {
         foreach (var line in lines) {
             var cells = Cells(line);
             if (cells[0] == "C") types[cells[1]] = cells[2];
-            else if (cells[0] == "M") MapData.Add(new PlaceSource(PlaceSourceKind.MapData, cells[2], new[] { Double.Parse(cells[3], CultureInfo.InvariantCulture), Double.Parse(cells[4], CultureInfo.InvariantCulture) }));
+            else if (cells[0] == "M") MapData.Add(new PlaceSource(cells[1] == "stop" ? PlaceSourceKind.MapDataPassengerStop : PlaceSourceKind.MapDataArea, cells[2], new[] { Double.Parse(cells[3], CultureInfo.InvariantCulture), Double.Parse(cells[4], CultureInfo.InvariantCulture) }));
             else if (cells[0] == "O") Objects.Add(new BaseMapObject {
                 Listed = cells[1] == "L", Path = cells[2], Components = cells[3].Length == 0 ? new string[0] : cells[3].Split(',').Select(i => types[i]).ToArray(), Family = cells[4].Length == 0 ? null : cells[4],
                 Structure = cells[5].Length == 0 ? null : cells[5], At = new[] { Double.Parse(cells[6], CultureInfo.InvariantCulture), Double.Parse(cells[7], CultureInfo.InvariantCulture) },
@@ -123,6 +123,7 @@ sealed class BaseMapFixture {
             return new ObjectFacts { Own = o.Node.Components.ToArray(), AtOrBelow = types.ToArray(), NamesBelow = SceneObjectRules.NamesBelow(o.Node).ToArray() };
         }
         public double[] Bounds(SceneObservation entry) => null;
+        public double[] Displacement(SceneObservation entry) => null;
         public IEnumerable<PlaceSource> PlaceSources(IReadOnlyList<SceneObservation> entries, List<string> notes) =>
             Map.MapData.Concat(Map.Objects.Where(o => !o.Listed).SelectMany(o => ScenePlaces.SourcesOf(o.Path, o.At)));
     }
