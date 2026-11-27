@@ -13,7 +13,7 @@ dotnet build Src/RailroaderScenePatcher --configuration Release -p:SceneFaults=t
 dotnet build Tests/FaultInjection --configuration Release -p:GameManaged=<Railroader_Data/Managed> -p:BuildArtifactsRoot=<fault build root>
 ```
 
-The core tests run in both shapes. The normal run, `Tests/RailroaderScenePatcher.Core.Tests`, checks that the core assembly has no `FaultInjection` type. The fault test program, `Tests/RailroaderScenePatcher.Core.FaultTests`, compiles the same test sources with `SCENE_PATCHER_FAULTS` against a fault build of the core library and runs only the fault suites, which arm each point against controlled scenes. A fault build keeps its outputs and intermediate files under `faults/` beside the normal build's, so both shapes share one build root:
+The core tests run in both shapes. The normal run, `Tests/RailroaderScenePatcher.Core.Tests`, checks that the core assembly has no `FaultInjection` type. The fault test program, `Tests/RailroaderScenePatcher.Core.FaultTests`, compiles the same test sources with `SCENE_PATCHER_FAULTS` against a fault build of the core library and runs only the fault suites, which arm each point against controlled scenes. The normal suites no longer run against a fault build of the core library. A fault build keeps its outputs and intermediate files under `faults/` beside the normal build's, so both shapes share one build root:
 
 ```powershell
 dotnet run --project Tests/RailroaderScenePatcher.Core.FaultTests --configuration Release
@@ -21,7 +21,7 @@ dotnet run --project Tests/RailroaderScenePatcher.Core.FaultTests --configuratio
 
 ## Install and arm
 
-1. Install the fault build of the patcher in the isolated test home, `C:\TMP\RailroaderMapResearch\RuntimeHome\Mods`, in place of the normal build. Install `SceneFaultSwitch.dll` and its `Info.json` from `<fault build root>\FaultInjection\bin\Release\net472` in a mod folder of its own there, and enable both mods in the test profile.
+1. Install the fault build of the patcher from `<fault build root>\RailroaderScenePatcher\bin\faults\Release\net472` in the isolated test home, `C:\TMP\RailroaderMapResearch\RuntimeHome\Mods`, in place of the normal build. Install `SceneFaultSwitch.dll` and its `Info.json` from `<fault build root>\FaultInjection\bin\Release\net472` in a mod folder of its own there, and enable both mods in the test profile.
 2. Start Railroader with the single `-homedir` of that test home. The switch shows a window titled **Scene Patcher fault switch (test only, F9 hides)**. In any other home it says it is inactive. With a normal patcher build it says that nothing can be armed.
 3. Click one **Arm** button. **Armed** shows the point. The failure trips at the next mutation that reaches that point: an edit, an Undo or Redo step, or a world-load application. It then disarms, and **Last** shows what tripped and when, in UTC. **Disarm** cancels an armed failure that has not tripped.
 

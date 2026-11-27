@@ -2,8 +2,10 @@
 # SPDX-FileCopyrightText: 2026 CrankyAnt
 # SPDX-License-Identifier: MIT
 # The free CI job (parts.custom in .github/ci-config.yml): the PowerShell tests that need no build, run from the
-# repository root. Every test runs, also after a failure, and the script fails when one of them failed.
+# repository root whatever the working directory. Every test runs, also after a failure, and the script fails
+# when one of them failed.
 set -u
+cd "$(dirname "$0")/.." || exit 2
 pwsh --version || { echo "::error title=powershell-tests::pwsh is not on PATH"; exit 2; }
 status=0
 for test in \

@@ -3,7 +3,8 @@
 # Checks what the code and the documentation say about each other, without building the code:
 # - every guide file that the code links to, a ".md" string literal in Src/**/*.cs, exists under docs/guides/scene-patches;
 # - neither the glossary nor a guide names a family "Track marker", and the glossary's Family entry names Generic track marker.
-param([string]$Root = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path)
+param([string]$Root = (Join-Path $PSScriptRoot '../..'))
+$Root = [IO.Path]::TrimEndingDirectorySeparator((Resolve-Path -LiteralPath $Root).ProviderPath)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 

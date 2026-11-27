@@ -68,7 +68,7 @@ One line per validation or test command and per CI workflow the repository runs.
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-FixturePreparation.ps1`: validates baseline-derived fixture generation with synthetic measurements
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-TestHome.ps1`: validates test-copy ownership and cleanup in a synthetic home
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-AttemptSummary.ps1`: validates the separation of active-world and unassigned attempt evidence
-- `pwsh -NoProfile -File Tests/DocumentationChecks/Test-Documentation.ps1`: checks that every guide the code links to exists and that the glossary and guides name the family Generic track marker
+- `pwsh -NoProfile -File Tests/DocumentationChecks/Test-Documentation.ps1`: checks the code's guide links and the documented family name
 - `bash Tests/Run-PowerShellTests.sh`: runs the PowerShell tests and the documentation check as the free CI job does
 - `ci` (shared, `v1`): runs repository hygiene and the configured CI parts and reports the required check `ci / verdict`
 - `automation` (shared, `v1`): runs the configured parts that write
