@@ -5,6 +5,7 @@ updates:
       - /Src/RailroaderScenePatcher.Core
       - /Src/RailroaderScenePatcher
       - /Tests/RailroaderScenePatcher.Core.Tests
+      - /Tests/RailroaderScenePatcher.Core.FaultTests
       - /Tools/NativeObservation
       - /Tests/FaultInjection
       - /Tools/TerrainHeightReadout

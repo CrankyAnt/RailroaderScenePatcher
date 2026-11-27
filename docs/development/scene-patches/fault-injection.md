@@ -13,15 +13,15 @@ dotnet build Src/RailroaderScenePatcher --configuration Release -p:SceneFaults=t
 dotnet build Tests/FaultInjection --configuration Release -p:GameManaged=<Railroader_Data/Managed> -p:BuildArtifactsRoot=<fault build root>
 ```
 
-The core tests run in both shapes. The normal run checks that the core assembly has no `FaultInjection` type. The run with `-p:SceneFaults=true` arms each point against controlled scenes:
+The core tests run in both shapes. The normal run, `Tests/RailroaderScenePatcher.Core.Tests`, checks that the core assembly has no `FaultInjection` type. The fault test program, `Tests/RailroaderScenePatcher.Core.FaultTests`, compiles the same test sources with `SCENE_PATCHER_FAULTS` against a fault build of the core library and runs only the fault suites, which arm each point against controlled scenes. The normal suites no longer run against a fault build of the core library. A fault build keeps its outputs and intermediate files under `faults/` beside the normal build's, so both shapes share one build root:
 
 ```powershell
-dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release -p:SceneFaults=true -p:BuildArtifactsRoot=<fault build root>
+dotnet run --project Tests/RailroaderScenePatcher.Core.FaultTests --configuration Release
 ```
 
 ## Install and arm
 
-1. Install the fault build of the patcher in the isolated test home, `C:\TMP\RailroaderMapResearch\RuntimeHome\Mods`, in place of the normal build. Install `SceneFaultSwitch.dll` and its `Info.json` from `<fault build root>\FaultInjection\bin\Release\net472` in a mod folder of its own there, and enable both mods in the test profile.
+1. Install the fault build of the patcher from `<fault build root>\RailroaderScenePatcher\bin\faults\Release\net472` in the isolated test home, `C:\TMP\RailroaderMapResearch\RuntimeHome\Mods`, in place of the normal build. Install `SceneFaultSwitch.dll` and its `Info.json` from `<fault build root>\FaultInjection\bin\Release\net472` in a mod folder of its own there, and enable both mods in the test profile.
 2. Start Railroader with the single `-homedir` of that test home. The switch shows a window titled **Scene Patcher fault switch (test only, F9 hides)**. In any other home it says it is inactive. With a normal patcher build it says that nothing can be armed.
 3. Click one **Arm** button. **Armed** shows the point. The failure trips at the next mutation that reaches that point: an edit, an Undo or Redo step, or a world-load application. It then disarms, and **Last** shows what tripped and when, in UTC. **Disarm** cancels an armed failure that has not tripped.
 
@@ -41,4 +41,4 @@ The unreadable-parts point works the same way for the Scene object family and is
 
 The hooks sit in `PatchEngine` after `IScene.Apply` and before `IScene.Restore`, in `PatchEditingSession.Commit` after `IScene.Apply` and before its restoration write, and in the crossing-coverage write between span creation and circuit creation. They replace the failure, not the native work around it: the mutation and the native state it leaves are real. A failure inside a native adapter call itself, such as an exception raised by the game midway through a call, is not reproduced. Track-following reconciliation and **Recheck** have no hook of their own. A crossing-coverage write inside **Recheck** still reaches the `between-addition-steps` point, so an armed interruption can trip there: Recheck then reports an incomplete cleanup with the spans it built and restores nothing. Every attempt ends the injected failure it tripped, so a restoration that the failure required but that never ran cannot fail a later, unrelated restoration. The unreadable-group hook sits in `GroupSkips.Read`, before world marking reads the objects of one complex, and replaces only that read: the scene stays unchanged. The unreadable-parts hook sits in `GroupSkips.ReadParts`, before the family (`GroupWorld.Verdicts`) reads the child objects of one complex, and replaces only that read.
 
-CI does not compile the fault build. It is checked locally only, with the fault core-test command above and the two fault builds.
+CI runs both core test programs, each in a job of its own. The fault builds of the patcher and the switch need the game assemblies, so they are checked locally only, with the two build commands above.

@@ -18,7 +18,6 @@ static class NativeButtonSourceTests {
 
     internal static void Run() {
         var root = Root();
-        Assert(File.Exists(Path.Combine(root, "AGENTS.md")), "The repository root holds AGENTS.md: " + root);
         var found = Directory.GetFiles(Path.Combine(root, "Src", "RailroaderScenePatcher"), "*.cs", SearchOption.AllDirectories)
             .SelectMany(f => File.ReadAllLines(f).Select((line, i) => new { File = Path.GetFileName(f), Line = i + 1, Text = line }))
             .Where(l => !l.Text.TrimStart().StartsWith("//", StringComparison.Ordinal) && SwitchedOffText.IsMatch(l.Text))

@@ -61,13 +61,15 @@ One line per validation or test command and per CI workflow the repository runs.
 - `actionlint`: validates GitHub Actions workflow definitions
 - `dotnet build Src/RailroaderScenePatcher -p:GameManaged=<Railroader_Data/Managed>`: builds the DLL mod against the installed game assemblies
 - `dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release`: validates the core library's behaviour without game assemblies and that the normal build has no fault injection switch; append `-- --suite <test-class>` to run one test class
-- `dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release -p:SceneFaults=true -p:BuildArtifactsRoot=<fault build root>`: validates the test-only fault injection points in a fault build of the core library
+- `dotnet run --project Tests/RailroaderScenePatcher.Core.FaultTests --configuration Release`: validates the test-only fault injection points in a fault build of the core library
 - `dotnet build Tests/FaultInjection --configuration Release -p:GameManaged=<Railroader_Data/Managed>`: builds the test-only switch that arms a failure in a fault build during a native journey
 - `dotnet build Tools/TerrainHeightReadout --configuration Release -p:GameManaged=<Railroader_Data/Managed>`: builds the terrain height readout for native journeys
 - `dotnet build Tools/NativeObservation -p:GameManaged=<Railroader_Data/Managed>`: builds the isolated native observation artifact
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-FixturePreparation.ps1`: validates baseline-derived fixture generation with synthetic measurements
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-TestHome.ps1`: validates test-copy ownership and cleanup in a synthetic home
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-AttemptSummary.ps1`: validates the separation of active-world and unassigned attempt evidence
+- `pwsh -NoProfile -File Tests/DocumentationChecks/Test-Documentation.ps1`: checks the code's guide links and the documented family name
+- `bash Tests/Run-PowerShellTests.sh`: runs the PowerShell tests and the documentation check as the free CI job does
 - `ci` (shared, `v1`): runs repository hygiene and the configured CI parts and reports the required check `ci / verdict`
 - `automation` (shared, `v1`): runs the configured parts that write
 - `release` (shared, `v1`): runs the configured release part

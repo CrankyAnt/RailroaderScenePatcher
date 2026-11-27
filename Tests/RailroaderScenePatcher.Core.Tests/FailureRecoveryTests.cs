@@ -206,7 +206,6 @@ static class FailureRecoveryTests {
         foreach (var route in routes) {
             var guide = RecoveryGuidance.Guide(route[0], route[1], route[2]).Value;
             Assert(guide == route[3], route[0] + " / " + route[1] + " opens " + route[3] + ", not " + guide);
-            Assert(System.IO.File.Exists(System.IO.Path.Combine(RepositoryRoot(), "docs", "guides", "scene-patches", guide.Split('#')[0])), "The guide " + guide + " exists");
         }
     }
     // The message area's result for each outcome, through the panel's own feedback route.
@@ -289,15 +288,6 @@ static class FailureRecoveryTests {
         scene.FailNextApplies = 1; scene.Pending = true;
         feedback.Run("Placement", "Placement", null, inventory, inventory.Entries.Single(), inspection => session.Edit(P, At(70), null, inspection));
         Assert(feedback.Messages[0].Recovery?.Kind == FailureKind.AwaitingOutput && feedback.Result.Contains("was undone; waiting for terrain") && RailroaderScenePatcher.CommandBand.RecoveryWarning(feedback.Messages[0].Recovery.Kind), "The message reports the restoration and takes the warning colour by its kind: " + feedback.Result);
-    }
-    static string RepositoryRoot() {
-        var directory = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !System.IO.File.Exists(System.IO.Path.Combine(directory.FullName, "AGENTS.md"))) directory = directory.Parent;
-        if (directory == null) {
-            directory = new System.IO.DirectoryInfo(Environment.CurrentDirectory);
-            while (directory != null && !System.IO.File.Exists(System.IO.Path.Combine(directory.FullName, "AGENTS.md"))) directory = directory.Parent;
-        }
-        return directory?.FullName ?? throw new InvalidOperationException("Repository root not found");
     }
     sealed class Rows : IPatchDiagnostics { public readonly List<PatchFailure> Failures = new List<PatchFailure>(); public void Warning(PatchFailure failure) => Failures.Add(failure); }
     // A runtime failure goes to the player as a report request, never as a request to repair the distributed scene patch file.

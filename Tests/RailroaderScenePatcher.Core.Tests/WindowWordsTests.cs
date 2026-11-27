@@ -110,8 +110,9 @@ static class WindowWordsTests {
     }
 
     // The family of the Generic track markers that no more specific family claims is Generic track marker. No window
-    // text, and neither the glossary nor a guide, names a family "Track marker": the bare name is the outliner category
-    // only, which keeps it. A sentence about one marker, such as "Track marker M4 is not on the track", names no family.
+    // text names a family "Track marker": the bare name is the outliner category only, which keeps it. A sentence about
+    // one marker, such as "Track marker M4 is not on the track", names no family. Tests/DocumentationChecks checks the
+    // glossary and the guides.
     static void NoTrackMarkerFamily() {
         var root = Root();
         var bare = new System.Text.RegularExpressions.Regex(@"\bTrack marker\b(?! [A-Za-z0-9{]| $)");
@@ -122,14 +123,6 @@ static class WindowWordsTests {
         var hits = code.Where(l => (bare.IsMatch(l.Text) || l.Text.IndexOf("Track marker family", StringComparison.Ordinal) >= 0)
             && !(l.File == "SceneClassification.cs" && l.Text == "Track marker")).Select(l => l.File + ": \"" + l.Text + "\"").ToArray();
         Check(hits.Length == 0, "no window text names a family Track marker; only the category constant says Track marker:\n" + String.Join("\n", hits));
-        var family = new System.Text.RegularExpressions.Regex(@"(?<![Gg]eneric )(\*\*|`)?Track marker(\*\*|`)? family");
-        var docs = new[] { Path.Combine(root, "GLOSSARY.md") }.Concat(Directory.GetFiles(Path.Combine(root, "docs", "guides"), "*.md", SearchOption.AllDirectories)).ToArray();
-        var docHits = docs.SelectMany(f => File.ReadAllLines(f).Where(l => family.IsMatch(l)).Select(l => Path.GetFileName(f) + ": " + l)).ToArray();
-        Check(docHits.Length == 0, "neither the glossary nor a guide names a family Track marker:\n" + String.Join("\n", docHits));
-        var glossary = File.ReadAllText(Path.Combine(root, "GLOSSARY.md"));
-        var entry = glossary.Substring(glossary.IndexOf("**Family**", StringComparison.Ordinal));
-        entry = entry.Substring(0, entry.IndexOf("\n**", 2, StringComparison.Ordinal) < 0 ? entry.Length : entry.IndexOf("\n**", 2, StringComparison.Ordinal));
-        Check(entry.Contains("Generic track marker"), "the glossary's Family entry names the family Generic track marker");
     }
 
     static void NoPavilionKindOrTrackRelativeFamily() {

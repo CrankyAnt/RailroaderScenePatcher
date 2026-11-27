@@ -1,0 +1,17 @@
+<!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
+<!-- SPDX-License-Identifier: MIT -->
+<!-- The fault build of the core tests: the core library as the netstandard2.0 library with SCENE_PATCHER_FAULTS, beside
+     its normal build (Directory.Build.props), and the core test sources, of which this program runs only the fault suites. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <StartupObject>FaultTestsProgram</StartupObject>
+    <DefineConstants>$(DefineConstants);SCENE_PATCHER_FAULTS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Src/RailroaderScenePatcher.Core/RailroaderScenePatcher.Core.csproj" AdditionalProperties="SceneFaults=true" />
+    <Compile Include="../RailroaderScenePatcher.Core.Tests/*.cs" LinkBase="CoreTests" />
+  </ItemGroup>
+  <Import Project="../RailroaderScenePatcher.Core.Tests/LinkedSources.props" />
+</Project>
