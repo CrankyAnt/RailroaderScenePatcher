@@ -146,6 +146,9 @@ namespace RailroaderScenePatcher {
         LocationSigns scene;
         // The scene ground masks of scene objects with child objects and of marker objects, with their terrain output.
         GroundMasks groundMasks;
+        // The markers whose track sets their place, which the marker capability records and the group capability leaves in
+        // place when a group moves. One record for the runtime, as the marker capability is built once.
+        readonly TrackPlacedObjects trackPlaced = new TrackPlacedObjects();
         GroundMaskWorld groundMaskWorld;
         NativeInventory native;
         SceneCapabilities capabilities;
@@ -317,7 +320,7 @@ namespace RailroaderScenePatcher {
                 GroupWorld groupWorld = null;
                 try {
                     groupWorld = new GroupWorld(); var holds = new PartHolds();
-                    capabilities.Add(new SceneObjects(groupWorld, Capability.Unchecked, holds, groundMasks));
+                    capabilities.Add(new SceneObjects(groupWorld, Capability.Unchecked, holds, groundMasks, trackPlaced));
                     capabilities.Add(new ChildObjects(groupWorld, holds, masks: groundMasks));
                 } catch (Exception e) {
                     capabilities.AddUnavailable(SceneObjects.Structure, e.GetBaseException().Message);
@@ -396,7 +399,7 @@ namespace RailroaderScenePatcher {
             native = new NativeInventory(g => scene == null ? "Location sign editing is unavailable" : scene.Refusal(g));
             OutlinerGrouping.Scene = new OutlinerScene();
             capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds, Keys = TargetKeyCache.Of, Resolved = target => TargetKeyCache.Of(target), ModObjectWorld = new ModObjectWorld() };
-            try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
+            try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks, trackPlaced)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             // A new game reads its start spawn point before the world load, so the spawn point capability is ready with the runtime.
             try { var spawnWorld = new SpawnPointWorld(); capabilities.Add(spawnScene = new SpawnPointScene(spawnWorld, Capability.Unchecked, groundMasks)); capabilities.SpawnPriorities = spawnWorld; }

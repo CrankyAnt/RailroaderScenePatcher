@@ -12,7 +12,7 @@ namespace RailroaderScenePatcher {
     // The native operations of the scene object with child objects and part capabilities: the transform and activity of a top scene object
     // or a part, the game's cullers in the group and the physics state of its colliders. The rules live in Core's
     // SceneObjectRules, SceneObjects and ChildObjects.
-    internal sealed class GroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisableRefusal, IDisposable {
+    internal sealed class GroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisableRefusal, IGroupActivityRefusal, IDisposable {
         internal const string SimpleCullerType = CullerTypes.SimpleCuller, GameObjectCullerType = CullerTypes.GameObjectCuller;
         static readonly Type simple = Native.Type(SimpleCullerType), renderer = Native.Type(BoardScene.CullerType), switcher = Native.Type(GameObjectCullerType);
         static readonly FieldInfo cullingGroup = simple?.GetField("_cullingGroup", Native.Flags), cullingSpheres = simple?.GetField("_cullingSpheres", Native.Flags),
@@ -410,8 +410,20 @@ namespace RailroaderScenePatcher {
         }
         public string ActivityRefusal(object part) => ActivityProblem(part as GameObject);
         // Why the Enabled setting of a top scene object or part cannot be set, or null: a game-object culler switches the part by
-        // camera distance. An object a construction controller switches takes an explicit disable, which holds.
-        internal static string ActivityProblem(GameObject go) => go == null ? null : SwitchedPart(go);
+        // camera distance, or a track marker stands at or below it. An object a construction controller switches takes an
+        // explicit disable, which holds.
+        internal static string ActivityProblem(GameObject go) => go == null ? null : SwitchedPart(go) ?? MarkerActivityProblem(go);
+        public string GroupActivityRefusal(object group) => MarkerActivityProblem(group as GameObject);
+        static readonly Type trackMarker = Native.Type(SceneObjectRules.Marker);
+        // Why a group or part that holds track markers takes no activity, or null: disabling it would take its markers off
+        // the track. A group reads it from its verdict, a part from the scene-saved markers below it.
+        static string MarkerActivityProblem(GameObject go) {
+            if (go == null) return null;
+            var verdict = VerdictOf(go);
+            if (verdict?.Disposition == GroupDisposition.Group) return verdict.HoldsTrackMarkers ? SceneObjectRules.MarkerActivityRefusal : null;
+            if (!IsPart(go) || trackMarker == null) return null;
+            return go.GetComponentsInChildren(trackMarker, true).Any(c => c != null && (c.gameObject.hideFlags & HideFlags.DontSave) == 0) ? SceneObjectRules.MarkerActivityRefusal : null;
+        }
         public string FollowingRefusal(object target) => FollowingProblem(target as GameObject);
         // Why the top scene object or part takes no track-following placement, or null: a rail or road bridge and its parts.
         internal static string FollowingProblem(GameObject go) {

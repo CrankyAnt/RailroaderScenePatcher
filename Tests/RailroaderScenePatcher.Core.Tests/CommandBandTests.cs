@@ -69,7 +69,7 @@ static class CommandBandTests {
         Check(unchanged == "Coverage preview completed. The object already has this value." && !unchanged.Contains(WindowGuidance.ApplyPreview),
             "A preview whose edit changes nothing says so and does not ask for Apply: " + unchanged);
     }
-    // A group left out under a settled rule, such as a group that holds track markers, is not waiting for support and
+    // A group left out under a settled rule, such as a group that holds a map icon, is not waiting for support and
     // never reads "Not yet supported:".
     static void GroupVerdictsSayWhyTheyAreNotEditable() {
         SceneObjectVerdict Verdict(string name, Node part) =>
@@ -77,13 +77,14 @@ static class CommandBandTests {
                 .Single(v => v.Path == "World/Large Scenery/Town/" + name);
         const string family = "Scene object";
         var markers = Verdict("Signs", new Node("Yard Limit").With("Track.TrackMarker").Solid().Family());
-        var settled = CommandBand.GroupInspectionOnly(markers, family);
-        Check(settled == "Not editable as a group: " + SceneObjectRules.TrackMarkerReason,
+        Check(CommandBand.GroupInspectionOnly(markers, family) == null, "A group that holds track markers is a listed group: " + CommandBand.GroupInspectionOnly(markers, family));
+        var settled = CommandBand.GroupInspectionOnly(Verdict("Depot Icon", new Node("Icon").With("UI.Map.MapIcon")), family);
+        Check(settled == "Not editable as a group: " + SceneObjectRules.MapIconReason,
             "A group left out under a rule reads Not editable as a group with its reason: " + settled);
         Check(settled.IndexOf("yet", StringComparison.OrdinalIgnoreCase) < 0 && CommandBand.Refusal(settled) == null,
             "Its reason promises no later support and is no refusal of a supported family: " + settled);
-        Check(CommandBand.EditReason(settled) == "Edit its track markers one by one" && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + SceneObjectRules.TrackMarkerReason
-            && CommandBand.Tooltip("Does something.", CommandBand.EditReason(settled)) == "Edit its track markers one by one.",
+        Check(CommandBand.EditReason(settled) == "Edit its map icon separately" && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + SceneObjectRules.MapIconReason
+            && CommandBand.Tooltip("Does something.", CommandBand.EditReason(settled)) == "Edit its map icon separately.",
             "The message, the Inspection only line and the tooltip give the reason without its label: " + CommandBand.Tooltip("Does something.", settled));
         var spawn = Verdict("Alarka Spawn", new Node("Spawn").With("Character.SpawnPoint"));
         Check(CommandBand.GroupInspectionOnly(spawn, family) == "Not editable as a group: " + SceneObjectRules.SpawnPointReason,

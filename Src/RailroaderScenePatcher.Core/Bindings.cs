@@ -436,7 +436,13 @@ namespace RailroaderScenePatcher.Core {
         // on the root of its building: a move of the marker rebuilds them, a mask that flattens the terrain height
         // included.
         readonly MaskFollowing masks;
-        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability, GroundMasks masks = null) { relationship = new MarkerRelationship(world, Structure, null, true); Capability = capability; this.masks = new MaskFollowing(masks); }
+        // The markers whose track sets their place, shared with the group capability: a marker with a track-following
+        // placement stays on its track point when its group moves.
+        readonly ITrackMarkerWorld world;
+        readonly TrackPlacedObjects placed;
+        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability, GroundMasks masks = null, TrackPlacedObjects placed = null) {
+            relationship = new MarkerRelationship(world, Structure, null, true); Capability = capability; this.masks = new MaskFollowing(masks); this.world = world; this.placed = placed;
+        }
         // Gives a capability built before the world's ground masks existed, as for a new game's start, those masks. A
         // capability that already has masks keeps them.
         public void UseMasks(GroundMasks value) => masks.Use(value);
@@ -456,11 +462,26 @@ namespace RailroaderScenePatcher.Core {
         public void CheckRelationships(object target, ObjectState state) {
             relationship.CheckRelationships(target, state);
         }
-        public object Capture(object target) => relationship.Capture(target);
+        // The snapshot also holds whether the marker's track set its place.
+        sealed class Taken { internal object Inner; internal bool Placed; }
+        public object Capture(object target) => new Taken { Inner = relationship.Capture(target), Placed = placed?.Contains(target) == true };
         public ObjectState Read(object target) => relationship.Read(target);
-        public void Apply(object target, ObjectState state) => masks.Write(target, () => relationship.Apply(target, state));
-        public void ApplyFollowUpdate(object target, ObjectState state) => masks.Write(target, () => relationship.Apply(target, state, true));
-        public bool Restore(object target, object snapshot) => masks.Restore(target, () => relationship.Restore(target, snapshot));
+        // The applied state decides whether the track sets the marker's place from now on: only a track-following
+        // placement does; a fixed placement or none leaves the marker's place to its object.
+        public void Apply(object target, ObjectState state) {
+            masks.Write(target, () => relationship.Apply(target, state));
+            placed?.Set(target, world, state?.Placement?.Following != null);
+        }
+        public void ApplyFollowUpdate(object target, ObjectState state) {
+            masks.Write(target, () => relationship.Apply(target, state, true));
+            placed?.Set(target, world, state?.Placement?.Following != null);
+        }
+        public bool Restore(object target, object snapshot) {
+            var taken = (Taken)snapshot;
+            var restored = masks.Restore(target, () => relationship.Restore(target, taken.Inner));
+            placed?.Set(target, world, taken.Placed);
+            return restored;
+        }
     }
     // State that a marker's consumer derives from the marker's location and the object's placement, such as generated geometry.
     internal interface IMarkerConsumer {

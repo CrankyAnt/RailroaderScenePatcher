@@ -94,7 +94,7 @@ static class SupportedEditsTests {
             ["Edit this marker through its crossing pad"] = "Edit it on its crossing pad",
             ["The pad's activity follows a track group; the crossing-pad operation does not support group-driven activity"] = "Its track group controls its activity",
             ["Only the Ela Bridge Scenery construction controller has construction segments of its own. For another rail bridge, set the construction segments on its group."] = "Edit it on its group",
-            [SceneObjectRules.TrackMarkerReason] = "Edit its track markers one by one",
+            [SceneObjectRules.CrossingPadReason] = "Edit its crossing pad separately",
             [SceneObjectRules.SpawnPointReason] = "Edit its spawn points one by one",
             [SceneObjectRules.MapIconReason] = "Edit its map icon separately",
             [SceneObjectRules.StationAgentReason] = "Station click spots are native map data",
@@ -216,7 +216,7 @@ static class SupportedEditsTests {
         var unnamed = texts.Where(found => EditReasons.Matched(found.Substring(found.LastIndexOf('|') + 1)) == null).ToArray();
         Check(unnamed.Length == 0, unnamed.Length + " pattern refusals have no rule in EditReasons: " + String.Join(" || ", unnamed));
         // The texts that constants hold, and the inventory's own refusals.
-        foreach (var text in new[] { SceneObjectRules.TrackMarkerReason, SceneObjectRules.SpawnPointReason, SceneObjectRules.MapIconReason, SceneObjectRules.StationAgentReason,
+        foreach (var text in new[] { SceneObjectRules.CrossingPadReason, SceneObjectRules.SpawnPointReason, SceneObjectRules.MapIconReason, SceneObjectRules.StationAgentReason,
             SceneObjectRules.ConstructionOutsideBridge, SceneObjectRules.TopObjectRefusal, SceneObjectRules.CullerOnlyRefusal, SceneObjectRules.GroupHolderRefusal,
             GameSwitchActivity.ProgressionMembersRefusal, GameSwitchActivity.MapFeatureMembersRefusal, GameSwitchActivity.UnsharedRefusal,
             CommandBand.SharedPath(2), CommandBand.NotYetSupported("track markers of type Ctc"), CommandBand.InspectionOnly("Unrecognised family", false),
@@ -311,7 +311,7 @@ static class SupportedEditsTests {
         ["starter"] = "Available: Set track location | Unavailable: | • Has no effect on where cars start: " + Placed
             + " | " + NoReplacementId + " | • No new-game car placement uses it: Set Start derailed",
         ["detection span"] = "Unavailable: | • Edit it on its crossing controller: " + Placed,
-        ["sign group"] = "Unavailable: | • Edit its track markers one by one: " + Placed,
+        ["marker group"] = "Available: Move, Rotate, Follow a track | Unavailable: | • Its activity can't be edited: Disable",
         ["refused marker"] = "Unavailable: | • Its structure isn't supported: " + Placed + ", Set track binding",
     };
 
@@ -324,14 +324,18 @@ static class SupportedEditsTests {
         // The inventory dump refused the objects that share a path; a key now names each of them.
         if (holders > 1) Accepted(o);
         var bindings = new List<string>();
-        string operations = "Edits of this family", only = null, holder = null, cls;
+        string operations = "Edits of this family", only = null, holder = null, cls, activity = null;
         var bridge = BridgeKind.None;
         if (o.TopSceneObject || o.ChildObject) {
             var root = o.TopSceneObject ? o.Path : map.Objects.Where(r => r.TopSceneObject && o.Path.StartsWith(r.Path + "/", StringComparison.Ordinal)).OrderByDescending(r => r.Path.Length).FirstOrDefault()?.Path;
             verdicts.TryGetValue(root ?? "", out var verdict);
             bridge = verdict?.Bridge ?? BridgeKind.None;
-            if (o.TopSceneObject && o.Structure == null) { only = CommandBand.GroupInspectionOnly(verdict, o.Family); cls = "sign group"; }
+            // The dump listed the sign groups that hold track markers for inspection only; the group rule now accepts them.
+            if (o.TopSceneObject && o.Structure == null && verdict?.Disposition == GroupDisposition.Group) o.Structure = SceneObjects.Structure;
+            if (o.TopSceneObject && o.Structure == null) { only = CommandBand.GroupInspectionOnly(verdict, o.Family); cls = "inspection-only group"; }
             else if (o.TopSceneObject && o.Components.Contains(SceneObjectRules.ConstructionController)) { bindings.Add(CommandBand.SegmentBinding("s1", true)); cls = "construction root"; }
+            // A group that holds track markers moves as a whole, but its activity is refused, as the layout reads it from the group world.
+            else if (o.TopSceneObject && verdict?.HoldsTrackMarkers == true) { activity = SceneObjectRules.MarkerActivityRefusal; cls = "marker group"; }
             else cls = bridge == BridgeKind.Rail ? "rail bridge" : bridge == BridgeKind.Road ? "road bridge" : "scenery";
         } else if (o.Family == "Track span") {
             holder = map.Objects.Any(c => c.Listed && c.Path == parent && c.Structure == CrossingCoverageScene.Structure) ? parent : null;
@@ -344,7 +348,7 @@ static class SupportedEditsTests {
             : o.Structure == LocationSigns.Structure || o.Structure == BridgeScene.Structure || o.Structure == StationMapIconRules.Structure || o.Structure == SpawnPoints.Structure ? "scenery" : "unknown " + o.Family + " " + o.Structure;
         var entry = Entry(o.Family, o.Structure, operations, o.Path, bindings: bindings, groupPath: o.ChildObject ? parent : null, holderPath: holder, bridge: o.TopSceneObject ? bridge : BridgeKind.None, only: only);
         var expected = Expected.TryGetValue(cls, out var text) ? text : null;
-        return (entry, o.ChildObject ? new SupportedEdits.Live { Bridge = bridge } : null, expected, cls);
+        return (entry, o.ChildObject ? new SupportedEdits.Live { Bridge = bridge } : activity != null ? new SupportedEdits.Live { ActivitySwitched = activity } : null, expected, cls);
     }
     static List<string> Mismatches(BaseMapFixture map, IEnumerable<BaseMapObject> objects, Dictionary<string, int> classes) {
         var verdicts = map.Verdicts.GroupBy(v => v.Path, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
@@ -365,7 +369,7 @@ static class SupportedEditsTests {
         var wrong = Mismatches(map, map.Objects, classes);
         Check(wrong.Count == 0, wrong.Count + " base-map objects list other edits than expected: " + String.Join(" || ", wrong.Take(6)));
         Check(classes.Keys.All(cls => !cls.StartsWith("unknown", StringComparison.Ordinal)), "every base-map object has an expected list: " + String.Join(", ", classes.Keys));
-        foreach (var cls in new[] { "scenery", "rail bridge", "road bridge", "marker", "pad", "milepost", "mast", "bell", "crossing controller", "construction controller", "starter", "detection span", "sign group", "refused marker" })
+        foreach (var cls in new[] { "scenery", "rail bridge", "road bridge", "marker", "pad", "milepost", "mast", "bell", "crossing controller", "construction controller", "starter", "detection span", "marker group", "refused marker" })
             Check(classes.ContainsKey(cls), "the base map holds a " + cls + ": " + String.Join(", ", classes.Select(pair => pair.Key + " " + pair.Value)));
     }
 

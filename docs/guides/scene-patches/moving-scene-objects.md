@@ -23,7 +23,7 @@ A group contains only the objects saved below its top scene object in the scene.
 
 Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
-Groups containing track markers or spawn points are also marked `inspection only` and can't move as a whole. Edit their markers in the **Generic track marker** family and their spawn points in the **Spawn point** family. A group marked `inspection only` stays under its category in the outliner. A group that fits no category stands under **Unclassified**. These groups list no parts.
+Groups containing spawn points or a crossing pad are also marked `inspection only` and can't move as a whole. Edit their spawn points in the **Spawn point** family and the pad in the **Crossing pad marker** family. A group that holds track markers is listed; see [groups with track markers](#groups-with-track-markers). A group marked `inspection only` stays under its category in the outliner. A group that fits no category stands under **Unclassified**. These groups list no parts.
 
 ## Which parts are listed
 
@@ -65,6 +65,18 @@ A part with a fixed placement stays at its map coordinates when you later move t
 Click **Remove modification** to restore a part's unmodified placement relative to its parent, either the top scene object or another part. The parent stays where it is, and the part moves with it again. If a part is below another part that has moved, disabling and enabling the lower part or removing its modification preserves its placement relative to the moved part.
 
 **Disable** is unavailable for a part that a game culler switches on and off by camera distance; the editor shows the reason. The culler would override a stored disable, so the patcher cannot maintain it. A placement edit leaves the part in the state set by the culler.
+
+## Groups with track markers
+
+A group can hold track markers, such as `Bryson Signs` with its speed sign and yard limit signs. Each marker keeps its own row in the **Generic track marker** family and isn't a part of the group.
+
+To move or rotate the group, select its row and follow [move a group in the native map editor](#move-a-group-in-the-native-map-editor). Its parts and its markers move together and keep their placement relative to each other. Each marker keeps the track binding it had: its segment, end, and distance don't change, so the game still reads the marker at the same track location. To bind a marker to the place where it now stands, select the marker and set its binding, as described in [repair track bindings](repairing-track-bindings.md).
+
+A marker that follows a track stays on its track point when the group moves or rotates, as a crossing pad does. The rest of the group moves around it. To make the marker move with the group again, select it and click **Stop** on the **Placement** tab's **Follow** mode, as described in [follow a track](following-track.md).
+
+**Disable** and **Enable** are unavailable for such a group, and for a part that holds a track marker, with the reason `Its activity can't be edited`. Disabling the group would take its markers off the track. A scene patch file that sets `active` for such a group fails with the message "This object holds track markers, so you can't enable or disable it. Disabling it would take its markers off the track." To switch a single marker off, disable it in the **Generic track marker** family.
+
+The modification records only the group's placement. It records no track binding.
 
 ## Industry buildings and storage piles
 

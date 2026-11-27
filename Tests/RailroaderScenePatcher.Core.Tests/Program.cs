@@ -354,6 +354,7 @@ class Program {
         PartCullingTests.Run();
         ExistingEquipmentTests.Run();
         CrossingSetupTests.Run();
+        MarkerGroupTests.Run();
         SelectionTests.Run();
         ComplexTests.Run();
         BoardTests.Run();

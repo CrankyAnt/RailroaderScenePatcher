@@ -70,6 +70,9 @@ namespace RailroaderScenePatcher.Core {
         public bool Crossbuck { get; internal set; }
         // For a crossbuck, the marker ID of its crossing's pad, or null when the crossing has no pad with one id.
         public string PadMarkerId { get; internal set; }
+        // A track marker stands at or below the group (SceneObjectRules.HoldsTrackMarker): the group moves as a whole,
+        // but its activity is refused (SceneObjectRules.MarkerActivityRefusal).
+        public bool HoldsTrackMarkers { get; internal set; }
     }
     // The categories the outliner lists objects under. Which category an object takes is decided by generic rules
     // from what the object provides (SceneClassification); no table names objects.
@@ -197,7 +200,7 @@ namespace RailroaderScenePatcher.Core {
             internal bool Matches(string type) => Prefix ? type.StartsWith(Component, StringComparison.Ordinal) : type == Component;
         }
         public static readonly IReadOnlyList<Exclusion> Exclusions = Array.AsReadOnly(new[] {
-            new Exclusion("Track.TrackMarker", "track marker", TrackMarkerReason),
+            new Exclusion(PadBuilder, "crossing pad", CrossingPadReason),
             new Exclusion("Model.StationAgent", "station click spot", StationAgentReason),
             new Exclusion(ConstructionController, "construction controller", ConstructionOutsideBridge),
             new Exclusion(SpawnPoints.Component, "spawn point", SpawnPointReason),
@@ -209,11 +212,21 @@ namespace RailroaderScenePatcher.Core {
         // Why a group with a station click spot is left out: in Railroader 0.6.3 station click spots are native map data,
         // which the native map editor edits.
         public const string StationAgentReason = "This group contains a station click spot. It's native map data, which you edit in the Map Editor.";
-        // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
-        // their own family.
-        public const string TrackMarkerReason = "This group can't be moved as a whole because it contains track markers. " + WindowGuidance.EditTrackMarkersIndividually;
+        // Why a group with a crossing pad outside a crossing is left out: its track binding places the pad, so the pad
+        // can't move with the group. A track marker without a pad moves with its group and keeps its binding.
+        public const string CrossingPadReason = "This group can't be moved as a whole because it contains a crossing pad, which its track binding places. " + WindowGuidance.EditCrossingPadSeparately;
         // Why a group with a spawn point is left out: its spawn points are edited one by one in their own family.
         public const string SpawnPointReason = "This group can't be moved as a whole because it contains spawn points. " + WindowGuidance.EditSpawnPointsIndividually;
+        // Why a group or part that holds track markers takes no activity: disabling it would deactivate its markers, which
+        // then leave the track's registrations, so its markers stop working. It moves and rotates as a whole.
+        public const string MarkerActivityRefusal = "This object holds track markers, so you can't enable or disable it. Disabling it would take its markers off the track.";
+        // Whether a track marker stands at or below the node, on an object the scene serializes.
+        public static bool HoldsTrackMarker(IHierarchyNode node) {
+            if (node == null) return false;
+            var types = new HashSet<string>(StringComparer.Ordinal);
+            Collect(node, types);
+            return types.Contains(Marker);
+        }
         // A road bridge, wherever it stands: a root whose name contains Road Bridge. Its road is native
         // map data; the bridge carries a renderer culler and its own scene ground mask.
         public static bool RoadBridge(string name) => name != null && name.IndexOf("Road Bridge", StringComparison.Ordinal) >= 0;
@@ -239,9 +252,11 @@ namespace RailroaderScenePatcher.Core {
         public static string FollowingRefusal(BridgeKind bridge) =>
             bridge == BridgeKind.Rail ? RailBridgeNoFollowing : bridge == BridgeKind.Road ? RoadBridgeNoFollowing : null;
         // Why a rail bridge with track-owned components in its hierarchy cannot be edited: the track and
-        // what the game builds for it belong to the native map data, which a bridge move must leave in place.
+        // what the game builds for it belong to the native map data, which a bridge move must leave in place. A track
+        // marker and its relative position are no part of the track: a marker moves with its group and keeps its binding.
+        static readonly string[] MarkerComponents = { "Track.TrackMarker", "Track.TrackRelativePosition" };
         public static string TrackOwnedRefusal(IEnumerable<string> types) {
-            var owned = (types ?? Enumerable.Empty<string>()).FirstOrDefault(type => type != null && (type.StartsWith("Track.", StringComparison.Ordinal) || type.StartsWith("AutoTrestle.", StringComparison.Ordinal)));
+            var owned = (types ?? Enumerable.Empty<string>()).FirstOrDefault(type => type != null && !MarkerComponents.Contains(type) && (type.StartsWith("Track.", StringComparison.Ordinal) || type.StartsWith("AutoTrestle.", StringComparison.Ordinal)));
             return owned == null ? null : "This rail bridge contains the track-owned component " + owned + ", which belongs to the native track. The bridge can't be moved, enabled, or disabled.";
         }
         public const string CrossingController = "Track.Crossings.GradeCrossingController", PadBuilder = "Track.TrackCurveMeshBuilder", Marker = "Track.TrackMarker",
@@ -326,6 +341,7 @@ namespace RailroaderScenePatcher.Core {
             // A supported rail bridge construction holds its own construction controller; any other group holding one is left out.
             var excluded = FirstExclusion(node, rail ? ConstructionController : null);
             var verdict = excluded != null ? new SceneObjectVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason, true) : new SceneObjectVerdict(node, path, GroupDisposition.Group, null);
+            verdict.HoldsTrackMarkers = HoldsTrackMarker(node);
             if (road || rail) { verdict.Category = SceneObjectCategories.Bridge; verdict.Subcategory = road ? SceneObjectCategories.RoadBridges : SceneObjectCategories.RailBridges; verdict.Bridge = road ? BridgeKind.Road : BridgeKind.Rail; }
             verdicts.Add(verdict);
         }
@@ -790,6 +806,11 @@ namespace RailroaderScenePatcher.Core {
     public interface ICrossbuckWorld {
         IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path);
     }
+    // Why a group takes no activity at all, enabled or disabled, or null: a group that holds track markers
+    // (SceneObjectRules.MarkerActivityRefusal). Checked before any mutation.
+    public interface IGroupActivityRefusal {
+        string GroupActivityRefusal(object group);
+    }
     public sealed class SceneObjects : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDependentOutputScene, IPadMarkerIdentityScene, IDisposable {
         public const string Structure = "scene-object-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
@@ -798,8 +819,10 @@ namespace RailroaderScenePatcher.Core {
         IConstructionSegmentWorld Segments => world as IConstructionSegmentWorld;
         // The scene ground masks of the groups, or null in a world without them.
         readonly GroundMasks masks;
-        public SceneObjects(IGroupWorld world, Capability capability = Capability.Unchecked, PartHolds holds = null, GroundMasks masks = null) {
-            this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.holds = holds ?? new PartHolds(); this.masks = masks;
+        // The markers below a group whose track sets their place: a group move leaves them where they stand.
+        readonly TrackPlacedObjects placed;
+        public SceneObjects(IGroupWorld world, Capability capability = Capability.Unchecked, PartHolds holds = null, GroundMasks masks = null, TrackPlacedObjects placed = null) {
+            this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.holds = holds ?? new PartHolds(); this.masks = masks; this.placed = placed;
         }
         // The terrain output that follows a ground mask of the group, by the edited top scene object.
         public DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;
@@ -838,17 +861,22 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship.");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Placement?.Following != null && world.FollowingRefusal(target) is string following) throw new InvalidOperationException(following);
-            var refusal = (state?.Placement == null ? null : world.PlacementRefusal(target))
+            var refusal = (state?.Active == null ? null : (world as IGroupActivityRefusal)?.GroupActivityRefusal(target))
+                ?? (state?.Placement == null ? null : world.PlacementRefusal(target))
                 ?? (state?.Active == false ? world.DisableRefusal(target) : null);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
         sealed class Snapshot { internal GroupObservation Observed; internal ConstructionSegments Segments; }
         public object Capture(object target) => new Snapshot { Observed = world.Observe(target), Segments = ConstructionSegmentRule.Read(Segments, target) };
         public ObjectState Read(object target) => world.Observe(target).Root.WithSegments(ConstructionSegmentRule.Read(Segments, target));
-        // The top scene object's placement applies first; every part with a fixed placement below it is then put back there.
-        void Place(object target, Placement placement) {
+        // The top scene object's placement applies first; every part with a fixed placement below it is then put back there,
+        // and so is every marker below it whose track sets its place. Returns those markers with where they stood.
+        IReadOnlyList<TrackPlacedObjects.Kept> Place(object target, Placement placement) {
+            var kept = placed?.Below(world, target) ?? Array.Empty<TrackPlacedObjects.Kept>();
             world.SetPlacement(target, placement);
             holds.Reassert(world, target);
+            TrackPlacedObjects.PutBack(kept);
+            return kept;
         }
         // The cullers follow the group, and each moved part outside its culler's sphere keeps a sphere of its own.
         CullingPlan Refresh(object target) {
@@ -867,12 +895,12 @@ namespace RailroaderScenePatcher.Core {
             var masked = masks?.Observe(target);
             var active = state.Active ?? before.Root.Active ?? true;
             if (active && before.Root.Active != true) world.SetActive(target, true);
-            if (state.Placement != null) Place(target, state.Placement);
+            var kept = state.Placement != null ? Place(target, state.Placement) : null;
             if (!active && before.Root.Active != false) world.SetActive(target, false);
             var plan = Refresh(target);
             var after = world.Observe(target);
             if (!GroupChecks.SamePlacement(after.Root.Placement, state.Placement ?? before.Root.Placement) || after.Root.Active != active) throw new InvalidOperationException("Applied group placement or activity did not verify");
-            var difference = GroupChecks.Layout(before, after, holds.Contains) ?? GroupChecks.Colliders(before, after) ?? GroupChecks.Culling(after, active, plan) ?? GroupChecks.RootCuller(after, active);
+            var difference = GroupChecks.Layout(before, after, holds.Contains) ?? GroupChecks.Colliders(before, after) ?? GroupChecks.Culling(after, active, plan) ?? GroupChecks.RootCuller(after, active) ?? TrackPlacedObjects.Moved(kept);
             if (difference != null) throw new InvalidOperationException("The group did not move as one: " + difference);
             // The ground masks at and below the root register again where their holders stand now.
             masks?.Follow(target, target, masked);
@@ -886,12 +914,12 @@ namespace RailroaderScenePatcher.Core {
                 var masked = masks?.Observe(target);
                 var root = captured.Root;
                 if (root.Active == true) world.SetActive(target, true);
-                if (root.Placement != null) Place(target, root.Placement);
+                var kept = root.Placement != null ? Place(target, root.Placement) : null;
                 if (root.Active == false) world.SetActive(target, false);
                 var plan = Refresh(target);
                 var current = world.Observe(target);
                 masks?.Follow(target, target, masked);
-                return GroupChecks.SamePlacement(current.Root.Placement, root.Placement) && current.Root.Active == root.Active && GroupChecks.Layout(captured, current, holds.Contains) == null
+                return TrackPlacedObjects.Moved(kept) == null && GroupChecks.SamePlacement(current.Root.Placement, root.Placement) && current.Root.Active == root.Active && GroupChecks.Layout(captured, current, holds.Contains) == null
                     && GroupChecks.Colliders(captured, current) == null && GroupChecks.Culling(current, root.Active != false, plan) == null && current.RootCulling == captured.RootCulling;
             } catch { return false; }
         }

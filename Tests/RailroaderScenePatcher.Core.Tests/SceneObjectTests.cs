@@ -112,7 +112,9 @@ class FakeRegistration { public FakeCuller Culler; public CullerKind Kind; publi
 // Controlled world: map coordinates are scene coordinates plus Origin on X. A culling refresh moves every culler of an
 // active group to where it stands; a disabled group holds no culling registration. The world runs the real own-culling
 // controller over controlled cullers, culling managers, renderers and lists.
-class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisposable, IDisableRefusal {
+class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisposable, IDisableRefusal, IGroupActivityRefusal {
+    // A group the group rule finds holding track markers takes no activity, as GroupWorld refuses it.
+    public string GroupActivityRefusal(object group) => GroupVerdict(PathOf(group))?.HoldsTrackMarkers == true ? SceneObjectRules.MarkerActivityRefusal : null;
     // Why an explicit disable cannot hold, as GroupWorld refuses it while the game's switch members are unavailable.
     public string DisableRefused;
     public string DisableRefusal(object target) => DisableRefused;
@@ -661,7 +663,9 @@ static class SceneObjectTests {
         var single = verdicts.Where(v => v.Path.StartsWith("World/Roads Bryson/Crossing Unprotected (1)/", StringComparison.Ordinal)).ToArray();
         Assert(single.Count(v => v.Disposition == GroupDisposition.ExistingFamily) == 3 && single.Count(v => v.Crossbuck && v.Disposition == GroupDisposition.Group) == 2 && At(verdicts, "World/Roads Bryson/Crossing Unprotected (1)") == null,
             "The pad and whistle signs of an unprotected crossing keep their families and its crossbucks are groups of their own");
-        Assert(At(verdicts, "World/Large Scenery/Bryson/Station Yard")?.Disposition == GroupDisposition.InspectionOnly, "A group that holds a pad among other parts is no crossing scene object that only holds other groups");
+        var yard = At(verdicts, "World/Large Scenery/Bryson/Station Yard");
+        Assert(yard?.Disposition == GroupDisposition.InspectionOnly, "A group that holds a pad among other parts is no crossing scene object that only holds other groups");
+        Assert(yard.Reason == SceneObjectRules.CrossingPadReason && yard.ReasonIsSentence, "Its pad, which its track binding places, keeps it from moving as a whole: " + yard.Reason);
     }
     // Every candidate that is no group comes back with the coverage rule that keeps it out, so evidence can explain it.
     static void CoverageRulesKeepObjectsOut() {
@@ -704,11 +708,10 @@ static class SceneObjectTests {
             Assert(verdict != null && verdict.Disposition == GroupDisposition.InspectionOnly, "A group that holds a " + item.Kind + " is inspection only");
             Assert(verdict.Reason.Contains(item.Kind), "The reason names the " + item.Kind + ": " + verdict.Reason);
         }
-        // A group that holds track markers is not moved as a whole: its markers are edited one by one in their own
-        // family.
+        // A group that holds track markers moves as a whole: each marker moves with it and keeps its track binding, and
+        // stays an object of its own family.
         var signs = At(SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Signs", new Node("Yard Limit").With("Track.TrackMarker").Solid().Family()))))), "World/Large Scenery/Bryson/Bryson Signs");
-        Assert(signs?.Disposition == GroupDisposition.InspectionOnly && signs.ReasonIsSentence &&
-            signs.Reason == "This group can't be moved as a whole because it contains track markers. Edit its track markers individually in the Generic track marker family.", "A group with track markers states why it is left out: " + signs?.Reason);
+        Assert(signs?.Disposition == GroupDisposition.Group && signs.Reason == null, "A group with track markers is a group of the family: " + signs?.Disposition + " " + signs?.Reason);
         ResearchHierarchy();
     }
     // The paths, components and physical presence recorded for the level4 scene of the base-game map

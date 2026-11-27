@@ -208,7 +208,7 @@ static class ComplexTests {
         var world = new Node("World", new Node("Roads Sylva", new Node("Sylva Road Bridge", new Node("Deck").Solid(),
             new Node("Sign N").With("Track.TrackMarker").Solid().Family(), new Node("Sign S").With("Track.TrackMarker").Solid().Family())));
         var verdict = SceneObjectRules.Classify(world).Single(v => v.Path == Bridge);
-        Check(verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Category == "Bridge" && verdict.Subcategory == "Road bridges", "a road bridge is a top scene object under Bridge / Road bridges");
+        Check(verdict.Disposition == GroupDisposition.Group && verdict.Category == "Bridge" && verdict.Subcategory == "Road bridges", "a road bridge is a top scene object under Bridge / Road bridges");
         var objects = new[] {
             Object("Sylva Road Bridge", Road, baked: true),            // 0
             Object("Sign N", Bridge, marker: true),                    // 1

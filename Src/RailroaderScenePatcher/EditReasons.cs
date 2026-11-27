@@ -19,7 +19,7 @@ namespace RailroaderScenePatcher {
             ControllerDisabled = "Its crossing controller is disabled", GameBuild = "Not supported on this game build",
             ProgressionUnread = "Progression data can't be read", MapFeatureUnread = "Map feature data can't be read",
             SharedActivity = "Progression or a map feature controls it", TrackGroupActivity = "Its track group controls its activity",
-            TrackMarkers = "Edit its track markers one by one", SpawnPoints = "Edit its spawn points one by one",
+            CrossingPad = "Edit its crossing pad separately", SpawnPoints = "Edit its spawn points one by one",
             MapIcon = "Edit its map icon separately", StationClickSpots = "Station click spots are native map data",
             ConstructionController = "It holds a construction controller", OnMilepost = "Edit it on its milepost",
             OnCrossingPad = "Edit it on its crossing pad", OnGroup = "Edit it on its group",
@@ -69,7 +69,8 @@ namespace RailroaderScenePatcher {
             if (Has("fixed placement")) return Fixed;
             if (Has("A bell's sound has no direction")) return CommandBand.BellNoRotation;
             if (Has("A crossing pad follows its track")) return CommandBand.PadFollowsTrack;
-            if (Has("contains track markers")) return TrackMarkers;
+            if (Has("contains a crossing pad")) return CrossingPad;
+            if (Has("holds track markers, so you can't enable or disable it")) return SupportedEdits.CrossingNoActivity;
             if (Has("contains spawn points") || Has("groups that hold a spawn point")) return SpawnPoints;
             if (Has("contains a map icon")) return MapIcon;
             if (Has("contains a station click spot")) return StationClickSpots;
@@ -106,7 +107,7 @@ namespace RailroaderScenePatcher {
             Fixed, CommandBand.BellNoRotation, Starter, CommandBand.GroupEnableReason, Camera,
             SharedActivity, ProgressionUnread, MapFeatureUnread,
             Replacement, CommandBand.SharedPathBlock, CurrentId, UniqueId, Crossing, Scene, State,
-            TrackMarkers, NoReader, SeveralReaders, Setups,
+            CrossingPad, NoReader, SeveralReaders, Setups,
             EquipmentUnread, CommandBand.NoTrackBinding, References, Members, Structure,
             SpawnPoints, MapIcon, StationClickSpots, ConstructionController, Family,
             WholeGroup, Parts, Groups,
