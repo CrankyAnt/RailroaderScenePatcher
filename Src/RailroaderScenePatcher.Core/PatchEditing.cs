@@ -965,8 +965,14 @@ namespace RailroaderScenePatcher.Core {
             scene.Preflight(resolved);
             return scene.Read(resolved).Equipment ?? throw new InvalidOperationException("This object has no crossing equipment");
         }
-        // The loaded devices offered as sources for the crossing, eligible or with their concrete rejection reason.
-        public IReadOnlyList<SourceCandidate> EquipmentSources(TargetIdentity target) {
+        // The choices offered for the crossing, each with a usable, fixed source identity.
+        public IReadOnlyList<SourceCandidate> EquipmentSources(TargetIdentity target) => EquipmentSources(target, out _);
+        public IReadOnlyList<SourceCandidate> EquipmentSources(TargetIdentity target, out IReadOnlyList<SourceCandidate> details) {
+            details = EquipmentSourceDetails(target);
+            return SourceCandidate.Choices(details);
+        }
+        // The loaded sources used to name additions already recorded in the file.
+        public IReadOnlyList<SourceCandidate> EquipmentSourceDetails(TargetIdentity target) {
             var resolved = engine.ResolveUnique(target);
             if (!(scene is ICrossingEquipmentScene equipment)) throw new InvalidOperationException("Crossing equipment editing is unavailable");
             return equipment.EquipmentCandidates(resolved);

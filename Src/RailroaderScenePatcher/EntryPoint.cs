@@ -1521,7 +1521,7 @@ namespace RailroaderScenePatcher {
                 try {
                     var copies = EquipmentCopies();
                     IReadOnlyList<SourceCandidate> candidates = null;
-                    try { candidates = session.EquipmentSources(identity); } catch { }
+                    try { candidates = session.EquipmentSourceDetails(identity); } catch { }
                     preview = session.PreviewEquipment(identity, addition, removeId, pin(selected), item => EquipmentDisplayName(item, copies, candidates));
                 }
                 catch (Exception e) { feedback.Refuse(place, "Equipment preview", e.GetBaseException().Message); preparedEquipment = null; return; }
@@ -1592,7 +1592,7 @@ namespace RailroaderScenePatcher {
                 equipmentSource = entry.Addition.Source; preparedEquipment = null; equipmentOwn = null; equipmentFields[0] = entry.Addition.Id;
                 var copies = EquipmentCopies();
                 IReadOnlyList<SourceCandidate> candidates = null;
-                if (entry.Built == null) try { candidates = attachment.Session.EquipmentSources(selected.Identity); } catch { }
+                if (entry.Built == null) try { candidates = attachment.Session.EquipmentSourceDetails(selected.Identity); } catch { }
                 equipmentLabel = EquipmentEntryName(entry, copies, candidates);
                 if (entry.Addition.Placement?.Position != null && entry.Addition.Placement.Rotation != null) FillEquipment(entry.Addition.Placement);
             } catch (Exception) { }

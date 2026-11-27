@@ -328,11 +328,30 @@ namespace RailroaderScenePatcher.Core {
         public EquipmentAddition Built { get; }
         public string Problem { get; }
     }
+    // The model assets and the configuration an equipment copy inherits. The world supplies values in hierarchy order.
+    public sealed class EquipmentDeviceIdentity : IEquatable<EquipmentDeviceIdentity> {
+        readonly object[] values;
+
+        public EquipmentDeviceIdentity(IEnumerable<object> values) { this.values = values.ToArray(); }
+
+        public bool Equals(EquipmentDeviceIdentity other) => other != null && values.SequenceEqual(other.values);
+        public override bool Equals(object other) => Equals(other as EquipmentDeviceIdentity);
+        public override int GetHashCode() {
+            unchecked {
+                var hash = 17;
+                foreach (var value in values) hash = hash * 31 + (value?.GetHashCode() ?? 0);
+                return hash;
+            }
+        }
+    }
     // A device scene patch editing offers as a source, with why it does not conform to the pattern, or null when it is eligible.
     public sealed class SourceCandidate {
-        public SourceCandidate(EquipmentSource source, string model, string problem, double[] position = null, double[] rotation = null) : this(source, model, problem, position, rotation, null, null, null, null) { }
-        public SourceCandidate(EquipmentSource source, string model, string problem, double[] position, double[] rotation, string name, string crossing, double[] crossingPosition, double[] crossingRotation) {
+        public SourceCandidate(EquipmentSource source, string model, string problem, double[] position = null, double[] rotation = null,
+            EquipmentDeviceIdentity device = null) : this(source, model, problem, position, rotation, null, null, null, null, device) { }
+        public SourceCandidate(EquipmentSource source, string model, string problem, double[] position, double[] rotation, string name, string crossing, double[] crossingPosition, double[] crossingRotation,
+            EquipmentDeviceIdentity device = null) {
             Source = source; Model = model; Problem = problem; Position = position; Rotation = rotation; Name = name; Crossing = crossing; CrossingPosition = crossingPosition; CrossingRotation = crossingRotation;
+            Device = device;
             Pattern = source != null && source.IsDefinition ? EquipmentAddition.BellPattern : EquipmentAddition.LightGatePattern;
         }
         // A bell definition the content library holds, with its definition name when it has one.
@@ -358,8 +377,27 @@ namespace RailroaderScenePatcher.Core {
             : (Name ?? Model ?? Source.Path) + (String.IsNullOrEmpty(Crossing) ? "" : " at " + Crossing);
         public EquipmentSource Source { get; }
         public string Model { get; }
+        EquipmentDeviceIdentity Device { get; }
         public string Problem { get; }
         public bool Eligible => Problem == null;
+        public string ChoiceName {
+            get {
+                var name = Source.IsDefinition || String.IsNullOrWhiteSpace(Model) ? Name : Model;
+                return String.IsNullOrWhiteSpace(name) ? Source.StoredName() : name;
+            }
+        }
+
+        // Order by stored identity before picking the representative. Discovery order and placement can change.
+        internal static IReadOnlyList<SourceCandidate> Choices(IEnumerable<SourceCandidate> candidates) => candidates
+            .Where(c => c.Eligible)
+            .OrderBy(c => c.Source.Scene, StringComparer.Ordinal)
+            .ThenBy(c => c.Source.Path, StringComparer.Ordinal)
+            .ThenBy(c => c.Source.Definition, StringComparer.Ordinal)
+            .GroupBy(c => (c.Source.Definition, c.Device,
+                c.Device == null ? c.Source.Scene : null, c.Device == null ? c.Source.Path : null))
+            .Select(g => g.First()).ToArray();
+
+        internal SourceCandidate Refused(string problem) => new SourceCandidate(Source, Model, problem, Position, Rotation, Name, Crossing, CrossingPosition, CrossingRotation, Device);
     }
     // The placement scene patch editing proposes for a copy of a source at another crossing: the source's placement relative to its own
     // crossing, carried over to the destination crossing, then moved aside along the copy's own X axis so it does not
@@ -585,7 +623,9 @@ namespace RailroaderScenePatcher.Core {
                 sink.VerificationFailed(controller, reason + "." + comparison + " Positions match when each coordinate has a finite 32-bit floating-point value and either differs by at most 0.0005 or has the same stored 32-bit value. Rotations match when the absolute dot product of the normalized rotations is at least 0.99999999. Requested: " + Detail(want) + ". Found: " + Detail(now) + ".");
             } catch { /* Diagnostics must not change verification or restoration. */ }
         }
-        internal IReadOnlyList<SourceCandidate> Candidates(object controller) => world.Candidates(controller) ?? Array.Empty<SourceCandidate>();
+        internal IReadOnlyList<SourceCandidate> Candidates(object controller) => (world.Candidates(controller) ?? Array.Empty<SourceCandidate>())
+            .Select(c => c.Eligible && world.ResolveSource(c.Source)?.Count != 1 ? c.Refused("the source cannot be resolved uniquely") : c)
+            .ToArray();
         internal string Status(List<object> owned, string scope, string id) {
             // The built addition of the ID, before a stale wrapper of the same ID that a failed cleanup left.
             var addition = owned.Where(world.Present).Where(a => { var r = world.Describe(a); return r.Scope == scope && r.Id == id; })

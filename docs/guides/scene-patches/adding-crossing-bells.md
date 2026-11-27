@@ -20,13 +20,13 @@ A crossing bell definition qualifies for the `crossing-bell-v1` pattern only if 
 
 The player splits the audio clip at its indexes. Each part must contain at least one sample. The audio loads after you apply the bell, so the patcher can check the parts only then. If the clip doesn't fit its indexes or the audio fails to load, the bell exists but stays silent. Its state explains why. The game's log records one warning for the bell, attributed to your mod's `Data/scene-patches.json`. The warning names the bell's ID, crossing controller, and reason. Remove the bell or replace its definition.
 
-If the game's crossing bell definition is missing from the content library or doesn't meet these requirements, **Add a bell** explains why it can't be used. The patcher won't offer another bell instead.
+**Add a bell** lists only usable crossing bell definitions. If the game's crossing bell definition is missing from the content library or doesn't meet these requirements, the patcher won't offer a substitute.
 
 The definition must already be in the content library. The patcher doesn't load a scene or another mod to find it. If the named definition is missing, it doesn't substitute another sound.
 
 ### Ineligible bell definitions
 
-The editor lists the bell definitions that the game uses at grade crossings and explains why any are ineligible. Some reasons appear only when you apply a bell or after its audio loads:
+If a scene patch file names an ineligible bell definition, the patcher reports the reason. Some checks run after its audio loads:
 
 | Reason | Meaning |
 | --- | --- |
@@ -39,7 +39,7 @@ The editor lists the bell definitions that the game uses at grade crossings and 
 | its audio indexes must be finite times greater than 0, in strictly increasing order | The player could not split the clip. |
 | the destination crossing controller has ... key-value objects, so it cannot address the bell | The controller has no key-value object or more than one, so the bell could not be addressed unambiguously. |
 | the destination crossing controller is inactive, so an added bell would not start | A bell beneath it would not start, and its audio could not be released when the scene unloads. |
-| Crossing bells are unavailable in this version of the game. | This game version lacks something the bell pattern needs. Lights and gates stay available. The editor shows this reason in **Add a bell**. With **Debug logging** on, the Player log has the technical details. |
+| Crossing bells are unavailable in this version of the game. | This game version lacks something the bell pattern needs. Lights and gates stay available. With **Debug logging** on, the Player log has the technical details. |
 | The patcher couldn't read the bell definitions from the game's content library, so it can't list bells. Report this to the patcher maintainer and include the Player log. | The Player log has a warning. With **Debug logging** on, it also has the technical details for a report to the patcher maintainer. |
 | bell definition ... is unavailable in the content library | The named definition is missing from the content library. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition. The patcher does not choose a replacement. |
 | is ambiguous; ... bell definitions share its identifier | More than one bell definition matches the identifier. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition. |
@@ -59,7 +59,7 @@ The editor lists the bell definitions that the game uses at grade crossings and 
 ## Add a bell in the native map editor
 
 1. Open the Scene Patcher window and inspect the crossing controller. Find it under **Grade crossing** in the outliner or select it in the world.
-2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. Under **Add a bell**, choose from the definitions the game uses at grade crossings. In the base game, only **US&S Teardrop Crossing Bell** is listed. The editor explains why a listed definition isn't eligible. **Why a bell definition isn't eligible** opens the table above.
+2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a bell** lists each usable crossing bell definition once. In the base game, the choice is **US&S Teardrop Crossing Bell**.
 3. Click **Use** for an eligible definition. Each button shows its display name, such as **Use US&S Teardrop Crossing Bell**. A form opens at the top of the tab with an unused **Equipment ID** and a position five meters beside the inspected crossing. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab.

@@ -46,7 +46,8 @@ namespace RailroaderScenePatcher {
     // source and stay loaded with the map; the copy owns only its GameObjects.
     internal sealed class CrossingEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificationDiagnostics {
         const string LampType = "Track.KeyValueLampMaterialController", GateType = "RollingStock.Controls.KeyValueBoolAnimator", OwnerType = "KeyValue.Runtime.KeyValueObject",
-            CullerType = CullerTypes.GameObjectCuller, SpanType = "Track.TrackSpan", BellType = "Audio.IntegerLoopingPlayer", AnimatorType = "UnityEngine.Animator", TransformerType = "Helpers.WorldTransformer";
+            CullerType = CullerTypes.GameObjectCuller, SpanType = "Track.TrackSpan", BellType = "Audio.IntegerLoopingPlayer", AnimatorType = "UnityEngine.Animator",
+            AudioSourceType = "UnityEngine.AudioSource", TransformerType = "Helpers.WorldTransformer";
         readonly Type controller, lamp, gate, keyOwner, culler, span, bell, animator, transformer;
         readonly FieldInfo lampKey, lampTargets, lampMaterials, gateKey, gateClip, cullerObjects, cullerState, lampObserver, gateObserver;
         readonly FieldInfo materialShared, materialProperty;
@@ -155,9 +156,63 @@ namespace RailroaderScenePatcher {
                 facts.Gates.Add(new GateFacts { Name = g.name, Key = gateKey.GetValue(g) as string, Animator = g.GetComponent(animator) != null, Clip = gateClip.GetValue(g) is UnityEngine.Object clip && clip != null });
             return facts;
         }
+        // A copy shares assets with its source and remaps its internal references. Compare the asset IDs and the
+        // relative targets, without reading the source's name, world placement or current lamp and animation state.
+        EquipmentDeviceIdentity DeviceIdentity(GameObject root) {
+            var nodes = root.GetComponentsInChildren<Transform>(true);
+            var indices = nodes.Select((node, index) => (node, index)).ToDictionary(entry => entry.node, entry => entry.index);
+            var values = new List<object>();
+            void Add(params object[] fields) => values.AddRange(fields);
+            void Properties(Component component, params string[] names) {
+                foreach (var name in names) {
+                    var value = Native.Read(component, name);
+                    values.Add(value is UnityEngine.Object asset ? AssetId(asset) : value);
+                }
+            }
+            int Target(GameObject target) => target == null ? -1 : indices[target.transform];
+            Add(nodes.Length);
+            foreach (var node in nodes) {
+                var components = node.GetComponents<Component>();
+                Add(node == root.transform ? -1 : indices[node.parent], components.Length);
+                foreach (var component in components) {
+                    var type = component.GetType();
+                    Add(type);
+                    if (component is MeshFilter filter) Add(AssetId(filter.sharedMesh));
+                    if (component is SkinnedMeshRenderer skin) Add(AssetId(skin.sharedMesh));
+                    if (component is SpriteRenderer sprite) Add(AssetId(sprite.sprite), sprite.color, sprite.flipX, sprite.flipY);
+                    if (component is Renderer renderer) {
+                        var materials = renderer.sharedMaterials;
+                        Add(materials.Length);
+                        foreach (var material in materials) Add(AssetId(material));
+                    }
+                    if (type == animator) Properties(component, "avatar", "runtimeAnimatorController", "applyRootMotion", "updateMode", "cullingMode");
+                    if (type.FullName == AudioSourceType) Properties(component, "clip", "outputAudioMixerGroup", "enabled", "playOnAwake",
+                        "loop", "volume", "pitch", "spatialBlend", "rolloffMode", "minDistance", "maxDistance");
+                    if (type == lamp) {
+                        Add(lampKey.GetValue(component), ((Behaviour)component).enabled,
+                            Field(lamp, "invert").GetValue(component), Field(lamp, "rampDuration").GetValue(component));
+                        var targets = (GameObject[])lampTargets.GetValue(component);
+                        Add(targets.Length);
+                        foreach (var target in targets) Add(Target(target));
+                        var materials = (Array)lampMaterials.GetValue(component);
+                        var materialType = lampMaterials.FieldType.GetElementType();
+                        Add(materials.Length);
+                        foreach (var material in materials) {
+                            Add(material != null);
+                            if (material != null) Add(AssetId((Material)materialShared.GetValue(material)), materialProperty.GetValue(material),
+                                Field(materialType, "lampColorFalse").GetValue(material), Field(materialType, "lampColorTrue").GetValue(material));
+                        }
+                    }
+                    if (type == gate) Add(gateKey.GetValue(component), ((Behaviour)component).enabled,
+                        AssetId((UnityEngine.Object)gateClip.GetValue(component)), Field(gate, "invert").GetValue(component), Field(gate, "speed").GetValue(component));
+                }
+            }
+            return new EquipmentDeviceIdentity(values);
+        }
+        static int AssetId(UnityEngine.Object asset) => asset == null ? 0 : asset.GetInstanceID();
+
         // The devices beneath every loaded crossing controller: its direct children that hold lamps, gates or bell players, or
-        // are culled with it. The controller's generated bell player is listed too, and rejected with its reason, so the
-        // scene patch editing explains why a bell does not qualify. The patcher's own additions are not offered.
+        // are culled with it. The controller's generated bell player is ineligible. The patcher's own additions are not offered.
         public IReadOnlyList<SourceCandidate> Candidates(object target) {
             var result = new List<SourceCandidate>();
             var owners = Resources.FindObjectsOfTypeAll(controller).OfType<Component>().Where(c => c != null && Loaded(c.gameObject)).Select(c => c.gameObject).Distinct().ToArray();
@@ -174,8 +229,13 @@ namespace RailroaderScenePatcher {
                     var model = All(child, gate).Select(g => g.name).Concat(All(child, lamp).Select(l => l.name)).FirstOrDefault() ?? child.name;
                     Placement(child.transform, out var position, out var rotation);
                     Placement(owner.transform, out var crossingPosition, out var crossingRotation);
-                    result.Add(new SourceCandidate(new EquipmentSource(child.scene.name, BoardScene.PathOf(child.transform)), model, SourceProblem(child, target, EquipmentAddition.LightGatePattern),
-                        position, rotation, child.name, places[o], crossingPosition, crossingRotation));
+                    var problem = SourceProblem(child, target, EquipmentAddition.LightGatePattern);
+                    EquipmentDeviceIdentity identity = null;
+                    // A source still works when its setup cannot be compared. Keep it as its own choice in that case.
+                    if (problem == null) try { identity = DeviceIdentity(child); }
+                    catch (MissingMemberException) { }
+                    result.Add(new SourceCandidate(new EquipmentSource(child.scene.name, BoardScene.PathOf(child.transform)), model, problem,
+                        position, rotation, child.name, places[o], crossingPosition, crossingRotation, identity));
                 }
             }
             // The bell definitions the game uses at grade crossings, eligible or with their reason, for the inspected controller;

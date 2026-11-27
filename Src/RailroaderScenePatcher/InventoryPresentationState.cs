@@ -171,16 +171,13 @@ namespace RailroaderScenePatcher {
 
         internal static string EquipmentKind(EquipmentSource source) => source.IsDefinition ? "Bell" : "Light or gate";
 
-        // A source by its visible name, or by the stored-name rule from its recorded source when it has none.
-        internal static string EquipmentSourceName(SourceCandidate candidate) {
-            var name = String.IsNullOrWhiteSpace(candidate.Name) ? candidate.Source.StoredName() : candidate.Name;
-            return String.IsNullOrEmpty(candidate.Crossing) ? name : name + " at " + candidate.Crossing;
-        }
+        internal static string EquipmentSourceName(SourceCandidate candidate) => candidate.ChoiceName;
 
         internal static string EquipmentSourceName(EquipmentSource source, IEnumerable<SourceCandidate> candidates) {
             var match = candidates?.FirstOrDefault(candidate => candidate.Source.Scene == source.Scene && candidate.Source.Path == source.Path
                 && candidate.Source.Definition == source.Definition);
-            return match == null ? source.StoredName() : EquipmentSourceName(match);
+            var name = String.IsNullOrWhiteSpace(match?.Name) ? source.StoredName() : match.Name;
+            return String.IsNullOrEmpty(match?.Crossing) ? name : name + " at " + match.Crossing;
         }
 
         internal static string UnbuiltEquipmentName(EquipmentAddition item, IEnumerable<SourceCandidate> candidates) =>

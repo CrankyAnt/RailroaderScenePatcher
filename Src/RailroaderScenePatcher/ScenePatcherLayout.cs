@@ -1095,7 +1095,6 @@ namespace RailroaderScenePatcher {
         }
         // Lights and gates added to the crossing: copies of eligible devices already loaded in the crossing's scene, which the
         // crossing controller drives. The open form stands first; the tab's pinned row holds Preview, Remove and Apply for it.
-        // Every device scene patch editing considers is listed: an eligible one with its Use button, a rejected one with its reason.
         // The open light or gate form stands first in the Connections tab, above the replacement targets it does not use,
         // so the scrolling tab body shows its name, ID and position.
         // The kind of the open equipment form, as its labels name it.
@@ -1142,8 +1141,9 @@ namespace RailroaderScenePatcher {
             if (attachment != null) try { current = attachment.Session.Equipment(identity); mine = attachment.Session.EquipmentEntries(identity); }
                 catch (Exception e) { builder.AddLabel(Tint(Red, "Lights, gates, and bells unavailable: " + CommandBand.Sentence(e.GetBaseException().Message))); }
             IReadOnlyList<SourceCandidate> candidates = null;
+            IReadOnlyList<SourceCandidate> choices = null;
             string sourcesUnavailable = null;
-            if (attachment != null) try { candidates = attachment.Session.EquipmentSources(identity); }
+            if (attachment != null) try { choices = attachment.Session.EquipmentSources(identity, out candidates); }
                 catch (Exception e) { sourcesUnavailable = e.GetBaseException().Message; }
             if (current != null) {
                 var copies = EquipmentCopies();
@@ -1180,36 +1180,25 @@ namespace RailroaderScenePatcher {
             }
             Section(builder, "Add a light or gate");
             if (sourcesUnavailable != null) builder.AddLabel(Tint(Red, "Sources unavailable: " + CommandBand.Sentence(sourcesUnavailable)));
-            if (candidates == null) return;
-            var bells = candidates.Where(c => c.Source.IsDefinition).ToList();
-            candidates = candidates.Where(c => !c.Source.IsDefinition).ToList();
+            if (choices == null) return;
+            var devices = choices.Where(c => !c.Source.IsDefinition).ToArray();
+            var bells = choices.Where(c => c.Source.IsDefinition).ToArray();
             // With the Edit form of a refused addition open, Use corrects that addition rather than adding a new one.
             var corrected = attachment == null ? null : CorrectedUse(attachment.Session);
             string UseTip(string added) => corrected == null ? added : "Correct " + corrected + " with this source, keeping its equipment ID and placement. Click Preview, then Apply.";
-            Line(builder, candidates.Count(c => c.Eligible) + " eligible and " + candidates.Count(c => !c.Eligible) + " ineligible devices in the loaded map", null, null);
-            foreach (var candidate in candidates) {
-                var source = candidate;
+            if (devices.Length == 0) Line(builder, "No usable lights or gates.", null, null);
+            foreach (var source in devices) {
                 var name = InventoryPresentationState.EquipmentSourceName(source);
-                if (source.Eligible) Button(builder, "Use " + name, () => UseSource(attachment.Session, source)).Inactive(wait != null)
+                Button(builder, "Use " + name, () => UseSource(attachment.Session, source)).Inactive(wait != null)
                     .Tooltip("Use " + name, CommandBand.Tooltip(UseTip("Copy this device to this crossing. The crossing controller drives its lamps and gates."), wait));
-                else Field(builder, "Not eligible: " + name, CommandBand.Sentence(source.Problem));
             }
-            var deviceGuide = CommandBand.RejectionGuide(candidates);
-            if (deviceGuide != null)
-                Button(builder, deviceGuide[0], () => Application.OpenURL(GuideRoot + deviceGuide[1])).Tooltip(deviceGuide[0], "Open in your browser the guide's reasons why a source isn't eligible.");
-            // Bells: the bell definitions the game uses at grade crossings, with the bell pattern's reason for an ineligible one.
             Section(builder, "Add a bell");
-            Line(builder, "Crossing bells: " + bells.Count(c => c.Eligible) + " eligible, " + bells.Count(c => !c.Eligible) + " ineligible", null, null);
-            foreach (var candidate in bells) {
-                var source = candidate;
+            if (bells.Length == 0) Line(builder, "No usable crossing bells.", null, null);
+            foreach (var source in bells) {
                 var name = InventoryPresentationState.EquipmentSourceName(source);
-                if (source.Eligible) Button(builder, "Use " + name, () => UseSource(attachment.Session, source)).Inactive(wait != null)
+                Button(builder, "Use " + name, () => UseSource(attachment.Session, source)).Inactive(wait != null)
                     .Tooltip("Use " + name, CommandBand.Tooltip(UseTip("Add a bell to this crossing using this definition's sound. It rings when the crossing controller rings its own bell."), wait));
-                else Field(builder, "Not eligible: " + name, CommandBand.Sentence(source.Problem));
             }
-            var bellGuide = CommandBand.RejectionGuide(bells);
-            if (bellGuide != null)
-                Button(builder, bellGuide[0], () => Application.OpenURL(GuideRoot + bellGuide[1])).Tooltip(bellGuide[0], "Open in your browser the guide's reasons why a source isn't eligible.");
         }
         void EquipmentNameField(UIPanelBuilder builder, EquipmentAddition item, string name, bool built) {
             var label = FieldLabel(builder, name);
@@ -2057,8 +2046,8 @@ namespace RailroaderScenePatcher {
                     new[] { "Set, Detach, Clear binding", "Click Set to register the marker at the location you entered. Click Detach to remove it from the track. Click Clear binding to restore its underlying binding." },
                     new[] { "Crossing coverage", "Each circuit has an approach A, an island, and an approach B. Select which tracks the circuit covers, or detach it. A nearby track is covered only if it's part of a circuit. Click Preview to see the result for every circuit before you click Apply." },
                     new[] { "Detection addition", "To give an extra track its own circuit, enter an ID, click Add detection, and select the tracks for its three spans. Use Delete to remove the addition." },
-                    new[] { "Lights and gates", "To add a copy of a light or gate already loaded in the crossing's scene, click the Use button for that device. The crossing controller operates it and shows or hides it with its own equipment. The list tells you why a device is unavailable." },
-                    new[] { "Bells", "Add a bell that sounds like one the game uses at grade crossings. It rings whenever the crossing controller rings its own bell. The list tells you why a bell is unavailable." },
+                    new[] { "Lights and gates", "To add a copy of a light or gate already loaded in the crossing's scene, click its Use button. The crossing controller operates it and shows or hides it with its own equipment. The list shows only usable choices." },
+                    new[] { "Bells", "Add a bell that sounds like one the game uses at grade crossings. It rings whenever the crossing controller rings its own bell. The list shows only usable choices." },
                     new[] { "Crossing pad", "A pad uses its marker's binding. Setting the binding rebuilds the pad along the track at that location and leaves the pad object in place. To hide the pad, disable it. Detach is unavailable." },
                     new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },
                     new[] { "Replacement marker ID", "The game uses this ID to register the marker's track location. If scene markers share an ID, changing one removes all their registrations. The patcher therefore refuses changes to Enabled, the binding, and Follow. Click Generate or enter an unused ID, then click Set replacement ID. This marker gets the new ID and the others keep their registrations. Click Clear replacement ID to restore the underlying ID." },

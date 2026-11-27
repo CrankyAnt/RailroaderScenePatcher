@@ -32,6 +32,7 @@ static class CommandBandTests {
         EquipmentIdsSurviveNarrowLabels();
         OutlinerRowsShortenAddedNamesOnlyWhenNarrow();
         EquipmentDisplayHidesInternalIdentities();
+        EquipmentChoiceShowsItsModelWithoutItsCrossing();
         WorldChoicesKeepAddedEquipmentIds();
         AClickOnTheInspectedRowClearsTheInspection();
         ClearActivityNeedsAnActivityValue();
@@ -151,11 +152,21 @@ static class CommandBandTests {
         var other = new InventoryPresentationState.FittedRow("Other family", "Grade Crossing - Allen", Markup);
         Check(other.Fit(5, Width) == other.Full, "Other rows keep the outliner's own shortening at the end of the row");
     }
+    static void EquipmentChoiceShowsItsModelWithoutItsCrossing() {
+        var mast = new BaseMapFixture().Objects.First(o => o.Family == SceneFamilies.CrossingMast);
+        var path = mast.Path.Substring(0, mast.Path.LastIndexOf('/'));
+        var source = new SourceCandidate(new EquipmentSource("BushnellWhittier", path), "Crossing Signal Wishbone A (1)", null,
+            null, null, "Signal 1", "Bryson Everett [mod object author/pack copy]", null, null);
+        Check(InventoryPresentationState.EquipmentSourceName(source) == "Crossing Signal Wishbone A (1)",
+            "The Use label names the model without the crossing or its internal identity");
+        Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.Bell(FakeEquipmentWorld.CrossingBell, "US&S Teardrop Crossing Bell", null))
+            == "US&S Teardrop Crossing Bell", "The Use label names the bell without its definition identifier");
+    }
     static void EquipmentDisplayHidesInternalIdentities() {
         var addition = new EquipmentAddition("signal-1-added", EquipmentAddition.LightGatePattern, new EquipmentSource("scene", "World/Crossings/Signal 1"), null);
         var source = new SourceCandidate(addition.Source, "source-model", null, null, null, "Signal 1", "Gov Island", null, null);
         Check(InventoryPresentationState.EquipmentSourceName(addition.Source, new[] { source }) == "Signal 1 at Gov Island",
-            "Source labels show the same visible equipment and crossing names as the Use buttons");
+            "The stored source of an addition retains its equipment and crossing names");
         var other = new EquipmentAddition("signal-2-added", addition.Pattern, addition.Source, null);
         Check(InventoryPresentationState.UnbuiltEquipmentName(addition, new[] { source }) == "signal-1-added: Signal 1 at Gov Island"
             && InventoryPresentationState.UnbuiltEquipmentName(other, new[] { source }) == "signal-2-added: Signal 1 at Gov Island",

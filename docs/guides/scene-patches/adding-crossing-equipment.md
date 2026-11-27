@@ -23,7 +23,7 @@ The source must already be loaded in the map you're editing. The patcher doesn't
 
 ### Ineligible sources
 
-The editor lists every device beneath a loaded crossing controller, including the bell player each controller generates. It explains why a device doesn't qualify:
+The editor lists only usable devices. If a scene patch file names an ineligible source, the patcher reports the reason:
 
 | Reason | Meaning |
 | --- | --- |
@@ -56,8 +56,8 @@ The editor lists every device beneath a loaded crossing controller, including th
 ## Add equipment in the native map editor
 
 1. Open the Scene Patcher window and inspect the crossing controller. Find it under **Grade crossing** in the outliner or select it in the world.
-2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a light or gate** lists the devices, with a reason for each one that does not qualify. **Why a device isn't eligible** opens the table above.
-3. Click **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. A form opens at the top of the tab with an unused **Equipment ID**. If the name is taken, the proposed ID has a numeric suffix. The proposed placement puts the copy at the same position relative to the inspected crossing as the source has relative to its own crossing, with a five-meter offset. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
+2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a light or gate** lists each usable device setup once. Devices that share a model can have separate choices when their lamps or gates work differently.
+3. Click **Use** for the device you want. A form opens at the top of the tab with an unused **Equipment ID**. If the name is taken, the proposed ID has a numeric suffix. The patcher chooses the first usable source by scene name and hierarchy path in ordinal order. The proposed placement puts the copy at the same position relative to the inspected crossing as the source has relative to its own crossing, with a five-meter offset. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab. Apply uses the previewed change; preview again after you change a field.
 

@@ -12,6 +12,7 @@ using RailroaderScenePatcher.Core;
 // one lamp keyed lights and one gate keyed gates.
 class FakeDevice {
     public string Scene = "BushnellWhittier", Path, Model = "Crossing Signal Wishbone A";
+    public int Mesh = 1;
     public DeviceFacts Facts = new DeviceFacts {
         Lamps = { new LampFacts { Name = "Signal 1", Key = "lights", Targets = 1, Materials = 2, RendererUsesMaterial = true } },
         Gates = { new GateFacts { Name = "Crossing Signal Wishbone A (1)", Key = "gates", Animator = true, Clip = true } }
@@ -88,7 +89,9 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
         return LightGatePattern.Problem(d.Facts, Keys);
     }
     public IReadOnlyList<SourceCandidate> Candidates(object controller) =>
-        Devices.Where(d => d.Owner == null).Select(d => new SourceCandidate(new EquipmentSource(d.Scene, d.Path), d.Model, SourceProblem(d, controller, EquipmentAddition.LightGatePattern)))
+        Devices.Where(d => d.Owner == null).Select(d => new SourceCandidate(new EquipmentSource(d.Scene, d.Path), d.Model,
+            SourceProblem(d, controller, EquipmentAddition.LightGatePattern), device: new EquipmentDeviceIdentity(new object[] { d.Mesh, d.Facts.Lamps.Count, d.Facts.Gates.Count }
+                .Concat(d.Facts.Lamps.Select(l => (object)l.Key)).Concat(d.Facts.Gates.Select(g => (object)g.Key)))))
             .Concat(BellPattern.Sources(CrossingBells, Bells, b => b.Identifier, b => b.Name, b => SourceProblem(b, controller, EquipmentAddition.BellPattern))).ToArray();
     public IReadOnlyList<object> Owned(object controller) => All.Where(a => ReferenceEquals(a.Controller, controller) && !a.Destroyed).Cast<object>().ToArray();
     public EquipmentAddition Describe(object addition) => ((Added)addition).Record;
@@ -176,6 +179,8 @@ static class EquipmentTests {
         public bool Unchanged => World.Live(Crossing).Count() == 0 && World.Live(Other).Count() == 0 && Crossing.Circuits.Count == 1;
     }
     public static void Run() {
+        EquipmentChoicesDistinguishSameNamedDevicesBySetup();
+        EquipmentChoicesKeepTheFirstUsableSourceOfEachModel();
         AdditionConstructsThroughTheController();
         EligibilityFollowsThePatternAcrossModels();
         UnresolvedAndNonconformingSourcesChangeNothing();
@@ -393,6 +398,63 @@ static class EquipmentTests {
         engine.Apply(Doc(Equip("coverage-only", Addition("other", x: 30))), "third/pack");
         Assert(f.Live.Count == 3 && f.Live.Single(a => a.Record.Scope == "first/pack").Position[0] == 10, "A scene patch file never removes or moves another mod's additions");
     }
+    static void EquipmentChoicesDistinguishSameNamedDevicesBySetup() {
+        var (f, session, _, _) = Session();
+        f.World.Devices.Clear();
+        f.World.Device("World/Z/Signal 1");
+        f.World.Device("World/B/Signal 1", d => d.Facts.Lamps[0].Key = "gates");
+        f.World.Device("World/C/Signal 1", d => d.Mesh = 2);
+        f.World.Device("World/A/Signal 1");
+        var expected = new[] { "World/A/Signal 1", "World/B/Signal 1", "World/C/Signal 1" };
+        foreach (var model in new[] { "Crossing Signal Wishbone A", "" }) {
+            foreach (var device in f.World.Devices) device.Model = model;
+            var choices = session.EquipmentSources(Crossing);
+            Assert(choices.Select(c => c.Source.Path).SequenceEqual(expected),
+                "Different assets or lamp setups have separate choices, while equivalent devices keep the first path");
+        }
+    }
+    static void EquipmentChoicesKeepTheFirstUsableSourceOfEachModel() {
+        var (f, session, mapEditor, store) = Session();
+        var map = new BaseMapFixture();
+        const string wishbone = "Crossing Signal Wishbone A (1)";
+        f.World.Devices.Clear();
+        foreach (var mast in map.Objects.Where(o => o.Family == SceneFamilies.CrossingMast).Reverse())
+            f.World.Device(mast.Path.Substring(0, mast.Path.LastIndexOf('/')), d => d.Model = wishbone);
+        const string first = "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Signal 1";
+        const string second = "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Signal 2";
+        f.World.Device("World/First/Signal", d => { d.Model = wishbone; d.Facts.MissingScript = true; });
+        var distinct = f.World.Device("World/Z/Gate", d => { d.Model = "Other gate"; d.Mesh = 2; });
+        f.World.Bell();
+        f.World.Bell("rr/locomotive-bell");
+
+        var choices = session.EquipmentSources(Crossing);
+        Assert(choices.Where(c => !c.Source.IsDefinition).Select(c => c.Source.Path).SequenceEqual(new[] { first, distinct.Path }),
+            "One choice per usable model keeps the first source in ordinal order");
+        var bell = choices.Single(c => c.Source.IsDefinition);
+        Assert(bell.Source.Definition == FakeEquipmentWorld.CrossingBell, "Only the crossing bell is offered by definition");
+        var chosen = choices.Single(c => c.Model == wishbone);
+        var addition = new EquipmentAddition("chosen", chosen.Pattern, chosen.Source, new Placement(new double[] { 10, 0, 7 }, new double[] { 0, 0, 0, 1 }));
+        var added = session.AddEquipment(Crossing, addition);
+        var addedBell = session.AddEquipment(Crossing, new EquipmentAddition("chosen-bell", bell.Pattern, bell.Source, addition.Placement));
+        Assert(added.Applied && addedBell.Applied && mapEditor.Save() == null, "Use and Save build and write the offered sources: " + added.Error + addedBell.Error);
+        var saved = JObject.Parse(store.Patch)["modifications"].Children<JProperty>().Single().Value["relationships"]["crossingEquipment"];
+        Assert((string)saved["chosen"]["source"]["scene"] == "BushnellWhittier" && (string)saved["chosen"]["source"]["path"] == first, "Save records the exact first usable device");
+        Assert((string)saved["chosen-bell"]["source"]["definition"] == FakeEquipmentWorld.CrossingBell, "Save records the crossing bell definition");
+        var fresh = new Fixture();
+        fresh.World.Device(first);
+        fresh.World.Bell();
+        var applied = new PatchEngine(fresh.Scene).Apply(store.Patch);
+        fresh.World.FinishLoads();
+        Assert(applied.Outcomes.Values.Single().Applied && fresh.Live.Count == 2 && fresh.Live.Any(a => a.Record.Source.Path == first)
+            && fresh.Live.Any(a => a.Record.Source.Definition == FakeEquipmentWorld.CrossingBell && a.AudioLoaded),
+            "Applying the saved patch builds the selected device and bell");
+        f.World.Devices.RemoveAll(d => d.Path == first);
+        f.World.Device(first, d => { d.Model = wishbone; d.Scene = "A different scene"; d.Facts.OtherScene = true; });
+        f.World.Device(second, d => d.Model = wishbone); // The recorded path is ambiguous.
+        f.World.Devices.Reverse();
+        Assert(session.EquipmentSources(Crossing).First(c => !c.Source.IsDefinition).Source.Path == "World/Roads Andrews/Grade Crossing Setup 2 Tracks/Signal 1",
+            "Refused and ambiguous sources cannot displace the first usable source");
+    }
     static void MissingCapabilityRefusesEquipment() {
         var f = new Fixture();
         var scene = new CrossingCoverageScene(f.Coverage, Capability.Unchecked);
@@ -413,7 +475,7 @@ static class EquipmentTests {
     static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
     static void EditingPreviewAddMoveUndoRedoAndRemoval() {
         var (f, session, mapEditor, store) = Session();
-        Assert(session.EquipmentSources(Crossing).Count(c => c.Eligible) == 2, "Scene patch editing offers the loaded conforming sources");
+        Assert(session.EquipmentSources(Crossing).Count == 1, "Scene patch editing offers the shared model once");
         var preview = session.PreviewEquipment(Crossing, West(), null);
         Assert(preview.Error == null && preview.Lines.Single().StartsWith("Would add author/pack west", StringComparison.Ordinal), "The preview names the addition: " + preview.Error + String.Join("|", preview.Lines));
         Assert(f.World.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && session.ScenePatchFileText.Contains("\"modifications\": {}"), "A preview changes nothing");

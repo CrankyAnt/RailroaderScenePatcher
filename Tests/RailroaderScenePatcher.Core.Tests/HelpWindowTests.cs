@@ -15,6 +15,7 @@ static class HelpWindowTests {
         AHelpNeverCoversTheMapEditorsTitleBar();
         EveryHelpOpensWithTheSameWidthAndPosition();
         ObjectHelpExplainsSupportedEditsAndReasonGroups();
+        ConnectionsHelpExplainsWhichEquipmentChoicesAppear();
         Console.WriteLine("PASS: help windows scroll at the game's wheel step, keep off the Map Editor's title bar and open with one width and position");
     }
 
@@ -39,6 +40,18 @@ static class HelpWindowTests {
         Check(elsewhere.Contains("Edit a marker on its milepost or crossing pad.") && !elsewhere.Contains("when its reason names one"), "Help names both marker owners directly");
         Check(elsewhere.Contains("Edit construction segments on their group."), "Help directs construction segment edits to the group");
         Check(words[words.IndexOf("Blocked for now") + 1].Contains("related object"), "Blocked for now includes related object states as well as failed reads");
+    }
+
+    static void ConnectionsHelpExplainsWhichEquipmentChoicesAppear([CallerFilePath] string path = "") {
+        var root = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path), "..", ".."));
+        var source = File.ReadAllText(Path.Combine(root, "Src", "RailroaderScenePatcher", "ScenePatcherLayout.cs"));
+        var start = source.IndexOf("[ConnectionsTab] = new HelpText", StringComparison.Ordinal);
+        var end = source.IndexOf("[ChangesTab] = new HelpText", start, StringComparison.Ordinal);
+        var words = WindowWordsTests.Literals(source.Substring(start, end - start));
+        foreach (var topic in new[] { "Lights and gates", "Bells" }) {
+            var index = words.IndexOf(topic);
+            Check(index >= 0 && words[index + 1].Contains("The list shows only usable choices."), topic + " help explains which choices appear");
+        }
     }
 
     static void TheWheelMovesAsTheGamesScrollViewsDo() {

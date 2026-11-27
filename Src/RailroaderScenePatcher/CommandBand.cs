@@ -801,16 +801,6 @@ namespace RailroaderScenePatcher {
         // The families of a light or gate and of a bell this patcher added: supported families whose edits live on their
         // crossing's Connections tab, not on the object itself.
         internal const string AddedEquipmentFamily = SceneFamilies.AddedEquipment, AddedBellFamily = SceneFamilies.AddedBell;
-        // The guide link offered below a list of equipment sources: its label and the guide page with the anchor of its
-        // eligibility reasons, or null while every source of the list is eligible. A list of bell definitions links to the bell
-        // guide, a list of devices to the light and gate guide.
-        internal static string[] RejectionGuide(IEnumerable<SourceCandidate> sources) {
-            var rejected = (sources ?? Enumerable.Empty<SourceCandidate>()).Where(s => s != null && !s.Eligible).ToList();
-            if (rejected.Count == 0) return null;
-            return rejected.Any(s => s.Source.IsDefinition)
-                ? new[] { "Why a bell definition isn't eligible", "adding-crossing-bells.md#ineligible-bell-definitions" }
-                : new[] { "Why a device isn't eligible", "adding-crossing-equipment.md#ineligible-sources" };
-        }
         internal static bool IsAddedFamily(string family) => family == AddedEquipmentFamily || family == AddedBellFamily;
         // Where added equipment is edited, one sentence for its supported edits and for why it cannot be edited as an
         // object of its own.
