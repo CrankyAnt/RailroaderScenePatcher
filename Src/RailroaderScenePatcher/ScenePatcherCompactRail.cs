@@ -140,6 +140,7 @@ namespace RailroaderScenePatcher {
         }
 
         void CompactObjectContext(UIPanelBuilder builder) {
+            DrawOrigin(builder);
             CompactHonestPlacement(builder);
             if (selected.Problems.Count == 0) return;
             var first = selected.Problems[0];

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // Mod objects: a modification with a source makes a new object from a supported scene object. The scene patch file
@@ -67,6 +68,7 @@ static class ModObjectTests {
         AModObjectCanBeDuplicatedAgain();
         RemoveTakesTheModObjectAndItsLaterEdits();
         AModObjectIsListedWhereItStands();
+        StationNameFollowsItsPlace();
         CanonicalSaveOrdersAModObject();
         Console.WriteLine("PASS: mod objects");
     }
@@ -271,6 +273,57 @@ static class ModObjectTests {
         Assert(StationMapIconRules.Listed(icon), "A duplicated station map icon is a station map icon");
         var kind = SceneObjectRules.ClassOf(station.Node, Station, map.Places.StripPlaces).ToString();
         Assert(kind == "Station building / Stations" && SceneObjectRules.ClassOf(station.Node, Made, map.Places.StripPlaces).ToString() == kind, "The mod object has its source's kind: " + SceneObjectRules.ClassOf(station.Node, Made, map.Places.StripPlaces));
+    }
+
+    static void StationNameFollowsItsPlace() {
+        var map = new BaseMapFixture();
+        var destination = map.Objects.Single(o => o.TopSceneObject && o.Name == "Nantahala Station");
+        var source = map.Objects.Single(o => o.Listed && o.Path == Station);
+        var world = new Loaded();
+        var session = Session(world, out var store, out _);
+        var entries = map.Observations(out var facts);
+        var mapStation = entries.Single(e => e.Identity.Path == Station);
+        var otherStation = entries.Single(e => e.Identity.Path == destination.Path);
+        string Label(SceneObservation entry, IReadOnlyList<SceneObservation> all) {
+            var tree = OutlinerGrouping.Build(all, all, "", false, null);
+            IEnumerable<InventoryPresentationState.OutlineNode> Nodes(IEnumerable<InventoryPresentationState.OutlineNode> nodes) =>
+                nodes.SelectMany(node => new[] { node }.Concat(Nodes(node.Children)));
+            return Nodes(tree.Tops).Single(node => node.Row == entry).Label;
+        }
+        SceneObservation ObserveModObject(Loaded loaded) {
+            var entry = new SceneObservation(loaded.ModObject, Id(Made), source.Family, true, loaded.At(loaded.ModObject), Upright,
+                Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "Placement");
+            facts[entry] = source;
+            return entry;
+        }
+        OutlinerGrouping.InvalidatePlaces();
+        OutlinerGrouping.Scene = map.Scene(facts);
+        try {
+            Assert(Label(mapStation, entries) == "Alarka Jct Station" && Label(otherStation, entries) == "Nantahala Station", "The map stations show their game names before placement");
+            var placed = session.PlaceModObject(Id(Station), new Placement(new[] { destination.At[0], 12, destination.At[1] }, Upright));
+            Assert(placed.Applied, "The station is placed: " + placed.Error);
+            var modStation = ObserveModObject(world);
+            var afterPlacement = entries.Concat(new[] { modStation }).ToArray();
+            Assert(Label(modStation, afterPlacement) == "Nantahala Station (2)", "The placed station is named Nantahala Station (2), got " + Label(modStation, afterPlacement));
+            Assert(Label(mapStation, afterPlacement) == "Alarka Jct Station" && Label(otherStation, afterPlacement) == "Nantahala Station", "Both game stations retain their original shown names");
+            var identity = Modifications(session)[Key]["target"].DeepClone();
+            var moved = session.Edit(placed.Target, new Placement(AtBryson, Upright), null);
+            Assert(moved.Applied, "The station moves: " + moved.Error);
+            var movedStation = ObserveModObject(world);
+            var afterMove = entries.Concat(new[] { movedStation }).ToArray();
+            Assert(Label(movedStation, afterMove) == "Bryson Station (1)", "The moved station is named Bryson Station (1), got " + Label(movedStation, afterMove));
+            Assert(Modifications(session).Count == 1 && JToken.DeepEquals(identity, Modifications(session)[Key]["target"]), "Moving preserves the scene patch file's modification key and target");
+            session.BeginSave();
+            session.CompleteNativeSave();
+            var reloaded = new Loaded();
+            var rebuilt = reloaded.Engine.Apply(store.Patch, "author/pack");
+            Assert(rebuilt.Outcomes[Key].Applied, "The saved scene patch file rebuilds the moved station");
+            var rebuiltStation = ObserveModObject(reloaded);
+            Assert(Label(rebuiltStation, entries.Concat(new[] { rebuiltStation }).ToArray()) == "Bryson Station (1)", "Loading preserves the move and yields the same shown name");
+        } finally {
+            OutlinerGrouping.Scene = null;
+            OutlinerGrouping.InvalidatePlaces();
+        }
     }
 
     // Save writes a mod object's source directly after its target, each in the order of a target.

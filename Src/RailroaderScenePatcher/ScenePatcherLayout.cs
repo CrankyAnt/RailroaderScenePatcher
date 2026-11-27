@@ -654,7 +654,7 @@ namespace RailroaderScenePatcher {
         // The inspected object's name as the heading, with its path in the tooltip; an added object's name is fitted to
         // the width. The full window and the compact rail share it.
         RectTransform ObjectHeading(UIPanelBuilder builder) {
-            var name = selected.DisplayName;
+            var name = OutlinerGrouping.InspectorName(selected, inventory, OutlinerTrackPoint);
             var added = IsAdded(selected);
             var heading = Heading(builder, Literal(name), "Object", added ? name : selected.Identity.Path);
             if (added) FitEquipmentText(heading.GetComponent<TMP_Text>(), selected.Family, name, value => "<style=H3>" + Literal(value) + "</style>");
@@ -715,8 +715,13 @@ namespace RailroaderScenePatcher {
         // An explicit disable holds the inspected object off against a switch of the game: its track construction,
         // progression or a map feature. The amber warning shows on the Object tab and in the footer; null otherwise.
         string HoldWarning => selected?.Handle is GameObject held ? GroupWorld.HoldWarning(held, FollowsGroup) : null;
+        void DrawOrigin(UIPanelBuilder builder) {
+            var origin = InventoryPresentationState.ObjectOrigin(selected);
+            Line(builder, "<style=FieldLabel>" + Literal(origin.Label) + "</style> " + Literal(origin.Value), origin.Label, origin.Value, LineHeight);
+        }
         // The Object tab: what the object is, whether it is enabled, and what was detected about it.
         void DrawObject(UIPanelBuilder builder) {
+            DrawOrigin(builder);
             // A part names its group first, with the button that inspects the group directly after the name.
             var partOf = InventoryPresentationState.PartOf(selected);
             if (partOf != null) {

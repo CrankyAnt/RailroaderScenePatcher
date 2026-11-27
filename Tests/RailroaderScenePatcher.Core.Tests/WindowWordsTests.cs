@@ -25,8 +25,23 @@ static class WindowWordsTests {
         NoPavilionKindOrTrackRelativeFamily();
         GroupTooltipsSayTheyMeanSceneObjects();
         HelpTermsUseTheWindowsWords();
+        ObjectOriginNamesTheMapOrMod();
         NoTrackMarkerFamily();
         Console.WriteLine("PASS: window words group and part");
+    }
+
+    static void ObjectOriginNamesTheMapOrMod() {
+        var map = new BaseMapFixture();
+        var entries = map.Observations(out _);
+        Check(entries.All(entry => InventoryPresentationState.ObjectOrigin(entry) == ("Origin", "Map")),
+            "every Object tab in the base map fixture has Origin Map");
+
+        var root = ModObjectTests.Made;
+        foreach (var path in new[] { root, root + "/Clock" }) {
+            var observation = new SceneObservation(new object(), ModObjectTests.Id(path), SceneObjectRules.Family, true,
+                new[] { 0.0, 0, 0 }, new[] { 0.0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "Placement");
+            Check(InventoryPresentationState.ObjectOrigin(observation) == ("Origin", "Mod"), path + " has Origin Mod on its Object tab");
+        }
     }
 
     // The string literals of a C# source, without comments: regular, verbatim and interpolated strings.

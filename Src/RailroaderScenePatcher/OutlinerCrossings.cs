@@ -65,7 +65,7 @@ namespace RailroaderScenePatcher {
         // Inside a crossing, crossbucks, masts and bells show their own game name, without the " at <crossing>" the flat
         // list adds to tell them apart.
         static string CrossingMemberLabel(SceneObservation row, string label) =>
-            row != null && (row.Family == MastFamily || row.Family == BellFamily || IsCrossbuck(row)) ? Last(row.Identity.Path) : label;
+            row != null && !ModObjects.IsPath(row.Identity.Path) && (row.Family == MastFamily || row.Family == BellFamily || IsCrossbuck(row)) ? Last(row.Identity.Path) : label;
         static void SortCrossingChildren(OutlineNode node) => node.Children.Sort((a, b) => {
             var byKind = CrossingChildRank(a.Row).CompareTo(CrossingChildRank(b.Row));
             if (byKind != 0) return byKind;

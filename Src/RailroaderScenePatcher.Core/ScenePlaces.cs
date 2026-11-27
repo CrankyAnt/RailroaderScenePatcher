@@ -86,6 +86,7 @@ namespace RailroaderScenePatcher.Core {
         public const double Close = 1500;
         const string Scenery = "World/Large Scenery/", Roads = "World/Roads ", MapLabels = "World/Map Labels/", StationIcons = "World/Map Labels/Station Icons/";
         static readonly Regex Word = new Regex(@"[A-Za-z0-9]+"), StationSuffix = new Regex(@"\s+(Station(\s+Icon)?|Depot)\s*\z", RegexOptions.IgnoreCase), Whitespace = new Regex(@"\s+");
+        static readonly Regex NameWord = new Regex(@"[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*");
         readonly List<ScenePlace> places = new List<ScenePlace>();
         public IReadOnlyList<ScenePlace> All => places;
 
@@ -154,6 +155,18 @@ namespace RailroaderScenePatcher.Core {
                 name = (plain.Substring(0, words[at].Index) + plain.Substring(words[at + length - 1].Index + words[at + length - 1].Length)).Trim();
             }
             return name;
+        }
+
+        // Keep the order and punctuation of the source name when it names a place.
+        public string NameAt(string name, ScenePlace place) {
+            if (place == null) return name;
+            var words = NameWord.Matches(name).Cast<Match>().ToArray();
+            var tokens = words.Select(w => w.Value.Replace("'", "").Replace("’", "").ToLowerInvariant()).ToArray();
+            if (Match(tokens, out var at, out var length) == null)
+                return place.Name + " " + name;
+            var first = words[at];
+            var last = words[at + length - 1];
+            return name.Substring(0, first.Index) + place.Name + name.Substring(last.Index + last.Length);
         }
 
         static double Between(double[] a, double[] b) => Math.Sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]));

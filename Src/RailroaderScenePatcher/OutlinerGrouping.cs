@@ -98,9 +98,39 @@ namespace RailroaderScenePatcher {
         static string Last(string path) => path.Substring(path.LastIndexOf('/') + 1);
         // A row shows the game's own name of its object. A part is named with its group, and an object the patcher
         // added has no scene name of the game: both keep the name the inventory gives them.
-        static string OwnName(SceneObservation row) =>
-            row.GroupPath != null || CommandBand.IsAddedFamily(row.Family) || row.Identity.Path.StartsWith(InventoryPresentationState.CoverageRoot, StringComparison.Ordinal) ? InventoryPresentationState.Name(row)
+        static string OwnName(SceneObservation row) => modObjectNames.TryGetValue(row, out var modName) ? modName
+            : row.GroupPath != null || CommandBand.IsAddedFamily(row.Family) || row.Identity.Path.StartsWith(InventoryPresentationState.CoverageRoot, StringComparison.Ordinal) ? InventoryPresentationState.Name(row)
             : InventoryPresentationState.SharedPathNames.TryGetValue(row, out var numbered) ? numbered : Last(row.Identity.Path);
+
+        static IReadOnlyDictionary<SceneObservation, string> modObjectNames = new Dictionary<SceneObservation, string>();
+        internal static string InspectorName(SceneObservation entry, SceneInventory inventory, Func<SceneObservation, double[]> trackPoint) {
+            if (!ModObjects.IsPath(entry.Identity.Path)) return entry.DisplayName;
+            Prepare(inventory?.Entries, trackPoint);
+            return modObjectNames.TryGetValue(entry, out var name) ? name : entry.DisplayName;
+        }
+        static void NameModObjects(IReadOnlyList<SceneObservation> entries, Func<SceneObservation, double[]> trackPoint) {
+            var names = new Dictionary<SceneObservation, string>();
+            if (entries.Any(e => ModObjects.IsPath(e.Identity.Path))) {
+                var hidden = SignContainers(entries);
+                var groups = entries.Where(e => !hidden.Contains(e) && !IsNativeSpan(e) && !CommandBand.IsAddedFamily(e.Family))
+                    .GroupBy(e => {
+                        var kind = ClassOf(e);
+                        return (kind.Category, Kind: kind.Kind ?? e.Family);
+                    })
+                    .Where(kind => kind.Any(e => ModObjects.IsPath(e.Identity.Path)))
+                    .SelectMany(kind => kind.GroupBy(e => PlaceOf(e, trackPoint)));
+                foreach (var group in groups) {
+                    // The map objects occupy the first slots and keep their own names.
+                    var number = group.Count(e => !ModObjects.Within(e.Identity.Path));
+                    foreach (var entry in group.Where(e => ModObjects.IsPath(e.Identity.Path))
+                        .OrderBy(e => e.Identity.Scene, StringComparer.Ordinal).ThenBy(e => e.Identity.Path, StringComparer.Ordinal)) {
+                        var source = Last(ModObjects.Plain(entry.Identity.Path));
+                        names[entry] = InventoryPresentationState.Numbered(places.NameAt(source, group.Key), ++number);
+                    }
+                }
+            }
+            modObjectNames = names;
+        }
         // The objects that share their scene, hierarchy path and component with another listed object get the game's name
         // with a sequence number (SharedPathSequence), numbered by where the game placed them.
         static void NumberSharedPaths(IReadOnlyList<SceneObservation> entries) {
@@ -227,6 +257,7 @@ namespace RailroaderScenePatcher {
             if (places != null && cachedWorldKey == worldKey && (placesBuiltWithEntries || !hasEntries)) {
                 preparedEntries = entries;
                 NumberSharedPaths(entries);
+                NameModObjects(entries, trackPoint);
                 TrimObservationCaches(entries);
                 return;
             }
@@ -245,6 +276,7 @@ namespace RailroaderScenePatcher {
             foreach (var e in entries.Where(e => e.GroupPath == null && e.HolderPath == null)) sources.AddRange(ScenePlaces.SourcesOf(e.Identity.Path, Placed(e, trackPoint)));
             places = ScenePlaces.From(sources);
             NumberSharedPaths(entries);
+            NameModObjects(entries, trackPoint);
             placesLine = String.Join(" | ", places.All.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).Select(p =>
                 p.Name + " [" + p.From + "] {" + String.Join("; ", p.Names) + "} " + String.Join(" ", p.Points.Select(at => "@" + Round(at[0]) + "," + Round(at[1]))) + (p.PointsFrom == null ? "" : " (" + p.PointsFrom + ")")))
                 + (notes.Count == 0 ? "" : " Problems reading places: " + String.Join("; ", notes));
@@ -269,7 +301,8 @@ namespace RailroaderScenePatcher {
             return searchTags[e] = text;
         }
         static bool MatchesGrouping(SceneObservation e, string search, Func<SceneObservation, double[]> trackPoint) =>
-            !String.IsNullOrEmpty(search) && GroupingSearchText(e, trackPoint).IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0;
+            !String.IsNullOrEmpty(search) && (GroupingSearchText(e, trackPoint).IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0
+                || modObjectNames.TryGetValue(e, out var name) && name.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0);
 
         // The outliner rows in inventory order. The filter narrows them, and so does the search text, which matches
         // what an object says about itself and also its category, kind, place and crossing. Neither changes the inventory.
@@ -352,7 +385,8 @@ namespace RailroaderScenePatcher {
                     b.RootEntries.TryGetValue(holderAt, out var found);
                     holder = b.Make(found, holderAt, true);
                 }
-                holder.Node.Children.Add(new OutlineNode { Key = new ScenePath(row.Identity.Scene, row.Identity.Path).ToString(), Label = row.GroupPath != null ? InventoryPresentationState.PartLabel(row) : OwnName(row), Row = row, Count = 1 });
+                var name = row.GroupPath != null && !ModObjects.IsPath(row.Identity.Path) ? InventoryPresentationState.PartLabel(row) : OwnName(row);
+                holder.Node.Children.Add(new OutlineNode { Key = new ScenePath(row.Identity.Scene, row.Identity.Path).ToString(), Label = name, Row = row, Count = 1 });
                 holder.Node.Count++;
             }
             foreach (var u in b.Units) {

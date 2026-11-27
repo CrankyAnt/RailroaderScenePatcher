@@ -105,8 +105,15 @@ namespace RailroaderScenePatcher {
         // The shown names of the objects that share their hierarchy path and component with another listed object, with
         // their sequence numbers, as the outliner last numbered them (OutlinerGrouping). Only the shown name changes.
         internal static IReadOnlyDictionary<SceneObservation, string> SharedPathNames = new Dictionary<SceneObservation, string>();
-        internal static string Numbered(string name, int number) => name + " (" + number + ")";
+        internal static string Numbered(string name, int number) => name + " (" + CommandBand.Number(number) + ")";
         static string Last(string path) => path.Substring(path.LastIndexOf('/') + 1);
+
+        internal static (string Label, string Value) ObjectOrigin(SceneObservation entry) {
+            var path = entry.Identity.Path;
+            var fromMod = ModObjects.Within(path) || CommandBand.IsAddedFamily(entry.Family)
+                || path.StartsWith(CoverageRoot + "/", StringComparison.Ordinal);
+            return ("Origin", fromMod ? "Mod" : "Map");
+        }
 
         // The suffix of an added name (AddedEquipmentName); an Equipment ID holds no parenthesis.
         static readonly Regex AddedSuffix = new Regex(@" \(added(?:: [^()]+)?\)\z");
