@@ -74,7 +74,7 @@ static class SupportedEditsTests {
     static void PatternRefusalsUseTheirShortReason() {
         var cases = new Dictionary<string, string> {
             ["The board's scene is not loaded"] = "Its scene isn't loaded",
-            ["2 objects share this hierarchy path, so a scene patch file cannot name this one"] = "Another object shares its hierarchy path",
+            ["2 objects share this hierarchy path, so a scene patch file cannot name this one"] = "This path doesn't identify one object",
             ["This object has no implemented bridge-placement capability"] = "Its structure isn't supported",
             ["The crossing controller's scene isn't loaded"] = "Its scene isn't loaded",
             ["The board's parents must be active"] = "Its parent object must be active",

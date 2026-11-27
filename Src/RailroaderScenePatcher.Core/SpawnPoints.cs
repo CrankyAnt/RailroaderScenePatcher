@@ -119,7 +119,7 @@ namespace RailroaderScenePatcher.Core {
         void SetPriority(object spawnPoint, int priority);
     }
     public static class SpawnPointCopies {
-        public const string Unavailable = "Duplicated spawn points are unavailable: the priorities of the map's spawn points can't be read.";
+        public const string Unavailable = "The patcher can't build the duplicated spawn point because it can't read the priorities of the map's spawn points.";
         // One below the lowest map priority; without map spawn points, one below the source's own.
         public static int Priority(IEnumerable<int> mapPriorities, int sourcePriority) {
             var lowest = (mapPriorities ?? Enumerable.Empty<int>()).DefaultIfEmpty(sourcePriority).Min();

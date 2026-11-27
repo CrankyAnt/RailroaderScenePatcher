@@ -139,7 +139,7 @@ namespace RailroaderScenePatcher {
                     return BuildVersion + count.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + BitConverter.ToString(digest, 0, 16).Replace("-", "").ToLowerInvariant();
                 }
             } catch (Exception e) {
-                PatcherLog.Debug("The model and build of a mod object's source could not be read: " + e.GetBaseException().Message);
+                PatcherLog.Debug("Couldn't read the model and build of the mod object's source: " + e.GetBaseException().Message);
                 return null;
             }
         }
@@ -418,7 +418,7 @@ namespace RailroaderScenePatcher {
             GameObject Copied(object item, bool inside) {
                 if (!(item is GameObject target) || target == null) return null;
                 if (inside) return target.transform.IsChildOf(made.transform) ? target : null;
-                return target.transform.IsChildOf(from.transform) ? twin(target) ?? throw new InvalidOperationException("The copy of " + target.name + " couldn't be found.") : null;
+                return target.transform.IsChildOf(from.transform) ? twin(target) ?? throw new InvalidOperationException("Couldn't find the copy of " + target.name + ".") : null;
             }
             void Set(object list, bool inside, bool active) { foreach (var item in Items(list)) Copied(item, inside)?.SetActive(active); }
             IEnumerable<Component> Switches(string type, bool inside) {

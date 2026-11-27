@@ -88,7 +88,7 @@ namespace RailroaderScenePatcher {
             string refused = null;
             try { var outcome = attachment.Session.Remove(identity, null); if (outcome == null || !outcome.Applied) refused = outcome?.Error ?? "The crossing could not be removed."; }
             catch (Exception e) { refused = e.GetBaseException().Message; }
-            if (refused != null) feedback.Report(DuplicatePlace, "The crossing couldn't be removed: " + refused.TrimEnd('.') + ".");
+            if (refused != null) feedback.Report(DuplicatePlace, "Couldn't remove the crossing. " + refused.TrimEnd('.') + ".");
             else { crossingNodeKey = null; crossingNode = null; feedback.Report(DuplicatePlace, DuplicateState.Removed); ModObjectsChanged(); }
             presentation?.RequestRefresh();
         }
@@ -136,7 +136,7 @@ namespace RailroaderScenePatcher {
                 }, escapeDismisses: true, width: 600, onCancel: dismiss => Choose(false, dismiss));
             } catch (Exception e) {
                 duplicate.KeepDuplicate();
-                feedback.Report(DuplicatePlace, "The question to cancel Duplicate couldn't open: " + e.GetBaseException().Message.TrimEnd('.') + ". Click Cancel to end Duplicate.");
+                feedback.Report(DuplicatePlace, "Couldn't open the Cancel Duplicate question. " + e.GetBaseException().Message.TrimEnd('.') + ". Click Cancel to discard the copy.");
             }
             return true;
         }

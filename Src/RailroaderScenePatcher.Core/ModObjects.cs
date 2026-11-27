@@ -66,21 +66,21 @@ namespace RailroaderScenePatcher.Core {
         const string Open = " [mod object ", Close = "]";
         public const string Unavailable = "Mod objects are unavailable in this scene.";
         public const string NeedsPlacement = "Invalid mod object: a mod object needs a placement.";
-        public const string TargetShape = "Invalid mod object: the target must name the source's scene, component and structure, and a path that ends with [mod object <ID>].";
+        public const string TargetShape = "Invalid mod object: the target must name the source's scene and component. Its structure must match the source's, except that a part's copy uses scene-object-v1. Its path must end with [mod object <ID>].";
         public const string SourceMissing = "The source of this mod object doesn't match any object in the loaded map.";
         public const string SourceAmbiguous = "The source of this mod object matches more than one object in the loaded map.";
-        public const string InvalidBuild = "Invalid mod object: the build of the source must be a non-empty string.";
+        public const string InvalidBuild = "Invalid mod object: the source's build must be a non-empty string.";
         // The Player log warning of a mod object built from an identical instance because its original is missing.
         public static string FallbackWarning(string scenePatchFile, string id, string original, string instance) =>
-            "Mod object " + id + " in " + scenePatchFile + ": its source " + original + " isn't in the loaded map, so the patcher built it from the identical object " + instance + ".";
-        public const string Taken = "Another object already stands at the path of this mod object.";
+            "Mod object " + id + " in " + scenePatchFile + ": its source " + original + " isn't in the loaded map, so the patcher built the mod object from the identical object " + instance + ".";
+        public const string Taken = "Another object already has this mod object's path.";
         public const string NeedsMarkerId = "Invalid mod object: a mod object that is a scene marker needs a marker ID of its own.";
         // The member of a duplicated spawn point's modification that holds its teleport name, and its refusals.
         public const string TeleportNameMember = "teleportName";
         public const string TeleportNameNotAString = "Invalid teleport name: a teleport name must be a non-empty string.";
-        public const string TeleportNameOnlySpawnPoints = "Invalid teleport name: only a duplicated spawn point takes a teleport name.";
+        public const string TeleportNameOnlySpawnPoints = "Invalid teleport name: only a duplicated spawn point can have a teleport name.";
         public const string TeleportNameSlash = "A teleport name can't contain a slash (/), because a slash splits the hierarchy path.";
-        public const string NamesUnavailable = "Object names of mod objects are unavailable in this scene.";
+        public const string NamesUnavailable = "Mod object names are unavailable in this scene.";
         // Why the text can't be a teleport name, or null. Null and empty text clear the teleport name and pass.
         public static string TeleportNameProblem(string name) =>
             name == null || name.Length == 0 ? null : name.Trim().Length == 0 ? TeleportNameNotAString : name.IndexOf('/') >= 0 ? TeleportNameSlash : null;
@@ -90,9 +90,9 @@ namespace RailroaderScenePatcher.Core {
         // The marker IDs of the scene markers below a mod object, the pads of a duplicated crossing, in hierarchy order.
         public const string PartMarkerIdsMember = "partMarkerIds";
         public const string PartMarkerIdsShape = "Invalid mod object: partMarkerIds must be a list of marker IDs that differ from each other and from markerId.";
-        public const string PartMarkerIdsOnlyModObject = "Invalid modification: only a mod object holds partMarkerIds.";
+        public const string PartMarkerIdsOnlyModObject = "Invalid modification: only a mod object can have partMarkerIds.";
         public static string PartMarkerIdCount(int pads, int ids) =>
-            "Invalid mod object: partMarkerIds must hold a marker ID for each crossing pad of its source. The source holds " + pads + ", and partMarkerIds holds " + ids + ".";
+            "Invalid mod object: partMarkerIds must contain a marker ID for each crossing pad of the source. The source has " + pads + " pads, and partMarkerIds has " + ids + " IDs.";
         // The global ID of a key-value object in a mod object, from the ID its source holds: the game keeps the values
         // of such an object, such as the lights and gates of a crossing, under that ID in the save and between the
         // peers of a multiplayer game, so a copy under its source's ID would share them. The mod object's mark makes

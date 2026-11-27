@@ -52,7 +52,7 @@ static class DuplicateTests {
         var icon = Map.Observations(out _).First(r => r.Family == SceneFamilies.StationMapIcon);
         Assert(DuplicateState.Reason(icon, new[] { SceneFamilies.StationMapIcon }) == null, "A station map icon can be duplicated");
         var starter = Map.Observations(out _).First(r => r.Family == SceneFamilies.StarterPlacement);
-        Assert(DuplicateState.Reason(starter, null) == "No start setup reads a duplicated marker.", "A starter placement marker shows its reason: " + DuplicateState.Reason(starter, null));
+        Assert(DuplicateState.Reason(starter, null) == "No start setup uses the copy.", "A starter placement marker shows its reason: " + DuplicateState.Reason(starter, null));
         var part = Row(ModObjectTests.Station + "/Mask");
         Assert(part.GroupPath == ModObjectTests.Station && DuplicateState.Reason(part, null) == null, "A part can be duplicated: " + DuplicateState.Reason(part, null));
         // A Generic track marker and a milepost are duplicated: the placing click gives the copy a marker ID of its own.
@@ -267,6 +267,6 @@ static class DuplicateTests {
             Assert(ReferenceEquals(chosen, other) && !window.State.Open && window.State.Selecting == null && window.State.Ghost == null, "Confirming cancels the duplicate and gives the selected object");
             Assert(window.Modifications == 0 && window.World.ModObject == null && !window.Session.IsDirty(false), "Confirming adds nothing");
         }
-        Assert(DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot") == "Inspecting Bryson Depot cancels the duplicate of Alarka Jct Station. Nothing is added.", "The question names both objects: " + DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot"));
+        Assert(DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot") == "To inspect Bryson Depot, discard the unplaced copy of Alarka Jct Station.", "The question names both objects: " + DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot"));
     }
 }

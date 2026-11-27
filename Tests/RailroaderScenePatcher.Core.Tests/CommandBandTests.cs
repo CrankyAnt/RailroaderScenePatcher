@@ -241,7 +241,7 @@ static class CommandBandTests {
             new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
             new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
             new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Track span", null, CommandBand.NotYetSupported("the Track span family"))), CommandBand.SnapMode, false), "This family has no supported edits." },
-            new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects have this hierarchy path, and a scene patch file names an object by its path." },
+            new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects have this hierarchy path. A scene patch file target can't single out this object." },
             new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
             new[] { "Inspect an object first.", "Inspect an object first." },
             new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
@@ -463,10 +463,10 @@ static class CommandBandTests {
             "An added bell is not inspection only and names where it is edited: " + bellOperations);
         // A hierarchy path that more than one object holds: no edit, with the reason under Supported edits.
         Check(CommandBand.SharedPath(1) == null && CommandBand.SharedPath(0) == null, "A path one object holds can be edited");
-        Check(CommandBand.SharedPath(2) == "2 objects have this hierarchy path, and a scene patch file names an object by its path"
+        Check(CommandBand.SharedPath(2) == "2 objects have this hierarchy path. A scene patch file target can't single out this object"
             && CommandBand.Refusal(CommandBand.NotEditable(CommandBand.SharedPath(2))) == CommandBand.SharedPath(2), "A path two objects hold reads Not editable with its reason");
         // Supported edits and the footer use the same short reason.
-        Check(CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))) == "Another object shares its hierarchy path"
+        Check(CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))) == "This path doesn't identify one object"
             && CommandBand.InspectorEditBlock(false, CommandBand.NotEditable(CommandBand.SharedPath(3))) == CommandBand.SharedPathBlock && !CommandBand.SharedPathBlock.Contains(CommandBand.SharedPath(2)),
             "The footer repeats the short reason for a shared path: " + CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))));
         // A file path shows from the game folder, or from the mod's own folder when the mod lies elsewhere; never from the drive.

@@ -260,7 +260,7 @@ static class SpawnPointCopyTests {
         Assert(TeleportNameField.Value(named) == "Bryson Yard" && TeleportNameField.Note(named) == null, "With a teleport name the field holds it and the note is gone");
         var map = Map.Observations(out _).First(r => r.Family == SpawnPoints.Family);
         Assert(!TeleportNameField.Shows(map) && TeleportNameField.Note(map) == null && SpawnPoints.TeleportName(map) == null, "A map spawn point has no teleport name field");
-        Assert(TeleportNameField.EmptyNote.Contains("full object name") && TeleportNameField.EmptyNote.Contains("very hard"), "The note says the copy is reachable only by its full object name, which is very hard");
+        Assert(TeleportNameField.EmptyNote.Contains("full object name") && TeleportNameField.EmptyNote.Contains("hard to enter"), "The note says the copy is reachable only by its full object name, which is hard to enter");
         Assert(TeleportNameField.Tip.Contains("quotation marks") && TeleportNameField.Tip.Contains("/tp"), "The tooltip names the console command and the quotation marks for a space");
     }
 

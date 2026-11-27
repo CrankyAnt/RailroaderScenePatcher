@@ -22,7 +22,7 @@ namespace RailroaderScenePatcher {
             TargetKey read;
             try { read = Read(go); }
             catch (Exception e) when (!(e is OutOfMemoryException)) {
-                PatcherLog.Debug("Target key unavailable for " + go.scene.name + "/" + BoardScene.PathOf(go.transform) + ": " + e.GetBaseException().Message);
+                PatcherLog.Debug("Couldn't read the target key for " + go.scene.name + "/" + BoardScene.PathOf(go.transform) + ": " + e.GetBaseException().Message);
                 return null;
             }
             if (read == null) return null;

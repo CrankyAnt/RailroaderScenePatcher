@@ -78,7 +78,7 @@ namespace RailroaderScenePatcher.Core {
         // A milepost that is a mod object is never the origin of its prefix: the game takes the first post with the
         // origin flag that it finds for a prefix as that prefix's origin, so a second one would change a game scene object's
         // role. The host clears the flag on the copy (ModObjects.NotCopied); a mod object that still holds it is refused.
-        public const string ModObjectOrigin = "A mod object can't be the origin milepost of its prefix.";
+        public const string ModObjectOrigin = "A copied milepost can't be the origin for its prefix.";
         public void Preflight(object target) {
             relationship.Preflight(target);
             if (world is IModObjectMarkers made && made.IsModObject(target) && world.Milepost(target).Origin) throw new InvalidOperationException(ModObjectOrigin);

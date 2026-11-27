@@ -9,11 +9,11 @@ namespace RailroaderScenePatcher {
     // to reach.
     internal static class TeleportNameField {
         internal const string Label = "Teleport name";
-        internal const string Tip = "Players teleport here by typing this name after /tp in the console, or find it in the quick search. In the console, a name with a space needs quotation marks.";
+        internal const string Tip = "To teleport here, type /tp followed by this name in the console. Put names with spaces in quotation marks. You can also use the name in quick search.";
         internal const string SetLabel = "Set";
-        internal const string SetTip = "Give this spawn point the name in the field. Clear the field to remove the teleport name.";
-        internal const string OtherMod = "Another mod placed this spawn point, so only that mod can name it.";
-        internal const string EmptyNote = "Without a teleport name, players can reach this spawn point only by typing its full object name, which is very hard.";
+        internal const string SetTip = "Set the name to the text in the field. To remove the name, clear the field and click Set.";
+        internal const string OtherMod = "Only the mod that placed this spawn point can name it.";
+        internal const string EmptyNote = "Without a teleport name, players have to type the full object name to get here. That name is hard to enter.";
         // Whether the Object tab shows the field: for a duplicated spawn point.
         internal static bool Shows(SceneObservation selected) =>
             selected != null && selected.Family == SceneFamilies.SpawnPoint && ModObjects.IsPath(selected.Identity.Path);

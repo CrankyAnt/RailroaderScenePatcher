@@ -404,8 +404,8 @@ namespace RailroaderScenePatcher.Core {
         // 62^10 possible IDs a draw that is already used is rare, and the next draw follows; the attempts end the search.
         public const string GeneratedCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         public const int GeneratedLength = 10, GenerationAttempts = 64;
-        public const string NoUnusedId = "No unused ID was found. " + WindowGuidance.GenerateAgain;
-        public const string GeneratedMapObjectsUnknown = "The game hasn't loaded the map objects in the map context, so a generated ID couldn't be checked against them. " + WindowGuidance.TryAfterMapLoaded;
+        public const string NoUnusedId = "Couldn't find an unused ID. " + WindowGuidance.GenerateAgain;
+        public const string GeneratedMapObjectsUnknown = "The game hasn't loaded the map objects yet, so the patcher can't check whether they use the generated ID. " + WindowGuidance.TryAfterMapLoaded;
         // A random ID that refusal passes, drawn with next, which returns a number from 0 up to but not including its
         // argument; or null with the reason. A refusal that does not name the drawn ID, such as an object that takes no
         // replacement ID or a target that cannot be resolved, and unread map objects end the search at once: another

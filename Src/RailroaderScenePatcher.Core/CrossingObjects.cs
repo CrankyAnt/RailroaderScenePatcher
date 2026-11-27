@@ -27,7 +27,7 @@ namespace RailroaderScenePatcher.Core {
         public const string Structure = "crossing-object-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         // The family the window names a crossing without signals by.
         public const string Family = "Crossing without signals";
-        public const string NoEdits = "A crossing without signals is not edited as one object. Edit its crossbucks and crossing pads.";
+        public const string NoEdits = "You can't edit this crossing as a whole. Edit its crossbucks and crossing pads separately.";
         readonly ICrossingObjectWorld world;
         public CrossingObjectScene(ICrossingObjectWorld world, Capability capability) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; }
         // The identity of the crossing object at the path. padMarkerId names the crossing where crossings share the path.

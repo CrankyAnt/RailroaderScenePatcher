@@ -228,7 +228,7 @@ namespace RailroaderScenePatcher {
             double[] by = null;
             if (at != null && Scene != null) {
                 try { by = Scene.Displacement(e); }
-                catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("displacement", "The patcher couldn't read where the map placed an object. The outliner uses where the object stands now to find its place: " + ex.GetBaseException().Message); }
+                catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("displacement", "The patcher couldn't read an object's original position. The outliner uses its current position to pick a place. Details: " + ex.GetBaseException().Message); }
             }
             return placed[e] = at == null || by == null || by.Length < 2 || !Finite(by[0], by[1]) ? at : new[] { at[0] - by[0], at[1] - by[1] };
         }

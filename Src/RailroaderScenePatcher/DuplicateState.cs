@@ -22,26 +22,26 @@ namespace RailroaderScenePatcher {
     // known, with Place and Cancel; Placing waits for the left click that places the object. Until that click nothing
     // of the mod object exists: no object, no outliner entry and no entry in the scene patch file.
     internal sealed class DuplicateState {
-        internal const string Label = "Duplicate", Tip = "Make a new object from this one and place it in the world.";
-        internal const string PlaceLabel = "Place", PlaceTip = "Put a ghost of the object on the pointer, then left-click the ground to place it.";
-        internal const string ReleaseLabel = "Release", ReleaseTip = "Take the ghost off the pointer. Nothing is placed.";
-        internal const string CancelLabel = "Cancel", CancelTip = "End Duplicate and return to the source object. Nothing is added.";
-        internal const string BlankInstruction = "Move the camera to where the object goes, then click Place.";
+        internal const string Label = "Duplicate", Tip = "Make a copy of this object and place it in the world.";
+        internal const string PlaceLabel = "Place", PlaceTip = "Show a ghost at the pointer. Left-click the ground to place the object there.";
+        internal const string ReleaseLabel = "Release", ReleaseTip = "Hide the ghost and return to the Place button. Nothing is placed.";
+        internal const string CancelLabel = "Cancel", CancelTip = "Discard the unplaced copy and return to the source object.";
+        internal const string BlankInstruction = "Move the camera to where you want to put the copy, then click Place.";
         internal const string PlacingInstruction = "Left-click the ground to place the object. Click Release or press Esc to stop placing.";
         internal const string PointerInstruction = "Left-click to place";
         internal const string LockReason = "Place the object or click Cancel first.";
-        internal const string NoGround = "No ground is under the pointer. Left-click the ground.";
+        internal const string NoGround = "There's no ground under the pointer. Move it over the ground and left-click.";
         internal const string NotPlaced = "Not placed";
-        internal const string Placed = "Mod object placed. Save when you're done.";
+        internal const string Placed = "Mod object placed. Click Save when you're done.";
         // What Remove modification says for a mod object: the object itself goes, not only a change of it.
-        internal const string RemoveTip = "Remove this mod object from the map. Your edits of its parts are removed with it.";
+        internal const string RemoveTip = "Remove this mod object and any edits you made to its parts.";
         // The crossing node of the outliner: what Duplicate and Remove say for a crossing without signals.
         // The mod's own crossing is removed there with Remove modification, as any mod object is.
-        internal const string CrossingField = "Crossing", NotThisMods = "This mod does not change this object.", Removed = "Mod object removed. Save when you're done.";
+        internal const string CrossingField = "Crossing", NotThisMods = "This mod doesn't change this object.", Removed = "Mod object removed. Click Save when you're done.";
         // Why Duplicate is inactive for an object, or null: the short reasons of its tooltip.
-        internal const string StarterMarker = "No start setup reads a duplicated marker.",
-            InspectionOnly = "Inspection-only objects have no edits.",
-            OtherFamily = "This family can't be duplicated.", HoldsOtherFamily = "It holds objects that can't be duplicated.";
+        internal const string StarterMarker = "No start setup uses the copy.",
+            InspectionOnly = "You can only inspect this object.",
+            OtherFamily = "This family can't be duplicated.", HoldsOtherFamily = "It contains objects that can't be duplicated.";
         // The families whose objects a copy rebuilds soundly: a scene object with what stands below it, a part, which
         // becomes an object of its own, a station map icon, a location sign, which registers its own ground mask at its
         // place, and the Ela bridge. A copy of a bridge stands fully built and no construction controller switches it.
@@ -75,7 +75,7 @@ namespace RailroaderScenePatcher {
         // The question that a selection in the outliner asks while the mod object is unplaced, with its title and choices.
         internal const string SelectTitle = "Cancel Duplicate?", KeepChoice = "Keep duplicating", CancelChoice = "Cancel Duplicate";
         internal static string SelectQuestion(SceneObservation source, string selectedName) =>
-            "Inspecting " + selectedName + " cancels the duplicate of " + source.DisplayName + ". Nothing is added.";
+            "To inspect " + selectedName + ", discard the unplaced copy of " + source.DisplayName + ".";
         // The title of the blank object window: it names the duplicated source.
         internal static string Title(SceneObservation source) => "Duplicating " + source.DisplayName;
 

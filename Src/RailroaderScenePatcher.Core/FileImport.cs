@@ -229,7 +229,7 @@ namespace RailroaderScenePatcher.Core {
                 case "dependsOn": return "the dependencies";
                 case "starterPlacement": return "the starter placement";
                 case "markerId": return "the replacement ID";
-                case ModObjects.PartMarkerIdsMember: return "the marker IDs of the crossing pads";
+                case ModObjects.PartMarkerIdsMember: return "the crossing pads' marker IDs";
                 case "trackMarker": return "the track binding";
                 case "crossingCoverage": return "the crossing coverage";
                 case "crossingEquipment": return "the added lights, gates, and bells";

@@ -55,7 +55,7 @@ namespace RailroaderScenePatcher.Core {
         const string RecoveryStart = "On the controller's Connections tab, click Edit ";
         // The problem of a crossing that no train triggers: no circuit of it detects. A duplicated crossing starts so,
         // until detection is added on its controller's Connections tab.
-        public const string NoDetection = "This crossing has no detection, so no train triggers it. On the controller's Connections tab, click Add detection.";
+        public const string NoDetection = "Trains can't trigger this crossing until you add detection. On the controller's Connections tab, click Add detection.";
         public static string Undetected(CrossingCoverage coverage) => coverage != null && coverage.Circuits.All(c => c.Value.Kind == CircuitKind.Detached) ? NoDetection : null;
         // Whether a problem is a crossing detection problem: it carries the circuit's recovery (Recovery), so its repair
         // route is Edit circuit or Edit detection addition, never another guided task.

@@ -2,77 +2,76 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Duplicate a scene object
 
-Duplicate makes a new object from an object of the map and places it where you click. The new object is a mod object: your mod makes it, and the game's own object stays as it is. Use it to give a new station an existing station building, to add a station map icon, a location sign or a bridge, to give a new siding its own speed sign, whistle sign or milepost, to give a new road a crossing with signals, or to add a spawn point that players teleport to.
+Use **Duplicate** to copy a supported map object and place the copy where you click. Your mod creates the copy as a mod object. The original stays as it is. For example, you can add a station building for a new station, a speed sign or milepost for a new siding, or a crossing with signals for a new road. You can also copy station map icons, location signs, bridges, whistle signs, and spawn points that players can teleport to.
 
 ## Before you start
 
-- Open the native map editor and the Scene Patcher window, and choose the mod to edit.
-- Inspect the object to duplicate. **Duplicate** is on the **Object** tab.
+- Open the native map editor and the Scene Patcher window, then choose the mod to edit.
+- Inspect the object you want to copy. **Duplicate** is on the **Object** tab.
 
-**Duplicate** is available for a group, such as a station building with its parts, for a single part of a group, for a station map icon, for a location sign, for a bridge, a road bridge or a rail bridge, for a Generic track marker and a milepost, for a crossing with signals, which you duplicate from its controller, for a crossing without signals, which you duplicate from its crossing in the outliner, for a crossing pad, and for a spawn point. For every other object the button is inactive, and its tooltip gives the reason:
+You can duplicate an entire group, such as a station building with its parts, or one part. You can also duplicate a station map icon, a location sign, a road or rail bridge, a Generic track marker, a milepost, a crossing pad, or a spawn point. For a crossing with signals, select its controller. For a crossing without signals, select the crossing in the outliner. For other objects, the button is inactive and its tooltip gives the reason:
 
-| Object | Reason |
+| Object | Tooltip reason |
 | --- | --- |
-| Starter placement marker | No start setup reads a duplicated marker. |
-| Inspection-only object | Inspection-only objects have no edits. |
-| Generic track marker, milepost, crossing controller, or crossing pad that Scene Patcher can't edit | The reason that Supported edits gives for it. |
+| Starter placement marker | No start setup uses the copy. |
+| Inspection-only object | You can only inspect this object. |
+| Generic track marker, milepost, crossing controller, or crossing pad that Scene Patcher can't edit | The reason shown in **Supported edits**. |
 | Any other family, such as a crossing mast | This family can't be duplicated. |
-| Group or crossing that holds an object of such a family | It holds objects that can't be duplicated. |
+| Group or crossing that contains an object of an unsupported family | It contains objects that can't be duplicated. |
 
-A crossing without signals has no controller and no object of its own to inspect. Select the crossing in the outliner: the inspector then shows **Crossing** with its name, **Duplicate**, and **Remove modification**. **Duplicate** works there as on the **Object** tab.
+A crossing without signals has no controller or separate object to inspect. Select the crossing in the outliner. The inspector shows **Crossing** with the crossing's name, plus **Duplicate** and **Remove modification**. **Duplicate** works the same way here as on the **Object** tab.
 
 ## Duplicate and place the object
 
 1. On the **Object** tab, click **Duplicate**.
 
-   A blank object window opens. Its title names the object you duplicate, and it shows only the **Object** tab with **Place** and **Cancel**. Nothing is added yet: the outliner and the scene patch file hold nothing of the new object.
+   A blank object window opens. Its title names the source object. Only the **Object** tab appears, with **Place** and **Cancel**. Nothing has been added to the outliner or scene patch file yet.
 
-1. Move the camera to where the object goes. The camera moves as always, and the native map editor stays available. The other controls of the Scene Patcher window, **Select in world** among them, wait until you place the object or click **Cancel**.
+1. Move the camera to the new location as usual. You can still use the native map editor. Other Scene Patcher controls, including **Select in world**, are unavailable until you place the object or click **Cancel**.
 
-1. Click **Place**. A ghost of the object, a copy that is shown only, stands on the ground under the pointer and follows it, with the instruction **Left-click to place**. The ghost shows what is placed: for a crossing it leaves out the whistle signs and the surfaces of the crossing pads. Over the Scene Patcher window, or where no ground is, the ghost is hidden. For a station map icon, the ghost is the map's icon.
+1. Click **Place**. A ghost follows the pointer over the ground, with the instruction **Left-click to place**. The ghost shows the object that will be placed. For a crossing, it does not show whistle signs or crossing pad surfaces. It disappears when the pointer is over the Scene Patcher window or where there is no ground. A station map icon appears as the map's icon.
 
-1. Left-click the ground. The object is placed where the ghost stands, with the rotation of the object you duplicated.
+1. Left-click the ground to place the object where the ghost stands. It keeps the source object's rotation.
 
-   To stop placing without placing anything, click **Release** or press Esc. The ghost leaves the pointer, and the blank object window shows **Place** and **Cancel** again.
+   To stop placing without adding the object, click **Release** or press Esc. The ghost disappears and the blank object window shows **Place** and **Cancel** again.
 
-After the click, the window shows the new object with all four tabs. The outliner lists it under the place where it stands.
+After placement, the window shows the new object with its four tabs, and the outliner lists it under the place where it stands. Its **Origin** is **Mod**. The map object it came from has **Origin** **Map**.
 
-What the new object is depends on what you duplicated:
+The result depends on the source:
 
-- A part becomes an object of its own. It stands beside the group it came from, not in it, and moving that group leaves it where it is.
-- A location sign gets its own ground mask at its new place, and the terrain there follows it.
-- A bridge stands fully built and active, whatever the construction or progression state of the bridge you duplicated, and neither ever switches it. A rail bridge brings no track: lay ordinary track over it in the native map editor.
-- A Generic track marker or milepost gets a marker ID of its own, which no other scene marker uses, so the object you duplicated keeps its registration. It binds to the track that the game finds at the placed position: the nearest track within 25 metres. Its **Connections** tab shows that track. Where no track lies within 25 metres, the new object stays unbound and the outliner lists it under **Problems** until you set its binding on the **Connections** tab. To give it another marker ID, use **Set replacement ID** on the **Connections** tab; a mod object always keeps an ID of its own, so **Clear replacement ID** is unavailable. A copy of an origin milepost is never the origin of its prefix: the milepost you duplicated stays the origin.
+- A part becomes a separate object beside its group. Moving the group does not move the new object.
+- A location sign gets a ground mask at its new location, and the terrain there follows the sign.
+- A bridge starts fully built and active. Construction or progression does not switch it. A rail bridge does not include track. Lay track over it in the native map editor.
+- A Generic track marker or milepost gets a marker ID that no other scene marker uses, so the source keeps its registration. The game binds the new object to the track it finds nearest the placed position, within 25 metres. The **Connections** tab shows the track. If there's no track within 25 metres, the object stays unbound and appears under **Problems** in the outliner until you set its binding on the **Connections** tab. To change its ID, use **Set replacement ID** on the **Connections** tab. A mod object always has its own ID, so **Clear replacement ID** is unavailable. If you duplicate an origin milepost, only the source remains the origin for that prefix.
+- A crossing with signals becomes a separate crossing with its own controller, masts, lights, gates, bell, and crossing pads. A train at one crossing doesn't trigger the other. Editing one leaves the other alone. The whistle signs, detection, and lights, gates, and bells added by a mod stay with the original crossing.
+  - The new crossing has no detection, so trains do not trigger it. Its controller appears under **Problems** in the outliner. On the controller's **Connections** tab, enter a unique ID under **Add detection**, click **Add detection**, and select the tracks. To change detection later, use **Edit detection addition**. See [Add crossing detection](adding-crossing-detection.md). Lay or change the track at the new location first.
+  - Each crossing pad gets its own marker ID, but no track binding. Each unbound pad appears under **Problems** in the outliner. On its **Connections** tab, bind it to a track. The pad surface appears after it is bound. See [Rebind crossing pads](rebinding-crossing-pads.md).
+  - The controller stays at the placement point. To move the crossing, remove it and duplicate it again. Move its masts and bell as you would for any crossing.
+- A crossing without signals becomes a new crossing with its own crossbucks and crossing pads. If several crossings share a name, as the three below Old River Rd do, the patcher copies the crossing you selected. The whistle signs stay with the original. As with other mod objects, the outliner names the new crossing for its place and gives it a number. Each pad gets its own marker ID and starts with no track binding. It appears under **Problems** until you bind it. Move each crossbuck as you would any other object. The crossing stays where you placed it. To remove the crossing, select it in the outliner and click **Remove modification**.
+- A crossing pad becomes a separate object beside its crossing, with its own marker ID and no track binding.
+- A spawn point gets an empty **Teleport name** field on the **Object** tab. Enter a name and click **Set**. The name becomes the spawn point's object name in the game. Players can use it with the `/tp` console command and find it in quick search. Put quotation marks around names with spaces, for example `/tp "Bryson Yard"`. The outliner and inspector heading show the name. Without a teleport name, players have to type the full object name to get here. That name is hard to enter. A teleport name cannot contain a slash (`/`). Clear the field and click **Set** to remove the name. Moving the spawn point keeps its name. A mod spawn point ranks below every map spawn point, so a new game does not start there. It keeps the source spawn point's radius.
 
-- A crossing with signals becomes a crossing of its own: the new object holds its own controller, masts with their lights and gates, bell, and crossing pads. It is independent of the crossing you duplicated: a train at one crossing never triggers the other, and an edit of one leaves the other as it is. Its whistle signs, its detection, and the lights, gates, and bells that a mod added to it stay with the crossing you duplicated.
-  - The new crossing has no detection, so no train triggers it. The outliner lists its controller under **Problems** until you add detection: on the controller's **Connections** tab, enter an ID under **Add detection**, click **Add detection**, and select the tracks. See [Add crossing detection](adding-crossing-detection.md). Lay or change the track at the new place first.
-  - Each crossing pad of the new crossing gets a marker ID of its own and no track binding. The outliner lists each pad under **Problems** until you bind it: on the pad's **Connections** tab, rebind it to the track. See [Rebind crossing pads](rebinding-crossing-pads.md). The pad shows its surface once it is bound.
-  - The controller of the new crossing stays where you placed it. To put the crossing elsewhere, remove it and duplicate again. Move its masts and bell like those of any other crossing.
-- A crossing without signals becomes one new crossing with its own crossbucks and crossing pads. Where several crossings share one name in the map, as the three below Old River Rd do, the new crossing is made from the one you selected. Its whistle signs stay with the crossing you duplicated. The outliner names the new crossing by the place where it stands, with a number, as it names any mod object. Each crossing pad gets a marker ID of its own and no track binding, and the outliner lists it under **Problems** until you rebind it. Move each crossbuck like any other object; the crossing as a whole stays where you placed it. To remove the new crossing, select it in the outliner and click **Remove modification**.
-- A crossing pad on its own becomes an object of its own beside the crossing it came from, with a marker ID of its own and no track binding, as a pad of a duplicated crossing has.
-- A spawn point gets a **Teleport name** field on the **Object** tab, empty after placing. Type a name and click **Set**. The name becomes the new spawn point's object name in the game, so players teleport to it with `/tp` and the name in the console, and find it in the quick search, as they do for the map's own spawn points. In the console, a name with a space needs quotation marks, such as `/tp "Bryson Yard"`. The outliner and the inspector heading then show the name. While the field is empty, the tab says that players can reach the new spawn point only by typing its full object name, which is very hard. A name can't contain a slash (/). To remove the name, clear the field and click **Set**. Moving the spawn point keeps its name. The new spawn point ranks below every spawn point of the map, so a new game never starts there, and it keeps the radius of the spawn point you duplicated.
+To end Duplicate without adding an object, click **Cancel**. The window returns to the source object. Closing the Scene Patcher window or reloading the map also ends Duplicate.
 
-To end without a new object, click **Cancel**. The window shows the object you started from. Closing the Scene Patcher window or reloading the map also ends Duplicate.
-
-If you select another object in the outliner before you place the object, Scene Patcher asks whether to cancel Duplicate. Click **Cancel Duplicate** to end it and inspect the object you selected, or **Keep duplicating** to stay in the blank object window.
+If you select another object in the outliner before placing the copy, Scene Patcher asks whether to cancel Duplicate. Click **Cancel Duplicate** to end Duplicate and inspect the selected object, or **Keep duplicating** to return to the blank object window.
 
 ## Edit or remove a mod object
 
-A mod object takes the edits of its family: move, rotate, enable or disable it like any other object of that family. You can duplicate it again; the new object is made from the same object of the map.
+Edit a mod object with the supported edits for its family. You can move, rotate, enable, or disable it where those edits are supported. You can duplicate a mod object too; the new object uses the same map object as its source.
 
-To remove a mod object, inspect it and click **Remove modification**. The object leaves the map, together with your edits of its parts.
+To remove a mod object, inspect it and click **Remove modification**. This removes the object and edits made to its parts.
 
-The placing click is one step in the native map editor's history: Undo removes the mod object and Redo places it again.
+The placement click is one step in the native map editor's history. Undo removes the mod object, and Redo places it again.
 
 ## What Save writes
 
-Save writes one modification for the mod object. It names the object of the map as `source`, with a `build` that identifies its model and build, the mod object's own path as `target`, and the placement. Each load builds the mod object again from its source. When a game update removes that object of the map, the load builds the mod object from an identical object of the map instead, and the player log holds a warning that names both. See [Mod objects](scene-patch-file-v1.md#mod-objects) in the format reference.
+Save writes a modification for the mod object. It records the map object as `source`, with `source.build` identifying its model and build. It also records the mod object's path as `target` and its placement. On each load, the patcher builds the mod object again from its source. If a game update removes the source object, the patcher uses an identical object in the loaded map and writes a warning naming both objects to the player log. See [Mod objects](scene-patch-file-v1.md#mod-objects) in the format reference.
 
-For a crossing, the modification also holds `partMarkerIds`, the marker ID of each of its crossing pads. Detection that you add to it is written in the same modification, and the binding of each pad in a modification of its own.
+A crossing modification also records the marker IDs of its crossing pads in `partMarkerIds`. Detection you add is recorded in the same modification. Each pad's binding is recorded in its own modification.
 
-A duplicated station map icon is a visual object. It shows on the map at its place, and no station is linked to it. To add a station, create it in the native map editor.
+A duplicated station map icon appears on the map at its placement point. It is not linked to a station. To add a station, create it in the native map editor.
 
 ## If something goes wrong
 
-- **The click places nothing.** The message in the blank object window gives the reason. Where no ground is under the pointer, left-click the ground.
-- **The mod object is missing after a load.** The Log names the modification and the reason, such as a source that no longer matches an object of the map. A mod object needs its source, or an identical object, in the loaded map.
+- **The click places nothing.** Read the message in the blank object window for the reason. If there is no ground under the pointer, left-click the ground.
+- **The mod object is missing after a load.** Check the Log for the modification and the reason, such as a source that no longer matches an object in the map. A mod object needs its source or an identical object in the loaded map.

@@ -173,13 +173,13 @@ namespace RailroaderScenePatcher {
         // A key names one of them (TargetKeys); this reason remains for holders that the key does not tell apart, such
         // as two holders of one marker ID at one path, and for a key that cannot be read. Supported edits says this
         // about the object; the footer says what it means for an edit now (SharedPathBlock).
-        const string SharedPathTail = " objects have this hierarchy path, and a scene patch file names an object by its path";
+        const string SharedPathTail = " objects have this hierarchy path. A scene patch file target can't single out this object";
         internal static string SharedPath(int holders) => holders > 1 ? holders + SharedPathTail : null;
-        internal const string SharedPathBlock = "Another object shares its hierarchy path";
+        internal const string SharedPathBlock = "This path doesn't identify one object";
         // The Identity fields of the key of an object whose hierarchy path and component another object shares.
         internal const string KeyMarkerIdField = "Target marker ID", KeyPositionField = "Target map position";
-        internal const string KeyMarkerIdTooltip = "The game's marker ID of this object. Other objects share this path, so the scene patch file names this object by its path and this ID.";
-        internal const string KeyPositionTooltip = "Where the game placed this object, as map x and z. Other objects share this path, so the scene patch file names this object by its path and this position.";
+        internal const string KeyMarkerIdTooltip = "This object's marker ID in the game. Other objects share its hierarchy path, so the scene patch file uses both the path and this ID to identify it.";
+        internal const string KeyPositionTooltip = "The map coordinates (x and z) where the game placed this object. Other objects share its hierarchy path, so the scene patch file uses both the path and these coordinates to identify it.";
         internal static string KeyPosition(double[] at) => "x " + Number(at[0]) + ", z " + Number(at[1]);
         // The Track group line of the Object tab. An object without edits is told what its activity follows, not what
         // Disable and Clear activity would do.
@@ -655,7 +655,7 @@ namespace RailroaderScenePatcher {
         internal const string SetMarkerId = "Set replacement ID", ClearMarkerId = "Clear replacement ID", RepairDuplicateId = "Repair duplicate ID";
         // Generate at the right end of the Replacement ID caption fills the field with a generated ID, which stays editable.
         internal const string GenerateMarkerId = "Generate";
-        internal const string GenerateMarkerIdTip = "Fill the field with a random ID of letters and digits that nothing in the world uses yet. You can still edit it.";
+        internal const string GenerateMarkerIdTip = "Fill the field with a random, unused ID made of letters and digits. You can edit the ID.";
         // The Inspector route of the same repair, beside Repair duplicate ID: the Replacement marker ID section of the Connections tab.
         internal const string SetIdOnConnections = "Set replacement ID on the Connections tab";
         internal const string SetIdOnConnectionsTip = "Open the Connections tab. In its Replacement marker ID section, enter a replacement ID and click Set replacement ID.";
@@ -700,7 +700,7 @@ namespace RailroaderScenePatcher {
         }
         // What to enter in a Replacement ID field, on the Connections tab and in the guided task, shown as text beside the
         // field: a new ID that the modder makes up, which is neither an existing marker ID nor a segment ID.
-        internal const string ReplacementIdInstruction = "Click Generate, or make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.";
+        internal const string ReplacementIdInstruction = "Click Generate or enter an unused ID. Don't use another marker's ID or a segment ID. Enter at least one character, with no spaces at either end. Don't start the ID with passengerStop: or flare:.";
         // The tooltip of a Replacement ID field: what the ID does, beside the instruction that stands below the field.
         internal const string ReplacementIdTip = "The game registers this marker's track location under this ID. A replacement ID repairs a duplicate marker ID. The patcher doesn't check Lua scripts or other mods that look up markers by ID.";
         internal static string MarkerIdUnavailable(string family, bool generic, string underlying, int sharers, bool hasValue) =>
