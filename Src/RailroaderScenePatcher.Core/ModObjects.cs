@@ -67,7 +67,7 @@ namespace RailroaderScenePatcher.Core {
         const string Open = " [mod object ", Close = "]";
         public const string Unavailable = "Mod objects are unavailable in this scene.";
         public const string NeedsPlacement = "Invalid mod object: a mod object needs a placement.";
-        public const string TargetShape = "Invalid mod object: the target must name the source's scene and component. Its structure must match the source's, except that a part's copy uses scene-object-v1. Its path must end with [mod object <ID>].";
+        public const string TargetShape = "Invalid mod object: the target must name the source's scene and component. Its structure must match the source's, except that a part's copy uses scene-object-v1. Its path must end with [mod object <mod ID> <modification ID>], with the ID of the mod that supplies the scene patch file.";
         public const string SourceMissing = "The source of this mod object doesn't match any object in the loaded map.";
         public const string SourceAmbiguous = "The source of this mod object matches more than one object in the loaded map.";
         public const string InvalidBuild = "Invalid mod object: the source's build must be a non-empty string.";
@@ -116,7 +116,9 @@ namespace RailroaderScenePatcher.Core {
         // A slash would split the name into two path segments.
         static string Safe(string text) => (text ?? "").Replace('/', ':');
         // The path of the mod object that the mod makes from the source under the modification key.
-        public static string Path(string sourcePath, string modId, string key) => Plain(sourcePath) + Open + Safe(modId) + " " + Safe(key) + Close;
+        public static string Path(string sourcePath, string modId, string key) => Plain(sourcePath) + " " + Mark(modId, key);
+        // The mark of the mod object that the mod makes under the modification key: "[mod object <mod ID> <key>]".
+        public static string Mark(string modId, string key) => Open.Substring(1) + Safe(modId) + " " + Safe(key) + Close;
         static bool IsName(string name) => name.EndsWith(Close, StringComparison.Ordinal) && name.IndexOf(Open, StringComparison.Ordinal) > 0;
         // Whether the path is the path of a mod object itself.
         public static bool IsPath(string path) => path != null && IsName(path.Substring(path.LastIndexOf('/') + 1));

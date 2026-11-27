@@ -107,9 +107,13 @@ static class OutlinerGroupingTests {
     // pad are the rows. They carry "+" and the Changed filter lists them, as it lists every mod object of the edited
     // mod, while the source's own crossbucks are neither added nor listed there. A copy that a second mod made is that
     // mod's: no "+" and no place under Changed. Without an edited mod nothing is added or listed. Fictional crossings at
-    // the Stenzel path.
+    // the Stenzel path. As in the game, the session runs under the patcher's ID and edits the scene patch file of
+    // crankyant/fixed-placement-fixture; the window takes the edited mod's ID from the session, and the mark carries it.
     static void AModObjectAndItsPartsCountAsAdded() {
-        const string modId = "crankyant/scene-patcher", secondMod = "othermod/rail-extras";
+        const string secondMod = "othermod/rail-extras";
+        var session = new PatchEditingSession(new ModObjectTests.Loaded().Engine, new NativeMapEditor(), new Store(), LoadedMod.PatcherId, "crankyant/fixed-placement-fixture");
+        var modId = session.ModId;
+        Check(modId == "crankyant/fixed-placement-fixture", "the session's edited mod is the mod whose scene patch file it edits, not the patcher (got " + modId + ")");
         var copy = ModObjects.Path(Stenzel, modId, "mod-object-crossing-unprotected---stenzel");
         var foreign = ModObjects.Path(Stenzel, secondMod, "mod-object-crossing-unprotected---stenzel");
         var copied = new[] {
@@ -151,6 +155,8 @@ static class OutlinerGroupingTests {
             Check(Added(Entry(other, Baked, 0, 0)) && Added(Entry(other + "/Heap", Baked, 0, 0, groupPath: other)) && !Added(Entry(Dealer, Baked, 0, 0)) && !Added(null)
                 && InventoryPresentationState.IsAdded(light, secondMod) && InventoryPresentationState.IsAdded(light, null) && !InventoryPresentationState.ChangedOrMade(row => false, modId, null)(light),
                 "every mod object of the edited mod with its parts is added and a map object is not; an added light keeps its + and, without the edited mod's scope, is not listed under Changed");
+            Check(!copied.Any(r => InventoryPresentationState.IsAdded(r, LoadedMod.PatcherId)) && OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(row => false, LoadedMod.PatcherId, null), null).Count == 0,
+                "the patcher's ID makes no mod object added or listed under Changed");
             Check(ModObjects.MadeBy(copy, modId) && ModObjects.MadeBy(copy + "/Crossing Pad", modId) && !ModObjects.MadeBy(foreign, modId) && !ModObjects.MadeBy(Stenzel, modId) && !ModObjects.MadeBy(copy, null),
                 "a mod object is the mod's whose ID its mark carries");
         } finally {

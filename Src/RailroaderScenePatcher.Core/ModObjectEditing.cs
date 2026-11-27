@@ -31,9 +31,10 @@ namespace RailroaderScenePatcher.Core {
             catch (InvalidOperationException) { return target; }
         }
         // The placing click of Duplicate: makes a mod object from the inspected object and places it. The scene patch
-        // file gets its modification, under a new key that is the mod object's identity in this mod; the scene gets
-        // the object. A refusal leaves both as they were. The outcome names the new object's target. group is the path
-        // of the inspected object's group when it is a part: the part's copy then stands beside that group, on its own.
+        // file gets its modification, under a new key that is the mod object's identity in this mod; its mark holds the
+        // edited mod's ID, the key the scene patch file is applied under, and that key. The scene gets the object. A
+        // refusal leaves both as they were. The outcome names the new object's target. group is the path of the
+        // inspected object's group when it is a part: the part's copy then stands beside that group, on its own.
         // A mod object that is a scene marker gets a marker ID of its own, drawn with next as Generate draws one; a
         // milepost or Generic track marker binds to the track the game finds at the placed position, and stays unbound
         // where the game finds none.
@@ -52,7 +53,7 @@ namespace RailroaderScenePatcher.Core {
                 // A crossing pad's copy stands beside the crossing that holds the pad, as a part's copy beside its group.
                 if (group == null && ModObjects.StandsBesideHolder(from.Structure)) group = ModObjects.ParentOf(ModObjects.Plain(from.Path));
                 var beside = ModObjects.Beside(ModObjects.Within(inspectedObject.Path) && group == null ? inspectedObject.Path : from.Path, group);
-                var identity = new TargetIdentity(from.Scene, ModObjects.Path(beside, modId, key), from.Component, ModObjects.StructureOf(from.Structure));
+                var identity = new TargetIdentity(from.Scene, ModObjects.Path(beside, scenePatchFileKey, key), from.Component, ModObjects.StructureOf(from.Structure));
                 var value = new JObject { ["target"] = identity.ToJson(), [ModObjects.SourceMember] = SourceJson(inspectedObject, from, origin) };
                 var drawn = new HashSet<string>(StringComparer.Ordinal);
                 if (ModObjects.IsSceneMarker(identity.Structure)) value[ReplacementMarkerIds.Member] = NewMarkerId(engine.ResolveUnique(from), next, drawn);

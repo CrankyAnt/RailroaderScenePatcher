@@ -79,6 +79,7 @@ static class ModObjectTests {
         AModObjectWithoutItsSourceFailsAlone();
         AModObjectNeedsItsPlacementAndItsOwnTarget();
         AModObjectLeavesWithItsModification();
+        EachModBuildsItsOwnModObjectUnderTheSameKey();
         PlacingAddsTheModificationAndTheObject();
         EditsOfTheFamilyApplyToAModObject();
         AModObjectCanBeDuplicatedAgain();
@@ -162,9 +163,47 @@ static class ModObjectTests {
         Assert(world.World.Objects[Station].Single() == world.Building, "The source stays");
     }
 
+    // #38/#160: a mod object's identity is scoped to the mod that supplies its scene patch file, as an Equipment ID is.
+    // Two mods whose files hold a mod object under the same modification key each build their own, with their own
+    // mark; each leaves with its own file. A file whose mod object carries another mod's mark is refused with the
+    // target shape and builds nothing, so one mod never takes another mod's mod object path.
+    static void EachModBuildsItsOwnModObjectUnderTheSameKey() {
+        const string first = "author/pack", second = "other/rail-extras";
+        string Mark(string mod) => ModObjects.Path(Station, mod, Key);
+        var world = new Loaded();
+        var mine = world.Engine.Apply(Doc(ModObject(Key, Station, Mark(first), AtBryson)), first).Outcomes[Key];
+        var theirs = world.Engine.Apply(Doc(ModObject(Key, Station, Mark(second), new[] { 4500.0, 12, 5420 })), second).Outcomes[Key];
+        Assert(mine.Applied && theirs.Applied && world.Builder.Builds == 2, "Both mods build their mod object under the same key: " + mine.Error + " / " + theirs.Error);
+        Assert(Mark(second) == Station + " [mod object other:rail-extras " + Key + "]" && world.World.Objects[Mark(first)].Count == 1 && world.World.Objects[Mark(second)].Count == 1
+            && !ReferenceEquals(world.World.Objects[Mark(first)][0], world.World.Objects[Mark(second)][0]), "Each mod object stands under its own mod's mark");
+        Assert(ModObjects.MadeBy(Mark(first), first) && !ModObjects.MadeBy(Mark(first), second) && ModObjects.MadeBy(Mark(second), second) && !ModObjects.MadeBy(Mark(second), first), "Each mod object is its own mod's");
+        world.Engine.Reenter();
+        var left = world.Engine.Apply(Doc(), second);
+        Assert(left.Error == null && world.Builder.Removes == 1 && world.World.Objects.ContainsKey(Mark(first)) && !world.World.Objects.ContainsKey(Mark(second)), "The second mod's mod object leaves with its file; the first mod's stays");
+        // A file of the second mod that writes the first mod's mark.
+        var borrowed = new Loaded();
+        var refused = borrowed.Engine.Apply(Doc(ModObject(Key, Station, Mark(first), AtBryson)), second).Outcomes[Key];
+        Assert(!refused.Applied && refused.Error == ModObjects.TargetShape && refused.Cause == FailureCause.InvalidDefinition && borrowed.Builder.Builds == 0, "Another mod's mark is refused: " + refused.Error);
+        // A mark whose modification ID differs from the key is refused too.
+        var renamed = new Loaded();
+        var other = renamed.Engine.Apply(Doc(ModObject(Key, Station, ModObjects.Path(Station, first, Key + "-2"), AtBryson)), first).Outcomes[Key];
+        Assert(!other.Applied && other.Error == ModObjects.TargetShape && renamed.Builder.Builds == 0, "A mark with another modification ID is refused: " + other.Error);
+        // The refusal holds whatever stands: with the first mod's mod object standing, the second mod's file that writes
+        // its mark neither resolves to it nor moves it.
+        var standing = new Loaded();
+        Assert(standing.Engine.Apply(Doc(ModObject(Key, Station, Mark(first), AtBryson)), first).Outcomes[Key].Applied && standing.ModObject != null, "The first mod's mod object stands");
+        var taken = standing.Engine.Apply(Doc(ModObject(Key, Station, Mark(first), new[] { 4500.0, 12, 5420 }, ",\"active\":false")), second).Outcomes[Key];
+        Assert(!taken.Applied && taken.Error == ModObjects.TargetShape && taken.Cause == FailureCause.InvalidDefinition && standing.Builder.Builds == 1
+            && Near(standing.At(standing.ModObject), AtBryson) && standing.ModObject.Active, "Another mod's mark is refused while that mod's mod object stands, which keeps its placement and activity: " + taken.Error);
+        // In the same mod, a modification whose mark names the key of a standing mod object neither resolves to it nor moves it.
+        var sibling = standing.Engine.Apply(Doc(ModObject(Key, Station, Mark(first), AtBryson), ModObject(Key + "-2", Station, Mark(first), new[] { 4500.0, 12, 5420 })), first).Outcomes;
+        Assert(sibling[Key].Applied && !sibling[Key + "-2"].Applied && sibling[Key + "-2"].Error == ModObjects.TargetShape && standing.Builder.Builds == 1
+            && Near(standing.At(standing.ModObject), AtBryson), "A mark with another modification ID is refused while that mod object stands, which keeps its placement: " + sibling[Key + "-2"].Error);
+    }
+
     internal static PatchEditingSession Session(Loaded world, out Store store, out NativeMapEditor editor) {
         store = new Store(); editor = new NativeMapEditor();
-        var session = new PatchEditingSession(world.Engine, editor, store, "author/pack", "author/pack"); editor.Session = session;
+        var session = new PatchEditingSession(world.Engine, editor, store, LoadedMod.PatcherId, "author/pack"); editor.Session = session;
         return session;
     }
     static JObject Modifications(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"];
@@ -192,6 +231,16 @@ static class ModObjectTests {
         var next = new Loaded();
         var result = next.Engine.Apply(store.Patch, "author/pack");
         Assert(result.Outcomes[Key].Applied && Near(next.At(next.ModObject), AtBryson), "After Save, the next load builds the mod object at that point: " + result.Outcomes[Key].Error);
+        // In a session over the saved file, run under the patcher's ID with the mod's key as the game runs it, the mod
+        // object's placement is edited, undone and edited again; the file keeps its source and mark.
+        var nextEditor = new NativeMapEditor(); var nextSession = new PatchEditingSession(next.Engine, nextEditor, new Store { Patch = store.Patch }, LoadedMod.PatcherId, "author/pack"); nextEditor.Session = nextSession;
+        var there = new[] { 4520.0, 12, 5390 };
+        var moved = nextSession.Edit(Id(Made), new Placement(there, Upright), null);
+        var movedItem = (JObject)Modifications(nextSession)[Key];
+        Assert(moved.Applied && Near(next.At(next.ModObject), there) && (string)movedItem["target"]["path"] == Made && (string)movedItem["source"]["path"] == Station, "After a load, a session moves the mod object: " + moved.Error);
+        nextEditor.Undo();
+        Assert(Near(next.At(next.ModObject), AtBryson), "Undo returns the mod object to its saved placement");
+        Assert(nextSession.Edit(Id(Made), new Placement(there, Upright), null).Applied && Near(next.At(next.ModObject), there), "The move applies again");
         // A refused click leaves the file and the scene as they were.
         var refusing = new Loaded(); var refused = Session(refusing, out _, out _);
         refusing.World.ThrowAfterPlacement = true;
@@ -292,7 +341,7 @@ static class ModObjectTests {
         var (world, source, capability, engine) = World();
         var sourceKeys = source.Keys.ToArray();
         var editor = new NativeMapEditor(); var store = new Store();
-        var session = new PatchEditingSession(engine, editor, store, "author/pack", "author/pack"); editor.Session = session;
+        var session = new PatchEditingSession(engine, editor, store, LoadedMod.PatcherId, "author/pack"); editor.Session = session;
         var placed = session.PlaceModObject(new TargetIdentity(SceneName, sign, LocationSigns.CullerType, LocationSigns.Structure), new Placement(at, Upright));
         Assert(placed.Applied && placed.Target.Path == sign + " [mod object author:pack mod-object-loc--alarka]" && placed.Target.Structure == LocationSigns.Structure, "A location sign is duplicated: " + (placed.Error ?? placed.Target.Path));
         var copy = (FakeBoard)placed.ResolvedTarget;
@@ -364,7 +413,7 @@ static class ModObjectTests {
         var scene = new SceneCapabilities(() => bridges.MapIds, null) { ModObjectWorld = new BridgeBuilder(bridges) };
         scene.Add(new BridgeScene(bridges, Capability.Unchecked));
         var editor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(scene), editor, new Store(), "author/pack", "author/pack"); editor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(scene), editor, new Store(), LoadedMod.PatcherId, "author/pack"); editor.Session = session;
         var identity = new TargetIdentity(SceneName, ela, "Helpers.Culling.RendererCuller", BridgeScene.Structure);
         var placed = session.PlaceModObject(identity, new Placement(AtBryson, Upright));
         Assert(placed.Applied && placed.Target.Path == ela + " [mod object author:pack mod-object-ela-bridge]" && placed.Target.Structure == BridgeScene.Structure, "The Ela bridge is duplicated: " + (placed.Error ?? placed.Target.Path));
@@ -414,7 +463,7 @@ static class ModObjectTests {
         scene.Objects["Depot"] = new List<object> { new Box { Position = new[] { 1.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } } };
         scene.Objects["Depot/Clock"] = new List<object> { new Box { Position = new[] { 1.0, 5, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } } };
         scene.Objects["Other"] = new List<object> { new Box { Position = new[] { 9.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } } };
-        var editor = new NativeMapEditor(); var session = new PatchEditingSession(new PatchEngine(scene), editor, new Store(), "author/pack", "author/pack"); editor.Session = session;
+        var editor = new NativeMapEditor(); var session = new PatchEditingSession(new PatchEngine(scene), editor, new Store(), LoadedMod.PatcherId, "author/pack"); editor.Session = session;
         TargetIdentity At(string path) => new TargetIdentity("s", path, "c");
         var placed = session.PlaceModObject(At("Depot"), new Placement(new[] { 400.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }));
         var made = placed.Target?.Path;
@@ -511,7 +560,7 @@ static class ModObjectTests {
     static void PlacedModObjectsKeepTheirNumbers() {
         var scene = new PlainScene { Maps = new[] { "map" } };
         foreach (var path in new[] { "Depot", "Shed" }) scene.Objects[path] = new List<object> { new Box { Position = new[] { 1.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } } };
-        var editor = new NativeMapEditor(); var keySession = new PatchEditingSession(new PatchEngine(scene), editor, new Store(), "author/pack", "author/pack"); editor.Session = keySession;
+        var editor = new NativeMapEditor(); var keySession = new PatchEditingSession(new PatchEngine(scene), editor, new Store(), LoadedMod.PatcherId, "author/pack"); editor.Session = keySession;
         TargetIdentity At(string path) => new TargetIdentity("s", path, "c");
         string PlaceKey(string path) {
             var outcome = keySession.PlaceModObject(At(path), new Placement(new[] { 400.0 + scene.Objects.Count, 2, 3 }, new[] { 0.0, 0, 0, 1 }));

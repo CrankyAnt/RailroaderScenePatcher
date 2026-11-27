@@ -166,7 +166,7 @@ static class ModObjectSourceTests {
     static JObject Modifications(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"];
     static PatchEditingSession Session(World world, string patch = null) {
         var editor = new NativeMapEditor();
-        var session = new PatchEditingSession(world.Engine, editor, new Store { Patch = patch }, "author/pack", "author/pack"); editor.Session = session;
+        var session = new PatchEditingSession(world.Engine, editor, new Store { Patch = patch }, LoadedMod.PatcherId, "author/pack"); editor.Session = session;
         return session;
     }
 
@@ -201,7 +201,7 @@ static class ModObjectSourceTests {
         Assert(world.Engine.Apply(text, "author/pack").Outcomes[Key].Applied, "The file applies");
         var store = new Store { Patch = text };
         var editor = new NativeMapEditor();
-        var session = new PatchEditingSession(world.Engine, editor, store, "author/pack", "author/pack"); editor.Session = session;
+        var session = new PatchEditingSession(world.Engine, editor, store, LoadedMod.PatcherId, "author/pack"); editor.Session = session;
         var disable = session.Edit(ModObjectTests.Id(Made), null, false);
         session.BeginSave(); session.CompleteNativeSave();
         var source = (JObject)JObject.Parse(store.Patch)["modifications"][Key]["source"];
@@ -268,7 +268,7 @@ static class ModObjectSourceTests {
         Assert(again.Outcomes.Values.All(o => o.Applied) && scene.Made == 1, "Applying again finds it by its mark and builds nothing more: " + String.Join("; ", again.Outcomes.Where(o => !o.Value.Applied).Select(o => o.Key + " " + o.Value.Error)));
 
         var editor = new NativeMapEditor(); var store = new Store { Patch = doc };
-        var session = new PatchEditingSession(engine, editor, store, "author/pack", "author/pack"); editor.Session = session;
+        var session = new PatchEditingSession(engine, editor, store, LoadedMod.PatcherId, "author/pack"); editor.Session = session;
         Assert(session.IsModObject(At(written)) && session.IsModObject(At(standing)), "Both paths name the mod object");
         var disable = session.Edit(At(standing), null, false);
         var moveClock = session.Edit(At(standing + "/Clock"), new Placement(new[] { 402.0, 7, 3 }, new[] { 0.0, 0, 0, 1 }), null);
@@ -293,7 +293,7 @@ static class ModObjectSourceTests {
         var fresh = PartScene.WithoutOriginal(); var freshEngine = new PatchEngine(fresh);
         freshEngine.Apply(only, "author/pack");
         var freshEditor = new NativeMapEditor();
-        var freshSession = new PatchEditingSession(freshEngine, freshEditor, new Store { Patch = only }, "author/pack", "author/pack"); freshEditor.Session = freshSession;
+        var freshSession = new PatchEditingSession(freshEngine, freshEditor, new Store { Patch = only }, LoadedMod.PatcherId, "author/pack"); freshEditor.Session = freshSession;
         var partEdit = freshSession.Edit(At(standing + "/Clock"), new Placement(new[] { 403.0, 8, 3 }, new[] { 0.0, 0, 0, 1 }), null);
         var part = Modifications(freshSession).Properties().SingleOrDefault(p => p.Name != key)?.Value;
         Assert(partEdit.Applied && part != null && ((JArray)part["dependsOn"]).Select(d => (string)d).SequenceEqual(new[] { key }),

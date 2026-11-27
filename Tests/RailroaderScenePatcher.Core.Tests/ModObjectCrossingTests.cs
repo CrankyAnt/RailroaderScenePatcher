@@ -127,6 +127,8 @@ static class ModObjectCrossingTests {
             PadsOf[crossing] = new List<KeyValuePair<string, FakeMarker>> { new KeyValuePair<string, FakeMarker>("Crossing Pad", pad) };
         }
         public readonly Builder Builder;
+        // The lights, gates and bells added to a crossing, so equipment edits reach the duplicate as they reach a map crossing.
+        public readonly FakeEquipmentWorld Equipment = new FakeEquipmentWorld();
         public readonly PatchEngine Engine;
         public readonly FakeSpan[] NativeSpans;
         public World() {
@@ -148,7 +150,7 @@ static class ModObjectCrossingTests {
             for (var i = 0; i < OldRiver.Length; i++) Hold(OldRiverPath, OldRiver[i], "Mold" + (i + 1), 20 + 10 * i);
             var scene = new SceneCapabilities(() => Crossings.MapIds) { ModObjectWorld = Builder = new Builder(this) };
             scene.Add(new CrossingObjectScene(Unprotected, Capability.Unchecked));
-            scene.Add(new CrossingCoverageScene(Crossings, Capability.Unchecked));
+            scene.Add(new CrossingCoverageScene(Crossings, Capability.Unchecked, Equipment));
             scene.Add(new CrossingPadScene(Pads, Capability.Unchecked));
             Engine = new PatchEngine(scene);
         }
@@ -163,7 +165,7 @@ static class ModObjectCrossingTests {
         }
         public PatchEditingSession Session(out Store store, out NativeMapEditor editor) {
             store = new Store(); editor = new NativeMapEditor();
-            var session = new PatchEditingSession(Engine, editor, store, "author/pack", "author/pack"); editor.Session = session;
+            var session = new PatchEditingSession(Engine, editor, store, LoadedMod.PatcherId, "author/pack"); editor.Session = session;
             return session;
         }
         // Whether a train on the segment at the distance triggers the crossing.
@@ -184,6 +186,7 @@ static class ModObjectCrossingTests {
         foreach (var pad in PadNames) InFixture(CrossingPath + "/" + pad, SceneFamilies.CrossingPad);
         ADuplicatedCrossingStartsWithItsOwnEmptyDetection();
         DetectionOfTheDuplicateTriggersOnlyTheDuplicate();
+        EditsOfTheDuplicatePreviewAsTheyApply();
         AnEditOfTheOriginalLeavesTheDuplicate();
         EachPadOfTheDuplicateStartsUnboundWithItsOwnMarkerId();
         ACrossingModObjectNeedsAMarkerIdForEachPad();
@@ -253,6 +256,33 @@ static class ModObjectCrossingTests {
         Assert(world.Crossings.Graph.Count == 6, "The spans of the deleted detection are gone");
     }
 
+    // #38/#160: the previews of the duplicate's edits parse its modification under the scene patch file's key with the
+    // modification's own key, so a detached copy of the value keeps the mark that matches. Adding detection (the
+    // guide's Add detection steps), changing that detection, a coverage edit and a bell edit each preview without the
+    // target shape refusal and change nothing, and the added detection and bell then apply.
+    static void EditsOfTheDuplicatePreviewAsTheyApply() {
+        var world = new World();
+        var session = world.Session(out _, out _);
+        var placed = Place(world, session);
+        Assert(placed.Applied, "The crossing is duplicated: " + placed.Error);
+        var copy = world.Copy(placed.Target);
+        var addition = session.PreviewAddition(placed.Target, "siding", NewTrack("Snew"));
+        Assert(addition.Error == null && copy.Circuits.Count == 0, "Adding detection to the duplicate previews and changes nothing: " + addition.Error);
+        Assert(session.AddDetection(placed.Target, "siding", NewTrack("Snew")).Applied, "Detection is added to the duplicate");
+        var changed = session.PreviewAddition(placed.Target, "siding", CircuitCoverage.Added(Range("Snew", 310, 560), Range("Snew", 290, 310), Range("Snew", 290, 40)));
+        Assert(changed.Error == null && world.Triggers(copy, "Snew", 300) && !world.Triggers(copy, "Snew", 555), "A change of the duplicate's detection previews and changes nothing: " + changed.Error);
+        var coverage = session.PreviewCoverage(placed.Target, "T1I", CircuitCoverage.Detached);
+        Assert(coverage.Error == null || !coverage.Error.StartsWith("Invalid mod object", StringComparison.Ordinal), "A coverage edit of the duplicate previews without the target shape refusal: " + coverage.Error);
+        world.Equipment.Bell(FakeEquipmentWorld.CrossingBell);
+        var bell = new EquipmentAddition("bell", EquipmentAddition.BellPattern, EquipmentSource.ForDefinition(FakeEquipmentWorld.CrossingBell), new Placement(new[] { 10.0, 0, 7 }, Upright));
+        var preview = session.PreviewEquipment(placed.Target, bell, null);
+        Assert(preview.Error == null && world.Equipment.All.Count == 0, "A bell edit of the duplicate previews and changes nothing: " + preview.Error);
+        var added = session.AddEquipment(placed.Target, bell);
+        Assert(added.Applied && world.Equipment.All.Count(a => !a.Destroyed) == 1, "The bell is added to the duplicate: " + added.Error);
+        var removal = session.PreviewEquipment(placed.Target, null, "bell");
+        Assert(removal.Error == null, "The bell's removal previews: " + removal.Error);
+    }
+
     // An edit of the original's coverage changes the original alone: the duplicate keeps its own detection.
     static void AnEditOfTheOriginalLeavesTheDuplicate() {
         var world = new World();
@@ -294,7 +324,7 @@ static class ModObjectCrossingTests {
         Assert(dependsOn != null && dependsOn.SequenceEqual(new[] { KeyOf(session, placed.Target) }), "The pad's modification depends on the duplicate's");
         session.BeginSave(); session.CompleteNativeSave();
         // The part marker IDs stand in a mod object, whose minimum is theirs: Save raises the dependency to it.
-        Assert(store.Info.Contains("author/pack >=0.5.0"), "Save raises the patcher dependency to the mod object version: " + store.Info);
+        Assert(store.Info.Contains(LoadedMod.PatcherId + " >=0.5.0"), "Save raises the patcher dependency to the mod object version: " + store.Info);
         var next = new World();
         var result = next.Engine.Apply(store.Patch, "author/pack");
         var loaded = next.Pad(padId.Path);

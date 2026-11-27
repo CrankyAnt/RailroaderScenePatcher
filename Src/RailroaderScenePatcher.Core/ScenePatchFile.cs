@@ -260,7 +260,7 @@ namespace RailroaderScenePatcher.Core {
                 var loaded = new ScenePatchFile(source, null, json);
                 // A modification this patcher does not execute stays in the scene patch file unchanged; its diagnostic says why.
                 foreach (var property in modifications.Properties()) {
-                    try { PatchEngine.Parse((JObject)property.Value, "", property.Name); }
+                    try { PatchEngine.Parse((JObject)property.Value, null, property.Name); }
                     catch (InvalidOperationException e) {
                         loaded.diagnostics.Add(ScenePatchFileDiagnostic.Create(json, property.Path, "Modification " + property.Name + " is not executed. " + Sentence(e.Message),
                             "A target, a placement and/or active, relationships, and a dependsOn list as the format reference describes. Correct known values outside scene patch editing; keep content of a newer patcher unless you mean to remove it", property.Value));

@@ -127,7 +127,7 @@ static class ModObjectMarkerTests {
         }
         public PatchEditingSession Session(out Store store, out NativeMapEditor editor) {
             store = new Store(); editor = new NativeMapEditor();
-            var session = new PatchEditingSession(Engine, editor, store, "author/pack", "author/pack"); editor.Session = session;
+            var session = new PatchEditingSession(Engine, editor, store, LoadedMod.PatcherId, "author/pack"); editor.Session = session;
             return session;
         }
         // A point beside the source where the lookup finds segment S9sc, and a point where it finds no track.

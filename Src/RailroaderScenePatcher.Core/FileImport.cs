@@ -311,7 +311,7 @@ namespace RailroaderScenePatcher.Core {
                         var item = pair.Item1;
                         if (item == null) continue;
                         var executable = true;
-                        try { PatchEngine.Parse(item, scenePatchFileKey); } catch (InvalidOperationException) { executable = false; }
+                        try { PatchEngine.Parse(item, scenePatchFileKey, key); } catch (InvalidOperationException) { executable = false; }
                         if (pair.Item2 && !executable) unapplied.Add(key);
                         TargetIdentity identity; object resolved;
                         try { identity = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(identity); }
@@ -336,7 +336,7 @@ namespace RailroaderScenePatcher.Core {
                         var item = Entry(modifications, key);
                         if (item == null) continue;
                         ObjectState state;
-                        try { state = PatchEngine.Parse(item, scenePatchFileKey).State; } catch (InvalidOperationException) { continue; }
+                        try { state = PatchEngine.Parse(item, scenePatchFileKey, key).State; } catch (InvalidOperationException) { continue; }
                         object owner;
                         try { owner = engine.ResolveUnique(PatchEngine.ParseTarget(item["target"] as JObject)); } catch (InvalidOperationException) { continue; }
                         try { engine.CheckRelationships(owner, state); }

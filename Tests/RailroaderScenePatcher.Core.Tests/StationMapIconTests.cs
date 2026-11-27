@@ -183,7 +183,7 @@ static class StationMapIconTests {
         Assert(Near(f.At(f.BrysonIcon), BrysonAuthored) && f.World.Registered.Contains(f.BrysonIcon), "The source icon stays as it is: " + f.Where());
         Assert(StationMapIconRules.Listed(made) && !ScenePlaces.SourcesOf(made, new[] { CochranTarget[0], CochranTarget[2] }).Any(), "It is a station map icon that names no place and no station");
         // It takes the edits of its family, and Remove modification takes it off the map.
-        var session = new PatchEditingSession(f.Engine, new NativeMapEditor(), new Store { Patch = doc }, "author/pack", "author/pack");
+        var session = new PatchEditingSession(f.Engine, new NativeMapEditor(), new Store { Patch = doc }, LoadedMod.PatcherId, "author/pack");
         Assert(session.Edit(Id(made), null, false).Applied && !icon.Active && !f.World.Registered.Contains(icon), "A duplicated icon is disabled like any station map icon");
         Assert(session.Remove(Id(made)).Applied && !f.World.Objects.ContainsKey(made) && f.World.Registered.Contains(f.BrysonIcon), "Remove modification removes the duplicated icon and leaves the source");
     }
@@ -216,7 +216,7 @@ static class StationMapIconTests {
         Assert(At(icon, 1260, 700, 1300, 740), "The square icon stands centred on Bryson's place: " + Show(icon));
         var wide = StationMapIconRules.WorldIcon(eye(f.At(f.BrysonIcon)), View, 2);
         Assert(At(wide, 1240, 700, 1320, 740), "An icon image twice as wide as high is drawn 80 by 40 pixels: " + Show(wide));
-        var session = new PatchEditingSession(f.Engine, new NativeMapEditor(), new Store(), "author/pack", "author/pack");
+        var session = new PatchEditingSession(f.Engine, new NativeMapEditor(), new Store(), LoadedMod.PatcherId, "author/pack");
         Assert(session.Edit(Id(Bryson), new Placement(BrysonTarget, Upright), null).Applied, "The Bryson icon moves");
         var moved = StationMapIconRules.WorldIcon(eye(f.At(f.BrysonIcon)), View, 1);
         Assert(At(moved, 2385, 700, 2425, 740), "The icon follows the move to its new place: " + Show(moved));

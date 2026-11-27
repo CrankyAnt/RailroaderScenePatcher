@@ -143,7 +143,7 @@ namespace RailroaderScenePatcher.Core {
                 if (refusal != null) throw new InvalidOperationException(refusal);
                 var context = scene.MapIds.ToArray();
                 foreach (var item in scenePatchFile.Items) {
-                    try { PatchEngine.Parse(item, scenePatchFileKey); } catch (InvalidOperationException) { continue; }
+                    try { PatchEngine.Parse(item, scenePatchFileKey, ScenePatchFile.Key(item)); } catch (InvalidOperationException) { continue; }
                     TargetIdentity target; object resolved;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(target); }
                     catch (InvalidOperationException) { continue; }
@@ -170,7 +170,7 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var property in scenePatchFile.Modifications.Properties().ToArray()) {
                     var item = property.Value as JObject;
                     if (item == null) continue;
-                    try { PatchEngine.Parse(item, scenePatchFileKey); } catch (InvalidOperationException) { continue; }
+                    try { PatchEngine.Parse(item, scenePatchFileKey, property.Name); } catch (InvalidOperationException) { continue; }
                     TargetIdentity target; object resolved;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(target); }
                     catch (InvalidOperationException) { continue; }

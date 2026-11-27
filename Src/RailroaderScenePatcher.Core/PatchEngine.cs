@@ -431,7 +431,7 @@ namespace RailroaderScenePatcher.Core {
         bool EarlyRepair(string id, JObject entry, TargetIdentity target, out string unavailable) {
             unavailable = null;
             try {
-                var parsed = Parse(entry, "", id); var identity = parsed.Identity;
+                var parsed = Parse(entry, null, id); var identity = parsed.Identity;
                 if (identity.Scene != target.Scene || identity.Path != target.Path || identity.Component != target.Component ||
                     identity.Structure != null && identity.Structure != target.Structure || parsed.State.Marker?.Location == null) return false;
                 // A replacement ID changes the id the native check registers under, so it waits for the world load.
@@ -456,7 +456,7 @@ namespace RailroaderScenePatcher.Core {
         bool EarlySpawn(string id, JObject entry, out string unavailable) {
             unavailable = null;
             try {
-                var parsed = Parse(entry, "", id); var identity = parsed.Identity;
+                var parsed = Parse(entry, null, id); var identity = parsed.Identity;
                 // A duplicated spawn point is built at the world load; below every map spawn point, no new game starts there.
                 if (parsed.Source != null) return false;
                 if (identity.Component != SpawnPoints.Component || identity.Structure != null && identity.Structure != SpawnPoints.Structure) return false;
@@ -962,8 +962,12 @@ namespace RailroaderScenePatcher.Core {
             return Only(item, Known) ? null : "Unsupported modification content";
         }
         // The owner is the key of the scene patch file the modification belongs to; it scopes the identities of its additions.
+        // A mod object's mark must hold the owner and the ID, so its identity is scoped to the mod that supplies the file:
+        // whatever stands in the scene, no modification resolves to the mod object of another mod or of another key. Null
+        // stands for a file whose owner is not known yet, such as one read for its diagnostics: the scope is then empty
+        // and the mark is not checked.
         // The ID is the key of the modification; a modification that stands in a scene patch file has it without being told.
-        internal static Modification Parse(JObject item, string owner = "", string id = null) {
+        internal static Modification Parse(JObject item, string owner = null, string id = null) {
             id = id ?? ScenePatchFile.Key(item);
             var unsupported = UnsupportedContent(id, item);
             if (unsupported != null) throw new InvalidOperationException(unsupported);
@@ -981,6 +985,7 @@ namespace RailroaderScenePatcher.Core {
                 source = ParseTarget(written);
                 if (identity.Keyed || identity.PadMarkerId != null || identity.Scene != source.Scene || identity.Component != source.Component || identity.Structure != ModObjects.StructureOf(source.Structure) || !ModObjects.IsPath(identity.Path))
                     throw new InvalidPatchDefinitionException(ModObjects.TargetShape);
+                if (owner != null && ModObjects.MarkOf(identity.Path) != ModObjects.Mark(owner, id)) throw new InvalidPatchDefinitionException(ModObjects.TargetShape);
                 if (item["placement"] == null) throw new InvalidPatchDefinitionException(ModObjects.NeedsPlacement);
             }
             string teleportName = null;
@@ -1005,7 +1010,7 @@ namespace RailroaderScenePatcher.Core {
                 var relationships = item["relationships"] as JObject;
                 if (relationships == null || !Only(relationships, "trackMarker", "crossingCoverage", "crossingEquipment", "constructionSegments") || !relationships.HasValues) throw new InvalidOperationException("Unsupported relationships");
                 if (relationships["trackMarker"] != null) marker = ParseTrackMarker(relationships["trackMarker"]);
-                if (relationships["crossingCoverage"] != null) coverage = ParseCoverage(relationships["crossingCoverage"]).OwnedBy(owner);
+                if (relationships["crossingCoverage"] != null) coverage = ParseCoverage(relationships["crossingCoverage"]).OwnedBy(owner ?? "");
                 if (relationships["crossingEquipment"] != null) equipment = ParseEquipment(relationships["crossingEquipment"]).In(owner ?? "");
                 if (relationships["constructionSegments"] != null) segments = ParseSegments(relationships["constructionSegments"]);
             }

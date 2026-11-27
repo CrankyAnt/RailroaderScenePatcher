@@ -180,9 +180,11 @@ namespace RailroaderScenePatcher.Core {
         readonly IScene scene;
         readonly INativeHistory history;
         readonly IStorage storage;
-        readonly string modId;
-        // The ID of the edited mod, which the mod objects it places carry in their mark.
-        public string ModId => modId;
+        // The patcher's own mod ID, which the edited mod's Info.json lists under its dependencies.
+        readonly string patcherId;
+        // The ID of the edited mod: the key its scene patch file is applied under, which the mod objects it places carry
+        // in their mark, as the engine requires at each load.
+        public string ModId => scenePatchFileKey;
         // The key the engine applied this scene patch file under at world load; it scopes the identities of the scene patch file's additions.
         readonly string scenePatchFileKey;
         // The key this session's scene patch file is applied under: the scope of its additions.
@@ -240,11 +242,11 @@ namespace RailroaderScenePatcher.Core {
                 ["placement"] = new JObject { ["mode"] = "fixed", ["position"] = new JArray(entry.Position), ["rotation"] = new JArray(entry.Rotation) }
             }.ToString();
         }
-        public PatchEditingSession(PatchEngine engine, INativeHistory history, IStorage storage, string modId = "crankyant/scene-patcher", string scenePatchFileKey = "") {
+        public PatchEditingSession(PatchEngine engine, INativeHistory history, IStorage storage, string patcherId = LoadedMod.PatcherId, string scenePatchFileKey = "") {
             this.engine = engine ?? throw new ArgumentNullException(nameof(engine));
             this.history = history ?? throw new ArgumentNullException(nameof(history));
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
-            this.modId = modId; this.scenePatchFileKey = scenePatchFileKey ?? ""; scene = engine.Scene;
+            this.patcherId = patcherId; this.scenePatchFileKey = scenePatchFileKey ?? ""; scene = engine.Scene;
             identity = new HistoryIdentity(history); savedIdentity = identity.Current;
             if (history is INativeHistoryActions) { nativeIdentity = new HistoryIdentity(new NativeOnlyHistory(history, action => patchActions.TryGetValue(action, out _))); savedNativeIdentity = nativeIdentity.Current; }
             string scenePatchFileError = null, metadataError = null;
@@ -872,7 +874,7 @@ namespace RailroaderScenePatcher.Core {
                 var existing = own.FirstOrDefault();
                 // The preview follows the equal-value rule of the edit, so it shows what Apply would store.
                 var value = Normalised(existing, CoverageValue(target, existing, circuit, coverage, addition), engine.Underlying(resolved));
-                if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey).State);
+                if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey, existing == null ? null : ScenePatchFile.Key(existing)).State);
                 if (value != null && existing != null) {
                     if (value.Parent != null) value = (JObject)value.DeepClone();
                     PreservingJson.KeepStoredPrecision(existing, value);
@@ -934,18 +936,19 @@ namespace RailroaderScenePatcher.Core {
         }
         // Why the modification value would be refused without its other refused additions, or null: the refusal the corrected
         // addition brings or keeps. An addition counts as refused when its own source or pattern is refused.
-        string IntroducedRefusal(object resolved, JObject value, string corrected) {
+        // key is the modification's key: value may be a detached copy, which carries no key of its own.
+        string IntroducedRefusal(object resolved, JObject value, string key, string corrected) {
             var equipment = value["relationships"]?["crossingEquipment"] as JObject;
             var rest = (JObject)value.DeepClone();
             var restEquipment = rest["relationships"]?["crossingEquipment"] as JObject;
             if (equipment != null && restEquipment != null) {
-                var additions = PatchEngine.Parse(value, scenePatchFileKey).State.Equipment?.Additions ?? Enumerable.Empty<EquipmentAddition>();
+                var additions = PatchEngine.Parse(value, scenePatchFileKey, key).State.Equipment?.Additions ?? Enumerable.Empty<EquipmentAddition>();
                 foreach (var other in additions.Where(a => a.Id != corrected)) {
                     try { engine.CheckRelationships(resolved, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { other }, false))); }
                     catch (InvalidOperationException) { restEquipment.Remove(other.Id); }
                 }
             }
-            try { engine.CheckRelationships(resolved, engine.Evaluate(PatchEngine.Parse(rest, scenePatchFileKey).State.LeavingActivity())); return null; }
+            try { engine.CheckRelationships(resolved, engine.Evaluate(PatchEngine.Parse(rest, scenePatchFileKey, key).State.LeavingActivity())); return null; }
             catch (InvalidOperationException e) { return e.Message; }
         }
         // Removes one of this mod's equipment additions: its copy is released from the controller and its culling.
@@ -985,7 +988,7 @@ namespace RailroaderScenePatcher.Core {
         // The additions of one modification of the crossing, each with its built state or why it was not built.
         IEnumerable<EquipmentEntry> EquipmentEntries(object resolved, JObject existing, CrossingEquipment observed) {
             CrossingEquipment modEquipment;
-            try { modEquipment = PatchEngine.Parse(existing, scenePatchFileKey).State.Equipment; } catch (InvalidOperationException) { return Array.Empty<EquipmentEntry>(); }
+            try { modEquipment = PatchEngine.Parse(existing, scenePatchFileKey, ScenePatchFile.Key(existing)).State.Equipment; } catch (InvalidOperationException) { return Array.Empty<EquipmentEntry>(); }
             if (modEquipment == null) return Array.Empty<EquipmentEntry>();
             // Why each addition on its own is refused, or null. The additions of one modification are one coherent operation:
             // a refused addition stops the others, so a valid addition that is not built names the refused ones rather than
@@ -1019,7 +1022,7 @@ namespace RailroaderScenePatcher.Core {
             if (shared != null) return PatchEngine.SharedAddition(shared);
             var dependency = engine.IneffectiveReason(scenePatchFile.Modifications, key, scenePatchFileKey);
             if (dependency != null) return dependency;
-            try { engine.CheckRelationships(resolved, engine.Evaluate(PatchEngine.Parse(item, scenePatchFileKey).State.LeavingActivity())); return null; }
+            try { engine.CheckRelationships(resolved, engine.Evaluate(PatchEngine.Parse(item, scenePatchFileKey, key).State.LeavingActivity())); return null; }
             catch (InvalidOperationException e) { return e.Message; }
         }
         public string NewEquipmentId(string stem) {
@@ -1051,15 +1054,15 @@ namespace RailroaderScenePatcher.Core {
                 var value = EquipmentValue(target, existing, addition, id);
                 var key = existing == null ? NewId(target, "equip-") : ScenePatchFile.Key(existing);
                 if (value != null) {
-                    try { engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey).State); }
+                    try { engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey, key).State); }
                     catch (InvalidOperationException e) when (existing != null && NotAppliedOf(key) != null) {
                         // A removal or correction in a modification that is not applied, which another addition keeps
                         // refused: only the scene patch file changes, and the scene keeps what it holds.
                         var stays = " Nothing is built because the modification is still refused. Reason: " + ScenePatchFile.Sentence(e.Message) + ".";
-                        var introduced = addition == null ? null : IntroducedRefusal(resolved, value, addition.Id);
+                        var introduced = addition == null ? null : IntroducedRefusal(resolved, value, key, addition.Id);
                         if (introduced != null) throw new InvalidOperationException(introduced);
                         if (addition != null) return new EquipmentPreview(new[] { "Would save " + CrossingEquipment.Named(addition, displayName) + " in the scene patch file." + stays }, null);
-                        var removed = PatchEngine.Parse(existing, scenePatchFileKey).State.Equipment.Additions.First(a => a.Id == id);
+                        var removed = PatchEngine.Parse(existing, scenePatchFileKey, key).State.Equipment.Additions.First(a => a.Id == id);
                         return new EquipmentPreview(new[] { "Would remove " + CrossingEquipment.Named(removed, displayName) + " from the scene patch file." + stays }, null);
                     }
                 }
@@ -1273,7 +1276,7 @@ namespace RailroaderScenePatcher.Core {
                 try { Commit(target, resolved, inspected, slot, existing, value, validateBeforeMutation); }
                 catch (InvalidOperationException) when (sceneHoldsNothing && contentRefusal != null) {
                     var reason = contentRefusal;
-                    var introduced = corrected == null ? null : IntroducedRefusal(resolved, value, corrected);
+                    var introduced = corrected == null ? null : IntroducedRefusal(resolved, value, slot, corrected);
                     if (introduced != null) throw new InvalidOperationException(introduced);
                     scenePatchFile.Replace(slot, value);
                     Refuse(slot, value, reason);
@@ -1548,7 +1551,7 @@ namespace RailroaderScenePatcher.Core {
                 // A starter placement is judged with the scene patch file's other starter placements, as at load.
                 if (value != null) {
                     engine.Plan(scenePatchFile.Modifications, scenePatchFileKey);
-                    try { engine.CheckRelationships(target, PatchEngine.Parse(value, scenePatchFileKey).State); }
+                    try { engine.CheckRelationships(target, PatchEngine.Parse(value, scenePatchFileKey, key).State); }
                     finally { engine.Unplan(); }
                 }
                 CheckEffectiveCoverage(target, desired.Coverage);
@@ -1728,7 +1731,7 @@ namespace RailroaderScenePatcher.Core {
         bool MetadataOutstanding {
             get {
                 if (scenePatchFile == null || scenePatchFile.Modifications.Count == 0) return false;
-                try { return DependencyMetadata.Raise(info, modId, MinimumPatcherVersion) != null; }
+                try { return DependencyMetadata.Raise(info, patcherId, MinimumPatcherVersion) != null; }
                 catch (InvalidOperationException) { return true; }
             }
         }
@@ -1766,7 +1769,7 @@ namespace RailroaderScenePatcher.Core {
         // file again when it writes.
         string DependencyRefusal() {
             if (scenePatchFile.Modifications.Count == 0) return null;
-            try { DependencyMetadata.Raise(storage.ReadModInfo(), modId, MinimumPatcherVersion); return null; }
+            try { DependencyMetadata.Raise(storage.ReadModInfo(), patcherId, MinimumPatcherVersion); return null; }
             catch (Exception e) { return "The patcher dependency was not written: " + e.Message; }
         }
         // The Save route. BeginSave runs before the native map write and throws when a patcher write fails;
@@ -1779,7 +1782,7 @@ namespace RailroaderScenePatcher.Core {
             if (scenePatchFile.Modifications.Count != 0) {
                 try {
                     var fresh = storage.ReadModInfo();
-                    var raised = DependencyMetadata.Raise(fresh, modId, MinimumPatcherVersion);
+                    var raised = DependencyMetadata.Raise(fresh, patcherId, MinimumPatcherVersion);
                     if (raised != null) { storage.WriteModInfo(raised); written.Add(Metadata); }
                     info = raised ?? fresh;
                 } catch (Exception e) { throw new InvalidOperationException("The patcher dependency was not written: " + e.Message, e); }

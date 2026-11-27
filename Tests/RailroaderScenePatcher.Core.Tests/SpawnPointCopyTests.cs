@@ -75,7 +75,7 @@ static class SpawnPointCopyTests {
     }
     static PatchEditingSession Session(World world, out Store store, out NativeMapEditor editor) {
         store = new Store(); editor = new NativeMapEditor();
-        var session = new PatchEditingSession(world.Engine, editor, store, Mod, Mod); editor.Session = session;
+        var session = new PatchEditingSession(world.Engine, editor, store, LoadedMod.PatcherId, Mod); editor.Session = session;
         return session;
     }
     static JObject Modifications(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"];
@@ -184,7 +184,7 @@ static class SpawnPointCopyTests {
         var result = next.Engine.Apply(store.Patch, Mod);
         Assert(result.Outcomes[Key].Applied && next.At(Made) != null && next.At(Made).Name == "Bryson Yard", "The reload builds the copy under its mark with its teleport name: " + result.Outcomes[Key].Error);
         var nextStore = new Store { Patch = store.Patch }; var nextEditor = new NativeMapEditor();
-        var nextSession = new PatchEditingSession(next.Engine, nextEditor, nextStore, Mod, Mod); nextEditor.Session = nextSession;
+        var nextSession = new PatchEditingSession(next.Engine, nextEditor, nextStore, LoadedMod.PatcherId, Mod); nextEditor.Session = nextSession;
         Assert(nextSession.TeleportNameOf(Id(Made)) == "Bryson Yard", "The reloaded file names the teleport name");
         var edit = nextSession.Edit(Id(Made), new Placement(new[] { 4500.0, 12, 5400 }, Upright), null);
         Assert(edit.Applied && next.At(Made).Name == "Bryson Yard", "The copy is edited by its mark after the reload: " + edit.Error);
