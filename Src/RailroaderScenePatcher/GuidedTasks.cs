@@ -258,7 +258,7 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.Activity: return "Placement and logical bindings.";
                 case GuidedTaskKind.StarterPlacement: return "The marker's position and activity, the wreck setting, and other car placements.";
                 case GuidedTaskKind.Wreck: return "Other car placements and the marker's position, activity, and track location.";
-                case GuidedTaskKind.MarkerId: return "Placement, activity, and track binding. Every other scene marker that holds the old ID keeps its registration.";
+                case GuidedTaskKind.MarkerId: return "Placement, activity, and track binding. Every other scene marker that uses the old ID keeps its registration.";
                 default: return IsPad ? "Activity. The pad follows its marker to the new location." : "Physical placement and activity.";
             }
         }

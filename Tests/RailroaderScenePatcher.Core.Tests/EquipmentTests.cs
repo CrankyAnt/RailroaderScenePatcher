@@ -286,10 +286,10 @@ static class EquipmentTests {
         f.World.Device("World/Other/Gate Lamp", d => { d.Model = "Unexamined Gate Lamp"; d.Facts.Gates.Clear(); d.Facts.Lamps[0] = new LampFacts { Name = "Arm Lamp", Key = "gates", Targets = 1, Materials = 3, RendererUsesMaterial = true }; });
         var rejected = new Dictionary<string, KeyValuePair<Action<FakeDevice>, string>> {
             ["bell"] = R(d => d.Facts.Bells = 1, "it contains a bell player and is not a light or gate source"),
-            ["owner"] = R(d => d.Facts.KeyValueObjects = 1, "it holds its own key-value object, which would intercept the crossing controller's keys"),
-            ["controller"] = R(d => d.Facts.Controllers = 1, "it holds a crossing controller; a copy would be a second crossing"),
-            ["span"] = R(d => d.Facts.Spans = 1, "it holds a detection span"),
-            ["culler"] = R(d => d.Facts.Cullers = 1, "it holds its own culler"),
+            ["owner"] = R(d => d.Facts.KeyValueObjects = 1, "it has its own key-value object, which would intercept the crossing controller's keys"),
+            ["controller"] = R(d => d.Facts.Controllers = 1, "it contains a crossing controller; a copy would be a second crossing"),
+            ["span"] = R(d => d.Facts.Spans = 1, "it contains a detection span"),
+            ["culler"] = R(d => d.Facts.Cullers = 1, "it has its own culler"),
             ["script"] = R(d => d.Facts.MissingScript = true, "a script in its hierarchy is missing"),
             ["scene"] = R(d => d.Facts.OtherScene = true, "it is in a different Unity scene from the destination crossing"),
             ["contains"] = R(d => d.Facts.ContainsDestination = true, "it contains the destination crossing"),

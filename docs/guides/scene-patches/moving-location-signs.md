@@ -20,7 +20,7 @@ In the native map editor, open **Scene Patcher**, click **Refresh** in the comma
 
 A mask that flattens the ground moves with its location sign like any other mask. The game rebuilds the terrain at both positions. At the old position, it restores the ground height without the mask. At the new position, the mask flattens the ground. **Undo**, **Remove modification**, and restoration after a failed edit make the game rebuild the terrain at both positions again.
 
-A location sign placement holds a position and a rotation only. It never names a track, segment, or marker, and the patcher does not attach the location sign to one.
+A location sign placement contains only a position and a rotation. It never names a track, segment, or marker, and the patcher does not attach the location sign to one.
 
 ## Move or rotate the location sign
 

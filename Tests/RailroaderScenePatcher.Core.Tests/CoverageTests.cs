@@ -393,7 +393,7 @@ static partial class CoverageTests {
     }
     static void PreflightRefusalLeavesCoverageUnchanged() {
         var f = new Fixture();
-        f.Crossing.Pattern = "The crossing controller holds no circuit list";
+        f.Crossing.Pattern = "The crossing controller has no circuit list";
         var result = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr"))));
         Assert(!result.Outcomes["reroute"].Applied && f.World.Mutations == 0 && f.Native, "A pattern refusal changes nothing");
         f = new Fixture();

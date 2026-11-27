@@ -20,7 +20,7 @@ Check the result in the world. The patcher doesn't align the bridge with the tra
 
 Click **Disable** at the bottom of the **Object** tab. The bridge disappears and its colliders stop colliding. Each collider keeps its own enabled setting, so **Enable**, Undo, or removal restores the same collision.
 
-In the inspected build, the construction-scenery controller references the bridge's abutments and steel below the root, but not the root itself. The patcher refuses a bridge whose root is a construction target. Whether an explicit disable holds through a later construction-state transition hasn't been tested.
+In the inspected build, the construction-scenery controller references the bridge's abutments and steel below the root, but not the root itself. The patcher refuses a bridge whose root is a construction target. It hasn't been tested whether an explicit disable keeps the object off through a later change in construction state.
 
 ## Write the modification by hand
 

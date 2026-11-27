@@ -40,7 +40,7 @@ namespace RailroaderScenePatcher {
             var set = circuitSet = circuitSets.FieldType.GetGenericArguments()[0];
             if (!set.IsClass || set.IsAbstract || set.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null) == null) throw new InvalidOperationException("A crossing circuit set cannot be constructed");
             roles = CircuitCoverage.Roles.Select(r => set.GetField(r, Native.Flags) ?? throw new MissingFieldException(set.FullName, r)).ToArray();
-            if (roles.Any(r => r.FieldType != span)) throw new InvalidOperationException("Crossing circuit roles do not hold track spans");
+            if (roles.Any(r => r.FieldType != span)) throw new InvalidOperationException("A crossing circuit role has an unexpected field type. The patcher expects a track span.");
             spanId = span.GetField("id", Native.Flags) ?? throw new MissingFieldException(SpanType, "id");
             lower = span.GetField("_lower", Native.Flags) ?? throw new MissingFieldException(SpanType, "_lower");
             upper = span.GetField("_upper", Native.Flags) ?? throw new MissingFieldException(SpanType, "_upper");
@@ -57,7 +57,7 @@ namespace RailroaderScenePatcher {
         public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         static object Graph() => Native.Read(Native.Type(GraphType), "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
-        Component ControllerOf(object target) => ((GameObject)target).GetComponent(controller) ?? throw new InvalidOperationException("The object no longer holds a crossing controller");
+        Component ControllerOf(object target) => ((GameObject)target).GetComponent(controller) ?? throw new InvalidOperationException("The object no longer has a crossing controller");
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
             if (identity.Component != CrossingCoverageScene.ComponentType) return Array.Empty<object>();
             return BoardScene.LoadedAt(identity.Scene, identity.Path).Where(g => Loaded(g) && g.GetComponent(controller) != null).Cast<object>().ToArray();
@@ -71,12 +71,12 @@ namespace RailroaderScenePatcher {
             var type = Native.Type(CrossingCoverageScene.ComponentType);
             if (type == null) return "The crossing controller type is unavailable";
             var controllers = go.GetComponents(type);
-            if (controllers.Length != 1) return controllers.Length == 0 ? "The object holds no crossing controller" : "The object holds several crossing controllers";
+            if (controllers.Length != 1) return controllers.Length == 0 ? "The object has no crossing controller" : "The object has several crossing controllers";
             if (go.GetComponents<Component>().Any(c => c == null)) return "Missing script on the crossing object";
-            if (!(type.GetField("circuitSets", Native.Flags)?.GetValue(controllers[0]) is IList sets)) return "The crossing controller holds no circuit list";
+            if (!(type.GetField("circuitSets", Native.Flags)?.GetValue(controllers[0]) is IList sets)) return "The crossing controller has no circuit list";
             if (sets.Count == 0 && !ModObjectWorld.IsModObject(go)) return CrossingCoverageScene.NoCircuits;
             foreach (var set in sets) {
-                if (set == null) return "The crossing holds an empty circuit";
+                if (set == null) return "The crossing has an empty circuit entry";
                 foreach (var role in CircuitCoverage.Roles) {
                     var value = set.GetType().GetField(role, Native.Flags)?.GetValue(set) as Component;
                     if (value == null) return "A circuit lacks its " + role + " span";
@@ -85,7 +85,7 @@ namespace RailroaderScenePatcher {
             }
             return null;
         }
-        IList Sets(object target) => circuitSets.GetValue(ControllerOf(target)) as IList ?? throw new InvalidOperationException("The crossing controller holds no circuit list");
+        IList Sets(object target) => circuitSets.GetValue(ControllerOf(target)) as IList ?? throw new InvalidOperationException("The crossing controller has no circuit list");
         public IReadOnlyList<object> Circuits(object target) => Sets(target).Cast<object>().ToArray();
         public IReadOnlyList<object> Spans(object circuit) => roles.Select(r => { var value = r.GetValue(circuit) as Component; return value == null ? null : (object)value; }).ToArray();
         public string SpanId(object value) => spanId.GetValue(value) as string;

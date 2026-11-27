@@ -153,7 +153,7 @@ namespace RailroaderScenePatcher.Core {
             var registration = world.Registration(target);
             if (registration.MissingMaskKeys != 0) throw new InvalidOperationException("The terrain system no longer stores the board's mask registration");
             if (!active) {
-                if (registration.CullingCenter != null || registration.MaskCenters.Count != 0) throw new InvalidOperationException("A disabled board still holds culling or mask registrations");
+                if (registration.CullingCenter != null || registration.MaskCenters.Count != 0) throw new InvalidOperationException("A disabled board still has culling or mask registrations");
                 return;
             }
             if (registration.CullingCenter == null || Distance(registration.CullingCenter, now) > RegistrationTolerance) throw new InvalidOperationException("The culling sphere did not follow the board");

@@ -488,7 +488,7 @@ static class CommandBandTests {
             && CommandBand.ShownPath(@"C:\Work\scene-patches.json", @"D:\Games\Railroader") == "scene-patches.json" && CommandBand.ShownPath(null, null) == null,
             "A shown path starts at the game folder or at the mod's folder: " + CommandBand.ShownPath(@"C:\Work\ModDev\MyMap\Data\scene-patches.json", @"D:\Games\Railroader"));
         // An object without edits is not told what Disable would do.
-        Check(CommandBand.TrackGroup(false) == "Activity follows the track group." && CommandBand.TrackGroup(true).Contains("Disable holds it inactive"), "The track-group line names edits only where the object offers them");
+        Check(CommandBand.TrackGroup(false) == "Activity follows the track group." && CommandBand.TrackGroup(true).Contains("Disable keeps it inactive"), "The track-group line names edits only where the object offers them");
         // The help of a tab closes when another tab opens; the outliner's and the window's stay.
         var tabs = new[] { "object", "placement", "connections", "changes" };
         Check(CommandBand.ClosesHelp("object", "placement", tabs) && !CommandBand.ClosesHelp("placement", "placement", tabs), "A tab's help closes on a switch to another tab");
@@ -733,7 +733,7 @@ static class CommandBandTests {
     static void HierarchyLinesHaveAShortForm() {
         const string Scene = "BushnellWhittier", Path = "World/Roads/Crossing";
         var dependencies = new[] {
-            "Duplicate marker ID Mg6m is held by 2 scene markers.",
+            "Duplicate marker ID Mg6m is used by 2 scene markers.",
             "Component BushnellWhittier/World/Roads/Crossing [Track.CrossingController]",
             "Component BushnellWhittier/World/Roads/Crossing/Gate [Track.CrossingGate]",
             "Component BushnellWhittier/World/Roads/Crossing/Gate [UnityEngine.MeshRenderer]",
@@ -744,7 +744,7 @@ static class CommandBandTests {
         };
         var shortForm = HierarchyDependencies.ShortForm(Scene, Path, dependencies);
         var expected = new[] {
-            "Duplicate marker ID Mg6m is held by 2 scene markers.",
+            "Duplicate marker ID Mg6m is used by 2 scene markers.",
             "Component BushnellWhittier/World/Roads/Crossing (1)/Gate [Track.CrossingGate]",
             "Referenced by Gate [Track.CrossingGate].controller",
             "Track-relative placement and track-group subscription.",

@@ -49,14 +49,14 @@ namespace RailroaderScenePatcher.Core {
             if (m.MissingScript) return "a script in its hierarchy is missing";
             if (!m.BelowController) return "its nearest key-value object does not belong to a crossing controller, so no crossing controller drives it";
             if (m.Lamps.Count == 0) return "this gate does not stand on a light object, so it is not part of a mast";
-            if (m.LampsBelow > 0) return "it holds another light object below it; the mast pattern covers one light object with its gates";
+            if (m.LampsBelow > 0) return "there's another light object below it; the mast pattern covers one light object with its gates";
             if (m.GatesBeside > 0) return "a gate stands beside this light object rather than on or below it; moving the light object would leave the gate behind";
-            if (m.Controllers > 0) return "it holds a crossing controller";
-            if (m.KeyValueObjects > 0) return "it holds its own key-value object, which intercepts the crossing controller's keys";
-            if (m.Spans > 0) return "it holds a detection span";
-            if (m.Cullers > 0) return "it holds its own culler";
-            if (m.Bells > 0) return "it holds a bell player";
-            if (m.Rigidbodies > 0) return "it holds a rigidbody; only static colliders are supported";
+            if (m.Controllers > 0) return "it contains a crossing controller";
+            if (m.KeyValueObjects > 0) return "it has its own key-value object, which intercepts the crossing controller's keys";
+            if (m.Spans > 0) return "it contains a detection span";
+            if (m.Cullers > 0) return "it has its own culler";
+            if (m.Bells > 0) return "it contains a bell player";
+            if (m.Rigidbodies > 0) return "it contains a rigidbody; only static colliders are supported";
             if (m.FollowsTrackGroup) return "a track-relative component switches it with a track group, which the mast pattern does not cover";
             foreach (var l in m.Lamps) {
                 if (!keys.Contains(l.Key)) return "lamp " + l.Name + " observes key '" + l.Key + "', which the crossing controller does not publish";

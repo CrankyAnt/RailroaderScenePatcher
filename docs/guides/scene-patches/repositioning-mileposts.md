@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Reposition or rebind a milepost
 
-Move, rotate, or disable a milepost, or set, replace, or detach its track binding. A milepost displays a mile value beside the track. Its scene object holds these components:
+Move, rotate, or disable a milepost, or set, replace, or detach its track binding. A milepost displays a mile value beside the track. Its scene object has these components:
 
 - `Helpers.MilePost`, with a prefix, an origin flag, and a mile value.
 - `Track.TrackMarker`, with the track binding.
@@ -14,13 +14,13 @@ Edits don't change the milepost's model, mile value, prefix, origin flag, or dis
 
 ## What qualifies
 
-To edit a milepost, all of these conditions must hold:
+The patcher can edit a milepost only if it meets all these conditions:
 
-- The object holds exactly one `Helpers.MilePost`, exactly one `Track.TrackMarker` of type `Generic` with a non-empty marker ID, and a `Helpers.TextSynchronizer`.
+- The object has exactly one `Helpers.MilePost`, exactly one `Track.TrackMarker` of type `Generic` with a non-empty marker ID, and a `Helpers.TextSynchronizer`.
 - The object has no missing script and no `Track.TrackCurveMeshBuilder`.
 - No component other than the milepost itself listens to the marker's location changes.
 - If a `Track.TrackRelativePosition` on the object makes its activity follow a track group, it activates this object itself. No other component has replaced its activation callback.
-- No loaded component other than the milepost and that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it refuses every marker until the next check.
+- No loaded component other than the milepost and that `Track.TrackRelativePosition` has a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could reference a marker, it refuses every marker until the next check.
 - While the post is enabled and active, the marker has exactly one named location and it matches the stored track location. Otherwise the marker has no named location.
 
 The inventory lists an object that meets these conditions in the `Milepost` family with the structure `milepost-v1`. For any other milepost, **Supported edits** on the **Object** tab lists **Move** under **Unavailable:** and gives the reason.

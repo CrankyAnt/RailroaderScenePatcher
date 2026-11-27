@@ -84,7 +84,7 @@ Clicking the native **Save** button writes the modification to the edited mod's 
 
 A modification of a mast or bell records a fixed placement, an Enabled value, or both. It records no controller, key, track, or circuit. The equipment's logical binding to its crossing stays unchanged and is not part of the modification. Its `placement` is recorded relative to the crossing controller, as described under [the existing crossing mast and bell target](scene-patch-file-v1.md#existing-crossing-mast-and-bell).
 
-A whole move records a fixed placement in the crossing controller's modification, next to any crossing coverage and crossing equipment that the modification holds. See [the crossing target](scene-patch-file-v1.md#crossing).
+A whole move records a fixed placement in the crossing controller's modification, next to any crossing coverage and crossing equipment that the modification already contains. See [the crossing target](scene-patch-file-v1.md#crossing).
 
 ```json
 "move-signal-1": {
@@ -115,7 +115,7 @@ A mast matches `existing-crossing-mast-v1` when it meets every requirement below
 | Each lamp and each gate observes a key that the crossing controller publishes: `lights` or `gates`. | lamp or gate ... observes key ..., which the crossing controller does not publish |
 | Every lamp target is inside the mast's hierarchy. | lamp ... targets an object outside the mast |
 | No gate is elsewhere under the light object's parent. Such a gate would stay behind when the light object moves. | a gate stands beside this light object |
-| The mast contains no second light object, crossing controller, key-value object, detection span, game-object culler, bell player, or rigidbody. | it holds ... |
+| The mast contains no second light object, crossing controller, key-value object, detection span, game-object culler, bell player, or rigidbody. | it contains ..., it has its own ..., or there's another light object below it ... |
 | No script in its hierarchy is missing. | a script in its hierarchy is missing |
 | No track-relative component switches it with a track group. | a track-relative component switches it with a track group |
 | No other loaded object shares its hierarchy path. | ... objects share this hierarchy path |
@@ -127,7 +127,7 @@ An operation can be unavailable even when other edits are supported. Its control
 
 - **Enable** and **Disable** are unavailable when a culler of the game itself enables and disables the equipment by camera distance. That culler would override a saved Enabled value. This was checked at one base-game map crossing in Railroader 0.6.3, Bryson Everett. Its culler lists each mast's parent, so Enabled is supported for those masts. **Runtime state** on the **Object** tab shows which object the culler lists for the inspected mast.
 - **Enable** and **Disable** are unavailable for a bell if the game build lacks what the patcher needs to configure the bell again after enabling it, such as unavailable crossing-equipment prerequisites. The tooltip names what the build lacks.
-- **Disable** is unavailable for a mast or bell that a progression controller or map feature switches when the disable could not hold, because the patcher cannot share its activity in this load or the game's members of that switch are unavailable. The tooltip gives that reason. A scene patch file that disables such a mast or bell fails that modification before changing anything, and the file's other modifications still apply. No base-game crossing has such a mast or bell in Railroader 0.6.3.
+- For a mast or bell that a progression controller or map feature switches, **Disable** is unavailable if the patcher can't keep the mast or bell off. This happens if the patcher can't share control of its activity during this load or if the game's members for that switch are unavailable. The tooltip gives that reason. A scene patch file that disables such a mast or bell fails that modification before changing anything, and the file's other modifications still apply. No base-game crossing has such a mast or bell in Railroader 0.6.3.
 - **Follow** is unavailable for every existing mast and bell. A modification that gives one a `trackFollowing` placement fails before changing anything.
 - Rotation is unavailable for a bell.
 

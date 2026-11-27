@@ -54,7 +54,7 @@ static class SupportedEditsTests {
         var plain = new BaseMapFixture();
         foreach (var (path, reason, shortReason) in new[] {
             (station, SceneObjectRules.StationAgentReason, "Station click spots are native map data"),
-            (depot, SceneObjectRules.ConstructionOutsideBridge, "It holds a construction controller"),
+            (depot, SceneObjectRules.ConstructionOutsideBridge, "It has a construction controller"),
         }) {
             var verdict = map.Verdicts.Single(v => v.Path == path);
             Check(verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Reason == reason && verdict.ReasonIsSentence, path + " is inspection only with its settled reason: " + verdict.Reason);
@@ -139,7 +139,7 @@ static class SupportedEditsTests {
             [SceneObjectRules.SpawnPointReason] = "Edit its spawn points one by one",
             [SceneObjectRules.MapIconReason] = "Edit its map icon separately",
             [SceneObjectRules.StationAgentReason] = "Station click spots are native map data",
-            [SceneObjectRules.ConstructionOutsideBridge] = "It holds a construction controller",
+            [SceneObjectRules.ConstructionOutsideBridge] = "It has a construction controller",
             [SceneObjectRules.TopObjectRefusal] = "Edit the whole group instead",
             [SceneObjectRules.CullerOnlyRefusal] = "Edit its parts directly",
             [SceneObjectRules.GroupHolderRefusal] = "Edit its groups instead",
@@ -284,7 +284,7 @@ static class SupportedEditsTests {
         Check(Shown(starter, new SupportedEdits.Live { StartersError = "the setups are missing" }).EndsWith("• The new-game setups can't be read: Set Start derailed", StringComparison.Ordinal), "unreadable setups hold back Start derailed");
         var marker = Entry("Generic track marker", TrackMarkerScene.Structure, CommandBand.MarkerOperations);
         Check(Shown(marker, new SupportedEdits.Live { MarkerIdReason = CommandBand.MarkerIdUnavailable("Generic track marker", true, new string('x', 1000), 0, false) })
-            == "Available: Move, Rotate, Follow a track, Disable, Set track binding | Unavailable: | • No other object holds its marker ID: Set replacement marker ID", "a unique marker ID is not a placeholder in the reason");
+            == "Available: Move, Rotate, Follow a track, Disable, Set track binding | Unavailable: | • No other object uses its marker ID: Set replacement marker ID", "a unique marker ID is not a placeholder in the reason");
         Check(Shown(marker, new SupportedEdits.Live { Present = false }) == "Unavailable: | • Its scene isn't loaded: " + Placed + ", Set track binding, Set replacement marker ID", "an absent object has no available edit");
         var added = Entry(SceneFamilies.AddedEquipment, null, CommandBand.AddedEquipmentOperations("Signal 1 (added)"));
         Check(Shown(added) == "Unavailable: | • Edit it on its crossing controller: " + Placed, "added equipment points to its crossing controller");

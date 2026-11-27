@@ -99,7 +99,7 @@ The scene, path, and segment in this example are placeholders. Use the scene, pa
 
 ## Multiplayer, later joins and reconnects
 
-Each player's game applies the coverage to its own crossing when its world loads. In Railroader 0.6.3, a crossing controller computes its detection in each player's own game, from the circuits that game holds. Whether the crossing's light, gate, and bell keys also reach other players hasn't been determined.
+Each player's game applies the coverage to its own crossing when its world loads. In Railroader 0.6.3, a crossing controller computes its detection in each player's own game using that game's own circuits. Whether the crossing's light, gate, and bell keys also reach other players hasn't been determined.
 
 A player who joins later or reconnects loads the map again. The patcher applies each circuit once in the newly loaded world, and the circuits you did not name keep the map's own detection spans. If the coverage fails in one player's game, that game reports it, and the other players keep their coverage. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
 

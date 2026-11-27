@@ -23,7 +23,7 @@ namespace RailroaderScenePatcher {
     // The pad and the crossing's Crossing-type markers stay outside this pattern.
     internal static class MarkerPattern {
         internal static string Refusal(MarkerShape shape) {
-            if (shape.Markers != 1) return shape.Markers == 0 ? "The object holds no track marker" : "The object holds several track markers";
+            if (shape.Markers != 1) return shape.Markers == 0 ? "The object has no track marker" : "The object has several track markers";
             if (shape.MissingScript) return "Missing script on the marker object";
             if (shape.Milepost) return "Use the milepost's own settings to edit it";
             if (shape.PadBuilder) return "Edit this marker through its crossing pad";

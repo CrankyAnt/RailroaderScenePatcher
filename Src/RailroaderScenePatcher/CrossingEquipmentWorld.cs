@@ -266,7 +266,7 @@ namespace RailroaderScenePatcher {
         }
         Component CullerOf(GameObject target) {
             var cullers = target.GetComponents(culler);
-            if (cullers.Length > 1) throw new InvalidOperationException("The crossing controller holds several cullers; the copy's culling would be ambiguous");
+            if (cullers.Length > 1) throw new InvalidOperationException("The crossing controller has several cullers; the copy's culling would be ambiguous");
             return cullers.Length == 1 ? cullers[0] : null;
         }
         // Builds the wrapper and copy disabled, checks the copy, joins the culler and enables the wrapper last, so the copy

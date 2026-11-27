@@ -96,7 +96,7 @@ namespace RailroaderScenePatcher {
         // A mod object this patcher built holds a marker ID of its own, which a replacement ID changes whatever its family;
         // so does a marker in a mod object, such as a pad of a duplicated crossing.
         public bool IsModObject(object target) => ModObjectWorld.Within(target as GameObject);
-        internal Component MarkerOf(object target) => ((GameObject)target).GetComponent(marker) ?? throw new InvalidOperationException("The object no longer holds a track marker");
+        internal Component MarkerOf(object target) => ((GameObject)target).GetComponent(marker) ?? throw new InvalidOperationException("The object no longer has a track marker");
         // The loaded objects at the path that hold a marker. Starting from the marker components avoids building the path of
         // every loaded object; an object with several markers is one match, as before.
         // Crossing pads belong to the crossing-pad capability, so the two capabilities never claim the same object.

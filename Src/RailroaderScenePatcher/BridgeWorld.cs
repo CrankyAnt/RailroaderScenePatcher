@@ -65,7 +65,7 @@ namespace RailroaderScenePatcher {
             if (components.Any(c => c == null)) return "Missing script in the bridge hierarchy";
             var owned = components.FirstOrDefault(c => { var n = c.GetType().FullName ?? ""; return n.StartsWith("Track.", StringComparison.Ordinal) || n.StartsWith("AutoTrestle.", StringComparison.Ordinal) || n == SceneryType; });
             if (owned != null) return "Unexpected track-owned component " + owned.GetType().FullName + " in the bridge hierarchy";
-            if (components.Any(c => c is Rigidbody)) return "The bridge hierarchy holds a rigidbody; only static bridge colliders are supported";
+            if (components.Any(c => c is Rigidbody)) return "The bridge hierarchy contains a rigidbody; only static bridge colliders are supported";
             if (!components.Any(c => c is Collider)) return "The bridge has no colliders";
             // Native construction control may switch bridge parts, never the root that an explicit disable owns.
             foreach (var controller in Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && Loaded(c.gameObject) && c.GetType().FullName == SceneryType)) {

@@ -1240,7 +1240,7 @@ namespace RailroaderScenePatcher.Core {
                 JObject value;
                 try { value = next(existing); }
                 catch (InvalidOperationException e) when (existing != null && e.Message.StartsWith("Unsupported", StringComparison.Ordinal)) {
-                    throw new InvalidOperationException("The existing modification holds content this patcher version does not understand; it is preserved and cannot be edited or removed here");
+                    throw new InvalidOperationException("The existing modification contains content this patcher version does not understand; it is preserved and cannot be edited or removed here");
                 }
                 // An edit in scene patch editing stores what it changes. A setting whose new value equals the object's value without
                 // this mod leaves the modification: the edit is a revert of that setting. An edit that leaves the

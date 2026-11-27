@@ -385,7 +385,7 @@ namespace RailroaderScenePatcher {
             if (VerdictOf(root)?.Disposition != GroupDisposition.Group) return "This object is not a listed group";
             var components = root.GetComponentsInChildren<Component>(true);
             if (components.Any(c => c == null)) return "Missing script in the group hierarchy";
-            if (components.Any(c => c is Rigidbody)) return "The group holds a rigidbody; only static colliders are supported";
+            if (components.Any(c => c is Rigidbody)) return "The group contains a rigidbody; only static colliders are supported";
             // The track and what the game builds for it are native map data, which a rail bridge move must leave in place.
             if (RailBridgeRoot(root)) { var owned = SceneObjectRules.TrackOwnedRefusal(components.Where(c => c != null).Select(c => c.GetType().FullName)); if (owned != null) return owned; }
             return ConstructionProblem(root) ?? PileProblem(root) ?? MaskProblem(root);

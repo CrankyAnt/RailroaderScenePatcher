@@ -28,10 +28,10 @@ The editor lists only usable devices. If a scene patch file names an ineligible 
 | Reason | Meaning |
 | --- | --- |
 | it contains a bell player and is not a light or gate source. Add bells from a bell definition using the bell pattern. | Bells use the controller-bound bell pattern; see [add a bell to an existing crossing](adding-crossing-bells.md). |
-| it holds its own key-value object, which would intercept the crossing controller's keys | The copy's lamps and gates would observe that object instead of the crossing controller. |
-| it holds a crossing controller; a copy would be a second crossing | A copy would duplicate a crossing. |
-| it holds a detection span | A copy would duplicate detection. |
-| it holds its own culler | A copy would duplicate culling. |
+| it has its own key-value object, which would intercept the crossing controller's keys | The copy's lamps and gates would observe that object instead of the crossing controller. |
+| it contains a crossing controller; a copy would be a second crossing | A copy would duplicate a crossing. |
+| it contains a detection span | A copy would duplicate detection. |
+| it has its own culler | A copy would duplicate culling. |
 | observes key '...', which the crossing controller does not publish | The lamp or gate would never respond. |
 | targets an object outside the source, so a copy would drive the original | A copy would drive the original device. |
 | has no renderer under its targets that uses its lamp material | The lamp would show no change. |

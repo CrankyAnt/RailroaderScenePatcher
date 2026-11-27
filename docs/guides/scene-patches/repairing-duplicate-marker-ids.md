@@ -12,13 +12,13 @@ This guide describes the patcher's behavior based on its code, automated tests, 
 
 Two groups of scene markers in the base-game map share a marker ID:
 
-- The active speed sign `Speed - Fontana South Curve (3)` and an inactive yard limit hold `Mg6m`.
-- The `Whistle Sign W` markers that hold `Mkft`.
+- The active speed sign `Speed - Fontana South Curve (3)` and an inactive yard limit share `Mg6m`.
+- The `Whistle Sign W` markers that use `Mkft`.
 
 Use this guide when either of these is true:
 
 - An active generic track marker shows the detected problem `Duplicate marker ID <id> is shared with <N> other scene markers. Give one of them a replacement ID to repair it.`
-- An edit of a holder is refused, such as **Enable**, a new track location, or **Follow**. The refusal starts with `Duplicate marker ID <id> is held by <N> scene markers`, and it names each holder with its activity. For a generic track marker it ends with `Give one of them a replacement ID to repair it.`
+- An edit of a holder is refused, such as **Enable**, a new track location, or **Follow**. The refusal starts with `Duplicate marker ID <id> is used by <N> scene markers`, and it names each holder with its activity. For a generic track marker it ends with `Give one of them a replacement ID to repair it.`
 
 Under **Dependencies** on the **Object** tab, the explanation lists every holder of the duplicate marker ID. Only an active generic track marker that can receive a replacement ID shows a detected problem.
 
@@ -29,18 +29,18 @@ Each repair changes one holder, and each replacement ID belongs to one marker. U
 ## Give a replacement ID in the inspector
 
 1. Open **Scene Patcher**, click **Refresh** in the command band, and select the row of the marker you want to change in the outliner.
-1. On the **Connections** tab, find the **Replacement marker ID** section. From the **Object** tab, click **Set replacement ID on the Connections tab** below the **Detected problems** section to open it. Under the caption **Also holding**, the section lists the other scene markers that hold the underlying ID. To give the replacement ID to one of them instead, click **Select** beside its name. The patcher inspects that marker and opens its **Connections** tab. **Select** also closes an open coverage or equipment form.
+1. On the **Connections** tab, find the **Replacement marker ID** section. From the **Object** tab, click **Set replacement ID on the Connections tab** below the **Detected problems** section to open it. The **Also using** caption gives the underlying ID. The list below it names the other scene markers that use that ID. To give the replacement ID to one of them instead, click **Select** beside its name. The patcher inspects that marker and opens its **Connections** tab. **Select** also closes an open coverage or equipment form.
 1. Click **Generate** beside **Replacement ID**, or type an unused ID in that field. **Generate** fills the field with a random ID made of letters and digits. It checks the ID against scene markers, game registrations, map objects in the map context, and other replacement IDs in the scene patch file. You can edit the generated ID. Follow the instruction below the field: `Click Generate or enter an unused ID. Don't use another marker's ID or a segment ID. Enter at least one character, with no spaces at either end. Don't start the ID with passengerStop: or flare:.`
 1. Click **Set replacement ID**. The result appears in the footer's message area under **Marker ID**.
 1. Set the activity or the track location of the marker. Click **Enable** or **Disable** on the **Object** tab, or enter the location and click **Set** at the bottom of the **Connections** tab. The repaired marker accepts these edits. The other holders do not change.
 
 If **Generate** can't find an unused ID, the field keeps its value. Look under **Marker ID** in the footer's message area for the reason. For example, the game may still be loading the map objects. When you can't edit the field, you can't click **Generate** either. Its tooltip gives the same reason.
 
-**Set replacement ID** is unavailable if the field is empty, contains only spaces, holds the marker's current ID, begins with a reserved prefix, or begins or ends with a space. Its tooltip explains why.
+**Set replacement ID** is unavailable if the field is empty, contains only spaces, already contains the marker's current ID, begins with a reserved prefix, or begins or ends with a space. Its tooltip explains why.
 
 The **Replacement marker ID** section is disabled for objects outside the **Generic track marker** family. Its tooltip reads `Only the Generic track marker family.` Marker type **Generic** alone isn't enough: mileposts and starter placement markers can also have that type. The section is also disabled for a generic track marker whose underlying ID is unique, unless this mod already sets a replacement ID.
 
-After **Set replacement ID**, the caption above the other holders changes from **Also holding** to **Still holding** and includes the underlying ID, for example `Still holding Mg6m, the underlying ID`. The list names the holders that keep that ID. The selected marker now has a unique replacement ID, so its detected problem disappears. The other holders keep sharing the underlying ID until each has its own.
+After **Set replacement ID**, the caption above the other holders changes from **Also using** to **Still using** and includes the underlying ID, for example `Still using Mg6m, the underlying ID`. The list names the holders that keep that ID. The selected marker now has a unique replacement ID, so its detected problem disappears. The other holders keep sharing the underlying ID until each has its own.
 
 The patcher checks the other holders of the old and the new ID again right after **Set replacement ID**, and after native **Undo** or **Redo** of it. A holder that no longer shares its ID loses its duplicate problem at once, without **Refresh**.
 
@@ -100,7 +100,7 @@ The segment, end, and distance are examples. Use a track location on your map. A
 ## Clear the ID, remove the modification and undo
 
 - **Clear replacement ID** in the **Replacement marker ID** section removes this mod's replacement ID. The marker returns to its underlying ID. **Clear replacement ID** is disabled with the general edit reason first. Then it is disabled with `This mod sets no replacement ID for this marker, so there is nothing to clear.` when the mod sets none.
-- **Clear replacement ID** is refused while the modification still sets **Enable** or **Disable**, a track binding or track following, and another scene marker holds the underlying ID. The message reads `Marker ID <id> is also held by <scene/path>, so this marker's activity, binding, and track-following settings need its replacement ID. Clear those settings first, or click Remove modification.`
+- **Clear replacement ID** is refused while the modification still sets **Enable** or **Disable**, a track binding or track following, and another scene marker uses the underlying ID. The message reads `Marker ID <id> is also used by <scene/path>, so this marker's activity, binding, and track-following settings need its replacement ID. Clear those settings first, or click Remove modification.`
 - **Clear replacement ID** is also refused while another modification names this one in `dependsOn`. The message reads `This marker's replacement ID can't be cleared because <key> names its modification in dependsOn. Another holder's activity, binding, or track-following settings need this ID. Change or remove that modification first.`
 - **Set replacement ID** with the marker's underlying ID returns the marker to that ID, as **Clear replacement ID** does, and is refused for the same two reasons.
 - **Remove modification** in the footer removes the whole modification from this mod. The marker returns to the underlying ID, track location, and activity of the loaded map, with its registrations. It is refused while another modification names this one in `dependsOn`, with the message `Modification <key> cannot leave the scene patch file because <key> names it in dependsOn. Change or remove that modification first. Nothing was changed`.
@@ -149,7 +149,7 @@ Before changing anything, the patcher checks the following rules. A refusal leav
 
 ## Limits
 
-- In Railroader 0.6.3, a repaired marker registers under its replacement ID, while the other holders keep their registrations under the old ID. This holds after **Undo**, **Redo**, Save, and a world reload. Removing the modification returns the marker to its registration before the repair. Track following by a repaired marker and multiplayer haven't been verified in Railroader.
+- In Railroader 0.6.3, a repaired marker registers under its replacement ID, while the other holders keep their registrations under the old ID. This remains true after **Undo**, **Redo**, Save, and a world reload. Removing the modification returns the marker to its registration before the repair. Track following by a repaired marker and multiplayer haven't been verified in Railroader.
 - The patcher doesn't check Lua scripts that look up a marker by ID, such as scripts that call `NativeTrack.GetMarkerLocation`. It doesn't check third-party mods that look up a marker by ID either.
 - Map object IDs come from the game's map object manager for the loaded map context. While the manager is not loaded, the patcher refuses every replacement ID.
 - A scene marker that is not loaded but still registers under the shared ID counts as a holder. A repair of another holder does not move its registration.

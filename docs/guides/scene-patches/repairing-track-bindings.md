@@ -8,13 +8,13 @@ Changing the binding never moves the object. Placement and activity are separate
 
 ## What qualifies
 
-The patcher can edit a marker only when all these conditions hold:
+The patcher can edit a marker only if it meets all these conditions:
 
-- the object holds exactly one `Track.TrackMarker`, of type `Generic`, with a non-empty marker ID,
-- the object holds no `Helpers.MilePost` and no `Track.TrackCurveMeshBuilder`,
+- the object has exactly one `Track.TrackMarker`, of type `Generic`, with a non-empty marker ID,
+- the object has no `Helpers.MilePost` and no `Track.TrackCurveMeshBuilder`,
 - no other component listens to the marker's location changes,
 - a `Track.TrackRelativePosition` on the object whose activity follows a track group activates this object itself, and no other component has replaced its activation callback,
-- no loaded component other than that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it does not know the holders and refuses every marker until the next check,
+- no loaded component other than that `Track.TrackRelativePosition` has a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could reference a marker, it cannot tell which components reference it and refuses every marker until the next check,
 - while the marker is enabled and active, it has exactly one named location and it matches the stored track location. Otherwise the marker has no named location. A named location for another scene marker with the same marker ID does not count for this marker.
 
 The same conditions apply to a Generic marker inside a grade-crossing setup, such as a whistle sign under a `Track.Crossings.GradeCrossingController`. The crossing controller reads its circuits and spans. The auto engineer uses the crossing pad's `Crossing` marker to sound the horn, so it doesn't read the sign. The crossing pad and the crossing's own `Crossing` markers keep their own operations.
@@ -56,9 +56,9 @@ A disabled marker keeps its binding without a registration. When it is enabled, 
 
 ## Markers with a duplicate marker ID
 
-Scene markers have a duplicate marker ID when more than one holds the same ID. In the base-game map, the active speed sign `Speed - Fontana South Curve (3)` and an inactive yard limit hold `Mg6m`, and six `Whistle Sign W` markers hold `Mkft`. Removing one marker's named location removes every named location under that marker ID on every segment. Disabling or rebinding one holder would therefore remove the other holders' registrations too.
+Scene markers have a duplicate marker ID when more than one uses the same ID. In the base-game map, the active speed sign `Speed - Fontana South Curve (3)` and an inactive yard limit use `Mg6m`, and six `Whistle Sign W` markers use `Mkft`. Removing one marker's named location removes every named location under that marker ID on every segment. Disabling or rebinding one holder would therefore remove the other holders' registrations too.
 
-The **Dependencies** section on the **Object** tab of such a marker starts with the duplicate marker ID, the number of scene markers that hold it, and why their edits are refused. For a generic track marker, that line ends with `Give one of them a replacement ID to repair it.`, and the **Object** tab offers **Repair duplicate ID** and **Set replacement ID on the Connections tab**. One sentence per holder follows: first the inspected marker, as **This marker**, then the active holders and the inactive ones last, each with its scene and path, whether it is active, and where it has a registration under the marker ID, or that it has none. A registration under the marker ID that no scene marker holds gets a sentence of its own. A scene marker that is not loaded but still owns a registration under the marker ID also counts as a holder.
+The **Dependencies** section on the **Object** tab of such a marker starts with the duplicate marker ID, the number of scene markers that use it, and why their edits are refused. For a generic track marker, that line ends with `Give one of them a replacement ID to repair it.`, and the **Object** tab offers **Repair duplicate ID** and **Set replacement ID on the Connections tab**. One sentence per holder follows: first the inspected marker, as **This marker**, then the active holders and the inactive ones last, each with its scene and path, whether it is active, and where it has a registration under the marker ID, or that it has none. A registration under that ID gets a sentence of its own if no scene marker uses it. A scene marker that is not loaded but still owns a registration under the marker ID also counts as a holder.
 
 While the marker ID is shared, the patcher refuses these edits of every holder, a Generic marker or a crossing pad:
 

@@ -15,8 +15,8 @@ namespace RailroaderScenePatcher.Core {
         public const string EditCrossingPadSeparately = "Edit its crossing pad in the Crossing pad marker family.";
         public const string EditSpawnPointsIndividually = "Edit its spawn points individually in the Spawn point family.";
         public const string RemovePadMarkerId = "Remove padMarkerId from this target.";
-        public const string EditCulledParts = "Edit the parts it holds directly.";
-        public const string EditHeldGroups = "Edit the groups it holds.";
+        public const string EditCulledParts = "Edit its parts directly.";
+        public const string EditHeldGroups = "Edit the groups inside it.";
         public const string EditAsGroup = "Edit it as a group.";
 
         // Marker IDs and track bindings.

@@ -70,10 +70,10 @@ namespace RailroaderScenePatcher {
         internal static string PadProblem(GameObject go, ReferenceScan references, HolderIndex setups, bool placementOnly = false) {
             if (!Loaded(go)) return "The crossing pad's scene isn't loaded";
             var markers = go.GetComponents<Component>().Where(c => c != null && c.GetType().FullName == MarkerType).ToArray();
-            if (markers.Length != 1) return markers.Length == 0 ? "The object holds no track marker" : "The object holds several track markers";
+            if (markers.Length != 1) return markers.Length == 0 ? "The object has no track marker" : "The object has several track markers";
             if (go.GetComponents<Component>().Any(c => c == null)) return "Missing script on the pad object";
             var builders = go.GetComponents<Component>().Where(c => c.GetType().FullName == PadBuilder).ToArray();
-            if (builders.Length != 1) return builders.Length == 0 ? "The object holds no crossing-pad builder" : "The object holds several crossing-pad builders";
+            if (builders.Length != 1) return builders.Length == 0 ? "The object has no crossing-pad builder" : "The object has several crossing-pad builders";
             if (Get(go, Milepost) != null) return "Use the milepost's own settings to edit it";
             var m = markers[0];
             var type = System.Convert.ToString(Field(m, "type"));
@@ -88,7 +88,7 @@ namespace RailroaderScenePatcher {
             return Consumers(go, m, references, setups, (owner, field) => owner is Component c && c.gameObject == go &&
                 ((c.GetType().FullName == Relative && field == "_marker") || (c.GetType().FullName == PadBuilder && field == "_marker")), placementOnly);
         }
-        Component Builder(object target) => Get((GameObject)target, PadBuilder) ?? throw new InvalidOperationException("The object no longer holds a crossing-pad builder");
+        Component Builder(object target) => Get((GameObject)target, PadBuilder) ?? throw new InvalidOperationException("The object no longer has a crossing-pad builder");
         public PadGeometry Geometry(object target) {
             var builder = Builder(target);
             var signature = Signature(builder);

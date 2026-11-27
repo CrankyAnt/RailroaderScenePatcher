@@ -123,13 +123,13 @@ static class RoadBridgeTests {
     // A bridge whose mask flattens the terrain height names that, and moving it stays offered.
     static void ObjectTabNamesTheMaskAndTheNativeRoad() {
         var line = CommandBand.GroundMaskDependency(true, new[] { "Concrete Road Bridge - 60m" }, false, group: true);
-        Assert(line == "Ground mask: the root of this group holds the scene ground mask. Moving the group moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(line == "Ground mask: the root of this group has the scene ground mask. Moving the group moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of a group whose root holds the mask: " + line);
         var flat = CommandBand.GroundMaskDependency(true, new[] { "Old Home Town Road Bridge" }, true, group: true);
-        Assert(flat == "Ground mask: the root of this group holds the scene ground mask. The mask also flattens the ground. Moving the group moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(flat == "Ground mask: the root of this group has the scene ground mask. The mask also flattens the ground. Moving the group moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of a group whose root holds a flattening mask: " + flat);
         Assert(CommandBand.HoldsGroundMask(new[] { line }) && CommandBand.HoldsGroundMask(new[] { flat }), "Both lines carry terrain output");
-        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false).StartsWith("Ground mask: this part holds the scene ground mask.", StringComparison.Ordinal), "A part that holds the mask keeps its line");
+        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false).StartsWith("Ground mask: this part has the scene ground mask.", StringComparison.Ordinal), "A part that holds the mask keeps its line");
         var use = CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { "Culling", line }, roadBridge: true);
         Assert(use == "The bridge is decorative. Its road is native map data that the Map Editor edits. The bridge's ground mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
             "The use of a road bridge: " + use);

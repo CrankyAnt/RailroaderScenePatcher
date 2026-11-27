@@ -79,7 +79,7 @@ To delete an addition, remove its member from `additions`. If it was the last on
 
 ## Multiplayer, later joins and reconnects
 
-Each player's game builds the addition in its own world when that world loads. In Railroader 0.6.3, a crossing controller computes its detection in each player's own game, from the circuits that game holds. Whether the crossing's light, gate, and bell keys also reach other players hasn't been determined.
+Each player's game builds the addition in its own world when that world loads. In Railroader 0.6.3, a crossing controller computes its detection in each player's own game using that game's own circuits. Whether the crossing's light, gate, and bell keys also reach other players hasn't been determined.
 
 A player who joins later or reconnects loads the map again. The patcher builds the addition once in the newly loaded world, under the same addition ID, and nothing of the earlier session stays behind. If the addition fails in one player's game, that game reports it, and the other players keep their detection. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
 

@@ -101,7 +101,7 @@ namespace RailroaderScenePatcher {
                 // A scene marker takes its own marker ID before it starts: under its source's ID its start would replace
                 // the source's registration in the track graph, which holds one entry per ID and segment.
                 if (markerId != null) {
-                    var marker = made.GetComponent(Native.Type(TrackMarkerWorld.MarkerType)) ?? throw new InvalidOperationException("The source of this mod object holds no track marker for its marker ID.");
+                    var marker = made.GetComponent(Native.Type(TrackMarkerWorld.MarkerType)) ?? throw new InvalidOperationException("The source of this mod object has no track marker for its marker ID.");
                     SetMarkerId(marker, markerId);
                     // A crossing pad's copy starts without a track location: its modder binds it to the track at its place.
                     if (IsPad(marker)) Unbind(marker);

@@ -184,7 +184,7 @@ namespace RailroaderScenePatcher {
         // The Track group line of the Object tab. An object without edits is told what its activity follows, not what
         // Disable and Clear activity would do.
         internal static string TrackGroup(bool editable) => editable
-            ? "Activity follows the track group. Disable holds it inactive. Clear activity returns control to the track group."
+            ? "Activity follows the track group. Disable keeps it inactive. Clear activity returns control to the track group."
             : "Activity follows the track group.";
         // Why the activity control cannot run, or null. The patcher refuses an explicit enable of an object whose activity
         // follows its track group, so Enable is inactive with that reason beforehand; Disable stays available.
@@ -472,10 +472,10 @@ namespace RailroaderScenePatcher {
                 var value = line.Substring(SavedStatesPrefix.Length);
                 said.Add(value.StartsWith(SavedIdPrefix, StringComparison.Ordinal)
                     ? "This " + self + " stores its toggles' states under the saved ID " + value.Substring(SavedIdPrefix.Length) + ". The game keeps them by this ID, independently of position. Saving the game while this " + self + " is disabled might lose those states."
-                    : "This " + self + " holds its toggles' states. It has no saved ID, so the game doesn't save those states.");
+                    : "This " + self + " keeps its toggles' states. It has no saved ID, so the game doesn't save those states.");
             }
             if (lines.Any(line => line.StartsWith(SavedStatesBelowPrefix, StringComparison.Ordinal)))
-                said.Add("Disabling this " + self + " also disables the object that holds its toggles' states. Saving the game while this " + self + " is disabled might lose those states.");
+                said.Add("Disabling this " + self + " also disables the object that keeps its toggles' states. Saving the game while this " + self + " is disabled might lose those states.");
             foreach (var line in lines.Where(line => line.StartsWith(NameTextPrefix, StringComparison.Ordinal)))
                 said.Add("The scene stores the name text \"" + line.Substring(NameTextPrefix.Length) + "\" with this " + self + ", independently of its position. The text moves with it.");
             var below = lines.Where(line => line.StartsWith(TogglesBelowPrefix, StringComparison.Ordinal)).Select(line => line.Substring(TogglesBelowPrefix.Length)).FirstOrDefault();
@@ -513,7 +513,7 @@ namespace RailroaderScenePatcher {
         // holds it, otherwise the part or parts below that hold it, by name, as Dependencies names them.
         static string MaskOwner(string line) {
             var who = line.Substring(GroundMaskPrefix.Length);
-            const string one = " holds the scene ground mask", several = " hold scene ground masks";
+            const string one = " has the scene ground mask", several = " have scene ground masks";
             var single = who.IndexOf(one, StringComparison.Ordinal);
             var plural = who.IndexOf(several, StringComparison.Ordinal);
             if (!who.StartsWith(TopObjectHolds, StringComparison.Ordinal) && who.StartsWith("the ", StringComparison.Ordinal)) {
@@ -724,7 +724,7 @@ namespace RailroaderScenePatcher {
         // The caption above the other holders of the marker's underlying ID: while the marker still holds that ID it
         // shares it with them; after a replacement it no longer does.
         internal static string SharersCaption(string underlying, string current) =>
-            current == underlying ? "Also holding " + underlying : "Still holding " + underlying + ", the underlying ID";
+            current == underlying ? "Also using " + underlying : "Still using " + underlying + ", the underlying ID";
         // A construction controller on an object of its own, Ela Bridge Scenery: its construction segments are its only edit.
         internal const string ConstructionSceneryFamily = "Bridge construction scenery";
         internal const string ConstructionSceneryOperations = "Set this controller's construction segments. Its position has no effect in the game. It stays enabled because it controls which parts of the bridge the game shows.";
@@ -738,7 +738,7 @@ namespace RailroaderScenePatcher {
         // The dependency an object with a scene ground mask names. self: the object holds the one mask itself; otherwise
         // holders names the parts at or below it that hold a mask. A mask that also flattens the terrain height moves
         // the same way, and the line says so.
-        const string TopObjectHolds = "the root of this group holds the scene ground mask";
+        const string TopObjectHolds = "the root of this group has the scene ground mask";
         const string GroundMaskPrefix = "Ground mask: ";
         // parts: the holders are parts of the object's family; below a marker object, and for an object of another
         // family that holds the mask itself, such as a milepost or a spawn point, they are plain objects.
@@ -747,7 +747,7 @@ namespace RailroaderScenePatcher {
             var names = (holders ?? Enumerable.Empty<string>()).ToArray();
             var several = !self && names.Length > 1;
             var kind = parts ? "part" : "object";
-            var who = self ? (group ? TopObjectHolds : "this " + kind + " holds the scene ground mask") : several ? "the " + kind + "s " + Prose.Join(names) + " hold scene ground masks" : "the " + kind + " " + names.FirstOrDefault() + " holds the scene ground mask";
+            var who = self ? (group ? TopObjectHolds : "this " + kind + " has the scene ground mask") : several ? "the " + kind + "s " + Prose.Join(names) + " have scene ground masks" : "the " + kind + " " + names.FirstOrDefault() + " has the scene ground mask";
             if (flattens) who += several ? ". At least one mask also flattens the ground" : ". The mask also flattens the ground";
             return GroundMaskPrefix + who + ". Moving " + (!self ? (group ? "this group" : "this " + kind) + " moves " + (several ? "those " + kind + "s, their masks" : "that " + kind + ", its mask") + ", and the terrain effects" : group ? "the group moves the mask and its effects on the terrain" : "this " + kind + " moves the mask and its effects on the terrain") +
                 ". The patcher asks the game to rebuild terrain and vegetation at both positions.";
@@ -1044,8 +1044,8 @@ namespace RailroaderScenePatcher {
 
         internal static bool NumericEditBlocksWorld(bool focused, IReadOnlyList<string> entered, IReadOnlyList<string> current) =>
             focused || !SameFields(entered, current);
-        internal const string SamePlacement = "The fields hold the object's current placement.", SameBinding = "The fields hold the marker's current binding.", AlreadyDetached = "The marker is detached already.",
-            SameLocation = "The fields hold the marker's current track location.", SameActivity = "The object already has the selected enabled or disabled state.";
+        internal const string SamePlacement = "The fields already show the object's current placement.", SameBinding = "The fields already show the marker's current binding.", AlreadyDetached = "The marker is detached already.",
+            SameLocation = "The fields already show the marker's current track location.", SameActivity = "The object already has the selected enabled or disabled state.";
         // The result of an edit that applied. An edit that changed nothing says so; an edit whose value equals the
         // object's value without this mod says that the modification no longer sets it; completed replaces the
         // plain result of an edit that did something else than its name says.

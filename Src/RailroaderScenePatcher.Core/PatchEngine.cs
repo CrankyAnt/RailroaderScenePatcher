@@ -1133,7 +1133,7 @@ namespace RailroaderScenePatcher.Core {
         // order of their keys has a meaning.
         static CrossingCoverage ParseCoverage(JToken token) {
             var coverage = token as JObject;
-            if (coverage == null || !coverage.HasValues) throw new InvalidOperationException("Invalid relationship: crossingCoverage must be an object that holds circuits, additions or both");
+            if (coverage == null || !coverage.HasValues) throw new InvalidOperationException("Invalid relationship: crossingCoverage must be an object that contains circuits, additions or both");
             if (!Only(coverage, "circuits", "additions")) throw new InvalidOperationException("Unsupported relationship content");
             var parsed = new List<KeyValuePair<string, CircuitCoverage>>();
             foreach (var name in new[] { "circuits", "additions" }) {

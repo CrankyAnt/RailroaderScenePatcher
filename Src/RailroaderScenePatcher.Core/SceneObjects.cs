@@ -219,7 +219,7 @@ namespace RailroaderScenePatcher.Core {
         public const string SpawnPointReason = "This group can't be moved as a whole because it contains spawn points. " + WindowGuidance.EditSpawnPointsIndividually;
         // Why a group or part that holds track markers takes no activity: disabling it would deactivate its markers, which
         // then leave the track's registrations, so its markers stop working. It moves and rotates as a whole.
-        public const string MarkerActivityRefusal = "This object holds track markers, so you can't enable or disable it. Disabling it would take its markers off the track.";
+        public const string MarkerActivityRefusal = "This object contains track markers, so you can't enable or disable it. Disabling it would take its markers off the track.";
         // Whether a track marker stands at or below the node, on an object the scene serializes.
         public static bool HoldsTrackMarker(IHierarchyNode node) {
             if (node == null) return false;
@@ -403,7 +403,7 @@ namespace RailroaderScenePatcher.Core {
         public static string PartRefusal(PartVerdict verdict) => verdict?.Reason == CullerOnlyChildren ? CullerOnlyRefusal : null;
         // Why a modification cannot edit, as a group, the object the group rule did not list, or null: the object is
         // a holder, such as Bryson Yard.
-        public const string GroupHolderRefusal = "This path names an object that only holds other groups, which isn't a group itself. " + WindowGuidance.EditHeldGroups;
+        public const string GroupHolderRefusal = "This path names an object that only contains other groups, which isn't a group itself. " + WindowGuidance.EditHeldGroups;
         public static string GroupRefusal(SceneObjectVerdict verdict) => verdict?.Disposition == GroupDisposition.GroupHolder ? GroupHolderRefusal : null;
         // Whether an object resolves as a group target: a listed top scene object and a holder, so that a
         // holder's modification fails with its reason instead of finding nothing.
@@ -831,13 +831,13 @@ namespace RailroaderScenePatcher.Core {
                 if (culler.Radius != null && culler.Authored != null && Math.Abs(culler.Radius.Value - culler.Authored.Value) > PositionTolerance) return "the culling sphere of " + culler.Id + " left the radius the scene gives it";
                 foreach (var region in culler.Regions) {
                     var planned = !active ? null : plan?.Regions.FirstOrDefault(r => r.Id == region.Id);
-                    if (planned == null) return region.Id + " still holds a culling sphere of its own";
+                    if (planned == null) return region.Id + " still has a culling sphere of its own";
                     // A sphere that waits for the game's culler to start is registered at the next update.
                     if (region.Pending) continue;
                     if (region.Centre == null || !Near(region.Centre, planned.Centre, RegistrationTolerance) || region.Radius + PositionTolerance < planned.Radius) return "the own culling sphere " + region.Id + " does not stand at its part";
                 }
                 if (culler.Registered == null) continue;
-                if (!active) return culler.Id + " still holds a culling sphere";
+                if (!active) return culler.Id + " still has a culling sphere";
                 if (!Near(culler.Registered, culler.Expected, RegistrationTolerance)) return "the culling sphere of " + culler.Id + " did not follow the group";
             }
             if (active && plan != null)

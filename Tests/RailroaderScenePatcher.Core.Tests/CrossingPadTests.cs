@@ -270,7 +270,7 @@ static class CrossingPadTests {
         (world, pad, rear, scene) = Setup();
         world.Owners.Add(new FakeOwner { Name = "Consumer", Fields = { new ReferenceField("marker", true, () => pad) } });
         outcome = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Sj7c", "a", 186.9477)))).Outcomes["rebind"];
-        Assert(!outcome.Applied && outcome.Error.Contains("Consumer.marker holds this marker") && world.Mutations == 0 && Mesh(world, pad) == Baseline, "Another holder of the pad marker refuses before mutation: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("Consumer.marker references this marker") && world.Mutations == 0 && Mesh(world, pad) == Baseline, "Another holder of the pad marker refuses before mutation: " + outcome.Error);
     }
     static void GenerationFailureRestoresCapturedState() {
         foreach (var (inject, name) in new (Action<FakePadWorld>, string)[] { (w => w.FailGenerate = true, "generation throws"), (w => w.EmptyGenerate = true, "generation yields no geometry"), (w => w.ThrowAfterLocation = true, "location write throws") }) {

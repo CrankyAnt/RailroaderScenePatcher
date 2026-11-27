@@ -485,7 +485,7 @@ namespace RailroaderScenePatcher.Core {
                 return;
             }
             var matches = inspection.Discover().Where(e => TargetIdentity.SameObject(e.Identity, identity)).ToArray();
-            if (matches.Length != 1) throw new InvalidOperationException(Changed(matches.Length == 0 ? "missing" : matches.Length + " objects hold its identity"));
+            if (matches.Length != 1) throw new InvalidOperationException(Changed(matches.Length == 0 ? "missing" : matches.Length + " objects match its identity"));
             if (!observed.Matches(matches[0])) throw new InvalidOperationException(Changed(observed, matches[0]));
         }
         // The refusal of a target that no longer reads as it was inspected. It names what differs, as a stale reason

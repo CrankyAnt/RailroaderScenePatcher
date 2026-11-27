@@ -195,7 +195,7 @@ static class ChildObjectTests {
         var verdicts = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Bulb").Solid()).With("Helpers.Culling.RendererCuller"))))));
         var yardVerdict = verdicts.Single(v => v.Path == Yard);
         var lamp = verdicts.Single(v => v.Path == Post);
-        Assert(yardVerdict.Disposition == GroupDisposition.GroupHolder && SceneObjectRules.GroupRefusal(yardVerdict) == "This path names an object that only holds other groups, which isn't a group itself. Edit the groups it holds." && SceneObjectRules.GroupRefusal(lamp) == null && SceneObjectRules.GroupRefusal(null) == null, "Only a scene object that only holds other groups is refused with the scene object that only holds other groups message");
+        Assert(yardVerdict.Disposition == GroupDisposition.GroupHolder && SceneObjectRules.GroupRefusal(yardVerdict) == "This path names an object that only contains other groups, which isn't a group itself. Edit the groups inside it." && SceneObjectRules.GroupRefusal(lamp) == null && SceneObjectRules.GroupRefusal(null) == null, "Only a scene object that only holds other groups is refused with the scene object that only holds other groups message");
         Assert(SceneObjectRules.PartRefusal(null, lamp) == SceneObjectRules.TopObjectRefusal && SceneObjectRules.PartRefusal(null, null) == null, "A top scene object is refused as a part with its own reason");
         Assert(SceneObjectRules.ResolvesGroup(yardVerdict) && SceneObjectRules.ResolvesGroup(lamp) && !SceneObjectRules.ResolvesGroup(null), "A scene object that only holds other groups resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
         f.World.GroupVerdicts = verdicts.ToDictionary(v => v.Path);
@@ -212,7 +212,7 @@ static class ChildObjectTests {
         var warning = diagnostics.Failures.Single(failure => failure.Operation == "yard");
         const string expectedWarning = "Example Map [example/map; version 1.0.0]. Definition Data/scene-patches.json; operation yard; object " +
             "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Yard [UnityEngine.Transform]. " +
-            "This path names an object that only holds other groups, which isn't a group itself. Edit the groups it holds. " +
+            "This path names an object that only contains other groups, which isn't a group itself. Edit the groups inside it. " +
             "Patcher 0.5.0; game 0.6.3. Report this to the mod author: Example author.";
         Assert(warning.Message == expectedWarning, "The native warning gives the author the reason to correct the file entry: " + warning.Message);
         Assert(warning.Cause == FailureCause.InvalidDefinition, "The container path is an invalid definition.");

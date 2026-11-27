@@ -112,8 +112,8 @@ namespace RailroaderScenePatcher.Core {
         // holds none.
         static string Stale(GroundMaskState mask) {
             if (mask.MissingKeys != 0) return "the terrain system no longer stores a registration of the ground mask on " + mask.Holder;
-            if (!mask.Enabled) return mask.Registrations.Count == 0 ? null : "the disabled ground mask on " + mask.Holder + " still holds a registration";
-            if (mask.Registrations.Count != mask.Modifiers) return "the ground mask on " + mask.Holder + " holds " + mask.Registrations.Count + " registrations instead of " + mask.Modifiers;
+            if (!mask.Enabled) return mask.Registrations.Count == 0 ? null : "the disabled ground mask on " + mask.Holder + " still has a registration";
+            if (mask.Registrations.Count != mask.Modifiers) return "the ground mask on " + mask.Holder + " has " + mask.Registrations.Count + " registrations instead of " + mask.Modifiers;
             foreach (var registration in mask.Registrations) {
                 // Like is compared with like: the registration with the one a registration made at the holder's
                 // current pose would hold. Without that, the holder's place counts on the ground, and the height is

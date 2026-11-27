@@ -139,11 +139,11 @@ static class DuplicateMarkerIdTests {
     static void InspectorNamesTheIdEveryHolderAndEachRegistrationOwner() {
         var w = new World();
         var pair = Lines(w, w.Yard);
-        Assert(pair.Count == 3 && pair[0].StartsWith("Duplicate marker ID Mg6m is held by 2 scene markers. ", StringComparison.Ordinal), "The dependency view names the duplicate marker ID first: " + String.Join(" | ", pair));
+        Assert(pair.Count == 3 && pair[0].StartsWith("Duplicate marker ID Mg6m is used by 2 scene markers. ", StringComparison.Ordinal), "The dependency view names the duplicate marker ID first: " + String.Join(" | ", pair));
         Assert(pair[1] == "This marker is inactive and has no registration under Mg6m." && pair[2] == SpeedPath + " is active and has the registration under Mg6m at Sjdl / a / 10.",
             "The inspected Yard Limit comes first, inactive without a registration; the speed sign is active and owns the registration: " + String.Join(" | ", pair));
         var group = Lines(w, w.Whistles[2]);
-        Assert(group.Count == 4 && group[0].StartsWith("Duplicate marker ID Mkft is held by 3 scene markers. ", StringComparison.Ordinal), "The group of three is named: " + String.Join(" | ", group));
+        Assert(group.Count == 4 && group[0].StartsWith("Duplicate marker ID Mkft is used by 3 scene markers. ", StringComparison.Ordinal), "The group of three is named: " + String.Join(" | ", group));
         Assert(group[1] == "This marker is active and has the registration under Mkft at Sc / a / 7." && group[2] == WhistlePaths[0] + " is active and has the registration under Mkft at Sa / a / 5."
             && group[3] == WhistlePaths[1] + " is active and has the registration under Mkft at Sb / a / 6.", "Each whistle sign owns its own registration: " + String.Join(" | ", group));
         Assert(group.All(line => !line.Contains(": ")), "Every line is a plain sentence without a label: " + String.Join(" | ", group));
@@ -231,13 +231,13 @@ static class DuplicateMarkerIdTests {
     static void RefusalNamesTheEditedAndActiveHoldersFirst() {
         var w = new World();
         var enable = w.Session.Edit(Marker(YardPath), null, true).Error;
-        Assert(enable.StartsWith("Duplicate marker ID Mg6m is held by 2 scene markers, " + YardPath + " (inactive) and " + SpeedPath + " (active). ", StringComparison.Ordinal), "The edited Yard Limit comes first: " + enable);
+        Assert(enable.StartsWith("Duplicate marker ID Mg6m is used by 2 scene markers, " + YardPath + " (inactive) and " + SpeedPath + " (active). ", StringComparison.Ordinal), "The edited Yard Limit comes first: " + enable);
         var disable = w.Session.Edit(Marker(SpeedPath), null, false).Error;
-        Assert(disable.StartsWith("Duplicate marker ID Mg6m is held by 2 scene markers, " + SpeedPath + " (active) and " + YardPath + " (inactive). ", StringComparison.Ordinal), "The edited speed sign comes first: " + disable);
+        Assert(disable.StartsWith("Duplicate marker ID Mg6m is used by 2 scene markers, " + SpeedPath + " (active) and " + YardPath + " (inactive). ", StringComparison.Ordinal), "The edited speed sign comes first: " + disable);
         var g = new World();
         g.Markers.SetActive(g.Whistles[0], false); g.Markers.Load(g.Whistles[1]); g.Markers.Load(g.Whistles[2]); g.Markers.Mutations = 0; // a load with the first sign inactive
         var group = g.Session.Bind(Marker(WhistlePaths[2]), MarkerBinding.At(new TrackLocation("Sc", "a", 9))).Error;
-        Assert(group.StartsWith("Duplicate marker ID Mkft is held by 3 scene markers, " + WhistlePaths[2] + " (active), " + WhistlePaths[1] + " (active), and " + WhistlePaths[0] + " (inactive). ", StringComparison.Ordinal),
+        Assert(group.StartsWith("Duplicate marker ID Mkft is used by 3 scene markers, " + WhistlePaths[2] + " (active), " + WhistlePaths[1] + " (active), and " + WhistlePaths[0] + " (inactive). ", StringComparison.Ordinal),
             "The edited sign first, the active sign next and the inactive sign last: " + group);
     }
     // A holder whose activity follows its track group: its explicit disable would install the hold and deactivate it,

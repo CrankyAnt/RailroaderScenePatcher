@@ -4,7 +4,7 @@
 
 Move a station map icon to show the station's new location in the map window. You can also disable and restore it. The station itself, its track span, its depot house, and its station agent are native map data. Move those in the native map editor.
 
-Station map icons are the direct children with a `UI.Map.MapIcon` component under the `World/Map Labels/Station Icons` object, which holds the icons and has no row of its own. Each icon is listed once under the **Station map icon** category of the outliner, with physical placement and **Enabled**. Only the icons directly in that object get rows. Map icons that the game creates while it runs, such as those of cars and players, are not listed. A station map icon target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content; see [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
+Station map icons are objects with a `UI.Map.MapIcon` component directly under `World/Map Labels/Station Icons`. The parent object has no row of its own. Each icon is listed once under the **Station map icon** category of the outliner, with physical placement and **Enabled**. Only the icons directly in that object get rows. Map icons that the game creates while it runs, such as those of cars and players, are not listed. A station map icon target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content; see [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
 ## Move a station: native map data first, then the icon
 

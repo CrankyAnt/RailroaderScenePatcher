@@ -14,14 +14,14 @@ namespace RailroaderScenePatcher {
             Starter = "Has no effect on where cars start", Replacement = "Only the Generic track marker family",
             NoReader = "No new-game car placement uses it", SeveralReaders = "Several new-game car placements use it",
             Setups = "The new-game setups can't be read", CurrentId = "Its current ID can't be read",
-            UniqueId = "No other object holds its marker ID", Camera = "The game switches it by camera distance",
+            UniqueId = "No other object uses its marker ID", Camera = "The game switches it by camera distance",
             ParentInactive = "Its parent object must be active", AttachedOutOfDate = "Its attached object is out of date",
             ControllerDisabled = "Its crossing controller is disabled", GameBuild = "Not supported on this game build",
             ProgressionUnread = "Progression data can't be read", MapFeatureUnread = "Map feature data can't be read",
             SharedActivity = "Progression or a map feature controls it", TrackGroupActivity = "Its track group controls its activity",
             CrossingPad = "Edit its crossing pad separately", SpawnPoints = "Edit its spawn points one by one",
             MapIcon = "Edit its map icon separately", StationClickSpots = "Station click spots are native map data",
-            ConstructionController = "It holds a construction controller", OnMilepost = "Edit it on its milepost",
+            ConstructionController = "It has a construction controller", OnMilepost = "Edit it on its milepost",
             OnCrossingPad = "Edit it on its crossing pad", OnGroup = "Edit it on its group",
             WholeGroup = "Edit the whole group instead", Parts = "Edit its parts directly", Groups = "Edit its groups instead",
             EquipmentUnread = "Its lights, gates and bells can't be read";
@@ -70,7 +70,7 @@ namespace RailroaderScenePatcher {
             if (Has("A bell's sound has no direction")) return CommandBand.BellNoRotation;
             if (Has("A crossing pad follows its track")) return CommandBand.PadFollowsTrack;
             if (Has("contains a crossing pad")) return CrossingPad;
-            if (Has("holds track markers, so you can't enable or disable it")) return SupportedEdits.CrossingNoActivity;
+            if (Has("contains track markers, so you can't enable or disable it")) return SupportedEdits.CrossingNoActivity;
             if (Has("contains spawn points") || Has("groups that hold a spawn point")) return SpawnPoints;
             if (Has("contains a map icon")) return MapIcon;
             if (Has("contains a station click spot")) return StationClickSpots;
@@ -80,7 +80,7 @@ namespace RailroaderScenePatcher {
             if (Has("set the construction segments on its group")) return OnGroup;
             if (Has("This path names a group, not a part")) return WholeGroup;
             if (Has("only carries a simple culler")) return Parts;
-            if (Has("only holds other groups")) return Groups;
+            if (Has("only contains other groups")) return Groups;
             if (Has("crossing controller's Connections tab") || Has("span's track locations determine its position")) return Crossing;
             if (Has("Objects listed under") || Has("cannot be edited") && reason.StartsWith("Not yet supported: ", StringComparison.Ordinal)) return Family;
             if (Has("Map coordinates are unavailable") || Has("editing is unavailable") || Has("could not be read") || Has("couldn't be read")) return State;
@@ -89,12 +89,14 @@ namespace RailroaderScenePatcher {
                 || Has("equipment cannot be edited on this game build") || Has("Construction scenery entries unavailable") || Has("Construction scenery targets unavailable")
                 || Has("Existing crossing bells are unavailable") || Has("construction controller is unavailable") || Has("log pond") && Has("members") || Has("storage pile") && Has("members")) return Members;
             if (Has("script") && Has("missing") || Has("rigidbody") || Has("renderer culler must") || Has("enabled circle map mask")
-                || Has("object holds no ") || Has("object holds several ") || Has("pad builder has no ")
+                || Has("object has no track marker") || Has("object has several track markers")
+                || Has("object has no crossing-pad builder") || Has("object has several crossing-pad builders") || Has("pad builder has no ")
+                || Has("object has no crossing controller") || Has("object has several crossing controllers")
                 || Has("track-owned component") || Has("controls the bridge root's activity") || Has("bridge has no colliders")
                 || Has("no text synchronizer") || Has("also has a crossing-pad builder") || Has("Generic track markers are supported")
                 || Has("Generic pad markers are supported") || Has("needs a Generic track marker") || Has("not a listed group")
                 || Has("not listed as a part") || Has("isn't a station map icon") || Has("has no scene spawn point")
-                || Has("holds no circuit") || Has("has no circuits") || Has("holds an empty circuit") || Has("A circuit lacks")
+                || Has("has no circuit list") || Has("has no circuits") || Has("has an empty circuit entry") || Has("A circuit lacks")
                 || Has("span of a circuit has no ID") || Has("milepost component") || Has("milepost has no track marker")
                 || Has("more than one track marker") || Has("marker has no ID") || Has("consumer is not supported")
                 || Has("dependent state is not supported") || Has("can't move that culler") || Has("group of this part is no longer listed") || Has("not part of a mast")) return Structure;

@@ -232,10 +232,10 @@ namespace RailroaderScenePatcher.Core {
             if (d.ContainsDestination) return "it contains the destination crossing";
             if (d.OtherScene) return "it is in a different Unity scene from the destination crossing and could unload while the copy still uses its assets";
             if (d.MissingScript) return "a script in its hierarchy is missing";
-            if (d.Controllers > 0) return "it holds a crossing controller; a copy would be a second crossing";
-            if (d.KeyValueObjects > 0) return "it holds its own key-value object, which would intercept the crossing controller's keys";
-            if (d.Spans > 0) return "it holds a detection span";
-            if (d.Cullers > 0) return "it holds its own culler";
+            if (d.Controllers > 0) return "it contains a crossing controller; a copy would be a second crossing";
+            if (d.KeyValueObjects > 0) return "it has its own key-value object, which would intercept the crossing controller's keys";
+            if (d.Spans > 0) return "it contains a detection span";
+            if (d.Cullers > 0) return "it has its own culler";
             if (d.Bells > 0) return "it contains a bell player and is not a light or gate source. " + WindowGuidance.AddBellsFromDefinition;
             if (d.Lamps.Count + d.Gates.Count == 0) return "it has no lamp or gate that observes the controller's " + String.Join(" or ", keys) + " key";
             foreach (var l in d.Lamps) {

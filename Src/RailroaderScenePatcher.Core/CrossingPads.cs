@@ -132,7 +132,7 @@ namespace RailroaderScenePatcher.Core {
             // differ from the current track, so it never leaves a mesh built from an earlier track shape.
             public string Problem(object target, bool resolvable, bool following, bool explicitApply) {
                 var geometry = world.Geometry(target) ?? throw new InvalidOperationException("The pad geometry is unavailable");
-                if (!resolvable) return geometry.Generated ? "the pad holds generated geometry although its marker location does not resolve" : null;
+                if (!resolvable) return geometry.Generated ? "the pad still has generated geometry although its marker location does not resolve" : null;
                 var location = world.Location(target);
                 if (!geometry.Generated) return "the pad has no generated geometry for its marker location " + location;
                 if (!TrackLocation.Same(geometry.Source, location)) return "the pad geometry was generated from " + (geometry.Source?.ToString() ?? "an unknown location") + " instead of " + location;

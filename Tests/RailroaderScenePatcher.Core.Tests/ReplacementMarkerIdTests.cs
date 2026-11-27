@@ -494,7 +494,7 @@ static class ReplacementMarkerIdTests {
             "A marker of another family keeps the row disabled with its reason: " + RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false));
         Assert(ReplacementMarkerIds.NotSupported == "Only objects in the Generic track marker family can have a replacement ID." && ReplacementMarkerIds.NotSupported.Contains(SceneFamilies.TrackMarker + " family"),
             "The refusal names the family Generic track marker, not the marker type Generic that a milepost also shows: " + ReplacementMarkerIds.NotSupported);
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mown", 0, false) == "No other object holds its marker ID", "A marker ID of its own needs no replacement");
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mown", 0, false) == "No other object uses its marker ID", "A marker ID of its own needs no replacement");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mg6m", 1, false) == null && RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Generic track marker", true, "Mg6m", 0, true) == null,
             "A shared native id offers the replacement ID, and a marker that already has one keeps the row");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "", "Mg6m") == ReplacementMarkerIds.Empty, "An empty field states the reason");
@@ -505,7 +505,7 @@ static class ReplacementMarkerIdTests {
         Assert(RailroaderScenePatcher.GuidedTaskState.Tasks.Contains(RailroaderScenePatcher.GuidedTaskKind.MarkerId), "The guided task list offers the replacement ID");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, " Mx", "Mg6m").Contains("begins or ends with a space"), "A space at either end states the reason");
         Assert(RailroaderScenePatcher.CommandBand.ClearMarkerIdReason("Editing is unavailable.", true) == "Editing is unavailable.", "Clear ID follows the general edit block first");
-        Assert(RailroaderScenePatcher.CommandBand.SharersCaption("Mg6m", "Mg6m") == "Also holding Mg6m" && RailroaderScenePatcher.CommandBand.SharersCaption("Mg6m", "Mg6m-yard") == "Still holding Mg6m, the underlying ID",
+        Assert(RailroaderScenePatcher.CommandBand.SharersCaption("Mg6m", "Mg6m") == "Also using Mg6m" && RailroaderScenePatcher.CommandBand.SharersCaption("Mg6m", "Mg6m-yard") == "Still using Mg6m, the underlying ID",
             "After the repair the caption no longer says the marker holds the underlying ID");
     }
 

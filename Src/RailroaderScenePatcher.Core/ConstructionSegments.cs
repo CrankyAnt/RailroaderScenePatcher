@@ -121,7 +121,7 @@ namespace RailroaderScenePatcher.Core {
         public void Preflight(object target) {
             var refusal = world.Refusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
-            if (world.ConstructionSegments(target) == null) throw new InvalidOperationException("The object no longer holds a construction controller.");
+            if (world.ConstructionSegments(target) == null) throw new InvalidOperationException("The object no longer has a construction controller.");
         }
         public void CheckRelationships(object target, ObjectState state) {
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship.");

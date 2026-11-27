@@ -628,13 +628,13 @@ static class GroundMaskTests {
     // The Object tab names the part that holds the ground mask and says that moving it moves the terrain shaping; the
     // top scene object and a part above the mask name the part that holds it. The Changes tab shows terrain output for them.
     static void ObjectTabNamesTheMaskHolder() {
-        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false) == "Ground mask: this part holds the scene ground mask. Moving this part moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false) == "Ground mask: this part has the scene ground mask. Moving this part moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The holder's line: " + CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false));
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) == "Ground mask: the part Mask holds the scene ground mask. Moving this part moves that part, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) == "Ground mask: the part Mask has the scene ground mask. Moving this part moves that part, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of an object above the holder: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false));
-        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true) == "Ground mask: this part holds the scene ground mask. The mask also flattens the ground. Moving this part moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true) == "Ground mask: this part has the scene ground mask. The mask also flattens the ground. Moving this part moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The holder of a flattening mask: " + CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true));
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) == "Ground mask: the part Mask holds the scene ground mask. The mask also flattens the ground. Moving this part moves that part, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) == "Ground mask: the part Mask has the scene ground mask. The mask also flattens the ground. Moving this part moves that part, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "An object above a flattening mask: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true));
         Assert(CommandBand.HoldsGroundMask(new[] { "Culling", CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) }) && !CommandBand.HoldsGroundMask(new[] { "Culling" }) && !CommandBand.HoldsGroundMask(null),
             "Whether an object has terrain output travels as its dependency line");
@@ -661,14 +661,14 @@ static class GroundMaskTests {
         Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(true, new[] { "Root" }, false, group: true) }).StartsWith("The building is decorative. Its ground mask shapes", StringComparison.Ordinal),
             "A mask on the top scene object is the group's own");
         // Below a marker object the holder is no part of a family: the line calls it an object.
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false) == "Ground mask: the object Mask holds the scene ground mask. The mask also flattens the ground. Moving this object moves that object, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false) == "Ground mask: the object Mask has the scene ground mask. The mask also flattens the ground. Moving this object moves that object, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of a marker object above the holder: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false));
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, group: true) == "Ground mask: the part Mask holds the scene ground mask. The mask also flattens the ground. Moving this group moves that part, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, group: true) == "Ground mask: the part Mask has the scene ground mask. The mask also flattens the ground. Moving this group moves that part, its mask, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "A group above a mask holder calls the inspected object a group");
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask", "Pad" }, true, group: true) == "Ground mask: the parts Mask and Pad hold scene ground masks. At least one mask also flattens the ground. Moving this group moves those parts, their masks, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask", "Pad" }, true, group: true) == "Ground mask: the parts Mask and Pad have scene ground masks. At least one mask also flattens the ground. Moving this group moves those parts, their masks, and the terrain effects. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "A group above several mask holders names the group and all the masks");
         // An object of another family, such as a milepost or a spawn point, that holds the mask itself is no part.
-        Assert(CommandBand.GroundMaskDependency(true, new[] { "Spawn" }, true, parts: false) == "Ground mask: this object holds the scene ground mask. The mask also flattens the ground. Moving this object moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
+        Assert(CommandBand.GroundMaskDependency(true, new[] { "Spawn" }, true, parts: false) == "Ground mask: this object has the scene ground mask. The mask also flattens the ground. Moving this object moves the mask and its effects on the terrain. The patcher asks the game to rebuild terrain and vegetation at both positions.",
             "The line of an object of another family that holds the mask: " + CommandBand.GroundMaskDependency(true, new[] { "Spawn" }, true, parts: false));
     }
 

@@ -10,34 +10,34 @@ The map's scene stores these groups. Props, masks, and other objects in the map'
 
 ## Which groups are listed
 
-In the outliner, each group appears once, under the group's category. See [selecting in the world](select-world-targets.md). A top scene object is a scene object directly below an object that only holds other groups under `World`, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, top scene objects are directly below a place's object that only holds other groups, such as `World/Large Scenery/Bryson/Bryson House Track`. An exception is `World/Large Scenery/Almond Bridge`, which is itself a top scene object because it holds the construction of one rail bridge. See [rail bridges outside Ela](#rail-bridges-outside-ela).
+In the outliner, each group appears once, under the group's category. See [selecting in the world](select-world-targets.md). A top scene object is a scene object directly below an object that only contains other groups under `World`, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, top scene objects are directly below a place's object that only contains other groups, such as `World/Large Scenery/Bryson/Bryson House Track`. An exception is `World/Large Scenery/Almond Bridge`, which is itself a top scene object because it contains the construction of one rail bridge. See [rail bridges outside Ela](#rail-bridges-outside-ela).
 
 To be listed, a group must be saved in the scene, have a renderer, collider, light, storage pile, or log pond at or below its top scene object, and belong to no other family. The following objects have no group entry:
 
 - Objects without a renderer, collider, light, storage pile, or log pond. A spawn point under `World/POIs` has its own **Spawn point** family; see [move player spawn points](moving-spawn-points.md).
 - Visual effects, such as the fireflies under `World/Environment Effects`.
-- Objects that only hold other groups, such as `World/Large Scenery/Bryson/Bryson Yard`. The patcher doesn't list them. Each of the 13 yard lamp posts below Bryson Yard is its own group.
+- Objects that only contain other groups, such as `World/Large Scenery/Bryson/Bryson Yard`. The patcher doesn't list them. Each of the 13 yard lamp posts below Bryson Yard is its own group.
 - `Almond/Cube` and `Bryson/Bryson Appalachian Hardwoods`, which have no model or game function.
 
 A group contains only the objects saved below its top scene object in the scene. Moving it leaves nearby native map data in place. Edit Props, tanks, conveyors, and terrain masks from `Map.json` in the native map editor. For example, the coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are Props, so they don't move with those groups.
 
-Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
+Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot or map icon. A group with a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
-Groups containing spawn points or a crossing pad are also marked `inspection only` and can't move as a whole. Edit their spawn points in the **Spawn point** family and the pad in the **Crossing pad marker** family. The **Placement** tab of a group that can't move as a whole, such as one that contains a station click spot or a construction controller outside a rail bridge, gives the reason and shows the group's position and rotation, without placement modes or actions. A group that holds track markers is listed; see [groups with track markers](#groups-with-track-markers). A group marked `inspection only` stays under its category in the outliner. A group that fits no category stands under **Unclassified**. These groups list no parts.
+Groups containing spawn points or a crossing pad are also marked `inspection only` and can't move as a whole. Edit their spawn points in the **Spawn point** family and the pad in the **Crossing pad marker** family. The **Placement** tab of a group that can't move as a whole, such as one that contains a station click spot or a construction controller outside a rail bridge, gives the reason and shows the group's position and rotation, without placement modes or actions. A group that contains track markers is listed; see [groups with track markers](#groups-with-track-markers). A group marked `inspection only` stays under its category in the outliner. A group that fits no category stands under **Unclassified**. These groups list no parts.
 
 ## Which parts are listed
 
 Each group lists its parts below its own row, in alphabetical order. A part's row shows the path from the top scene object, such as `Jetty / Piece (2)`. A search matches the full name, including the group, such as `Whittier Saw Mill / Jetty / Piece (2)`.
 
-A part is a scene object at any depth below the top scene object. Renderers and components aren't parts. To appear in the list, an object must be saved in the scene and have a renderer, collider, light, storage pile, or log pond at or below it. A saved object holding a scene ground mask also appears, even without any of those. Parts can contain other parts, which move with them.
+A part is a scene object at any depth below the top scene object. Renderers and components aren't parts. To appear in the list, an object must be saved in the scene and have a renderer, collider, light, storage pile, or log pond at or below it. A saved object with a scene ground mask also appears, even without any of those. Parts can contain other parts, which move with them.
 
 Some objects below a top scene object are not listed as parts:
 
 - Sibling objects with the same name share one path. A scene patch file cannot tell them apart, so neither they nor the objects below them are listed.
-- A level of a LOD group, such as `LOD0` and `LOD1` below a lamp, belongs to the entry of the object that holds the LOD group.
-- An object that only carries a simple culler (the game's SimpleCuller), such as `Bryson House Track / Culled`, has no row of its own and appears in no world choice list. The parts in it are listed under their group, with the culler object in their name. A group whose top scene object carries the culler, such as Sylva Culled, keeps its group row and lists its models as parts. A modification whose path names such an object fails with the message "This path names an object that only carries a simple culler, which isn't an editable part. Edit the parts it holds directly." The file's other modifications still apply.
+- A level of a LOD group, such as `LOD0` and `LOD1` below a lamp, belongs to the entry of the object with the LOD group.
+- An object that only carries a simple culler (the game's SimpleCuller), such as `Bryson House Track / Culled`, has no row of its own and appears in no world choice list. The parts in it are listed under their group, with the culler object in their name. A group whose top scene object carries the culler, such as Sylva Culled, keeps its group row and lists its models as parts. A modification whose path names such an object fails with the message "This path names an object that only carries a simple culler, which isn't an editable part. Edit its parts directly." The file's other modifications still apply.
 - Objects the game moves during play, such as a clock hand at Bryson depot or the flame of a lantern, which the game turns toward the camera, are not listed as parts. Neither are the objects below them. These objects remain in their group and move with it.
-- Objects without a renderer, collider, light, storage pile, or log pond, objects created while the game runs, and objects listed by another family have no part entry. The exception is an object that holds a scene ground mask, which is listed as a part.
+- Objects without a renderer, collider, light, storage pile, or log pond, objects created while the game runs, and objects listed by another family have no part entry. The exception is an object with a scene ground mask, which is listed as a part.
 
 ## Move a group in the native map editor
 
@@ -68,13 +68,13 @@ Click **Remove modification** to restore a part's unmodified placement relative 
 
 ## Groups with track markers
 
-A group can hold track markers, such as `Bryson Signs` with its speed sign and yard limit signs. Each marker keeps its own row in the **Generic track marker** family and isn't a part of the group.
+A group can contain track markers. For example, `Bryson Signs` contains its speed sign and yard limit signs. Each marker keeps its own row in the **Generic track marker** family and isn't a part of the group.
 
 To move or rotate the group, select its row and follow [move a group in the native map editor](#move-a-group-in-the-native-map-editor). Its parts and its markers move together and keep their placement relative to each other. Each marker keeps the track binding it had: its segment, end, and distance don't change, so the game still reads the marker at the same track location. To bind a marker to the place where it now stands, select the marker and set its binding, as described in [repair track bindings](repairing-track-bindings.md).
 
 A marker that follows a track stays on its track point when the group moves or rotates, as a crossing pad does. The rest of the group moves around it. To make the marker move with the group again, select it and click **Stop** on the **Placement** tab's **Follow** mode, as described in [follow a track](following-track.md).
 
-**Disable** and **Enable** are unavailable for such a group, and for a part that holds a track marker, with the reason `Its activity can't be edited`. Disabling the group would take its markers off the track. A scene patch file that sets `active` for such a group fails with the message "This object holds track markers, so you can't enable or disable it. Disabling it would take its markers off the track." To switch a single marker off, disable it in the **Generic track marker** family.
+**Disable** and **Enable** are unavailable for such a group, and for a part that contains a track marker, with the reason `Its activity can't be edited`. Disabling the group would take its markers off the track. A scene patch file that sets `active` for such a group fails with the message "This object contains track markers, so you can't enable or disable it. Disabling it would take its markers off the track." To switch a single marker off, disable it in the **Generic track marker** family.
 
 The modification records only the group's placement. It records no track binding.
 
@@ -93,7 +93,7 @@ The `Coal Loader` at Robinson Gap Mine is a decorative group under **Industry bu
 
 ## Lake surfaces
 
-You can move, rotate, or disable a lake surface to fit a changed river or track. A lake surface is a water mesh that the scene saves. `Fontana Lake (1)` and `Fontana Lake (2)` below `World/Rivers` are lake surfaces, each its own group under **Water**. The `Whittier Log Pond` group at the Whittier saw mill, under **Storage display**, holds a lake surface and a log pond.
+You can move, rotate, or disable a lake surface to fit a changed river or track. A lake surface is a water mesh that the scene saves. `Fontana Lake (1)` and `Fontana Lake (2)` below `World/Rivers` are lake surfaces, each its own group under **Water**. The `Whittier Log Pond` group at the Whittier saw mill, under **Storage display**, contains a lake surface and a log pond.
 
 Edit lake masks and rivers from `Map.json` in the native map editor. Native masks shape and color the terrain. The lake surface is a separate scene object, so moving it with the patcher leaves the native mask in place. To reshape the terrain under the moved water, edit the mask in the native map editor.
 
@@ -109,21 +109,21 @@ If the game draws a lake surface from a static batch, moving it would leave the 
 
 A scene ground mask is a component that registers a shape in the game's terrain system where its object stands. The shape sets the ground and the vegetation there. The flag-stop stations `Alarka Jct Station`, `Cochran flagstopstation`, `Ela flagstopstation`, `Nantahala Station`, `Rhodo Station`, `Topton Station`, and `Wilmot Station`, and the depots `Alarka Depot`, `Almond Depot`, `Sylva Depot`, and `Southern Combination Depot` at Whittier, are groups under **Station building** with **Group** as their family.
 
-In each of them, the mask is a `RectangleMapMask` on a part named `Mask`. The patcher lists `Mask` as a part although it has no renderer, collider, or light, because it is the part that holds the mask. On its **Object** tab, **Dependencies** explains that the mask flattens the ground and moves with this part, along with its effects on the terrain. The top scene object and any part above `Mask` name that part under **Dependencies** too, and their **Use in the game** says that the ground mask of the part `Mask` shapes the ground and the vegetation where it stands.
+In each of them, the mask is a `RectangleMapMask` on a part named `Mask`. The patcher lists `Mask` as a part because it has the ground mask, even though it has no renderer, collider, or light. On its **Object** tab, **Dependencies** explains that the mask flattens the ground and moves with this part, along with its effects on the terrain. The top scene object and any part above `Mask` name that part under **Dependencies** too, and their **Use in the game** says that the ground mask of the part `Mask` shapes the ground and the vegetation where it stands.
 
 When a mask's holder moves, the patcher calls the game's `Rebuild` method to request one mask registration at the holder's center and rotation, followed by terrain and vegetation regeneration at the old and new positions. This behavior hasn't yet been observed in Railroader with a numeric height comparison.
 
 As with a location sign, the patcher tracks the edited object's terrain output at the mask's center. Read the output under **Terrain** on the **Changes** tab. After an edit of the group, such as **Disable**, the **Terrain** line of `Mask` shows the group's result, for example `By the edit of its group Wilmot Station: Terrain updated: …`. Click **Retry** to request another attempt if a write stops. For a mask that crosses a terrain tile border, the patcher tracks and retries only the tile containing its center. See [the limits](#limits). Save doesn't write terrain output. If a write doesn't finish within 30 seconds, the patcher reports the completed and outstanding positions. See [move a location sign with its terrain effects](moving-location-signs.md#when-the-terrain-output-does-not-complete).
 
-Moving a bridge, milepost, crossing pad, station map icon, or spawn point also moves any scene ground masks on that object or its children, including masks that flatten the ground. Its **Changes** tab shows the **Terrain** output. No such object holds a mask on the Railroader 0.6.3 base-game map.
+Moving a bridge, milepost, crossing pad, station map icon, or spawn point also moves any scene ground masks on that object or its children, including masks that flatten the ground. Its **Changes** tab shows the **Terrain** output. No such object has a mask on the Railroader 0.6.3 base-game map.
 
 A part with its own placement moves its mask with it when its group moves, as it moves the part. Disabling a group or part is expected to release the mask through the component's lifecycle. Enabling it is expected to register the mask again. The patcher checks both transitions and fails the edit if the mask doesn't match the activity. This behavior hasn't yet been observed in Railroader. After **Undo**, **Redo**, restoration after a failed edit, and **Remove modification**, the patcher checks that the mask is back at its holder.
 
-In Railroader 0.6.3, these buildings' masks also flatten the ground under them to a single height. These masks move with the objects that hold them, like any other mask. You can move the group, the `Mask` part, or a part above it with **Gizmo**, **Snap**, **Follow**, or **Numeric**. You can also enable or disable each object. The game builds each terrain tile from its base heights and the masks registered on it. After a move, it rebuilds the terrain at both positions. At the old position, it restores the ground height without the mask. At the new position, the mask flattens the ground. **Undo**, **Remove modification**, and restoration after a failed edit move the mask back and make the game rebuild the terrain at both positions again. When the world reloads, the game builds the terrain from the saved scene patch file, with the mask registered once at the object that holds it.
+In Railroader 0.6.3, these buildings' masks also flatten the ground under them to a single height. Each mask moves with the object it is on, as other masks do. You can move the group, the `Mask` part, or a part above it with **Gizmo**, **Snap**, **Follow**, or **Numeric**. You can also enable or disable each object. The game builds each terrain tile from its base heights and the masks registered on it. After a move, it rebuilds the terrain at both positions. At the old position, it restores the ground height without the mask. At the new position, the mask flattens the ground. **Undo**, **Remove modification**, and restoration after a failed edit move the mask back and make the game rebuild the terrain at both positions again. When the world reloads, the game builds the terrain from the saved scene patch file, with the mask registered once at the object with the mask.
 
 If the game's ground mask members are unavailable in a build, the group is refused with `The game's ground mask members are unavailable, so you can't move, enable, or disable this group or its parts.`
 
-Hemingway flagstopstation isn't a group. The building's root holds a marker of type Generic, so the object belongs to the **Generic track marker** family. Moving its marker also moves its ground mask, which flattens the ground, as with the station groups. On its **Object** tab, **Dependencies** names the object that holds the mask, because the **Generic track marker** family has no parts. Moving any other track marker object also moves the masks on that object or its children. This includes a mask on a `Loc:` location sign that moves with its parent. When you edit the location sign itself, the **Location sign** family moves its mask.
+Hemingway flagstopstation isn't a group. The building's root has a marker of type Generic, so the object belongs to the **Generic track marker** family. Moving its marker also moves its ground mask, which flattens the ground, as with the station groups. On its **Object** tab, **Dependencies** names the object with the mask, because the **Generic track marker** family has no parts. Moving any other track marker object also moves the masks on that object or its children. This includes a mask on a `Loc:` location sign that moves with its parent. When you edit the location sign itself, the **Location sign** family moves its mask.
 
 The game's progression switches the `Cochran flagstopstation`, `Alarka Depot`, and `Alarka Jct Station` groups and the track marker on `Hemingway flagstopstation` on and off when the map loads and whenever industries change. Without a disable, the game controls this activity. If you disable an object, it stays off even when progression would switch it on. The **Object** tab and footer's message area show an amber warning explaining that your disable keeps the object off despite progression.
 
@@ -134,7 +134,7 @@ The game's progression switches the `Cochran flagstopstation`, `Alarka Depot`, a
 Four buildings under **Railroad service building** have objects that you click in the game:
 
 - `Bryson Section House` has a trainman's lantern, `Bryson Section House / TrainmanLantern`, that switches on and off.
-- `Bryson Tower Chance Clayton`, the tower at Bryson, has a lantern, `Bryson Tower Chance Clayton / Culling Container / TrainmanLantern`, and a name sign whose text is held by the part `Bryson Tower Chance Clayton / Culling Container / Sign-Station / Text`.
+- `Bryson Tower Chance Clayton`, the tower at Bryson, has a lantern, `Bryson Tower Chance Clayton / Culling Container / TrainmanLantern`, and a name sign with its text on the part `Bryson Tower Chance Clayton / Culling Container / Sign-Station / Text`.
 - `Bryson Turntable` and `Roundhouse 3` at Dillsboro are roundhouses. Each stall, such as `Bryson Turntable / Roundhouse / Stall (2)` or `Roundhouse 3 / Stall (1)`, has doors that open and close.
 
 Move or disable these buildings and their parts as you would any other group or part. After a move, test the lantern or door by clicking it at its new position.
@@ -145,12 +145,12 @@ On the **Object** tab, **Use in the game** names the interactive objects and the
 
 - A lantern reads `Lantern switch: click the lantern in the game to switch it on or off.`, followed by its key and the note that its state stays when the group or part moves.
 - A stall reads `Door toggle: click the doors in the game to open or close them.`, with the same note.
-- The object that holds the states names their saved ID. For the tower, whose holder is an object that only carries a simple culler and has no row of its own, the group names it.
-- A group or part above the object that holds the states, such as the `Bryson Turntable` group, says that disabling it also disables that object, so a game save might not keep the states.
-- A group or part with interactive objects below it says how many it holds.
+- The object that keeps its toggles' states names their saved ID. For the tower, whose holder is an object that only carries a simple culler and has no row of its own, the group names it.
+- The description of a group or part above the object that keeps its toggles' states, such as the `Bryson Turntable` group, warns that disabling the group or part also disables that object. Saving the game while that group or part is disabled might lose those states.
+- If a group or part has interactive objects below it, its description gives the count.
 - The tower's name text says that the scene keeps the text with the part, so the text moves with it.
 
-The object that animates a stall's doors, such as `Stall (2) / Roundhouse Modular A Stall`, has no row of its own. It holds the stall's walls, roof, and doors and moves with its stall, so move the stall to move the doors. The turntable and the tracks into the stalls are native map data; move them in the native map editor.
+The object that animates a stall's doors, such as `Stall (2) / Roundhouse Modular A Stall`, has no row of its own. It contains the stall's walls, roof, and doors and moves with its stall, so move the stall to move the doors. The turntable and the tracks into the stalls are native map data; move them in the native map editor.
 
 ## Rail bridges outside Ela
 
@@ -160,7 +160,7 @@ You can move, rotate, or disable a rail bridge outside Ela so that it stands whe
 - `Almond Bridge`, the top scene object at `World/Large Scenery/Almond Bridge`, with its parts `Almond Bridge / Abutments` and `Almond Bridge / Steel`. The top scene object carries the bridge's construction controller and culler, so the abutments and steel are parts of one group.
 - Each of the seven plate girder bridges below `World/Large Scenery/Plate Girder Bridge`, such as `Plate Girder Bridge (1)`. Each one is one object without parts.
 
-The bridge's colliders and culling move with it. After every edit, the patcher checks that each collider keeps its shape and enabled state. It checks that the physics bounds of box, sphere, and capsule colliders follow the bridge, but doesn't compare mesh collider bounds. It also verifies that nearby generated trestles remain unchanged. A bridge holding a track component or generated trestle is refused.
+The bridge's colliders and culling move with it. After every edit, the patcher checks that each collider keeps its shape and enabled state. It checks that the physics bounds of box, sphere, and capsule colliders follow the bridge, but doesn't compare mesh collider bounds. It also verifies that nearby generated trestles remain unchanged. A bridge with a track component or generated trestle is refused.
 
 Move the track in the native map editor. It remains native map data and keeps its own trestle or steel flags. A rail bridge doesn't follow its track. **Follow** is unavailable for a rail bridge and its parts, and the patcher refuses a hand-written track-following placement. Move the track first, then move the bridge onto it:
 
@@ -199,14 +199,14 @@ The road remains native map data. Move it in the native map editor; moving the b
 
 The bridge moves with its colliders and its culling. Each road bridge carries a renderer culler on its top scene object; the patcher moves the culler's sphere to the bridge and keeps its radius. After every edit, the patcher checks that each collider keeps its shape and enabled state, and that the physics bounds of each box, sphere, or capsule collider follow the bridge.
 
-A road bridge can hold a scene ground mask, a `RectangleMapMask` on its top scene object that extends the length of the bridge. In Railroader 0.6.3, the scene configures it as a tree-cutting mask, so it is expected to keep trees off the bridge. On the bridge's **Object** tab, **Dependencies** identifies the top scene object as the mask's holder. **Use in the game** describes the bridge as decorative, identifies its road as native map data, and explains the mask's effect.
+A road bridge can have a scene ground mask, a `RectangleMapMask` on its top scene object that extends the length of the bridge. In Railroader 0.6.3, the scene configures it as a tree-cutting mask, so it is expected to keep trees off the bridge. On the bridge's **Object** tab, **Dependencies** identifies the top scene object as the mask's holder. **Use in the game** describes the bridge as decorative, identifies its road as native map data, and explains the mask's effect.
 
 When the bridge moves, the patcher asks the game to rebuild the mask with one registration at the bridge's center and rotation. It tracks terrain output at the old and new positions, as described in [buildings with ground masks](#buildings-with-ground-masks). Read the output under **Terrain** on the **Changes** tab and click **Retry** to request another attempt if a write stops. Moving a part leaves the mask on the top scene object in place. Disabling the bridge releases the mask, and enabling it registers the mask again. See [the tested road bridge behavior](#limits).
 
 Two bridges differ:
 
 - The mask of `Old Home Town Road Bridge` also flattens the ground. It moves with the bridge, and the game rebuilds the terrain at both positions, as with the station buildings.
-- The mask component of `Whittier Road Bridge` is disabled in the scene. It holds no registration, so the bridge moves without a rebuild and without terrain output. Its **Dependencies** name no ground mask, **Use in the game** names no terrain, and the **Changes** tab shows no **Terrain** section for it.
+- The mask component of `Whittier Road Bridge` is disabled in the scene. It has no registration, so the bridge moves without a rebuild and without terrain output. Its **Dependencies** name no ground mask, **Use in the game** names no terrain, and the **Changes** tab shows no **Terrain** section for it.
 
 The 60-meter bridge at US19 Gov Island stands beside the grade-crossing setup under the same `World/Roads Bryson/US19 Gov Island` object. The bridge is separate from the crossing setup. A move of the bridge leaves the crossing, its lights, gates, and bells where they are. To move the crossing's lights, gates, and bells, see [move existing crossing equipment](moving-crossing-equipment.md).
 
@@ -240,9 +240,9 @@ In the outliner, each of the three crossings is its own `Crossing Unprotected` r
 
 ### Move a crossing as a whole
 
-A crossing without signals has no controller, so you move it from its own row in the outliner. Selecting that row inspects the crossing object, which holds the crossbucks and pads. Its crossbucks move together and keep their placement relative to each other, a crossbuck with its own placement included. Its crossing pads stay where they are with their track bindings. This works for a map crossing, a duplicated crossing, and crossings that share a path.
+A crossing without signals has no controller, so you move it from its own row in the outliner. Selecting that row inspects the crossing object, which contains the crossbucks and pads. Its crossbucks move together and keep their placement relative to each other, a crossbuck with its own placement included. Its crossing pads stay where they are with their track bindings. This works for a map crossing, a duplicated crossing, and crossings that share a path.
 
-1. Select the crossing's row in the outliner. The row holds its crossbucks and pads. The **Object** tab reads **Move or rotate the whole crossing. Its crossbucks move together, and its crossing pads stay in place.**
+1. Select the crossing's row in the outliner. The outliner lists its crossbucks and pads under that row. The **Object** tab reads **Move or rotate the whole crossing. Its crossbucks move together, and its crossing pads stay in place.**
 1. On the **Placement** tab, move or rotate the crossing as you would a group, with **Numeric**, **Gizmo**, or **Snap**. See [move a group in the native map editor](#move-a-group-in-the-native-map-editor).
 1. **Follow** is unavailable with the reason `Uses fixed placement`. **Disable** is unavailable with the reason `Its activity can't be edited`; disable each crossbuck on its own instead.
 
@@ -296,7 +296,7 @@ The part's `placement` is recorded relative to the group. While the group stands
 
 ## What the patcher checks
 
-Before changing a group, the patcher checks that its scene is loaded, its path names exactly one listed top scene object, and it contains no missing script or rigidbody. If the path names an object that only holds other groups, such as `World/Large Scenery/Bryson/Bryson Yard`, the modification fails with the message "This path names an object that only holds other groups, which isn't a group itself. Edit the groups it holds." A modification also fails if its path names no group or several groups. In each case, the file's other modifications still apply.
+Before changing a group, the patcher checks that its scene is loaded, its path names exactly one listed top scene object, and it contains no missing script or rigidbody. If the path names an object that only contains other groups, such as `World/Large Scenery/Bryson/Bryson Yard`, the modification fails with the message "This path names an object that only contains other groups, which isn't a group itself. Edit the groups inside it." A modification also fails if its path names no group or several groups. In each case, the file's other modifications still apply.
 
 For a part, the path must name exactly one listed part, and its group must pass the same checks. If a part modification names a top scene object, such as a yard lamp post below Bryson Yard, it fails with an explanation that the path names a group and not a part. The file's other modifications still apply. Edit that object as a group.
 
@@ -326,7 +326,7 @@ In Railroader 0.6.3, terrain heights were measured after moving a group with a f
 
 A mask whose shape crosses a terrain tile border is tracked only on the tile of its center. A depot mask is 10.2 m by 26.9 m, with up to 16 m of falloff, so its footprint can cross such a border. **Retry** asks the game again only for the tile of the center, and the terrain output on any other tile of the shape is not tracked. Location signs and road bridges behave the same way, so **Changes** can report completion while a neighboring tile is still rebuilding.
 
-Without the game's ground mask members, the groups that hold a mask are refused, but the Hemingway marker is not refused and would move without its mask. This is a limit of this version.
+Without the game's ground mask members, the groups with a mask are refused, but the Hemingway marker is not refused and would move without its mask. This is a limit of this version.
 
 You can move each lake surface on the base-game map because the game draws none of them from a static batch. The logs of a moved log pond follow it.
 

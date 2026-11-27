@@ -362,14 +362,14 @@ namespace RailroaderScenePatcher.Core {
                 // A retained world still holds the additions an earlier load built; they stay owned and are reconciled, not taken for native circuits.
                 var addition = world.AdditionKey(set);
                 if (addition != null) {
-                    if (!DetectionAddition.TryRead(addition, out _, out _) || baseline.Added.Any(c => c.Key == addition)) throw new InvalidOperationException("The crossing holds an added circuit this patcher cannot identify. " + WindowGuidance.ReloadBeforeEditing);
+                    if (!DetectionAddition.TryRead(addition, out _, out _) || baseline.Added.Any(c => c.Key == addition)) throw new InvalidOperationException("The crossing has an added circuit this patcher cannot identify. " + WindowGuidance.ReloadBeforeEditing);
                     baseline.Added.Add(new Circuit { Key = addition, Set = set });
                     baseline.Owned.AddRange(spans.Where(s => !baseline.Owned.Any(o => ReferenceEquals(o, s))));
                     continue;
                 }
                 if (spans.Any(s => !world.Registered(s))) throw new InvalidOperationException("A span of this crossing is not registered in the track graph under its ID. " + WindowGuidance.ReloadBeforeEditing);
                 // Spans under the patcher's prefix are never native: an earlier patcher state left this circuit patched.
-                if (spans.Any(s => (world.SpanId(s) ?? "").StartsWith(OwnedPrefix, StringComparison.Ordinal))) throw new InvalidOperationException("A circuit of this crossing holds spans an earlier patcher state created, so its native coverage is unknown. " + WindowGuidance.ReloadBeforeEditing);
+                if (spans.Any(s => (world.SpanId(s) ?? "").StartsWith(OwnedPrefix, StringComparison.Ordinal))) throw new InvalidOperationException("A circuit of this crossing uses spans an earlier patcher state created, so its native coverage is unknown. " + WindowGuidance.ReloadBeforeEditing);
                 var key = world.SpanId(spans[1]);
                 if (String.IsNullOrWhiteSpace(key)) throw new InvalidOperationException("The island span of a circuit has no ID; the circuit cannot be identified");
                 if (baseline.Circuits.Any(c => c.Key == key || ReferenceEquals(c.Set, set))) throw new InvalidOperationException("Two circuits of this crossing share island span " + key + "; they cannot be told apart");
@@ -505,10 +505,10 @@ namespace RailroaderScenePatcher.Core {
             if (!members.Any(m => ReferenceEquals(m, circuit.Set))) return circuit.Original == null ? CircuitCoverage.Detached : CircuitCoverage.DetachedFrom(NativeRanges(circuit.Original));
             var spans = (world.Spans(circuit.Set) ?? Array.Empty<object>()).ToArray();
             var owned = spans.Length == 3 && spans.All(s => s != null && baseline.Owned.Any(o => ReferenceEquals(o, s)));
-            if (circuit.Original == null) return owned ? CircuitCoverage.Added(world.Range(spans[0]), world.Range(spans[1]), world.Range(spans[2])) : throw new InvalidOperationException(DetectionAddition.Name(circuit.Key) + " holds spans this patcher does not own");
+            if (circuit.Original == null) return owned ? CircuitCoverage.Added(world.Range(spans[0]), world.Range(spans[1]), world.Range(spans[2])) : throw new InvalidOperationException(DetectionAddition.Name(circuit.Key) + " uses spans this patcher does not own");
             if (spans.Length == 3 && spans.Zip(circuit.Original, ReferenceEquals).All(x => x)) return CircuitCoverage.Native(circuit.Original.Select(world.SpanId).ToArray(), NativeRanges(circuit.Original));
             if (owned) return CircuitCoverage.Tracks(world.Range(spans[0]), world.Range(spans[1]), world.Range(spans[2]));
-            throw new InvalidOperationException("Circuit " + circuit.Key + " holds spans other than the map's own detection spans for this circuit or spans this patcher owns");
+            throw new InvalidOperationException("Circuit " + circuit.Key + " uses spans other than the map's own detection spans for this circuit or spans this patcher owns");
         }
         // The track the map's own spans cover, or null when a span's ends cannot be read.
         SpanRange[] NativeRanges(object[] spans) {

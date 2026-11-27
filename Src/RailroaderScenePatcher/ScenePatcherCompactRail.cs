@@ -197,7 +197,7 @@ namespace RailroaderScenePatcher {
             var changed = IsChanged(selected);
             var shownFailure = FailureOf(selected);
             var badge = shownFailure != null ? CommandBand.Badges(changed, false, shownFailure)[0].Markup : changed ? ChangedBadge : "Unchanged";
-            Line(builder, "<style=FieldLabel>THIS MOD</style> " + badge, "Changes", "Whether Data/scene-patches.json of the edited mod holds a modification of this object.", LineHeight);
+            Line(builder, "<style=FieldLabel>THIS MOD</style> " + badge, "Changes", "Whether Data/scene-patches.json of the edited mod contains a modification for this object.", LineHeight);
             if (changed && attachment != null) CompactChangedSettings(builder);
             else CompactHonestPlacement(builder);
             if (!HasTerrain) return;

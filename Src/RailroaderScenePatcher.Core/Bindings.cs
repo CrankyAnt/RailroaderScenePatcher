@@ -93,7 +93,7 @@ namespace RailroaderScenePatcher.Core {
         }
         // The refusal of an edit that changes the activity, binding or track-following placement of a holder: plain
         // sentences that follow the label of the action they refuse.
-        public string Refusal(object self) => "Duplicate marker ID " + Id + " is held by " + Holders.Count + " scene markers, " + Names(self) + ". " + Reason;
+        public string Refusal(object self) => "Duplicate marker ID " + Id + " is used by " + Holders.Count + " scene markers, " + Names(self) + ". " + Reason;
         const string Reason = "When the game removes a marker's registration by marker ID, it removes the registration of every scene marker with that ID. You can't edit their activity, binding, or track-following placement until the duplicate marker ID is repaired. Reloading or choosing another track doesn't change the duplicate marker ID.";
         // The problem of an active holder that can receive a replacement ID: a duplicate marker ID is then a defect the
         // modder repairs with the patcher. An inactive holder, and a holder that cannot receive a replacement ID, such as a
@@ -114,7 +114,7 @@ namespace RailroaderScenePatcher.Core {
         // for a holder that can receive a replacement ID.
         public IReadOnlyList<string> Dependencies(object self, bool offer = false) {
             if (!Duplicate) return Array.Empty<string>();
-            var lines = new List<string> { "Duplicate marker ID " + Id + " is held by " + Holders.Count + " scene markers. " + Reason + (offer ? " " + ReplacementMarkerIds.Offer : "") };
+            var lines = new List<string> { "Duplicate marker ID " + Id + " is used by " + Holders.Count + " scene markers. " + Reason + (offer ? " " + ReplacementMarkerIds.Offer : "") };
             foreach (var holder in Ordered(self)) {
                 var own = registrations.Where(e => ReferenceEquals(e.Owner, holder.Handle)).Select(e => e.Location?.Display ?? e.Bucket).ToArray();
                 lines.Add((ReferenceEquals(holder.Handle, self) ? "This marker" : holder.Name) + " is " + Activity(holder) + " and "
@@ -225,7 +225,7 @@ namespace RailroaderScenePatcher.Core {
         public string Refusal(object target, Func<object, string, bool> allowed, Func<object, string> label) {
             if (!Complete) return "The direct-reference scan could not read " + unreadable.Count + " field" + (unreadable.Count == 1 ? "" : "s") + ", first " + unreadable[0] + ". The patcher could not check which other objects use this marker, so its binding cannot be changed";
             var holder = HoldersOf(target).FirstOrDefault(h => !allowed(h.Key, h.Value));
-            return holder.Key == null ? null : label(holder.Key) + "." + holder.Value + " holds this marker; that consumer is not supported";
+            return holder.Key == null ? null : label(holder.Key) + "." + holder.Value + " references this marker; that consumer is not supported";
         }
     }
     // The objects one ordered walk of placements holds, read once at the first question. A placement found before the
@@ -398,7 +398,7 @@ namespace RailroaderScenePatcher.Core {
         public static string Shared(string id) => "Replacement ID " + id + " is used by more than one modification. A replacement ID must identify one marker in its scene patch file.";
         // Clearing the replacement ID would return a duplicate marker ID while the modification still changes the
         // marker's activity, binding or track-following placement.
-        public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also held by " + user + ", so this marker's activity, binding, and track-following settings need its replacement ID. " + WindowGuidance.ClearSettingsFirst;
+        public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also used by " + user + ", so this marker's activity, binding, and track-following settings need its replacement ID. " + WindowGuidance.ClearSettingsFirst;
 
         // A generated replacement ID: letters and digits only, so it passes Problem, in GeneratedLength characters. With
         // 62^10 possible IDs a draw that is already used is rare, and the next draw follows; the attempts end the search.

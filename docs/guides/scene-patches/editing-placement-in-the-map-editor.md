@@ -138,7 +138,7 @@ If a write fails, the native map editor shows **Save Failed**, the cause, and th
 
 A failed write leaves the file it was replacing intact. The patcher first writes the complete new content for `Data/scene-patches.json` or `Info.json` to a neighboring file ending in `.saving`, then replaces the original. If writing stops midway, the previous file stays unchanged. On a first Save, no original file exists yet. The patcher removes the unfinished `.saving` file. If an interruption such as a crash leaves one behind, the next Save replaces it.
 
-If another program, such as a virus scanner or sync client, briefly holds the file open, Save retries for up to half a second before reporting failure.
+If another program, such as a virus scanner or sync client, briefly keeps the file open, Save retries for up to half a second before reporting failure.
 
 Correct the cause, such as a locked or read-only file, then click **Save** again. The retry writes only what remains outstanding. If `Data/scene-patches.json` changed outside the session after the patcher read it, the retry refuses to overwrite it. Click **Use file version**, **Keep editor version**, or **Import** before retrying. A file that needs repair requires a backup first.
 
