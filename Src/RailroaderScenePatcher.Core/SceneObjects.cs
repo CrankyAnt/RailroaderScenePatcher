@@ -572,7 +572,7 @@ namespace RailroaderScenePatcher.Core {
             GroupState = groupState ?? throw new ArgumentNullException(nameof(groupState)); Parent = parent; ParentPlacement = parentPlacement;
         }
         // The map placement of the object the part stands directly below: its top scene object or the part above it. A part
-        // without a fixed placement of its own keeps its place relative to this object.
+        // without a placement of its own keeps its place relative to this object.
         public Placement ParentPlacement { get; }
         // The part's placement in map coordinates and its own activity as the scene authored it.
         public ObjectState Part { get; }
@@ -630,28 +630,81 @@ namespace RailroaderScenePatcher.Core {
         // Whether the object, a top scene object or a part, still exists.
         bool Alive(object handle);
     }
-    // The fixed placements that hold child objects in place, by part. A part with a fixed placement keeps
-    // its map placement when the top scene object or a part above it moves; without one it moves with them. The group and part
-    // capabilities of one scene share one instance.
+    // A group world whose objects can stand in another frame than their top scene object, or in a mod object. Without
+    // it every top scene object stands in no frame and outside every mod object, and an object's placement is read from
+    // its observation.
+    public interface IFrameWorld {
+        // The object above a top scene object that it moves with, such as the crossing object above a crossbuck, or null.
+        object FrameAbove(object handle);
+        // The mod object at or above the object, or null.
+        object ModObjectOf(object handle);
+        // The object's placement in map coordinates.
+        Placement PlacementOf(object handle);
+    }
+    // The own placements of parts, by part: a part that a modification gives a placement of its own. The rule that every
+    // capability with own placements shares: the recorded placement says where the part stands while the object above it,
+    // its frame, stands at its map placement. So a part with its own placement moves with its frame and keeps its
+    // placement relative to it, whatever moves the frame and in whatever order the scene patch files and their
+    // modifications apply. The frame is the top scene object of a part, the controller of crossing equipment, or the
+    // crossing object of a crossbuck. A frame's map placement is where it stood before the patcher moved it; a frame in
+    // a mod object counts from that mod object, which stands at the origin. Without an own placement a part moves with
+    // the object directly above it. The capabilities of one scene that move a frame or its parts share one instance;
+    // each captures the frame's reference (Remember) before it moves the frame.
     public sealed class PartHolds {
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) => ReferenceEquals(a, b);
             public int GetHashCode(object value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
         }
+        // The recorded placement of each held part.
         readonly Dictionary<object, Placement> held = new Dictionary<object, Placement>(new ByReference());
-        // The top scene object of each held part, so a released part's group can let go of the part's own culling.
+        // The frame of each held part, so a released part's group can let go of the part's own culling.
         readonly Dictionary<object, object> groups = new Dictionary<object, object>(new ByReference());
         // Where each held part stood in the object above it before it was held: the placement the scene gives it.
         readonly Dictionary<object, Placement> authored = new Dictionary<object, Placement>(new ByReference());
+        // The held objects that are top scene objects, such as a crossbuck in its crossing object: placed as a group root.
+        readonly HashSet<object> tops = new HashSet<object>(new ByReference());
+        // The held parts that follow a track: their placement is the map placement the track gives them, which the
+        // reconciliation of track following evaluates, so they keep it when their frame moves.
+        readonly HashSet<object> followers = new HashSet<object>(new ByReference());
+        // The reference placement of each frame, captured before the patcher moved it.
+        readonly Dictionary<object, Placement> references = new Dictionary<object, Placement>(new ByReference());
         internal Placement Of(object part) => held.TryGetValue(part, out var placement) ? placement : null;
         internal object GroupOf(object part) => groups.TryGetValue(part, out var group) ? group : null;
         internal Placement AuthoredOf(object part) => authored.TryGetValue(part, out var placement) ? placement : null;
-        internal void Set(object part, Placement placement, object group = null, Placement scene = null) {
-            if (placement == null) { held.Remove(part); groups.Remove(part); authored.Remove(part); return; }
+        internal bool Follows(object part) => part != null && followers.Contains(part);
+        // placement is the recorded placement in the frame group, or for a part that follows a track its map placement;
+        // top marks a top scene object held in its frame.
+        internal void Set(object part, Placement placement, object group = null, Placement scene = null, bool top = false) {
+            if (placement == null) { held.Remove(part); groups.Remove(part); authored.Remove(part); tops.Remove(part); followers.Remove(part); return; }
             held[part] = new Placement((double[])placement.Position.Clone(), (double[])placement.Rotation.Clone());
             if (group != null) groups[part] = group;
             if (scene != null) authored[part] = scene; else authored.Remove(part);
+            if (top) tops.Add(part); else tops.Remove(part);
+            if (placement.Following != null) followers.Add(part); else followers.Remove(part);
         }
+        static readonly double[] Still = { 0, 0, 0, 1 };
+        static Placement Placed(IGroupWorld world, object handle) => (world as IFrameWorld)?.PlacementOf(handle) ?? world.Observe(handle).Root.Placement;
+        // Captures the frame's reference placement, once, before the frame moves.
+        internal void Remember(IGroupWorld world, object frame) { if (frame != null) Reference(world, frame); }
+        // The placement the frame counts from: its map placement before the patcher moved it. A mod object stands at the
+        // origin, and a frame in another frame or in a mod object takes its place there as it stood at its first reading.
+        internal Placement Reference(IGroupWorld world, object frame) {
+            if (references.TryGetValue(frame, out var known)) return known;
+            var frames = world as IFrameWorld;
+            var modObject = frames?.ModObjectOf(frame);
+            Placement reference;
+            if (modObject != null && ReferenceEquals(modObject, frame)) reference = new Placement(new double[3], (double[])Still.Clone());
+            else {
+                var above = frames?.FrameAbove(frame) ?? modObject;
+                var now = Placed(world, frame);
+                reference = above == null ? now : GroupChecks.Carried(Placed(world, above), Reference(world, above), now);
+            }
+            return references[frame] = new Placement((double[])reference.Position.Clone(), (double[])reference.Rotation.Clone());
+        }
+        // The map placement now of a placement recorded in the frame.
+        internal Placement InMap(IGroupWorld world, object frame, Placement recorded) => GroupChecks.Carried(Reference(world, frame), Placed(world, frame), recorded);
+        // The recorded placement in the frame of a map placement now.
+        internal Placement Recorded(IGroupWorld world, object frame, Placement inMap) => GroupChecks.Carried(Placed(world, frame), Reference(world, frame), inMap);
         // The held parts of the group whose placement differs from the placement the scene gives them: only these can
         // get culling of their own. A held part whose scene placement is not known counts as moved.
         internal IReadOnlyList<object> Moved(IGroupWorld world, object group, GroupObservation observed, object except = null) {
@@ -664,8 +717,11 @@ namespace RailroaderScenePatcher.Core {
             return moved;
         }
         internal bool Contains(object part) => part != null && held.ContainsKey(part);
-        // Drops the holds of parts that no longer exist, such as those of a world that was unloaded.
-        internal void Prune(IGroupWorld world) { foreach (var gone in held.Keys.Where(part => !world.Alive(part)).ToList()) Set(gone, null); }
+        // Drops the holds of parts and the references of frames that no longer exist, such as those of a world that was unloaded.
+        internal void Prune(IGroupWorld world) {
+            foreach (var gone in held.Keys.Where(part => !world.Alive(part)).ToList()) Set(gone, null);
+            foreach (var gone in references.Keys.Where(frame => !world.Alive(frame)).ToList()) references.Remove(gone);
+        }
         // The held parts below the object, each after every held part above it, so a part above sets its place first.
         internal IReadOnlyList<KeyValuePair<object, Placement>> Below(IGroupWorld world, object above) {
             Prune(world);
@@ -677,8 +733,29 @@ namespace RailroaderScenePatcher.Core {
             }
             return ordered;
         }
-        // Puts every held part below the object back at its fixed placement.
-        internal void Reassert(IGroupWorld world, object above) { foreach (var pair in Below(world, above)) world.SetPartPlacement(pair.Key, pair.Value); }
+        // Puts every held part below the object at its own placement in its frame as the frame stands now: outer parts first.
+        internal void Reassert(IGroupWorld world, object above) {
+            foreach (var pair in Below(world, above)) {
+                var placement = followers.Contains(pair.Key) ? pair.Value : InMap(world, groups.TryGetValue(pair.Key, out var frame) ? frame : above, pair.Value);
+                if (tops.Contains(pair.Key)) world.SetPlacement(pair.Key, placement); else world.SetPartPlacement(pair.Key, placement);
+            }
+        }
+    }
+    // The own-placement rule of PartHolds as the part capabilities read and apply a part's placement: the child objects of
+    // a group and the existing equipment of a crossing.
+    static class OwnPlacement {
+        // A held part reads its own placement as recorded in its frame; any other part its map placement in the object
+        // directly above it (parent), so a removal returns it to its place there.
+        internal static Placement Read(IGroupWorld world, PartHolds holds, object target, object frame, Placement inMap, Placement parent) {
+            if (inMap == null) return null;
+            if (holds.Follows(target)) return inMap;
+            if (holds.Contains(target)) return holds.Recorded(world, holds.GroupOf(target) ?? frame, inMap);
+            return parent == null ? inMap : new Placement(inMap.Position, inMap.Rotation) { Frame = parent };
+        }
+        // The map placement a desired placement puts the part at now: a recorded one through its frame as the frame stands
+        // now; a placement read in the parent is one already.
+        internal static Placement InMap(IGroupWorld world, PartHolds holds, object frame, Placement desired) =>
+            desired == null || desired.Frame != null || desired.Following != null ? desired : holds.InMap(world, frame, desired);
     }
     // The checks that the group and part capabilities share.
     static class GroupChecks {
@@ -716,6 +793,13 @@ namespace RailroaderScenePatcher.Core {
         sealed class Identity : IEqualityComparer<object> {
             public new bool Equals(object a, object b) => ReferenceEquals(a, b);
             public int GetHashCode(object value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
+        }
+        // The placement that stands in the frame now as the placement stood in the frame at from: to ∘ from⁻¹ ∘ placement.
+        internal static Placement Carried(Placement from, Placement to, Placement placement) {
+            var inverse = Quaternion.Conjugate(Quaternion.Normalize(from.Rotation));
+            var local = Quaternion.Rotate(inverse, new[] { placement.Position[0] - from.Position[0], placement.Position[1] - from.Position[1], placement.Position[2] - from.Position[2] });
+            var turn = Quaternion.Normalize(to.Rotation); var moved = Quaternion.Rotate(turn, local);
+            return new Placement(new[] { to.Position[0] + moved[0], to.Position[1] + moved[1], to.Position[2] + moved[2] }, Quaternion.Normalize(Quaternion.Multiply(turn, Quaternion.Multiply(inverse, placement.Rotation))));
         }
         internal static (double[], double[]) InMap(Placement root, GroupPart part) {
             var turn = Quaternion.Normalize(root.Rotation); var offset = Quaternion.Rotate(turn, part.RootPosition);
@@ -799,7 +883,8 @@ namespace RailroaderScenePatcher.Core {
         internal static bool Finite(Placement placement) => placement?.Position != null && !placement.Position.Any(v => Double.IsNaN(v) || Double.IsInfinity(v));
     }
     // Scene objects with child objects: places and enables or disables a top scene object with everything below it. A group move is
-    // physical placement only: the activity of the parts stays theirs, and a part with its own fixed placement keeps it.
+    // physical placement only: the activity of the parts stays theirs, and a part with its own placement keeps it relative
+    // to the group (PartHolds).
     // The root of a rail bridge construction that carries its construction controller, such as Bryson Bridge 1 and the
     // Almond Bridge, also holds the construction-segment relationship.
     // The crossbucks a world lists at a hierarchy path, with the marker ID of each one's crossing pad, for the identity
@@ -812,7 +897,10 @@ namespace RailroaderScenePatcher.Core {
     public interface IGroupActivityRefusal {
         string GroupActivityRefusal(object group);
     }
-    public sealed class SceneObjects : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDependentOutputScene, IPadMarkerIdentityScene, IDisposable {
+    // A top scene object that stands in a frame of its own, a crossbuck in its crossing object (IFrameWorld.FrameAbove),
+    // follows the own-placement rule of PartHolds: with a placement of its own it moves with its crossing object and keeps
+    // its placement relative to it; without one it keeps its place in the crossing object.
+    public sealed class SceneObjects : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDependentOutputScene, IPadMarkerIdentityScene, IFramedScene, IRecordedPlacementScene, IRetainedScene, IDisposable {
         public const string Structure = "scene-object-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
@@ -867,11 +955,46 @@ namespace RailroaderScenePatcher.Core {
                 ?? (state?.Active == false ? world.DisableRefusal(target) : null);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
-        sealed class Snapshot { internal GroupObservation Observed; internal ConstructionSegments Segments; }
-        public object Capture(object target) => new Snapshot { Observed = world.Observe(target), Segments = ConstructionSegmentRule.Read(Segments, target) };
-        public ObjectState Read(object target) => world.Observe(target).Root.WithSegments(ConstructionSegmentRule.Read(Segments, target));
-        // The top scene object's placement applies first; every part with a fixed placement below it is then put back there,
-        // and so is every marker below it whose track sets its place. Returns those markers with where they stood.
+        sealed class Snapshot { internal GroupObservation Observed; internal ConstructionSegments Segments; internal Placement Held, Scene; }
+        // The frame the top scene object stands in, such as a crossbuck's crossing object, or null.
+        object FrameOf(object target) => (world as IFrameWorld)?.FrameAbove(target);
+        static Placement PlacementOf(IGroupWorld world, object handle) => (world as IFrameWorld)?.PlacementOf(handle) ?? world.Observe(handle).Root.Placement;
+        public object Capture(object target) {
+            holds.Remember(world, target);
+            return new Snapshot { Observed = world.Observe(target), Segments = ConstructionSegmentRule.Read(Segments, target), Held = holds.Of(target), Scene = holds.AuthoredOf(target) };
+        }
+        // A top scene object in a frame reads its own placement as recorded in that frame, and without one its map
+        // placement in that frame, so a removal returns it to its place in the frame wherever the frame stands.
+        public ObjectState Read(object target) {
+            holds.Remember(world, target);
+            var root = world.Observe(target).Root;
+            var frame = FrameOf(target);
+            var placement = root.Placement;
+            if (frame != null && placement != null)
+                placement = holds.Follows(target) ? placement : holds.Contains(target) ? holds.Recorded(world, frame, placement) : new Placement(placement.Position, placement.Rotation) { Frame = PlacementOf(world, frame) };
+            return new ObjectState(placement, root.Active).WithSegments(ConstructionSegmentRule.Read(Segments, target));
+        }
+        public Placement FramePlacement(object target) { var frame = FrameOf(target); return frame == null ? null : PlacementOf(world, frame); }
+        public Placement Recorded(object target, Placement inMap) { var frame = FrameOf(target); return frame == null || inMap == null ? inMap : holds.Recorded(world, frame, inMap); }
+        public Placement InMap(object target, Placement recorded) { var frame = FrameOf(target); return frame == null || recorded == null || recorded.Frame != null || holds.Follows(target) ? recorded : holds.InMap(world, frame, recorded); }
+        // A top scene object in a frame that no longer stands under its identity holds nothing any more.
+        public void Release(object target) => holds.Set(target, null);
+        public bool Unsettled(object target) => false;
+        // The map placement a desired placement puts the top scene object at. In a frame, a recorded placement holds the
+        // object in its frame and a placement read in the frame lets it go.
+        Placement Hold(object target, Placement desired) {
+            var frame = desired == null ? null : FrameOf(target);
+            if (frame == null) return desired;
+            if (desired.Frame != null) { holds.Set(target, null); return desired; }
+            var scene = holds.Contains(target) ? holds.AuthoredOf(target) : GroupChecks.Carried(PlacementOf(world, frame), Origin, PlacementOf(world, target));
+            var inMap = desired.Following != null ? desired : holds.InMap(world, frame, desired);
+            holds.Set(target, desired, frame, scene, true);
+            return inMap;
+        }
+        static readonly Placement Origin = new Placement(new double[3], new double[] { 0, 0, 0, 1 });
+        // The top scene object's placement applies first; every part with its own placement below it then takes its place in
+        // it, and every marker below it whose track sets its place is put back where it stood. Returns those markers with
+        // where they stood.
         IReadOnlyList<TrackPlacedObjects.Kept> Place(object target, Placement placement) {
             var kept = placed?.Below(world, target) ?? Array.Empty<TrackPlacedObjects.Kept>();
             world.SetPlacement(target, placement);
@@ -889,19 +1012,23 @@ namespace RailroaderScenePatcher.Core {
         // the layout that every later check compares with is the one after that.
         public void Apply(object target, ObjectState state) {
             if (state.Placement != null) GroupChecks.CheckPlacement(state.Placement);
+            holds.Remember(world, target);
             ConstructionSegmentRule.Apply(Segments, target, state.Segments);
             var segments = ConstructionSegmentRule.Verify(Segments, target, state.Segments);
             if (segments != null) throw new InvalidOperationException("Applied construction segments did not verify: " + segments);
             var before = world.Observe(target);
             var masked = masks?.Observe(target);
             var active = state.Active ?? before.Root.Active ?? true;
+            var placement = Hold(target, state.Placement);
             if (active && before.Root.Active != true) world.SetActive(target, true);
-            var kept = state.Placement != null ? Place(target, state.Placement) : null;
+            var kept = placement != null ? Place(target, placement) : null;
             if (!active && before.Root.Active != false) world.SetActive(target, false);
             var plan = Refresh(target);
             var after = world.Observe(target);
-            if (!GroupChecks.SamePlacement(after.Root.Placement, state.Placement ?? before.Root.Placement) || after.Root.Active != active) throw new InvalidOperationException("Applied group placement or activity did not verify");
-            var difference = GroupChecks.Layout(before, after, holds.Contains) ?? GroupChecks.Colliders(before, after) ?? GroupChecks.Culling(after, active, plan) ?? GroupChecks.RootCuller(after, active) ?? TrackPlacedObjects.Moved(kept);
+            if (!GroupChecks.SamePlacement(after.Root.Placement, placement ?? before.Root.Placement) || after.Root.Active != active) throw new InvalidOperationException("Applied group placement or activity did not verify");
+            // Every part, one with its own placement included, keeps its place relative to the root; only a marker whose
+            // track sets its place keeps its map placement.
+            var difference = GroupChecks.Layout(before, after, Fixed(kept)) ?? GroupChecks.Colliders(before, after) ?? GroupChecks.Culling(after, active, plan) ?? GroupChecks.RootCuller(after, active) ?? TrackPlacedObjects.Moved(kept);
             if (difference != null) throw new InvalidOperationException("The group did not move as one: " + difference);
             // The ground masks at and below the root register again where their holders stand now.
             masks?.Follow(target, target, masked);
@@ -914,23 +1041,28 @@ namespace RailroaderScenePatcher.Core {
                 if (ConstructionSegmentRule.Verify(Segments, target, taken.Segments) != null) return false;
                 var masked = masks?.Observe(target);
                 var root = captured.Root;
+                var frame = FrameOf(target);
+                if (frame != null) holds.Set(target, taken.Held, frame, taken.Scene, true);
                 if (root.Active == true) world.SetActive(target, true);
                 var kept = root.Placement != null ? Place(target, root.Placement) : null;
                 if (root.Active == false) world.SetActive(target, false);
                 var plan = Refresh(target);
                 var current = world.Observe(target);
                 masks?.Follow(target, target, masked);
-                return TrackPlacedObjects.Moved(kept) == null && GroupChecks.SamePlacement(current.Root.Placement, root.Placement) && current.Root.Active == root.Active && GroupChecks.Layout(captured, current, holds.Contains) == null
+                return TrackPlacedObjects.Moved(kept) == null && GroupChecks.SamePlacement(current.Root.Placement, root.Placement) && current.Root.Active == root.Active && GroupChecks.Layout(captured, current, Fixed(kept)) == null
                     && GroupChecks.Colliders(captured, current) == null && GroupChecks.Culling(current, root.Active != false, plan) == null && current.RootCulling == captured.RootCulling;
             } catch { return false; }
         }
+        // The parts that keep their map placement when the top scene object moves: only the markers whose track sets their
+        // place. A part with its own placement moves with it too.
+        static Func<object, bool> Fixed(IReadOnlyList<TrackPlacedObjects.Kept> kept) => part => kept != null && kept.Any(one => ReferenceEquals(one.Target, part));
         public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, ComponentType, RequiredVersion);
     }
     // Parts of scene objects with child objects: places and enables or disables one scene object inside a listed group. A part edit
-    // is an ordinary scene-object edit; the top scene object and the other parts keep their placement and activity. A fixed
-    // placement holds the part in map coordinates when its group moves later; the placement the part has without any
-    // modification stays relative to its group.
-    public sealed class ChildObjects : IScene, IVersionedScene, IFramedScene, IRelationshipScene, IRetainedScene, IDependentOutputScene {
+    // is an ordinary scene-object edit; the top scene object and the other parts keep their placement and activity. The
+    // part's own placement is recorded relative to its group and moves with the group when the group moves later
+    // (PartHolds); the placement the part has without any modification stays relative to the object above it.
+    public sealed class ChildObjects : IScene, IVersionedScene, IFramedScene, IRecordedPlacementScene, IRelationshipScene, IRetainedScene, IDependentOutputScene {
         public const string Structure = "child-object-v1", ComponentType = SceneObjects.ComponentType, RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
@@ -957,18 +1089,19 @@ namespace RailroaderScenePatcher.Core {
             var observed = world.ObservePart(target);
             if (!GroupChecks.Finite(observed.Part.Placement) || !GroupChecks.Finite(observed.GroupState.Root.Placement)) throw new InvalidOperationException("Map coordinates are unavailable for the part or its group");
         }
-        // Without a fixed placement of its own the part stands in its top scene object: its placement says so, and applied back
-        // it returns the part to its place in the group.
+        // A part with its own placement reads it as recorded in its top scene object (PartHolds). Without one the part
+        // stands in the object above it: its placement says so, and applied back it returns the part to its place there.
         public ObjectState Read(object target) {
             var observed = world.ObservePart(target);
-            var placement = observed.Part.Placement;
-            if (placement != null && !holds.Contains(target) && observed.ParentPlacement != null) placement = new Placement(placement.Position, placement.Rotation) { Frame = observed.ParentPlacement };
+            var placement = OwnPlacement.Read(world, holds, target, observed.Group, observed.Part.Placement, observed.ParentPlacement);
             // The activity of a part a game-object culler switches is the culler's: the part reads none, so neither the
             // underlying state nor a desired state ever holds one for it.
             return new ObjectState(placement, world.ActivityRefusal(target) != null ? null : observed.Part.Active);
         }
         // A part stands in the object directly above it, so a part below a moved part keeps its place in that part.
         public Placement FramePlacement(object target) => world.ObservePart(target).ParentPlacement;
+        public Placement Recorded(object target, Placement inMap) => inMap == null ? null : holds.Recorded(world, world.ObservePart(target).Group, inMap);
+        public Placement InMap(object target, Placement recorded) => recorded == null || recorded.Frame != null || holds.Follows(target) ? recorded : holds.InMap(world, world.ObservePart(target).Group, recorded);
         public void CheckRelationships(object target, ObjectState state) {
             if (state?.Marker != null) throw new InvalidOperationException("Parts do not support track-marker relationships");
             if (state?.Coverage != null) throw new InvalidOperationException("Parts do not support crossing-coverage relationships");
@@ -981,7 +1114,7 @@ namespace RailroaderScenePatcher.Core {
         }
         sealed class Snapshot { internal PartObservation Observed; internal Placement Held, Scene; }
         public object Capture(object target) => new Snapshot { Observed = world.ObservePart(target), Held = holds.Of(target), Scene = holds.AuthoredOf(target) };
-        // The part's placement applies, then every held part below it is put back at its fixed placement. scene is where
+        // The part's placement applies, then every held part below it takes its own placement again. scene is where
         // the part stood in the object above it before any hold.
         void Place(object target, object group, Placement placement, Placement held, Placement scene) {
             holds.Set(target, held, group, scene);
@@ -1004,11 +1137,13 @@ namespace RailroaderScenePatcher.Core {
             var switched = world.ActivityRefusal(target) != null;
             var active = state.Active ?? before.Part.Active ?? true;
             if (!switched && active && before.Part.Active != true) world.SetPartActive(target, true);
-            // A placement read in its parent returns the part there; any other placement is a fixed placement that holds it.
-            // A part that is not held yet stands where the scene has it in the object above it.
-            if (desired != null) Place(target, before.Group, desired, desired.Frame == null ? desired : null, holds.Contains(target) ? holds.AuthoredOf(target) : GroupChecks.InParent(before.GroupState, target));
+            // A placement read in its parent returns the part there; any other placement is the part's own placement, recorded
+            // in its top scene object, which holds it there. A part that is not held yet stands where the scene has it in the
+            // object above it.
+            var inMap = OwnPlacement.InMap(world, holds, before.Group, desired);
+            if (desired != null) Place(target, before.Group, inMap, desired.Frame == null ? desired : null, holds.Contains(target) ? holds.AuthoredOf(target) : GroupChecks.InParent(before.GroupState, target));
             if (!switched && !active && before.Part.Active != false) world.SetPartActive(target, false);
-            Verify(target, before, desired ?? before.Part.Placement, switched ? (bool?)null : active, Refresh(before.Group));
+            Verify(target, before, inMap ?? before.Part.Placement, switched ? (bool?)null : active, Refresh(before.Group));
             // The ground masks of the group register again where their holders stand now: the part's and those below it.
             masks?.Follow(target, before.Group, masked);
         }

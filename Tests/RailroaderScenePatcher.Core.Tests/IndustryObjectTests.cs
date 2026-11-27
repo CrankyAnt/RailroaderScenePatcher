@@ -139,6 +139,8 @@ static class IndustryObjectTests {
     static readonly TargetIdentity DisplayId = new TargetIdentity(SceneName, Connelly, SceneObjects.ComponentType, SceneObjects.Structure);
     static readonly double[] Upright = { 0, 0, 0, 1 }, PileTarget = { 1080, 10, 60 }, DisplayTarget = { 1150, 10, 20 };
     static readonly double[] L1aAuthored = { 1100, 10, 20 }, L1bAuthored = { 1107, 10, 9 };
+    // Where the pile with its own placement PileTarget stands once the display moved 50 m east to DisplayTarget.
+    static readonly double[] PileWithDisplay = { PileTarget[0] + 50, PileTarget[1], PileTarget[2] };
 
     // A pile moves and disables through the scene patch file like any part, with only the edited pile changing; a
     // moved display carries its other piles; a repeated application and a load at another origin reach the same
@@ -149,11 +151,13 @@ static class IndustryObjectTests {
         var doc = Doc(PileMod("move-l1a", "Log Pile L1a", PileTarget), PileMod("hide-l1b", "Log Pile L1b", active: false), Mod("move-display", Connelly, SceneObjects.Structure, DisplayTarget));
         var result = f.Engine.Apply(doc);
         Assert(result.Outcomes.Values.All(o => o.Applied), "The pile and display modifications apply: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Error)));
-        Assert(Near(f.At(f.L1a), PileTarget) && !f.L1b.Active && f.P1a.Active && Near(f.At(f.P1a), new[] { 1167.0, 11, 44 }), "The moved pile keeps its fixed placement, the disabled pile is off, the other pile moves with its display: " + f.Where());
+        // The display moves 50 m east: the moved pile keeps its own placement relative to the display and moves with it.
+        Assert(Near(f.At(f.L1a), PileWithDisplay) && !f.L1b.Active && f.P1a.Active && Near(f.At(f.P1a), new[] { 1167.0, 11, 44 }), "The moved pile keeps its placement relative to its display, the disabled pile is off, the other pile moves with its display: " + f.Where());
         var first = f.Where();
         Assert(f.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && f.Where() == first, "A repeated application accumulates no offset: " + f.Where());
         // A world loaded at another origin reaches the same map placements.
-        var shifted = new Display(); shifted.World.Origin = 1010;
+        // The scene stands 10 m further west in the scene's coordinates, so every map placement stays the same.
+        var shifted = new Display(); shifted.World.Origin = 1010; shifted.Group.Position[0] -= 10;
         Assert(shifted.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && shifted.Where() == first, "A load at another origin reaches the same map placements: " + shifted.Where());
         // The display root and a pile resolve only as what the rule lists them as.
         var wrong = new Display().Engine.Apply(Doc(Mod("root-as-part", Connelly, ChildObjects.Structure, PileTarget), Mod("pile-as-group", Connelly + "/Log Pile L1a", SceneObjects.Structure, PileTarget)));
@@ -190,19 +194,19 @@ static class IndustryObjectTests {
         Assert(session.Edit(PileId("Log Pile L1a"), new Placement(PileTarget, Upright), null).Applied && session.Edit(PileId("Log Pile L1b"), null, false).Applied
             && session.Edit(DisplayId, new Placement(DisplayTarget, Upright), null).Applied, "A pile move, a pile disable and a display move apply");
         Persistence(true, all, "After three edits");
-        mapEditor.Undo(); Assert(Near(f.At(f.L1b), L1bAuthored) && Near(f.At(f.L1a), PileTarget), "Undo returns the display; the moved pile stays: " + f.Where());
+        mapEditor.Undo(); Assert(Near(f.At(f.L1b), L1bAuthored) && Near(f.At(f.L1a), PileTarget), "Undo returns the display, and the moved pile with it: " + f.Where());
         mapEditor.Undo(); Assert(f.L1b.Active, "Undo enables the pile");
         mapEditor.Undo(); Assert(Near(f.At(f.L1a), L1aAuthored), "Undo returns the pile: " + f.Where()); Persistence(false, new string[0], "After Undo back to the unedited display");
         mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo();
-        Assert(Near(f.At(f.L1a), PileTarget) && !f.L1b.Active && Near(f.At(f.P1a), new[] { 1167.0, 11, 44 }), "Redo reapplies every edit: " + f.Where()); Persistence(true, all, "After Redo");
+        Assert(Near(f.At(f.L1a), PileWithDisplay) && !f.L1b.Active && Near(f.At(f.P1a), new[] { 1167.0, 11, 44 }), "Redo reapplies every edit: " + f.Where()); Persistence(true, all, "After Redo");
         var removed = session.Remove(PileId("Log Pile L1a"));
         Assert(removed.Applied && Near(f.At(f.L1a), DisplayTarget), "Remove modification returns the pile to its place in the moved display: " + removed.Error + " " + f.Where());
-        mapEditor.Undo(); Assert(Near(f.At(f.L1a), PileTarget), "Undo of the removal holds the pile again");
+        mapEditor.Undo(); Assert(Near(f.At(f.L1a), PileWithDisplay), "Undo of the removal holds the pile again: " + f.Where());
         Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0") && (int)JObject.Parse(store.Patch)["formatVersion"] == 1, "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
         Persistence(false, new string[0], "After Save");
         var fresh = new Display();
         var reload = fresh.Engine.Apply(store.Patch);
-        Assert(reload.Outcomes.Count == 3 && reload.Outcomes.Values.All(o => o.Applied) && Near(fresh.At(fresh.L1a), PileTarget) && !fresh.L1b.Active && fresh.Group.Parts.Count == 3,
+        Assert(reload.Outcomes.Count == 3 && reload.Outcomes.Values.All(o => o.Applied) && Near(fresh.At(fresh.L1a), PileWithDisplay) && !fresh.L1b.Active && fresh.Group.Parts.Count == 3,
             "A reloaded world reproduces the edits without duplicated state: " + fresh.Where());
         var strict = new Store { Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.9.0\"]}}" };
         var other = new Display(); var strictEditor = new NativeMapEditor(); var kept = new PatchEditingSession(other.Engine, strictEditor, strict); strictEditor.Session = kept;

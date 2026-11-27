@@ -18,18 +18,30 @@ namespace RailroaderScenePatcher.Core {
         double[] Rotation(object crossing);
         bool Active(object crossing);
     }
-    // A crossing without signals as one object: the crossing object with its crossbucks and crossing pads. The
-    // capability exists so that such a crossing is duplicated as one mod object and that mod object is removed as one.
-    // It changes nothing: a crossbuck is moved and a pad is rebound by the capability of its own family, and the
-    // crossing object stays where it stands. Where crossings share a path, the marker ID of a crossing's pad names
-    // the crossing, as it names the crossbucks of that crossing.
-    public sealed class CrossingObjectScene : IScene, IVersionedScene, IRelationshipScene, IPadMarkerIdentityScene {
+    // A crossing without signals as one object: the crossing object with its crossbucks and crossing pads. Such a crossing
+    // is duplicated as one mod object, and that mod object is removed as one. A placement moves the crossing as a whole
+    // (WholeMove): its crossbucks move together and keep their placement relative to each other, a crossbuck with its own
+    // placement included, and its pads stay where their track binding sets them. Its activity is not edited as a whole:
+    // a crossbuck is enabled or disabled, and a pad rebound, by the capability of its own family. Without a whole move
+    // the capability moves no crossing. Where crossings share a path, the marker ID of a crossing's pad names the
+    // crossing, as it names the crossbucks of that crossing.
+    public sealed class CrossingObjectScene : IScene, IVersionedScene, IRelationshipScene, IPadMarkerIdentityScene, IDependentOutputScene {
         public const string Structure = "crossing-object-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         // The family the window names a crossing without signals by.
         public const string Family = "Crossing without signals";
         public const string NoEdits = "You can't edit this crossing as a whole. Edit its crossbucks and crossing pads separately.";
+        // Why an edit of a crossing that moves as a whole is refused before any change.
+        public const string NoActivity = "You can't enable or disable this crossing as a whole. Enable or disable its crossbucks separately.";
+        public const string NoFollowing = "A crossing without signals uses fixed placement. Track-following placement does not apply to it.";
         readonly ICrossingObjectWorld world;
-        public CrossingObjectScene(ICrossingObjectWorld world, Capability capability) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; }
+        // The whole move of the crossing, or null: the capability then moves no crossing.
+        readonly WholeMove crossing;
+        public CrossingObjectScene(ICrossingObjectWorld world, Capability capability, WholeMove crossing = null) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.crossing = crossing; }
+        // Whether a placement moves the crossing as a whole; without it this capability moves no crossing.
+        public bool MovesCrossing => crossing != null;
+        // The terrain output that follows a ground mask of the crossing after a whole move.
+        public DependentOutput Output(object target) => crossing?.Output(target) ?? DependentOutput.None;
+        public void RetryOutput(object target) => crossing?.RetryOutput(target);
         // The identity of the crossing object at the path. padMarkerId names the crossing where crossings share the path.
         public static TargetIdentity Identity(string scene, string path, string padMarkerId = null) => new TargetIdentity(scene, path, ComponentType, Structure, String.IsNullOrEmpty(padMarkerId) ? null : padMarkerId);
         // How many crossing objects an inventory shows for a target, by the rule Resolve uses. A crossing object is no
@@ -68,19 +80,30 @@ namespace RailroaderScenePatcher.Core {
         public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, null, RequiredVersion);
         public void Preflight(object target) { }
         Placement Placed(object target) => new Placement(world.Position(target), world.Rotation(target));
-        // The one state a modification holds for a crossing object is the placement its mod object was built at.
+        // The one state a modification holds for a crossing object is its placement: where it moves as a whole, and for
+        // a mod object also where it is built. Without a whole move only the placement a mod object was built at.
         public void CheckRelationships(object target, ObjectState state) {
             if (state == null) return;
-            if (state.Marker != null || state.Coverage != null || state.Equipment != null || state.Starter != null || state.Segments != null || state.MarkerId != null || state.Active != null) throw new InvalidPatchDefinitionException(NoEdits);
-            if (state.Placement != null && (state.Placement.Following != null || !Placements.Same(state.Placement, Placed(target)))) throw new InvalidPatchDefinitionException(NoEdits);
+            if (state.Marker != null || state.Coverage != null || state.Equipment != null || state.Starter != null || state.Segments != null || state.MarkerId != null) throw new InvalidPatchDefinitionException(NoEdits);
+            if (crossing == null) {
+                if (state.Active != null) throw new InvalidPatchDefinitionException(NoEdits);
+                if (state.Placement != null && (state.Placement.Following != null || !Placements.Same(state.Placement, Placed(target)))) throw new InvalidPatchDefinitionException(NoEdits);
+                return;
+            }
+            if (state.Active != null) throw new InvalidPatchDefinitionException(NoActivity);
+            if (state.Placement?.Following != null) throw new InvalidPatchDefinitionException(NoFollowing);
+            var refusal = state.Placement == null ? null : crossing.Refusal(target);
+            if (refusal != null) throw new InvalidOperationException(refusal);
         }
-        public object Capture(object target) => null;
+        public object Capture(object target) => crossing?.Capture(target);
         public ObjectState Read(object target) => new ObjectState(Placed(target), world.Active(target), null, null);
         public void Apply(object target, ObjectState state) {
-            if (state?.Placement != null && !Placements.Same(state.Placement, Placed(target))) throw new InvalidOperationException(NoEdits);
-            if (state?.Active != null && state.Active.Value != world.Active(target)) throw new InvalidOperationException(NoEdits);
+            if (state?.Active != null && state.Active.Value != world.Active(target)) throw new InvalidOperationException(crossing == null ? NoEdits : NoActivity);
+            if (state?.Placement == null) return;
+            if (crossing == null) { if (!Placements.Same(state.Placement, Placed(target))) throw new InvalidOperationException(NoEdits); return; }
+            if (!crossing.At(target, state.Placement)) crossing.Move(target, state.Placement);
         }
-        // Apply changes nothing, so there is nothing to put back.
-        public bool Restore(object target, object snapshot) => true;
+        // Without a whole move Apply changes nothing, so there is nothing to put back.
+        public bool Restore(object target, object snapshot) => crossing == null || snapshot == null || crossing.Restore(target, snapshot);
     }
 }

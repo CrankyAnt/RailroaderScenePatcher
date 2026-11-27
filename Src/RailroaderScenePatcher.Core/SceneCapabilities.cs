@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : IModObjectPartScene, ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, ITrackPointLookup, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IModObjectScene, IModObjectSources, IModObjectNames, ISpawnPointPriorities, IDisposable {
+    public sealed class SceneCapabilities : IModObjectPartScene, ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, ITrackPointLookup, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IRecordedPlacementScene, IMapPatchContext, IModObjectScene, IModObjectSources, IModObjectNames, ISpawnPointPriorities, IDisposable {
         // Supplied by the host: what builds and removes mod objects. Without it no mod object is built.
         public IModObjectScene ModObjectWorld { get; set; }
         public object Build(TargetIdentity identity, object source, Placement placement, string markerId) =>
@@ -46,6 +46,9 @@ namespace RailroaderScenePatcher.Core {
         public IEnumerable<string> MapPatchIds => MapPatches?.Invoke() ?? Enumerable.Empty<string>();
         // The frame belongs to the adapter that resolved the object; an adapter without frames reports none.
         public Placement FramePlacement(object target) => target != null && owners.TryGetValue(target, out var owner) && owner is IFramedScene framed ? framed.FramePlacement(target) : null;
+        // An object whose adapter records no own placement records its map placement.
+        public Placement Recorded(object target, Placement inMap) => target != null && owners.TryGetValue(target, out var owner) && owner is IRecordedPlacementScene recorded ? recorded.Recorded(target, inMap) : inMap;
+        public Placement InMap(object target, Placement recorded) => target != null && owners.TryGetValue(target, out var owner) && owner is IRecordedPlacementScene placed ? placed.InMap(target, recorded) : recorded;
         // The observation of one object, when the inspection source can make it.
         public SceneObservation Observe(object handle, TargetIdentity identity) {
             return inspection is ITargetedInspectionScene targeted ? targeted.Observe(handle, identity) : inspection?.Discover().FirstOrDefault(o => ReferenceEquals(o.Handle, handle) && o.Identity.Component == identity.Component);

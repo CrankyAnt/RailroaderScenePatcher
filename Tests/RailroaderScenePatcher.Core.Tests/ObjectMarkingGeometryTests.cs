@@ -154,6 +154,18 @@ static class ObjectMarkingGeometryTests {
             "a top scene object's frame keeps every object below it");
     }
 
+    // The node of a crossing without signals stands for its crossing object: its frame encloses the crossbucks and the
+    // pad, not only the pad next to its marker. At Alarka Jct the two crossbucks stand NW and SE of the pad.
+    static void CrossingNodeFramesItsCrossbucksAndPad() {
+        Check(ObjectMarkingGeometry.FramesWhole(CrossingObjectScene.Family), "a crossing without signals is framed whole");
+        var boxes = new[] { Box("pad", 0, 0, 100, 5, .1, 2), Box("crossbuck NW", -8, 2, 108, .3, 2, .3), Box("crossbuck SE", 8, 2, 92, .3, 2, .3) };
+        var whole = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, boxes, Camera, View, null, ObjectMarkingGeometry.FrameDistance, null, ObjectMarkingGeometry.FramesWhole(CrossingObjectScene.Family));
+        Check(whole.Bounds.HasValue && whole.Bounds.Value.Min.X <= -8.29 && whole.Bounds.Value.Max.X >= 8.29 && whole.Bounds.Value.Min.Z <= 91.71 && whole.Bounds.Value.Max.Z >= 108.29,
+            "the node's frame encloses both crossbucks and the pad: " + whole.Bounds);
+        var piece = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, boxes, Camera, View, null);
+        Check(piece.Bounds.HasValue && piece.Bounds.Value.Max.X < 6, "framed by the piece at its marker, as before, only the pad is framed: " + piece.Bounds);
+    }
+
     // A renderer outlines its object whether or not the game's distance culling shows it now: on, or off only through
     // a culler that holds it, with every object above it on or off only through a culler. A renderer or object that the
     // scene or a modder switched off outlines nothing.
@@ -626,6 +638,7 @@ static class ObjectMarkingGeometryTests {
         RenderersOutlineWhateverTheCullingDoes();
         MarkerStaysOnItsPointOutsideTheView();
         CrossingControllerFramesItsSetup();
+        CrossingNodeFramesItsCrossbucksAndPad();
         Console.WriteLine("PASS: object marking frames identify their object at near and far zoom");
     }
 

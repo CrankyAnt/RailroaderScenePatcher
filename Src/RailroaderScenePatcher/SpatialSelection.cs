@@ -70,7 +70,10 @@ namespace RailroaderScenePatcher {
         internal IEnumerable<SpatialCandidate> Scan(SelectionKind kind) {
             if (kind == SelectionKind.SceneObject) {
                 var snapshot = entries?.Invoke();
-                foreach (var observation in snapshot != null && snapshot.Count != 0 ? snapshot : inventory.Discover()) yield return Observe(observation);
+                // The crossing object of a crossing without signals is chosen through its outliner node: in the world its
+                // crossbucks and pads show, as one complex beyond 125 m.
+                foreach (var observation in snapshot != null && snapshot.Count != 0 ? snapshot : inventory.Discover())
+                    if (!WorldSelectionOverlay.ChosenInOutliner(observation)) yield return Observe(observation);
                 yield break;
             }
 

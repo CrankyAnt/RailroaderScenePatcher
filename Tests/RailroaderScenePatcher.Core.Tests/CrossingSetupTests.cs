@@ -11,8 +11,8 @@ using RailroaderScenePatcher.Core;
 // Whole scene patch file tests for the whole move of a grade-crossing setup through its crossing controller, against a
 // controlled crossing: a controller whose game-object culler lists the object above each mast, two masts, one with a
 // gate, the bell, two pads, three detection spans and a whistle sign. A placement of the controller moves the masts
-// with their gates and the bell together; the pads, the detection spans and the whistle sign stay where they are, and
-// so does a mast with a fixed placement. The same holds for a duplicated crossing.
+// with their gates and the bell together, a mast with its own placement included; the pads, the detection spans and
+// the whistle sign stay where they are. The same holds for a duplicated crossing.
 static class CrossingSetupTests {
     const string SceneName = "BushnellWhittier", Crossing = "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett";
     const string Mast1Path = Crossing + "/Signal 1/Signal 1";
@@ -219,7 +219,7 @@ static class CrossingSetupTests {
         MovingTheSetupMovesMastsGatesAndBellTogether();
         RotatingTheSetupTurnsThemAboutTheSetup();
         PadsSpansAndDetectionStayAfterAWholeMove();
-        AMastWithAFixedPlacementStays();
+        AMastWithItsOwnPlacementMovesWithTheSetup();
         AddedEquipmentKeepsItsFixedPlacement();
         AMovedSetupKeepsItsCulling();
         RefusalsLeaveSceneAndFileUnchanged();
@@ -271,13 +271,16 @@ static class CrossingSetupTests {
     sealed class AnyTrack : ITrackPoseScene { public TrackPose TrackPose(TrackAnchor anchor) => new TrackPose(new[] { 1200.0, 10, 20 }, new[] { 0.0, 0, 0, 1 }); }
     static SpanRange Range(string segment, double from, double to) => new SpanRange(new TrackLocation(segment, "a", from), new TrackLocation(segment, "a", to));
 
-    // A part with a fixed placement keeps its map placement when its setup moves, as a part of any group does.
-    static void AMastWithAFixedPlacementStays() {
-        var f = new Fixture(); var session = f.Session(out _, out _);
+    // A part with its own placement keeps it relative to its setup and moves with it, as a part of any group does.
+    static void AMastWithItsOwnPlacementMovesWithTheSetup() {
+        var f = new Fixture(); var session = f.Session(out var store, out _);
         var held = new[] { 1090.0, 10, 26 };
-        Assert(session.Edit(Mast1Id, new Placement(held, Identity), null).Applied, "A mast takes a fixed placement");
+        Assert(session.Edit(Mast1Id, new Placement(held, Identity), null).Applied, "A mast takes a placement of its own");
         var moved = session.Edit(ControllerId(), new Placement(Shifted, Quarter), null);
-        Assert(moved.Applied && Near(f.At(f.Mast1), held) && SameTurn(f.Facing(f.Mast1), Identity) && Near(f.At(f.Gate1), new[] { 1090.0, 13, 26 }), "The mast with a fixed placement stays, with its gate: " + moved.Error + " " + f.Where());
+        // 10 m west and 6 m north of the setup turns to 6 m east and 10 m north of the moved setup.
+        Assert(moved.Applied && Near(f.At(f.Mast1), new[] { 1116.0, 10, 35 }) && SameTurn(f.Facing(f.Mast1), Quarter) && Near(f.At(f.Gate1), new[] { 1116.0, 13, 35 }), "The mast with its own placement moves and turns with the setup, with its gate: " + moved.Error + " " + f.Where());
+        var item = JObject.Parse(session.ScenePatchFileText)["modifications"].Children<JProperty>().Select(p => (JObject)p.Value).Single(m => (string)m["target"]["structure"] == ExistingEquipmentScene.MastStructure);
+        Assert(Near(item["placement"]["position"].Select(v => (double)v).ToArray(), held), "The file keeps the mast's placement relative to the setup at its map placement: " + item["placement"]);
         // The other mast at 6 m east and 4 m south turns to 4 m west and 6 m south of the moved setup.
         Assert(Near(f.At(f.Mast2), new[] { 1106.0, 10, 19 }) && SameTurn(f.Facing(f.Mast2), Quarter) && Near(f.At(f.Bell), Shifted) && f.Kept(), "The other mast and the bell move with the setup: " + f.Where());
     }
@@ -310,7 +313,8 @@ static class CrossingSetupTests {
         }
     }
 
-    // The crossing's culler follows the setup, and a mast left outside its sphere keeps a sphere of its own.
+    // The crossing's culler follows the setup. A mast with its own placement moves with the setup: inside the culler's
+    // sphere it needs no sphere of its own, and outside it its own sphere follows it.
     static void AMovedSetupKeepsItsCulling() {
         var f = new Fixture();
         var far = new[] { 1500.0, 10, 20 };
@@ -319,9 +323,13 @@ static class CrossingSetupTests {
             "The crossing's culler follows the setup with its radius and its list, and no part needs a sphere of its own");
         var g = new Fixture(); var session = g.Session(out _, out _);
         Assert(session.Edit(Mast1Id, new Placement(new[] { 1090.0, 10, 26 }, Identity), null).Applied && g.World.Native.Registered.Count == 0, "A mast held inside the culler's sphere needs no sphere of its own");
-        Assert(session.Edit(ControllerId(), new Placement(far, Identity), null).Applied, "The setup moves away from the held mast");
-        Assert(g.World.Native.Registered.Count == 1 && g.World.Native.Registered[0].Owner == g.Mast1 && !g.Culler.Lists.Contains(g.Outer1) && g.Culler.Lists.Contains(g.Outer2),
-            "The mast that stayed behind, outside the culler's sphere, has a culling sphere of its own");
+        Assert(session.Edit(ControllerId(), new Placement(far, Identity), null).Applied, "The setup moves with the held mast");
+        Assert(Near(g.At(g.Mast1), new[] { 1490.0, 10, 26 }) && g.World.Native.Registered.Count == 0, "The held mast moved with the setup and still needs no sphere of its own: " + g.Where());
+        var h = new Fixture(); var edits = h.Session(out _, out _);
+        Assert(edits.Edit(Mast1Id, new Placement(new[] { 1150.0, 10, 20 }, Identity), null).Applied && h.World.Native.Registered.Count == 1 && h.World.Native.Registered[0].Owner == h.Mast1 && !h.Culler.Lists.Contains(h.Outer1) && h.Culler.Lists.Contains(h.Outer2),
+            "A mast held outside the culler's sphere has a culling sphere of its own");
+        Assert(edits.Edit(ControllerId(), new Placement(far, Identity), null).Applied && Near(h.At(h.Mast1), new[] { 1550.0, 10, 20 }) && h.World.Native.Registered.Count == 1 && h.World.Native.Registered[0].Owner == h.Mast1,
+            "Its own sphere moves with it when the setup moves: " + h.Where());
     }
 
     static void RefusalsLeaveSceneAndFileUnchanged() {

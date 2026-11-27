@@ -9,7 +9,7 @@ Use **Duplicate** to make a mod object from a supported scene object. Click the 
 - Open the native map editor and the Scene Patcher window, then choose the mod to edit.
 - Inspect the object you want to duplicate to find **Duplicate** on the **Object** tab. For a crossing with signals, select its controller.
 
-A crossing without signals has no controller or separate object to inspect. Select the crossing in the outliner. The inspector shows the crossing's name under **Crossing**, with **Duplicate** and **Remove modification**. **Duplicate** works the same way here as on the **Object** tab.
+A crossing without signals has no controller. Select the crossing's row in the outliner: this inspects its crossing object, and **Duplicate** is on its **Object** tab.
 
 You can duplicate an entire group, such as a station building with its parts, or just one part. Other supported objects include station map icons, location signs, road and rail bridges, Generic track markers, mileposts, crossing pads, and spawn points. If you can't duplicate an object, hover over **Duplicate** to see why.
 
@@ -47,7 +47,7 @@ Some mod objects need another step before they work in the game. See [Mod object
 
 - **Generic track marker or milepost.** The game binds the mod object to the nearest track within 25 meters of where you placed it. The **Connections** tab shows the track. If there's no track within 25 meters, the mod object appears under **Problems** in the outliner. Set the binding on the **Connections** tab. To change the marker ID, click **Set replacement ID** on the same tab. **Clear replacement ID** is unavailable because the mod object always has its own marker ID.
 - **Crossing with signals.** Lay or change the track at the new location first. Trains can't trigger the new crossing until you add detection. The controller appears under **Problems** until then. On the controller's **Connections** tab, enter a unique ID under **Add detection**, click **Add detection**, and select the tracks. To change detection later, click **Edit detection addition**. See [Add crossing detection](adding-crossing-detection.md). Then bind each crossing pad on its **Connections** tab. See [Rebind crossing pads](rebinding-crossing-pads.md). To move the duplicated crossing later, move or rotate its controller. Its masts and bell move together, and its pads stay where they are. See [move or rotate the whole grade-crossing setup](moving-crossing-equipment.md#move-or-rotate-the-whole-grade-crossing-setup). Move a single mast or the bell as you would for any crossing.
-- **Crossing without signals.** Bind each crossing pad on its **Connections** tab. Move each crossbuck as you would any other object. The crossing stays where you placed it. If several crossings share a name, as the three below Old River Rd do, Scene Patcher duplicates the crossing you selected.
+- **Crossing without signals.** Bind each crossing pad on its **Connections** tab. Move the whole crossing from its row in the outliner, as described in [move a crossing as a whole](moving-scene-objects.md#move-a-crossing-as-a-whole), or move each crossbuck as you would any other object. The crossing stays where you placed it until you move it. If several crossings share a name, as the three below Old River Rd do, Scene Patcher duplicates the crossing you selected.
 - **Crossing pad.** Bind the pad on its **Connections** tab.
 - **Rail bridge.** Lay track over the bridge in the native map editor.
 - **Station map icon.** The icon isn't linked to a station. To add a station, create it in the native map editor.
@@ -57,7 +57,7 @@ Some mod objects need another step before they work in the game. See [Mod object
 
 You can move, rotate, enable, or disable a mod object if its family supports that edit. Moving a duplicated spawn point keeps its teleport name. You can also duplicate a mod object. Scene Patcher uses the same original scene object for both mod objects.
 
-To remove a mod object, inspect it and click **Remove modification**. This removes the object and edits made to its parts. For a crossing without signals, select the crossing in the outliner and click **Remove modification**.
+To remove a mod object, inspect it and click **Remove modification**. This removes the object and edits made to its parts. For a crossing without signals, select the crossing's row in the outliner and click **Remove modification**.
 
 Placing a mod object adds one step to the native map editor's history. Undo removes the mod object, and Redo places it again.
 

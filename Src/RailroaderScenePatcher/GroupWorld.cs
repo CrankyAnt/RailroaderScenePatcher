@@ -12,7 +12,7 @@ namespace RailroaderScenePatcher {
     // The native operations of the scene object with child objects and part capabilities: the transform and activity of a top scene object
     // or a part, the game's cullers in the group and the physics state of its colliders. The rules live in Core's
     // SceneObjectRules, SceneObjects and ChildObjects.
-    internal sealed class GroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisableRefusal, IGroupActivityRefusal, IDisposable {
+    internal sealed class GroupWorld : IGroupWorld, IFrameWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisableRefusal, IGroupActivityRefusal, IDisposable {
         internal const string SimpleCullerType = CullerTypes.SimpleCuller, GameObjectCullerType = CullerTypes.GameObjectCuller;
         static readonly Type simple = Native.Type(SimpleCullerType), renderer = Native.Type(BoardScene.CullerType), switcher = Native.Type(GameObjectCullerType);
         static readonly FieldInfo cullingGroup = simple?.GetField("_cullingGroup", Native.Flags), cullingSpheres = simple?.GetField("_cullingSpheres", Native.Flags),
@@ -911,6 +911,23 @@ namespace RailroaderScenePatcher {
         public bool Below(object target, object above) =>
             target is GameObject part && part != null && above is GameObject over && over != null && part != over && part.transform.IsChildOf(over.transform);
         public bool Alive(object handle) => handle is GameObject go && go != null;
+        // A crossbuck stands in the crossing object of its crossing without signals and moves with it (PartHolds).
+        public object FrameAbove(object handle) {
+            var go = handle as GameObject;
+            if (go == null || VerdictOf(go)?.Crossbuck != true || go.transform.parent == null) return null;
+            var crossing = go.transform.parent.gameObject;
+            return CrossingObjectWorld.IsCrossingObject(crossing) ? crossing : null;
+        }
+        public object ModObjectOf(object handle) => ModObjectAt(handle as GameObject);
+        internal static GameObject ModObjectAt(GameObject go) {
+            for (var t = go == null ? null : go.transform; t != null; t = t.parent) if (ModObjectWorld.IsModObject(t.gameObject)) return t.gameObject;
+            return null;
+        }
+        public Placement PlacementOf(object handle) => MapPlacement(handle as GameObject ?? throw new InvalidOperationException("The object no longer exists"));
+        internal static Placement MapPlacement(GameObject go) {
+            var at = NativeInventory.MapPosition(go.transform); var turn = go.transform.rotation;
+            return new Placement(new double[] { at.x, at.y, at.z }, new double[] { turn.x, turn.y, turn.z, turn.w });
+        }
         static float Checked(double value) { var f = (float)value; if (Single.IsNaN(f) || Single.IsInfinity(f)) throw new InvalidOperationException("Coordinate exceeds native precision"); return f; }
     }
     // The stand-in that receives a switch's writes for an object the patcher shares with it: Unity calls OnEnable and

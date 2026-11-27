@@ -227,6 +227,9 @@ namespace RailroaderScenePatcher {
         bool staleLogged = true;
         NativeTrackPoses trackPoses;
         CrossingCoverageScene crossingCoverageScene;
+        // The crossing-object capability: whether it moves a crossing without signals as a whole decides the Placement
+        // tab of its crossing object.
+        CrossingObjectScene crossingObjectScene;
         float nextTrackFollow;
         const string FollowPlace = "Follow";
         readonly string[] placementFields = { "", "", "", "", "", "" };
@@ -316,10 +319,12 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to change bridges: " + e.GetBaseException().Message);
                 }
-                // Groups and their parts share one world and the fixed placements that hold parts when their group moves.
+                // Groups and their parts share one world and the own placements of parts, which move with their group. The
+                // whole move of a crossing without signals shares them too: its crossbucks are groups.
                 GroupWorld groupWorld = null;
+                PartHolds groupHolds = null;
                 try {
-                    groupWorld = new GroupWorld(); var holds = new PartHolds();
+                    groupWorld = new GroupWorld(); var holds = groupHolds = new PartHolds();
                     capabilities.Add(new SceneObjects(groupWorld, Capability.Unchecked, holds, groundMasks, trackPlaced));
                     capabilities.Add(new ChildObjects(groupWorld, holds, masks: groundMasks));
                 } catch (Exception e) {
@@ -355,8 +360,8 @@ namespace RailroaderScenePatcher {
                 try { equipmentWorld = new CrossingEquipmentWorld { Warn = Report }; }
                 catch (Exception e) { PatcherLog.Debug("The patcher couldn't prepare to add crossing equipment: " + e.GetBaseException().Message); }
                 // Existing masts and bells take their transforms, cullers and own culling from the group world, with their
-                // crossing controller as the group; one set of fixed placements gives each crossing one culling plan. The
-                // whole move of a setup through its controller shares that world and those fixed placements.
+                // crossing controller as the group; one set of own placements gives each crossing one culling plan. The
+                // whole move of a setup through its controller shares that world and those own placements.
                 var held = new PartHolds();
                 CrossingDeviceWorld mastWorld = null;
                 string devicesUnavailable = null;
@@ -369,8 +374,9 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to change crossing detection coverage: " + e.GetBaseException().Message);
                 }
-                // A crossing without signals is duplicated and removed as one object, through its crossing object.
-                try { capabilities.Add(new CrossingObjectScene(new CrossingObjectWorld(), Capability.Unchecked)); }
+                // A crossing without signals is duplicated, removed and moved as one object, through its crossing object. It
+                // moves as a whole only where the group world is ready.
+                try { capabilities.Add(crossingObjectScene = new CrossingObjectScene(new CrossingObjectWorld(), Capability.Unchecked, groupWorld == null || groupHolds == null ? null : new WholeMove(new CrossingObjectGroupWorld(groupWorld), groupHolds, groundMasks))); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingObjectScene.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to duplicate a crossing without signals: " + e.GetBaseException().Message);

@@ -138,20 +138,20 @@ static class RailBridgeTests {
             && session.Edit(GroupId(Girder), new Placement(PlateTarget, Upright), false).Applied, "A girder move, a construction move and a plate girder bridge move with disable apply");
         Persistence(true, all, "After three edits");
         mapEditor.Undo(); Assert(Near(f.At(f.Plate), PlateAuthored) && f.Plate.Active, "Undo returns the plate girder bridge and enables it: " + f.Where());
-        mapEditor.Undo(); Assert(Near(f.At(f.Bridge1), BridgeAuthored) && Near(f.Culls(), BridgeAuthored) && f.CollidersFollow() && Near(f.At(f.Beam), BeamTarget), "Undo returns the construction with its culling and colliders; the held girder stays: " + f.Where());
+        mapEditor.Undo(); Assert(Near(f.At(f.Bridge1), BridgeAuthored) && Near(f.Culls(), BridgeAuthored) && f.CollidersFollow() && Near(f.At(f.Beam), BeamTarget), "Undo returns the construction with its culling and colliders, and the held girder with it: " + f.Where());
         mapEditor.Undo(); Assert(Near(f.At(f.Beam), BeamAuthored), "Undo returns the girder: " + f.Where()); Persistence(false, new string[0], "After Undo back to the unedited bridges");
         mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo();
-        Assert(Near(f.At(f.Beam), BeamTarget) && Near(f.At(f.Bridge1), BridgeTarget) && Near(f.At(f.Plate), PlateTarget) && !f.Plate.Active && Near(f.Culls(), BridgeTarget) && f.CollidersFollow(), "Redo reapplies every edit: " + f.Where());
+        Assert(Near(f.At(f.Beam), BeamWithBridge) && Near(f.At(f.Bridge1), BridgeTarget) && Near(f.At(f.Plate), PlateTarget) && !f.Plate.Active && Near(f.Culls(), BridgeTarget) && f.CollidersFollow(), "Redo reapplies every edit: " + f.Where());
         Persistence(true, all, "After Redo");
         var removed = session.Remove(PartId(Beam));
         Assert(removed.Applied && Near(f.At(f.Beam), new[] { 3540.0, 539, 4429 }), "Remove modification returns the girder to its place in the moved construction: " + removed.Error + " " + f.Where());
-        mapEditor.Undo(); Assert(Near(f.At(f.Beam), BeamTarget), "Undo of the removal holds the girder again");
+        mapEditor.Undo(); Assert(Near(f.At(f.Beam), BeamWithBridge), "Undo of the removal holds the girder again: " + f.Where());
         Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=" + SceneObjects.RequiredVersion) && (int)JObject.Parse(store.Patch)["formatVersion"] == 1,
             "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
         Persistence(false, new string[0], "After Save");
         var fresh = new Bridges();
         var reload = fresh.Engine.Apply(store.Patch);
-        Assert(reload.Outcomes.Count == 3 && reload.Outcomes.Values.All(o => o.Applied) && Near(fresh.At(fresh.Beam), BeamTarget) && Near(fresh.At(fresh.Bridge1), BridgeTarget) && !fresh.Plate.Active
+        Assert(reload.Outcomes.Count == 3 && reload.Outcomes.Values.All(o => o.Applied) && Near(fresh.At(fresh.Beam), BeamWithBridge) && Near(fresh.At(fresh.Bridge1), BridgeTarget) && !fresh.Plate.Active
             && Near(fresh.Culls(), BridgeTarget) && fresh.Bridge1.Parts.Count == 3 && fresh.Bridge1.Cullers.Count == 1 && fresh.Bridge1.Colliders.Count == 2, "A reloaded world reproduces the moves without duplicated state: " + fresh.Where());
         // A refused bridge edit leaves the scene patch file and the persistence state unchanged.
         var before = store.Patch;
@@ -238,6 +238,9 @@ static class RailBridgeTests {
     static TargetIdentity PartId(string path) => new TargetIdentity(SceneName, path, ChildObjects.ComponentType, ChildObjects.Structure);
     static readonly double[] Upright = { 0, 0, 0, 1 }, BridgeTarget = { 3500, 540, 4400 }, PlateTarget = { 5200, 529, 5700 }, BeamTarget = { 3560, 539, 4440 };
     static readonly double[] BridgeAuthored = { 3391, 532, 4315 }, PlateAuthored = { 5098, 529, 5667 }, BeamAuthored = { 3431, 531, 4344 };
+    // Where the girder with its own placement BeamTarget stands once the construction moved from BridgeAuthored to
+    // BridgeTarget: it keeps its placement relative to the construction.
+    static readonly double[] BeamWithBridge = { BeamTarget[0] + BridgeTarget[0] - BridgeAuthored[0], BeamTarget[1] + BridgeTarget[1] - BridgeAuthored[1], BeamTarget[2] + BridgeTarget[2] - BridgeAuthored[2] };
 
     // Bryson Bridge 1 moves with its parts, its culling sphere and its colliders, whose shape and enabled state stay
     // unchanged and whose physics bounds follow; a plate girder bridge moves on its own; a part moves within its
@@ -249,13 +252,14 @@ static class RailBridgeTests {
         var doc = Doc(GroupMod("move-bryson", Bryson, BridgeTarget), GroupMod("move-plate", Girder, PlateTarget), PartMod("move-beam", Bryson + "/Steel/Plate Girder E (4)", BeamTarget));
         var result = f.Engine.Apply(doc);
         Assert(result.Outcomes.Values.All(o => o.Applied), "The rail bridge modifications apply: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Error)));
-        Assert(Near(f.At(f.Bridge1), BridgeTarget) && Near(f.At(f.Steel), BridgeTarget) && Near(f.At(f.Beam), BeamTarget) && Near(f.At(f.Plate), PlateTarget),
+        Assert(Near(f.At(f.Bridge1), BridgeTarget) && Near(f.At(f.Steel), BridgeTarget) && Near(f.At(f.Beam), BeamWithBridge) && Near(f.At(f.Plate), PlateTarget),
             "The construction, its parts and the plate girder bridge stand at their targets: " + f.Where());
         Assert(Near(f.Culls(), BridgeTarget) && f.CollidersFollow(), "Culling and colliders follow the moved construction: " + f.Where());
         var first = f.Where();
         Assert(f.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && f.Where() == first, "A repeated application accumulates no offset: " + f.Where());
-        var shifted = new Bridges(); shifted.World.Origin = 1010;
-        Assert(shifted.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && N(shifted.At(shifted.Bridge1)) == N(BridgeTarget) && N(shifted.At(shifted.Beam)) == N(BeamTarget),
+        // The scene stands 10 m further west in the scene's coordinates, so every map placement stays the same.
+        var shifted = new Bridges(); shifted.World.Origin = 1010; shifted.Bridge1.Position[0] -= 10; shifted.Plate.Position[0] -= 10;
+        Assert(shifted.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && N(shifted.At(shifted.Bridge1)) == N(BridgeTarget) && N(shifted.At(shifted.Beam)) == N(BeamWithBridge),
             "A load at another origin reaches the same map placements: " + shifted.Where());
         var hidden = new Bridges();
         Assert(hidden.Engine.Apply(Doc(GroupMod("hide-bryson", Bryson, active: false))).Outcomes.Values.All(o => o.Applied) && !hidden.Bridge1.Active && hidden.Culls() == null,

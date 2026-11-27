@@ -114,6 +114,8 @@ namespace RailroaderScenePatcher {
         // name, holding its crossbucks, pads and crossing track markers. Crossings that share one crossing path are told
         // apart by pad marker ID: each crossbuck names its pad's marker ID, and each pad and track marker carries its own.
         // A member in a shared crossing whose ID matches no crossbuck stays in a node of the shared path alone, logged.
+        // The inventory entry of the crossing object, where it is listed, is the node's row: a click on the node inspects
+        // the crossing object, which moves the crossing as a whole.
         static void GroupUnprotectedCrossings(BuildContext b) {
             var crossingObjects = new HashSet<ScenePath>();
             var sharedPadIds = new Dictionary<ScenePath, HashSet<string>>();
@@ -143,9 +145,12 @@ namespace RailroaderScenePatcher {
                 found.Members.Add(u);
             }
             var joined = new HashSet<Unit>();
+            var rows = b.Units.Where(u => u.Row?.Family == CrossingObjectScene.Family).GroupBy(u => (new ScenePath(u.Row.Identity.Scene, u.Row.Identity.Path), u.Row.Identity.PadMarkerId)).ToDictionary(g => g.Key, g => g.First());
             foreach (var crossing in crossings.Values.Where(c => c.Members.Count >= 2)) {
-                var node = new OutlineNode { Key = CrossingNodeKey(crossing.Crossing.Scene, crossing.Crossing.Path, crossing.PadMarkerId), Label = Last(ModObjects.Plain(crossing.Crossing.Path)) };
-                var unit = new Unit { Node = node, Members = crossing.Members, CrossingPath = crossing.Crossing.Path, CrossingScene = crossing.Crossing.Scene, CrossingPadMarkerId = crossing.PadMarkerId };
+                rows.TryGetValue((crossing.Crossing, crossing.PadMarkerId), out var own);
+                var node = new OutlineNode { Key = CrossingNodeKey(crossing.Crossing.Scene, crossing.Crossing.Path, crossing.PadMarkerId), Label = Last(ModObjects.Plain(crossing.Crossing.Path)), Row = own?.Row };
+                var unit = new Unit { Node = node, Row = own?.Row, Members = crossing.Members, CrossingPath = crossing.Crossing.Path, CrossingScene = crossing.Crossing.Scene, CrossingPadMarkerId = crossing.PadMarkerId };
+                if (own != null) { node.Count += own.Node.Count; joined.Add(own); }
                 foreach (var m in crossing.Members) { Join(unit, m); joined.Add(m); }
                 SortCrossingChildren(node);
                 unit.Category = SceneObjectCategories.GradeCrossing;

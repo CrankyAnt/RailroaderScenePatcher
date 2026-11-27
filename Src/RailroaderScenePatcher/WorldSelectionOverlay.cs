@@ -442,7 +442,7 @@ namespace RailroaderScenePatcher {
             if (ReferenceEquals(from, groupedFrom) && count == groupedCount) return inventoryGroups;
             groupedFrom = from; groupedCount = count; mappedFor = null; inventoryGroups = new InventoryGroup[0];
             try {
-                var all = listed ? snapshot.ToArray() : candidates.Where(c => c.Observation != null).Select(c => c.Observation).ToArray();
+                var all = (listed ? snapshot.ToArray() : candidates.Where(c => c.Observation != null).Select(c => c.Observation).ToArray()).Where(o => !ChosenInOutliner(o)).ToArray();
                 // A root of the Scene object and Child object families anchors a scene object with child objects with the inventory objects
                 // below it: its parts, and the objects of other families there.
                 bool TopSceneObject(SceneObservation o) => SceneObjectRules.InFamilies(o.Family) && o.GroupPath == null && o.Handle is GameObject go && go != null && GroupWorld.IsTopObject(go);
@@ -496,6 +496,9 @@ namespace RailroaderScenePatcher {
         internal static void Skipped(GameObject root, string reason) => skips.Skip(RootPath(root), reason);
         // Reads the parts of one family group; a group whose parts cannot be read is skipped with one line.
         internal static void ReadParts(GameObject root, Action read) => skips.ReadParts(() => RootPath(root), read);
+        // Whether an inventory object is chosen only through its outliner row, and takes no part in world choices and
+        // complexes: the crossing object of a crossing without signals. Inspected, it is framed whole (FramesWhole).
+        internal static bool ChosenInOutliner(SceneObservation o) => o?.Family == CrossingObjectScene.Family;
         int[][] Mapped(SpatialCandidate[] candidates, InventoryGroup[] groups) {
             if (ReferenceEquals(candidates, mappedFor)) return mapped;
             var byHandle = new Dictionary<object, List<int>>();
@@ -829,7 +832,8 @@ namespace RailroaderScenePatcher {
                 if (candidate.Parts != null) renderers = PartsOnly(renderers, ref outlines, candidate.Parts);
                 // A crossing pad lies on its track: the track's ballast and the road it crosses are not ground it
                 // stands in, so the pad is framed whole and not cut off where its ends meet the road.
-                var ground = PadFamilies.Contains(candidate.Observation.Family) ? null : (Func<double, double, double?>)GroundAt;
+                // The crossing object of a crossing without signals holds its pads: its frame is not cut at the ground either.
+                var ground = PadFamilies.Contains(candidate.Observation.Family) || ChosenInOutliner(candidate.Observation) ? null : (Func<double, double, double?>)GroundAt;
                 Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods = null;
                 var boxes = new List<ObjectMarkingBox>();
                 // What is read once per renderer and per place is read within a share of the frame: a renderer whose

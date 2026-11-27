@@ -550,10 +550,12 @@ namespace RailroaderScenePatcher.Core {
             return WorldRibbonGeometry.Hull(all);
         }
         // Whether an inventory object of a family stands for everything below it and is framed whole: the root of a
-        // scene object with child objects, which the inventory lists as one entry for the whole group, and a crossing controller,
-        // which stands for the whole crossing: its scene object is the root of the grade-crossing setup it controls.
+        // scene object with child objects, which the inventory lists as one entry for the whole group, a crossing controller,
+        // which stands for the whole crossing: its scene object is the root of the grade-crossing setup it controls, and
+        // the crossing object of a crossing without signals, which its outliner node stands for: its frame encloses the
+        // crossbucks and pads of that crossing.
         public const string ControllerFamily = "Grade crossing controller";
-        public static bool FramesWhole(string family) => SceneObjectRules.InFamilies(family) || family == ControllerFamily;
+        public static bool FramesWhole(string family) => SceneObjectRules.InFamilies(family) || family == ControllerFamily || family == CrossingObjectScene.Family;
         // Whether a renderer below an object framed whole counts for its frame. families holds the families of the
         // inventory objects on the renderer's scene object and above it, up to the framed object, nearest first. A
         // crossing controller's frame leaves out its whistle signs, which are no part of its setup

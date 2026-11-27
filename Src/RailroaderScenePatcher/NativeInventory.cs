@@ -51,6 +51,17 @@ namespace RailroaderScenePatcher {
             var found = new List<SceneObservation>();
             // A top scene object or a part is observed through its transform; the families below it through their own components.
             var group = GroupWorld.FamilyOf(target);
+            // A whole move of a crossing without signals moves its crossbucks and their parts: they take their new
+            // observations too, with the crossing object itself.
+            if (group == null && CrossingObjectWorld.IsListedCrossing(target)) {
+                found.Add(observer(target.transform, CrossingObjectScene.Family));
+                foreach (var below in target.GetComponentsInChildren<Transform>(true)) {
+                    if (below == target.transform) continue;
+                    var held = GroupWorld.FamilyOf(below.gameObject);
+                    if (held != null) found.Add(observer(below, held));
+                    else if (GroupWorld.IsPart(below.gameObject)) found.Add(observer(below, SceneObjectRules.ChildFamily));
+                }
+            }
             if (group != null) {
                 found.Add(observer(target.transform, group));
                 // An edit of a top scene object or a part moves or switches every part below it with it: those parts are
@@ -245,8 +256,9 @@ namespace RailroaderScenePatcher {
             // Every object below a scene root that holds signals, CTC and interlocking, game logic, native operations data or
             // editor helpers stays out; a starter placement marker below Setups keeps its family.
             if (!SceneObjectRules.ListedBelow(c.transform.root.name, type == Marker)) return null;
-            // A top scene object of the scene object rule, and a part of a listed group, is listed through its transform.
-            if (c is Transform) return GroupWorld.FamilyOf(go);
+            // A top scene object of the scene object rule, and a part of a listed group, is listed through its transform, and
+            // so is the crossing object of a crossing without signals, which its outliner node stands for.
+            if (c is Transform) return GroupWorld.FamilyOf(go) ?? (CrossingObjectWorld.IsListedCrossing(go) ? CrossingObjectScene.Family : null);
             if (type == Milepost) return "Milepost";
             if (SpawnPoints.FamilyOf(type, c.transform.root.name) is string spawnFamily) return spawnFamily;
             if (type == Marker) {
@@ -394,7 +406,11 @@ namespace RailroaderScenePatcher {
         // parts of the listed groups.
         static IEnumerable<Component> TopObjects() =>
             GroupWorld.Verdicts().Where(pair => pair.Key != null && GroupWorld.FamilyOf(pair.Key) != null).Select(pair => (Component)pair.Key.transform)
-                .Concat(GroupWorld.Parts().Select(part => (Component)part.transform)).ToArray();
+                .Concat(GroupWorld.Parts().Select(part => (Component)part.transform)).Concat(CrossingObjects()).ToArray();
+        // The crossing objects of the crossings without signals: the objects that hold the listed crossbucks.
+        static IEnumerable<Component> CrossingObjects() =>
+            GroupWorld.Verdicts().Where(pair => pair.Key != null && pair.Value?.Crossbuck == true && pair.Key.transform.parent != null).Select(pair => pair.Key.transform.parent.gameObject)
+                .Distinct().Where(CrossingObjectWorld.IsListedCrossing).Select(go => (Component)go.transform).ToArray();
         static bool Transient(Transform child, Transform root) {
             for (var t = child; t != null && t != root; t = t.parent) if ((t.gameObject.hideFlags & HideFlags.DontSave) != 0) return true;
             return false;
@@ -404,9 +420,11 @@ namespace RailroaderScenePatcher {
             var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>(); var duplicate = new List<string>();
             // The segment ids of the construction controller this entry names, for its construction segment problems.
             string[] constructionIds = null;
-            // A transform stands for a top scene object or a part of a listed group.
-            var part = c is Transform && GroupWorld.IsPart(go);
-            var topObject = c is Transform && !part;
+            // A transform stands for a top scene object or a part of a listed group, or for the crossing object of a crossing
+            // without signals.
+            var crossingObject = c is Transform && family == CrossingObjectScene.Family;
+            var part = c is Transform && !crossingObject && GroupWorld.IsPart(go);
+            var topObject = c is Transform && !part && !crossingObject;
             // The object's own active flag. What a culler switches off by camera distance is no disabling; an object
             // that is off while its culler shows its objects was switched off by the scene or by a patch.
             var enabled = AuthoredActivity.Enabled(GroupWorld.OwnActivity(go), culled.ContainsKey(go), !hidden.Contains(go));
@@ -700,13 +718,13 @@ namespace RailroaderScenePatcher {
                 var type = MarkerKind(marker);
                 if (type != "Generic") only = CommandBand.NotYetSupported(type == null ? "track markers of an unknown type" : "track markers of type " + type);
             });
-            else if (part) { }
+            else if (part || crossingObject) { }
             else if (topObject) only = CommandBand.GroupInspectionOnly(verdict, family);
             else if (family == "Track span") only = CommandBand.SpanInspectionOnly(spanHolder != null);
             else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost || mast || ownBell || icon || spawnPoint);
             if (only != null) markerEditable = false;
-            var structure = only != null ? null : part ? (partRefusal == null ? ChildObjects.Structure : null) : topObject ? (groupRefusal == null ? SceneObjects.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : icon && iconRefusal == null ? StationMapIconRules.Structure : spawnPoint && spawnRefusal == null ? SpawnPoints.Structure : scenery && sceneryRefusal == null ? ConstructionSceneryScene.Structure : null;
-            var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : topObject ? (groupRefusal == null ? (verdict?.Crossbuck == true ? CommandBand.CrossbuckOperations : CommandBand.GroupOperations) : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable, or disable this board." : CommandBand.NotEditable(refusal))
+            var structure = only != null ? null : crossingObject ? CrossingObjectScene.Structure : part ? (partRefusal == null ? ChildObjects.Structure : null) : topObject ? (groupRefusal == null ? SceneObjects.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : icon && iconRefusal == null ? StationMapIconRules.Structure : spawnPoint && spawnRefusal == null ? SpawnPoints.Structure : scenery && sceneryRefusal == null ? ConstructionSceneryScene.Structure : null;
+            var operations = only != null ? only : crossingObject ? CommandBand.CrossingObjectOperations : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : topObject ? (groupRefusal == null ? (verdict?.Crossbuck == true ? CommandBand.CrossbuckOperations : CommandBand.GroupOperations) : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable, or disable this board." : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Move, rotate, enable, or disable the bridge. Track scenery stays in place." : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? CommandBand.MarkerOperations
                 : marked ? CommandBand.NotEditable(markerRefusal)
@@ -747,6 +765,11 @@ namespace RailroaderScenePatcher {
             Read(() => TargetKeyCache.Of(go));
             Read(() => {
                 var path = BoardScene.PathOf(go.transform);
+                // Crossing objects that share a path, as the three below Old River Rd do, are named by their pad's marker ID.
+                if (crossingObject) {
+                    if (CrossingObjectWorld.SharesPath(go)) padMarkerId = CrossingObjectWorld.PadMarkerId(go);
+                    return;
+                }
                 // A crossbuck that a pad marker ID identifies counts the crossbucks at its path that hold that id.
                 if (padMarkerId != null) {
                     if (only == null && structure != null) {
@@ -801,7 +824,7 @@ namespace RailroaderScenePatcher {
             return new SceneObservation(go, keyed ?? new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure, padMarkerId), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
                 bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: displayName, groupPath: groupPath,
-                category: topObject ? verdict?.Category : null, subcategory: topObject ? verdict?.Subcategory : null, bridge: topObject && verdict != null ? verdict.Bridge : BridgeKind.None,
+                category: topObject ? verdict?.Category : crossingObject ? SceneObjectCategories.GradeCrossing : null, subcategory: topObject ? verdict?.Subcategory : null, bridge: topObject && verdict != null ? verdict.Bridge : BridgeKind.None,
                 holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform), storage: storageName, information: information, gamePosition: gamePosition);
         }
         // The names of the objects that enclose a transform, from its parent upwards.

@@ -5,9 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
-    // A group world whose groups hold objects that stay where they are when the group moves as a whole, beside the
-    // parts with a fixed placement: an object whose place a track binding sets, such as a crossing pad or a whistle
-    // sign, and a detection span.
+    // A group world whose groups hold objects that stay where they are when the group moves as a whole: an object whose
+    // place a track binding sets, such as a crossing pad or a whistle sign, and a detection span.
     public interface IWholeMoveWorld : IGroupWorld {
         // The objects below the group that keep their map placement when the group moves, each with everything below
         // it. Empty for a group without them.
@@ -17,12 +16,12 @@ namespace RailroaderScenePatcher.Core {
         void SetPlacementKeeping(object group, Placement placement, IReadOnlyList<object> kept);
     }
     // The whole move of a group that another capability than the scene object family edits, such as a grade-crossing
-    // setup, moved through its crossing controller: the root takes the placement, and every part that takes physical
-    // placement moves with it and keeps its placement relative to the others. A part with a fixed placement and the
-    // objects the world names (IWholeMoveWorld.Stays) keep their map placement. The cullers follow, a moved part
-    // outside its culler's sphere keeps a sphere of its own, and the ground masks at and below the root register again
-    // where their holders stand. The fixed placements are the ones the part capabilities of the same group share, so
-    // one group has one culling plan.
+    // setup, moved through its crossing controller, or a crossing without signals, moved through its crossing object:
+    // the root takes the placement, and every part that takes physical placement moves with it and keeps its placement
+    // relative to the others, a part with its own placement included (PartHolds). Only the objects the world names
+    // (IWholeMoveWorld.Stays) keep their map placement. The cullers follow, a moved part outside its culler's sphere
+    // keeps a sphere of its own, and the ground masks at and below the root register again where their holders stand.
+    // The own placements are the ones the part capabilities of the same group share, so one group has one culling plan.
     public sealed class WholeMove {
         readonly IWholeMoveWorld world;
         readonly PartHolds holds;
@@ -34,7 +33,7 @@ namespace RailroaderScenePatcher.Core {
         internal void RetryOutput(object group) => masks.RetryOutput(group);
         // Why the group takes no placement now, or null. Checked before any change.
         internal string Refusal(object group) => world.Refusal(group) ?? world.PlacementRefusal(group);
-        internal object Capture(object group) => world.Observe(group);
+        internal object Capture(object group) { holds.Remember(world, group); return world.Observe(group); }
         // Whether the group stands at the placement already.
         internal bool At(object group, Placement placement) => GroupChecks.SamePlacement(world.Observe(group).Root.Placement, placement);
         // The objects that stay, topmost only: an object below another one that stays keeps its place in that object.
@@ -42,7 +41,8 @@ namespace RailroaderScenePatcher.Core {
             var named = (world.Stays(group) ?? Array.Empty<object>()).Where(handle => handle != null).ToList();
             return named.Where(handle => !named.Any(other => !ReferenceEquals(other, handle) && world.Below(handle, other))).ToArray();
         }
-        // The root takes the placement around the objects that stay; every part with a fixed placement is then put back there.
+        // The root takes the placement around the objects that stay; every part with its own placement then takes its
+        // place in its frame as the frame stands now.
         void Place(object group, Placement placement, IReadOnlyList<object> staying) {
             world.SetPlacementKeeping(group, placement, staying);
             holds.Reassert(world, group);
@@ -52,9 +52,11 @@ namespace RailroaderScenePatcher.Core {
             world.RefreshCulling(group, plan);
             return plan;
         }
-        Func<object, bool> Framed(IReadOnlyList<object> staying) => handle => holds.Contains(handle) || staying.Any(kept => ReferenceEquals(kept, handle));
+        // Only the objects that stay keep their map placement; every other part keeps its place relative to the root.
+        static Func<object, bool> Framed(IReadOnlyList<object> staying) => handle => staying.Any(kept => ReferenceEquals(kept, handle));
         internal void Move(object group, Placement placement) {
             GroupChecks.CheckPlacement(placement);
+            holds.Remember(world, group);
             var before = world.Observe(group);
             if (!GroupChecks.Finite(before.Root.Placement)) throw new InvalidOperationException("The group's map coordinates are unavailable");
             var staying = Staying(group);

@@ -393,7 +393,7 @@ namespace RailroaderScenePatcher.Core {
                 // A placement edit of a track-following object keeps following the same track at the new relative placement.
                 var following = existing == null ? null : PatchEngine.Parse(existing).State.Placement?.Following;
                 if (placement != null && following != null) value["placement"] = PlacementJson(TrackFollowing.Relative(following.Anchor, TrackPose(following.Anchor), placement.Position, placement.Rotation));
-                else if (placement != null) value["placement"] = FixedJson(placement);
+                else if (placement != null) value["placement"] = FixedJson(Recorded(target, placement));
                 else if (existing?["placement"] != null) value["placement"] = existing["placement"].DeepClone();
                 if (active != null) value["active"] = active.Value;
                 else if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
@@ -403,13 +403,23 @@ namespace RailroaderScenePatcher.Core {
                 return value;
             }, validateBeforeMutation);
         }
+        // The placement the scene patch file records for an object that the window places at a map placement: for an
+        // object with its own placement in a frame (PartHolds), where it stands while its frame stands at its map placement.
+        Placement Recorded(TargetIdentity target, Placement inMap) =>
+            scene is IRecordedPlacementScene recorded ? recorded.Recorded(engine.ResolveUnique(target), inMap) : inMap;
+        // The map placement of the object now, as its adapter reads it: a recorded own placement through its frame.
+        Placement CurrentInMap(TargetIdentity target) {
+            var resolved = engine.ResolveUnique(target);
+            var read = scene.Read(resolved).Placement;
+            return scene is IRecordedPlacementScene recorded ? recorded.InMap(resolved, read) : read;
+        }
         // Makes the object follow an explicitly selected track or endpoint from where it stands: the scene patch file records its
         // current placement relative to the anchor's current native pose. Activity and relationships keep their mod values.
         public Outcome Follow(TargetIdentity target, TrackAnchor anchor, InspectedTarget inspected = null, Action validateBeforeMutation = null) {
             return Change("Follow track", target, inspected, existing => {
                 if (anchor == null) throw new InvalidOperationException("No track or endpoint is selected for track following. " + WindowGuidance.SelectFollowAnchor);
                 if (existing != null) PatchEngine.Parse(existing);
-                var current = scene.Read(engine.ResolveUnique(target)).Placement;
+                var current = CurrentInMap(target);
                 PatchEngine.CheckPlacement(current?.Position, current?.Rotation);
                 var following = TrackFollowing.Relative(anchor, TrackPose(anchor), current.Position, current.Rotation);
                 return WithPlacement(target, existing, PlacementJson(following));
@@ -476,8 +486,8 @@ namespace RailroaderScenePatcher.Core {
         public Outcome StopFollowing(TargetIdentity target, InspectedTarget inspected = null) {
             return Change("Stop following track", target, inspected, existing => {
                 if (existing == null || PatchEngine.Parse(existing).State.Placement?.Following == null) throw new InvalidOperationException("This object does not follow a track in the active scene patch file");
-                var current = scene.Read(engine.ResolveUnique(target)).Placement;
-                return WithPlacement(target, existing, FixedJson(PatchEngine.CheckPlacement(current.Position, current.Rotation)));
+                var current = CurrentInMap(target);
+                return WithPlacement(target, existing, FixedJson(Recorded(target, PatchEngine.CheckPlacement(current.Position, current.Rotation))));
             });
         }
         JObject WithPlacement(TargetIdentity target, JObject existing, JObject placement) {

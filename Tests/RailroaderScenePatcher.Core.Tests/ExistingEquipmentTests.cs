@@ -357,8 +357,8 @@ static class ExistingEquipmentTests {
         f.Engine.Apply(doc); var first = Where(f); var spheres = f.World.Native.Registered.Count; var listed = f.Culler.Lists.Count;
         Assert(f.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && Where(f) == first && f.World.Native.Registered.Count == spheres && f.Culler.Lists.Count == listed && f.World.Culling.HandedOver(f.Culler).Count == 1,
             "Repeated application adds no offset and no second sphere or hand-over: " + first + " / " + Where(f));
-        f.World.Origin = 1010;
-        Assert(new PatchEngine(f.Scene).Apply(doc).Outcomes.Values.All(o => o.Applied) && Near(f.MapOf(f.Mast1).Position, Far), "A load at another origin reaches the same map placement: " + Where(f));
+        var g = new Fixture(); g.World.Origin = 1010;
+        Assert(new PatchEngine(g.Scene).Apply(doc).Outcomes.Values.All(o => o.Applied) && Near(g.MapOf(g.Mast1).Position, Far), "A load at another origin reaches the same map placement: " + Where(g));
     }
 
     // A new load attempt over a kept world reconciles the moved mast, bell and disabled mast without another sphere or

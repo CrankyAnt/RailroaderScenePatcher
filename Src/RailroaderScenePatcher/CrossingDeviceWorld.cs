@@ -27,7 +27,7 @@ namespace RailroaderScenePatcher {
     // below it moves with its transform, and the crossing pads, the whistle signs and the detection spans are put
     // back where they stood (Stays). A detection span reads its two track locations and never its transform
     // (Track.TrackSpan), and a crossing pad is generated along its marker's track location, so neither follows a move.
-    internal sealed class CrossingDeviceWorld : IWholeMoveWorld {
+    internal sealed class CrossingDeviceWorld : IWholeMoveWorld, IFrameWorld {
         const string ControllerType = CrossingCoverageScene.ComponentType, LampType = ExistingEquipmentScene.MastComponent, GateType = ExistingEquipmentScene.GateComponent,
             BellType = ExistingEquipmentScene.BellComponent, OwnerType = "KeyValue.Runtime.KeyValueObject", SpanType = "Track.TrackSpan", RelativeType = "Track.TrackRelativePosition";
         static readonly Type controller = Native.Type(ControllerType), lamp = Native.Type(LampType), gate = Native.Type(GateType), bell = Native.Type(BellType), keyOwner = Native.Type(OwnerType),
@@ -280,5 +280,9 @@ namespace RailroaderScenePatcher {
         public IReadOnlyList<double> Anchor(object part) => groups.Anchor(part);
         public bool Below(object part, object above) => groups.Below(part, above);
         public bool Alive(object handle) => groups.Alive(handle);
+        // A controller stands in no frame of its own; in a duplicated crossing its mod object is the frame it counts from.
+        public object FrameAbove(object handle) => null;
+        public object ModObjectOf(object handle) => GroupWorld.ModObjectAt(handle as GameObject);
+        public Placement PlacementOf(object handle) => GroupWorld.MapPlacement(handle as GameObject ?? throw new InvalidOperationException("The object no longer exists"));
     }
 }

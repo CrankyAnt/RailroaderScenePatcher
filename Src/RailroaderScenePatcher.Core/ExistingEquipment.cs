@@ -81,9 +81,10 @@ namespace RailroaderScenePatcher.Core {
     // child, or the bell of a crossing controller. Both are physical placement and activity only: the equipment keeps
     // observing its controller, which keeps driving it. The crossing controller is the equipment's group for culling:
     // a mast moved out of the sphere of its crossing's culler keeps a culling sphere of its own, as a moved part of a
-    // scene object with child objects does, and the culler keeps its radius. A fixed placement holds the equipment in map
-    // coordinates; without one it stands where the scene has it in the object above it.
-    public sealed class ExistingEquipmentScene : IScene, IVersionedScene, IFramedScene, IRelationshipScene, IRetainedScene {
+    // scene object with child objects does, and the culler keeps its radius. Equipment with its own placement keeps it
+    // relative to its crossing controller and moves with it (PartHolds); without one it stands where the scene has it in
+    // the object above it.
+    public sealed class ExistingEquipmentScene : IScene, IVersionedScene, IFramedScene, IRecordedPlacementScene, IRelationshipScene, IRetainedScene {
         public const string MastStructure = "existing-crossing-mast-v1", BellStructure = "existing-crossing-bell-v1";
         public const string MastComponent = "Track.KeyValueLampMaterialController", BellComponent = "Audio.IntegerLoopingPlayer", GateComponent = "RollingStock.Controls.KeyValueBoolAnimator";
         public const string MastFamily = "Crossing mast", BellFamily = "Crossing bell";
@@ -113,16 +114,17 @@ namespace RailroaderScenePatcher.Core {
             var observed = world.ObservePart(target);
             if (!GroupChecks.Finite(observed.Part.Placement) || !GroupChecks.Finite(observed.GroupState.Root.Placement)) throw new InvalidOperationException("Map coordinates are unavailable for the " + noun + " or its crossing controller");
         }
-        // Without a fixed placement the equipment stands in the object above it: its placement says so, and applied back
-        // it returns the equipment there.
+        // Equipment with its own placement reads it as recorded in its crossing controller (PartHolds). Without one the
+        // equipment stands in the object above it: its placement says so, and applied back it returns the equipment there.
         public ObjectState Read(object target) {
             var observed = world.ObservePart(target);
-            var placement = observed.Part.Placement;
-            if (placement != null && !holds.Contains(target) && observed.ParentPlacement != null) placement = new Placement(placement.Position, placement.Rotation) { Frame = observed.ParentPlacement };
+            var placement = OwnPlacement.Read(world, holds, target, observed.Group, observed.Part.Placement, observed.ParentPlacement);
             // Equipment that a culler of the game switches itself reads no activity: Enabled does not apply to it.
             return new ObjectState(placement, world.ActivityRefusal(target) != null ? null : observed.Part.Active);
         }
         public Placement FramePlacement(object target) => world.ObservePart(target).ParentPlacement;
+        public Placement Recorded(object target, Placement inMap) => inMap == null ? null : holds.Recorded(world, world.ObservePart(target).Group, inMap);
+        public Placement InMap(object target, Placement recorded) => recorded == null || recorded.Frame != null || holds.Follows(target) ? recorded : holds.InMap(world, world.ObservePart(target).Group, recorded);
         // Placement and activity leave the logical binding: the equipment takes no relationship of any kind.
         public void CheckRelationships(object target, ObjectState state) {
             if (state?.Marker != null) throw new InvalidOperationException("An existing crossing " + noun + " does not support a track-marker relationship");
@@ -155,10 +157,12 @@ namespace RailroaderScenePatcher.Core {
             var switched = world.ActivityRefusal(target) != null;
             var active = state.Active ?? before.Part.Active ?? true;
             if (!switched && active && before.Part.Active != true) world.SetPartActive(target, true);
-            // A placement read in the object above returns the equipment there; any other placement is fixed and holds it.
-            if (desired != null) Place(target, before.Group, desired, desired.Frame == null ? desired : null, holds.Contains(target) ? holds.AuthoredOf(target) : GroupChecks.InParent(before.GroupState, target));
+            // A placement read in the object above returns the equipment there; any other placement is its own placement,
+            // recorded in its crossing controller, which holds it there.
+            var inMap = OwnPlacement.InMap(world, holds, before.Group, desired);
+            if (desired != null) Place(target, before.Group, inMap, desired.Frame == null ? desired : null, holds.Contains(target) ? holds.AuthoredOf(target) : GroupChecks.InParent(before.GroupState, target));
             if (!switched && !active && before.Part.Active != false) world.SetPartActive(target, false);
-            Verify(target, before, desired ?? before.Part.Placement, switched ? (bool?)null : active, Refresh(before.Group));
+            Verify(target, before, inMap ?? before.Part.Placement, switched ? (bool?)null : active, Refresh(before.Group));
         }
         void Verify(object target, PartObservation before, Placement placement, bool? active, CullingPlan plan) {
             var after = world.ObservePart(target);

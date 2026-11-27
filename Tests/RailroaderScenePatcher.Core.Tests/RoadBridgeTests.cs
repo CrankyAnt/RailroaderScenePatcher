@@ -399,13 +399,15 @@ static class RoadBridgeTests {
         Assert(session.Output(BridgeId).Outstanding.Count == 2, "The history steps track the terrain at both places: " + String.Join("; ", session.Output(BridgeId).Outstanding));
         f.Terrain.BuildTiles(); f.Masks.Poll();
         Assert(session.Output(BridgeId).Settled, "The terrain output of the history steps completes");
-        // The deck gets a fixed placement of its own; removing the bridge's modification then returns the bridge and
-        // its mask to where the scene has them, and the deck keeps the placement its remaining modification gives it.
+        // The deck gets a placement of its own; removing the bridge's modification then returns the bridge and its mask
+        // to where the scene has them, and the deck keeps its own placement relative to the bridge, so it returns with it.
         var held = new[] { 2720.0, 527, 350 };
-        Assert(session.Edit(DeckId, new Placement(held, Upright), null).Applied, "The deck takes a fixed placement");
+        Assert(session.Edit(DeckId, new Placement(held, Upright), null).Applied, "The deck takes a placement of its own");
         var removed = session.Remove(BridgeId);
-        Assert(removed.Applied && Close(f.At(f.Group), Authored) && f.RegisteredOnceAt(Authored, 90) && Close(f.Culls(), Authored) && Close(f.At(f.Deck), held),
-            "Remove modification returns the bridge, its mask and its culling to the scene's state, and the deck's remaining modification holds: " + removed.Error + " " + f.Where());
+        var inBridge = Turn.Rotate(Turn.Inverse(Turn.Yaw(40)), new[] { held[0] - Far[0], held[1] - Far[1], held[2] - Far[2] });
+        var deckHome = new[] { Authored[0] + inBridge[0], Authored[1] + inBridge[1], Authored[2] + inBridge[2] };
+        Assert(removed.Applied && Close(f.At(f.Group), Authored) && f.RegisteredOnceAt(Authored, 90) && Close(f.Culls(), Authored) && Close(f.At(f.Deck), deckHome),
+            "Remove modification returns the bridge, its mask and its culling to the scene's state, and the deck keeps its own placement relative to the bridge: " + removed.Error + " " + f.Where());
         Assert(session.Output(BridgeId).Outstanding.Count == 2, "The removal tracks the terrain at both places");
         f.Terrain.BuildTiles(); f.Masks.Poll();
         mapEditor.Undo(); Assert(Close(f.At(f.Group), Far) && f.RegisteredOnceAt(Far, 130) && Close(f.At(f.Deck), held), "Undo of the removal moves the bridge and its mask again: " + f.Where());

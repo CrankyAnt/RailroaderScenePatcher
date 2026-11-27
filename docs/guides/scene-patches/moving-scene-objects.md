@@ -60,7 +60,7 @@ If the top scene object has a simple culler, as at Bryson House Track, the culle
 1. Select the part's row in the outliner, for example `Bryson House Track / Ramp`. On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `child-object-v1`. **Use in the game** identifies the part as decorative.
 2. On the **Placement** tab, change the **Numeric** fields and click **Apply**, or use **Gizmo** or **Snap** as for other objects, unless a ground mask refuses the move. To switch the part off, click **Disable** at the bottom of the **Object** tab.
 
-A part with a fixed placement stays at its map coordinates when you later move the group, including during a **Gizmo** drag. This also applies when another mod's scene patch file moves the group, regardless of key order or load order. The patcher applies the group placement first, then each part's fixed placement. Parts without fixed placements move with the group.
+A part with its own placement moves with the group when you later move the group, including during a **Gizmo** drag, and keeps its place relative to the group. This also applies when another mod's scene patch file moves the group, regardless of key order or load order. The patcher applies the group placement first, then each part's placement relative to the group. Parts without their own placement move with the group.
 
 Click **Remove modification** to restore a part's unmodified placement relative to its parent, either the top scene object or another part. The parent stays where it is, and the part moves with it again. If a part is below another part that has moved, disabling and enabling the lower part or removing its modification preserves its placement relative to the moved part.
 
@@ -117,7 +117,7 @@ As with a location sign, the patcher tracks the edited object's terrain output a
 
 Moving a bridge, milepost, crossing pad, station map icon, or spawn point also moves any scene ground masks on that object or its children, including masks that flatten the ground. Its **Changes** tab shows the **Terrain** output. No such object holds a mask on the Railroader 0.6.3 base-game map.
 
-A part with its own fixed placement keeps its mask in place when its group moves. Disabling a group or part is expected to release the mask through the component's lifecycle. Enabling it is expected to register the mask again. The patcher checks both transitions and fails the edit if the mask doesn't match the activity. This behavior hasn't yet been observed in Railroader. After **Undo**, **Redo**, restoration after a failed edit, and **Remove modification**, the patcher checks that the mask is back at its holder.
+A part with its own placement moves its mask with it when its group moves, as it moves the part. Disabling a group or part is expected to release the mask through the component's lifecycle. Enabling it is expected to register the mask again. The patcher checks both transitions and fails the edit if the mask doesn't match the activity. This behavior hasn't yet been observed in Railroader. After **Undo**, **Redo**, restoration after a failed edit, and **Remove modification**, the patcher checks that the mask is back at its holder.
 
 In Railroader 0.6.3, these buildings' masks also flatten the ground under them to a single height. These masks move with the objects that hold them, like any other mask. You can move the group, the `Mask` part, or a part above it with **Gizmo**, **Snap**, **Follow**, or **Numeric**. You can also enable or disable each object. The game builds each terrain tile from its base heights and the masks registered on it. After a move, it rebuilds the terrain at both positions. At the old position, it restores the ground height without the mask. At the new position, the mask flattens the ground. **Undo**, **Remove modification**, and restoration after a failed edit move the mask back and make the game rebuild the terrain at both positions again. When the world reloads, the game builds the terrain from the saved scene patch file, with the mask registered once at the object that holds it.
 
@@ -238,6 +238,18 @@ The three unprotected crossings below `World/Roads Bryson/Old River Rd` have the
 
 In the outliner, each of the three crossings is its own `Crossing Unprotected` row with its two crossbucks and its pad. The inspector's title shows the ID in the crossbuck's name, for example `Sign-Crossing0 (1) at Crossing Unprotected in Old River Rd (pad marker Mbkd)`. On the **Object** tab, **Identity** shows it as **Pad marker ID** below the path. **Copy ID** copies it as `padMarkerId` beside the path. Without `padMarkerId`, the path names all three crossbuck, so the modification fails before anything changes. If `padMarkerId` matches no crossing pad at that path, it identifies no crossbuck and the modification also fails. When a crossing has a unique name, its crossbuck's path alone identifies it and the target refuses `padMarkerId`. Targets that aren't crossbucks also refuse this member.
 
+### Move a crossing as a whole
+
+A crossing without signals has no controller, so you move it from its own row in the outliner. Selecting that row inspects the crossing object, which holds the crossbucks and pads. Its crossbucks move together and keep their placement relative to each other, a crossbuck with its own placement included. Its crossing pads stay where they are with their track bindings. This works for a map crossing, a duplicated crossing, and crossings that share a path.
+
+1. Select the crossing's row in the outliner. The row holds its crossbucks and pads. The **Object** tab reads **Move or rotate the whole crossing. Its crossbucks move together, and its crossing pads stay in place.**
+1. On the **Placement** tab, move or rotate the crossing as you would a group, with **Numeric**, **Gizmo**, or **Snap**. See [move a group in the native map editor](#move-a-group-in-the-native-map-editor).
+1. **Follow** is unavailable with the reason `Uses fixed placement`. **Disable** is unavailable with the reason `Its activity can't be edited`; disable each crossbuck on its own instead.
+
+To move one crossbuck on its own, select its row and move it as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). Each crossbuck is still moved, rotated, enabled and disabled on its own.
+
+A duplicated crossing moves the same way. Its placement is where the patcher builds it, and a later move puts it at the new place. In the scene patch file, the crossing object's target uses the structure `crossing-object-v1`; see [crossing without signals](scene-patch-file-v1.md#crossing-without-signals).
+
 ## Write the modification by hand
 
 Click **Copy ID** in the command band to copy the identity. Add a modification under a key of your choice in the `modifications` object of `Data/scene-patches.json`, as described in [scene patch file v1](scene-patch-file-v1.md):
@@ -280,7 +292,7 @@ A part modification uses the part's path and the structure `child-object-v1`. Se
 }
 ```
 
-The part placement uses map coordinates, not coordinates relative to the group.
+The part's `placement` is recorded relative to the group. While the group stands at its map placement, the recorded values equal the part's map coordinates. After the group moves, the recorded values differ from the map coordinates that the **Placement** tab shows. The patcher converts between them when it writes the file.
 
 ## What the patcher checks
 
@@ -288,7 +300,7 @@ Before changing a group, the patcher checks that its scene is loaded, its path n
 
 For a part, the path must name exactly one listed part, and its group must pass the same checks. If a part modification names a top scene object, such as a yard lamp post below Bryson Yard, it fails with an explanation that the path names a group and not a part. The file's other modifications still apply. Edit that object as a group.
 
-After changing a group, the patcher checks that the top scene object's placement and activity match the mod values. Parts must keep their placement relative to the top scene object, except those with their own fixed placement, which must remain at that placement. Each part must keep its activity unless a culler switches it.
+After changing a group, the patcher checks that the top scene object's placement and activity match the mod values. Parts must keep their placement relative to the top scene object, including those with their own placement. Each part must keep its activity unless a culler switches it.
 
 Every enabled culler's sphere must stay at the culler with the radius set in the scene. A disabled group has no culling sphere. After a move, every enabled ground mask must register at its holder's new center and direction. If a mask doesn't follow its holder, the edit fails.
 

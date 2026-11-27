@@ -538,8 +538,8 @@ namespace RailroaderScenePatcher.Core {
             }
         }
         // The whole move of the setup. Equipment the patcher added stands below the controller at a fixed placement of
-        // its own, in map coordinates: it keeps that placement, as a part with a fixed placement does, whichever scene
-        // patch file moves the setup and in whatever order.
+        // its own, in map coordinates: it keeps that placement whichever scene patch file moves the setup and in whatever
+        // order.
         void MoveSetup(object target, Baseline baseline, Placement placement) {
             var kept = equipment?.Observed(target, baseline.Equipment);
             setup.Move(target, placement);

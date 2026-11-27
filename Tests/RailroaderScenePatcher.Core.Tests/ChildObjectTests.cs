@@ -9,8 +9,8 @@ using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // Whole scene patch file tests for single child objects against a controlled group with nested parts and
-// cullers: part identity and ambiguity, part-only edits, the fixed placement of a part through a later group move and
-// a group gizmo preview, ordering, removal, repeated application, refusal and restoration.
+// cullers: part identity and ambiguity, part-only edits, a part's own placement relative to its group through a later
+// group move and a group gizmo preview, ordering, removal, repeated application, refusal and restoration.
 static class ChildObjectTests {
     const string SceneName = "BushnellWhittier-MapManager", Mill = "World/Large Scenery/Whittier/Whittier Saw Mill";
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
@@ -86,14 +86,20 @@ static class ChildObjectTests {
     // Where a part stands in map coordinates when it keeps its place relative to the root at rootPosition, rootTurn.
     static double[] InGroup(double[] rootPosition, double[] rootTurn, double[] offset) => Plus(rootPosition, Turn.Rotate(rootTurn, offset));
     static string Where(Fixture f) => String.Join("; ", f.Group.Parts.Select(p => p.Id + "=" + N(f.MapOf(p).Position.Select(v => Math.Round(v, 3)))));
+    // Where the mill stands in the unedited scene, in map coordinates.
+    static readonly double[] MillAt = { 1100, 10, 20 };
+    // Where the jetty with its own placement JettyTarget, JettyTurn stands when the mill stands at rootPosition, rootTurn:
+    // its own placement keeps its place relative to the mill.
+    static double[] JettyAt(double[] rootPosition, double[] rootTurn) => InGroup(rootPosition, rootTurn, new[] { JettyTarget[0] - MillAt[0], JettyTarget[1] - MillAt[1], JettyTarget[2] - MillAt[2] });
+    static double[] JettyTurnAt(double[] rootTurn) => Turn.Multiply(rootTurn, JettyTurn);
 
     public static void Run() {
         PartRuleListsSceneObjectsOfListedGroups();
         PartEditChangesOnlyThatPart();
-        FixedPartKeepsItsPlacementWhenTheGroupMoves();
+        OwnPlacementMovesWithTheGroup();
         GroupAndPartInOneFileInEitherKeyOrder();
         GroupAndPartInTwoModsInEitherLoadOrder();
-        FixedPartHoldsThroughAGroupGizmoPreview();
+        OwnPlacementMovesThroughAGroupGizmoPreview();
         RemovalReturnsThePartToItsPlaceInTheGroup();
         UnmatchedAndAmbiguousPartPathsFailBeforeMutation();
         RepeatedApplicationAccumulatesNoOffset();
@@ -113,7 +119,7 @@ static class ChildObjectTests {
         CullerOnlyChildrenAreNoPartsButTheirChildrenAre();
         CullerOnlyChildPathFailsBeforeMutation();
         GroupHolderAndTopObjectPathsFailBeforeMutation();
-        Console.WriteLine("PASS: child objects: part rule, part-only edits, fixed placement through group moves and previews, ordering, removal, culling, refusal, restoration and scene patch editing");
+        Console.WriteLine("PASS: child objects: part rule, part-only edits, own placement through group moves and previews, ordering, removal, culling, refusal, restoration and scene patch editing");
     }
 
     // A part is one scene object at any depth below a listed top scene object. Sibling objects that share a path, levels of a
@@ -254,13 +260,13 @@ static class ChildObjectTests {
         Assert(Near(f.MapOf(f.Jetty).Position, JettyTarget), "An activity edit leaves the placement");
     }
 
-    static void FixedPartKeepsItsPlacementWhenTheGroupMoves() {
+    static void OwnPlacementMovesWithTheGroup() {
         var f = new Fixture();
         f.Engine.Apply(Doc(Part("move-jetty", "Jetty", JettyTarget, JettyTurn)), "first");
-        var post = f.MapOf(f.Post).Position;
         var outcome = f.Engine.Apply(Doc(Group("move-mill", GroupTarget, GroupTurn)), "second").Outcomes["move-mill"];
         Assert(outcome.Applied, "The group move applies: " + outcome.Error);
-        Assert(Near(f.MapOf(f.Jetty).Position, JettyTarget) && SameTurn(f.MapOf(f.Jetty).Rotation, JettyTurn) && Near(f.MapOf(f.Post).Position, post), "The fixed part and what stands below it keep their placement: " + Where(f));
+        Assert(Near(f.MapOf(f.Jetty).Position, JettyAt(GroupTarget, GroupTurn)) && SameTurn(f.MapOf(f.Jetty).Rotation, JettyTurnAt(GroupTurn)), "The part with its own placement moves with the group and keeps its placement relative to it: " + Where(f));
+        Assert(Near(f.MapOf(f.Post).Position, Plus(f.MapOf(f.Jetty).Position, Turn.Rotate(f.MapOf(f.Jetty).Rotation, new[] { 1.0, 0, 0 }))), "What stands below the part keeps its place in it: " + Where(f));
         Assert(Near(f.MapOf(f.Platform).Position, InGroup(GroupTarget, GroupTurn, new[] { 0.0, 0, 5 })), "A part without a fixed placement moves with the group: " + Where(f));
     }
 
@@ -272,7 +278,7 @@ static class ChildObjectTests {
         var b = second.Engine.Apply(Doc(Part("a-jetty", "Jetty", JettyTarget, JettyTurn), Group("b-mill", GroupTarget, GroupTurn)));
         Assert(a.Outcomes.Values.All(o => o.Applied) && b.Outcomes.Values.All(o => o.Applied), "Both orders apply: " + String.Join("; ", a.Outcomes.Values.Concat(b.Outcomes.Values).Select(o => o.Error)));
         Assert(Final(first) == Final(second), "A part and its group in one scene patch file reach the same placements in either key order: " + Final(first) + " / " + Final(second));
-        Assert(Near(first.MapOf(first.Jetty).Position, JettyTarget), "The part keeps its fixed placement");
+        Assert(Near(first.MapOf(first.Jetty).Position, JettyAt(GroupTarget, GroupTurn)), "The part keeps its placement relative to the moved group: " + Where(first));
     }
     static void GroupAndPartInTwoModsInEitherLoadOrder() {
         var first = new Fixture(); var second = new Fixture();
@@ -281,7 +287,7 @@ static class ChildObjectTests {
         runtime.ApplyLoaded(new[] { new LoadedMod(new PatchSource("author/parts", "Parts", "1.0.0"), parts, new[] { "crankyant/scene-patcher" }), new LoadedMod(new PatchSource("author/groups", "Groups", "1.0.0"), groups, new[] { "crankyant/scene-patcher" }) }, null);
         runtime = new PatchRuntime(second.Engine, new Diagnostics(), "0.5.0", "test");
         runtime.ApplyLoaded(new[] { new LoadedMod(new PatchSource("author/groups", "Groups", "1.0.0"), groups, new[] { "crankyant/scene-patcher" }), new LoadedMod(new PatchSource("author/parts", "Parts", "1.0.0"), parts, new[] { "crankyant/scene-patcher" }) }, null);
-        Assert(Final(first) == Final(second) && Near(first.MapOf(first.Jetty).Position, JettyTarget), "A part and its group in two mods reach the same placements in either load order: " + Final(first) + " / " + Final(second));
+        Assert(Final(first) == Final(second) && Near(first.MapOf(first.Jetty).Position, JettyAt(GroupTarget, GroupTurn)), "A part and its group in two mods reach the same placements in either load order: " + Final(first) + " / " + Final(second));
     }
     sealed class Diagnostics : IPatchDiagnostics { public readonly List<PatchFailure> Failures = new List<PatchFailure>(); public void Warning(PatchFailure failure) => Failures.Add(failure); }
 
@@ -290,7 +296,7 @@ static class ChildObjectTests {
         var session = new PatchEditingSession(f.Engine, mapEditor, store); mapEditor.Session = session;
         return (store, mapEditor, session);
     }
-    static void FixedPartHoldsThroughAGroupGizmoPreview() {
+    static void OwnPlacementMovesThroughAGroupGizmoPreview() {
         foreach (var complete in new[] { true, false }) {
             var f = new Fixture(); var (_, _, session) = Session(f);
             Assert(session.Edit(PartId("Jetty"), new Placement(JettyTarget, JettyTurn), null).Applied, "The part edit applies");
@@ -299,11 +305,12 @@ static class ChildObjectTests {
             foreach (var x in new[] { 1105.0, 1110.0 }) {
                 var preview = gesture.Preview(new Placement(new[] { x, 10.0, 20 }, GroupTurn));
                 Assert(preview.Applied, "The group preview applies: " + preview.Error);
-                Assert(Near(f.MapOf(f.Jetty).Position, JettyTarget) && Near(f.MapOf(f.Platform).Position, InGroup(new[] { x, 10.0, 20 }, GroupTurn, new[] { 0.0, 0, 5 })), "During the preview the fixed part keeps its placement: " + Where(f));
+                Assert(Near(f.MapOf(f.Jetty).Position, JettyAt(new[] { x, 10.0, 20 }, GroupTurn)) && Near(f.MapOf(f.Platform).Position, InGroup(new[] { x, 10.0, 20 }, GroupTurn, new[] { 0.0, 0, 5 })), "During the preview the part with its own placement moves with the group: " + Where(f));
             }
             var end = complete ? gesture.Complete() : gesture.Cancel();
             Assert(end.Applied, "The gesture ends: " + end.Error);
-            Assert(Near(f.MapOf(f.Jetty).Position, JettyTarget) && SameTurn(f.MapOf(f.Jetty).Rotation, JettyTurn), "After the preview the fixed part keeps its placement: " + Where(f));
+            var root = complete ? GroupTarget : MillAt; var turn = complete ? GroupTurn : Identity;
+            Assert(Near(f.MapOf(f.Jetty).Position, JettyAt(root, turn)) && SameTurn(f.MapOf(f.Jetty).Rotation, JettyTurnAt(turn)), "After the preview the part keeps its placement relative to the group: " + Where(f));
             Assert(Near(f.MapOf(f.Platform).Position, InGroup(complete ? GroupTarget : new[] { 1100.0, 10, 20 }, complete ? GroupTurn : Identity, new[] { 0.0, 0, 5 })), "The group ends where the gesture leaves it: " + Where(f));
         }
     }
@@ -311,16 +318,16 @@ static class ChildObjectTests {
     static void RemovalReturnsThePartToItsPlaceInTheGroup() {
         var f = new Fixture(); var (_, mapEditor, session) = Session(f);
         Assert(session.Edit(PartId("Jetty"), new Placement(JettyTarget, JettyTurn), null).Applied, "The part edit applies");
-        Assert(session.Edit(GroupId, new Placement(GroupTarget, GroupTurn), null).Applied && Near(f.MapOf(f.Jetty).Position, JettyTarget), "The group move leaves the fixed part");
+        Assert(session.Edit(GroupId, new Placement(GroupTarget, GroupTurn), null).Applied && Near(f.MapOf(f.Jetty).Position, JettyAt(GroupTarget, GroupTurn)), "The group move takes the part with its own placement along: " + Where(f));
         var removed = session.Remove(PartId("Jetty"));
         Assert(removed.Applied, "Remove modification applies: " + removed.Error);
         Assert(Near(f.MapOf(f.Jetty).Position, InGroup(GroupTarget, GroupTurn, new[] { 0.0, 0, -6 })) && SameTurn(f.MapOf(f.Jetty).Rotation, GroupTurn), "The part returns to its unedited placement relative to its group: " + Where(f));
         Assert(Near(f.MapOf(f.Post).Position, InGroup(GroupTarget, GroupTurn, new[] { 1.0, 0, -6 })), "What stands below the part returns with it: " + Where(f));
-        Assert(f.Group.Cullers.Single(c => c.OnRoot).Radius == 10, "Without a fixed part the root culler keeps its authored radius");
+        Assert(f.Group.Cullers.Single(c => c.OnRoot).Radius == 10, "Without a held part the root culler keeps its authored radius");
         Assert(f.World.Native.Registered.Count == 0, "Remove modification releases the part's own culling spheres");
         Assert(session.Edit(GroupId, new Placement(new[] { 1120.0, 10, 20 }, GroupTurn), null).Applied && Near(f.MapOf(f.Jetty).Position, InGroup(new[] { 1120.0, 10, 20 }, GroupTurn, new[] { 0.0, 0, -6 })), "The returned part moves with its group again: " + Where(f));
         mapEditor.Undo(); mapEditor.Undo();
-        Assert(Near(f.MapOf(f.Jetty).Position, JettyTarget), "Undo of the removal holds the part at its fixed placement again: " + Where(f));
+        Assert(Near(f.MapOf(f.Jetty).Position, JettyAt(GroupTarget, GroupTurn)), "Undo of the removal holds the part at its own placement in the group again: " + Where(f));
     }
 
     static void UnmatchedAndAmbiguousPartPathsFailBeforeMutation() {
@@ -338,7 +345,7 @@ static class ChildObjectTests {
         f.Engine.Apply(doc); var first = Final(f);
         Assert(f.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && Final(f) == first, "Repeated application keeps the same placements: " + first + " / " + Final(f));
         f.World.Origin = 1010;
-        Assert(new PatchEngine(f.Scene).Apply(doc).Outcomes.Values.All(o => o.Applied) && Near(f.MapOf(f.Jetty).Position, JettyTarget), "A load at another origin reaches the same map placements: " + Where(f));
+        Assert(new PatchEngine(f.Scene).Apply(doc).Outcomes.Values.All(o => o.Applied) && Near(f.MapOf(f.Jetty).Position, JettyAt(GroupTarget, GroupTurn)), "A load at another origin reaches the same map placements: " + Where(f));
     }
 
     // A part moved out of the root culler's sphere leaves that culler at the radius the scene gives it and gets a
@@ -375,7 +382,7 @@ static class ChildObjectTests {
             var outcome = f.Engine.Apply(Doc(Part("move-jetty", "Jetty", JettyTarget, JettyTurn, active))).Outcomes["move-jetty"];
             Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A failure after mutation is restored: " + outcome.Error);
             Assert(Near(f.MapOf(f.Jetty).Position, new[] { 1100.0, 10, 14 }) && SameTurn(f.MapOf(f.Jetty).Rotation, Identity) && f.Jetty.Active && Near(f.Platform.Offset, platform), "The captured placement and activity of the part are restored: " + Where(f));
-            Assert(Near(f.Engine.Apply(Doc(Group("move-mill", GroupTarget, GroupTurn))).Outcomes.Values.Single().Applied ? f.MapOf(f.Jetty).Position : new double[3], InGroup(GroupTarget, GroupTurn, new[] { 0.0, 0, -6 })), "The restored part holds no fixed placement: " + Where(f));
+            Assert(Near(f.Engine.Apply(Doc(Group("move-mill", GroupTarget, GroupTurn))).Outcomes.Values.Single().Applied ? f.MapOf(f.Jetty).Position : new double[3], InGroup(GroupTarget, GroupTurn, new[] { 0.0, 0, -6 })), "The restored part holds no own placement: " + Where(f));
         }
     }
 
@@ -423,8 +430,9 @@ static class ChildObjectTests {
         Assert(without.MinimumPatcherVersion == ChildObjects.RequiredVersion, "A part scene patch file requires the part capability version whether or not this build offers it: " + without.MinimumPatcherVersion);
     }
 
-    // A part without a fixed placement stands in the object directly above it: a part below a held part keeps its place
-    // in that part through an activity edit, an Undo and a removal.
+    // A part without an own placement stands in the object directly above it: a part below a held part keeps its place
+    // in that part through an activity edit, an Undo and a removal. A held part keeps its place in its group when the
+    // part above it moves.
     static void NestedPartKeepsItsPlaceInItsParent() {
         double[] PostOnJetty(Fixture f) => Plus(f.MapOf(f.Jetty).Position, Turn.Rotate(f.MapOf(f.Jetty).Rotation, new[] { 1.0, 0, 0 }));
         foreach (var undo in new[] { false, true }) {
@@ -432,7 +440,7 @@ static class ChildObjectTests {
             Assert(session.Edit(PartId("Jetty"), new Placement(JettyTarget, JettyTurn), null).Applied && session.Edit(PartId("Jetty/Post"), null, false).Applied, "The jetty holds and the post is disabled");
             Assert(session.Edit(GroupId, new Placement(GroupTarget, GroupTurn), null).Applied, "The group moves");
             if (undo) { mapEditor.Undo(); mapEditor.Undo(); } else Assert(session.Edit(PartId("Jetty/Post"), null, true).Applied, "Enable applies");
-            Assert(f.Post.Active && Near(f.MapOf(f.Post).Position, PostOnJetty(f)) && Near(f.MapOf(f.Jetty).Position, JettyTarget),
+            Assert(f.Post.Active && Near(f.MapOf(f.Post).Position, PostOnJetty(f)) && Near(f.MapOf(f.Jetty).Position, undo ? JettyTarget : JettyAt(GroupTarget, GroupTurn)),
                 "The post comes back on in its place on the held jetty after " + (undo ? "Undo of the disable" : "Enable") + ": " + Where(f));
         }
         var g = new Fixture(); var (_, _, edits) = Session(g);

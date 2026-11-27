@@ -263,7 +263,9 @@ static class InteractiveBuildingTests {
         mapEditor.Redo(); mapEditor.Redo();
         Assert(Near(f.Root, Moved) && !f.Stall.Active && Near(f.At(f.Stall), StallMoved), "Redo reapplies every edit: " + f.Where()); Persistence(true, all, "After Redo");
         var removed = session.Remove(GroupId);
-        Assert(removed.Applied && Near(f.Root, Authored) && !f.Stall.Active && Near(f.At(f.Stall), StallMoved), "Remove modification returns the group and keeps the fixed stall edit: " + removed.Error + " " + f.Where());
+        // The stall's own placement stays relative to the building, so it returns with it.
+        var stallHome = new[] { StallMoved[0] + Authored[0] - Moved[0], StallMoved[1] + Authored[1] - Moved[1], StallMoved[2] + Authored[2] - Moved[2] };
+        Assert(removed.Applied && Near(f.Root, Authored) && !f.Stall.Active && Near(f.At(f.Stall), stallHome), "Remove modification returns the group, and the stall keeps its own placement relative to it: " + removed.Error + " " + f.Where());
         mapEditor.Undo(); Assert(Near(f.Root, Moved), "Undo of the removal moves the building again: " + f.Where());
         Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0") && (int)JObject.Parse(store.Patch)["formatVersion"] == 1, "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
         Persistence(false, new string[0], "After Save");

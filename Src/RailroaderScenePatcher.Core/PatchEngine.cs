@@ -151,6 +151,15 @@ namespace RailroaderScenePatcher.Core {
         // The map placement of the frame the object stands in now, or null when it stands in none.
         Placement FramePlacement(object target);
     }
+    // A scene whose objects record their own placement relative to the object above them (PartHolds): the scene patch file
+    // holds where the object stands while the object above it stands at its map placement. The window shows and takes
+    // map placements; an edit converts the placement it takes into the recorded one before it writes it.
+    public interface IRecordedPlacementScene {
+        // The placement the scene patch file records for the target standing at the map placement.
+        Placement Recorded(object target, Placement inMap);
+        // The map placement of a recorded placement of the target now. A placement read in a frame is already one.
+        Placement InMap(object target, Placement recorded);
+    }
     // Desired or observed state of one object. A null member is left untouched by an application.
     public sealed class ObjectState {
         public ObjectState(Placement placement, bool? active) : this(placement, active, null) { }

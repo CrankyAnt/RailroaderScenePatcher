@@ -264,20 +264,22 @@ static class LakeSurfaceTests {
             && session.Edit(GroupId(Fontana1), new Placement(FontanaTarget, Upright), null).Applied, "A logs move, a log pond move and a Fontana lake move apply");
         Persistence(true, all, "After three edits");
         mapEditor.Undo(); Assert(Near(f.At(f.Fontana), FontanaAuthored) && Near(f.Culls(), FontanaAuthored), "Undo returns the lake with its culling: " + f.Where());
-        mapEditor.Undo(); Assert(Near(f.At(f.Pond), PondAuthored) && Near(f.At(f.LogsPart), LogsTarget), "Undo returns the log pond; the moved logs stay: " + f.Where());
+        mapEditor.Undo(); Assert(Near(f.At(f.Pond), PondAuthored) && Near(f.At(f.LogsPart), LogsTarget), "Undo returns the log pond, and the moved logs return with it: " + f.Where());
         mapEditor.Undo(); Assert(Near(f.At(f.LogsPart), LogsAuthored), "Undo returns the logs: " + f.Where()); Persistence(false, new string[0], "After Undo back to the unedited lakes");
         mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo();
-        Assert(Near(f.At(f.LogsPart), LogsTarget) && Near(f.At(f.Pond), PondTarget) && Near(f.At(f.Fontana), FontanaTarget) && Near(f.Culls(), FontanaTarget), "Redo reapplies every edit: " + f.Where());
+        // The logs keep their own placement relative to the log pond, which moved 250 m east and 40 m north.
+        var logsInMovedPond = new[] { LogsTarget[0] + PondTarget[0] - PondAuthored[0], LogsTarget[1] + PondTarget[1] - PondAuthored[1], LogsTarget[2] + PondTarget[2] - PondAuthored[2] };
+        Assert(Near(f.At(f.LogsPart), logsInMovedPond) && Near(f.At(f.Pond), PondTarget) && Near(f.At(f.Fontana), FontanaTarget) && Near(f.Culls(), FontanaTarget), "Redo reapplies every edit: " + f.Where());
         Persistence(true, all, "After Redo");
         var removed = session.Remove(PartId(Logs));
         Assert(removed.Applied && Near(f.At(f.LogsPart), new[] { 1607.0, 7, -844 }), "Remove modification returns the logs to their place in the moved log pond: " + removed.Error + " " + f.Where());
-        mapEditor.Undo(); Assert(Near(f.At(f.LogsPart), LogsTarget), "Undo of the removal holds the logs again");
+        mapEditor.Undo(); Assert(Near(f.At(f.LogsPart), logsInMovedPond), "Undo of the removal holds the logs again: " + f.Where());
         Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=" + SceneObjects.RequiredVersion) && (int)JObject.Parse(store.Patch)["formatVersion"] == 1,
             "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
         Persistence(false, new string[0], "After Save");
         var fresh = new Lakes();
         var reload = fresh.Engine.Apply(store.Patch);
-        Assert(reload.Outcomes.Count == 3 && reload.Outcomes.Values.All(o => o.Applied) && Near(fresh.At(fresh.LogsPart), LogsTarget) && Near(fresh.At(fresh.Fontana), FontanaTarget)
+        Assert(reload.Outcomes.Count == 3 && reload.Outcomes.Values.All(o => o.Applied) && Near(fresh.At(fresh.LogsPart), logsInMovedPond) && Near(fresh.At(fresh.Fontana), FontanaTarget)
             && Near(fresh.Culls(), FontanaTarget) && fresh.Pond.Parts.Count == 2 && fresh.Fontana.Cullers.Count == 1, "A reloaded world reproduces the moves without duplicated state: " + fresh.Where());
         var strict = new Store { Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.9.0\"]}}" };
         var other = new Lakes(); var strictEditor = new NativeMapEditor(); var kept = new PatchEditingSession(other.Engine, strictEditor, strict); strictEditor.Session = kept;

@@ -922,6 +922,7 @@ namespace RailroaderScenePatcher {
             }
             // A crossing controller moves its setup only where the crossing capability holds the whole move.
             if (CommandBand.EditsCoverage(selected.Identity) && crossingCoverageScene?.MovesSetup != true) live.WholeMoveReason = EditReasons.GameBuild;
+            if (selected.Identity.Structure == CrossingObjectScene.Structure && crossingObjectScene?.MovesCrossing != true) live.WholeMoveReason = EditReasons.GameBuild;
             // A crossing whose lights, gates and bells the session cannot read offers no equipment edit, with that reason.
             if (CommandBand.EditsCoverage(selected.Identity) && attachment != null)
                 try { attachment.Session.Equipment(selected.Identity); } catch (Exception e) { live.EquipmentReason = e.GetBaseException().Message; }
@@ -2014,7 +2015,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Changed", "Lists objects this mod changes (*) or adds (+). If the patcher refuses a modification, the row shows × instead. Open the object's Changes tab for the reason." },
                     new[] { "Disabled", "Lists objects that are themselves switched off, whether or not their parents are active. Problems usually leaves them out. See the exception for starter placement markers below." },
                     new[] { "Problems", "Lists objects with detected problems you can repair here. Each of those objects has a ! marker. For example, the game may need a binding it can't use, a binding may refer to a segment that no longer exists, or the game may be unable to use a crossing detection span. Edit limits and things the inspection couldn't read are separate from detected problems. This filter leaves out objects that are themselves switched off. A starter placement marker can still appear here if the game uses it and its track location has a problem. Even without a detected problem, an object may be in the wrong place or use the wrong track." },
-                    new[] { "Groups and crossings", "The outliner lists a group's parts and a crossing controller's lights, gates, bells, pads, and detection spans beneath their respective rows. For a crossing without a controller, one row holds its crossbucks and pads. Select that row and click Focus to go to the crossing." },
+                    new[] { "Groups and crossings", "The outliner lists a group's parts and a crossing controller's lights, gates, bells, pads, and detection spans beneath their respective rows. For a crossing without a controller, one row holds its crossbucks and pads. Select that row to move or rotate the whole crossing on the Placement tab, or click Focus to go to the crossing." },
                     new[] { "Spawn point", "Players can start at a scene spawn point, teleport to it, or return to it after rescue. Edit native spawns in the Map Editor's Spawns category." },
                     new[] { StarterPlacements.Family, "An active new-game setup uses these markers' track locations to place its starting cars. The marker's own position has no effect. Click Focus to move the camera to where the cars stand." },
                     new[] { StationMapIconRules.Family, "These icons show stations on the map. After moving a station in the Map Editor, move its icon to the station's new location." },

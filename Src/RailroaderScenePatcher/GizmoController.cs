@@ -47,13 +47,13 @@ namespace RailroaderScenePatcher {
         internal void Hold() {
             if (!Shown || Active) return;
             holding = true;
-            try { shown = scene.Read(target).Placement; Pose("hold"); } catch { }
+            try { shown = ShownPlacement(); Pose("hold"); } catch { }
         }
         // Binds the standing gizmo to a new inspection of the same object and lets it take drags again.
         internal void Rebind(InspectedTarget inspection) {
             if (!Shown || Active) throw new EditRefusal("The gizmo is not standing");
             target = Checked(inspection); inspected = inspection;
-            shown = scene.Read(target).Placement;
+            shown = ShownPlacement();
             Pose("rebind");
             holding = false;
         }
@@ -77,6 +77,8 @@ namespace RailroaderScenePatcher {
             return matches[0];
         });
 
+        // Where the target stands in map coordinates: an object with its own placement in a frame reads it as recorded there.
+        Placement ShownPlacement() { var read = scene.Read(target).Placement; return scene is IRecordedPlacementScene recorded ? recorded.InMap(target, read) : read; }
         internal void Initialize(PatchEngine engine, IScene scene, MapEditorAttachment attachment, TargetIdentity identity, InspectedTarget inspected, TransformGizmoMode mode, Action<Outcome, string> finished) {
             this.engine = engine; this.scene = scene; this.attachment = attachment; this.identity = identity; this.inspected = inspected; this.finished = finished;
             dragFault = new DragFault(attachment.Fault);
@@ -85,7 +87,7 @@ namespace RailroaderScenePatcher {
                 controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as Behaviour;
                 if (controller == null || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor)) throw new EditRefusal("The Map Editor changed");
                 target = Checked(inspected);
-                shown = scene.Read(target).Placement;
+                shown = ShownPlacement();
                 var position = MapToWorld(shown);
                 var nativeGizmo = Native.Read(controller, "TransformGizmo");
                 var native = nativeGizmo == null ? null : Native.Read(nativeGizmo, "_gizmo") as TransformGizmo;

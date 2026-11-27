@@ -388,7 +388,9 @@ namespace RailroaderScenePatcher {
         // The supported edits of a crossbuck of an unprotected crossing, a group of its own under Grade crossing, and
         // what the game uses it for: nothing reads it. The auto engineer's crossing horn reads the crossing's
         // Crossing-type pad marker, which keeps its own family.
-        internal const string CrossbuckOperations = "Move, rotate, enable, or disable this crossbuck. The crossing pad, the whistle signs, and the other crossbuck stay in place.";
+        // The operations of the crossing object of a crossing without signals, which its outliner node inspects: its whole move.
+        internal const string CrossingObjectOperations = "Move or rotate the whole crossing. Its crossbucks move together, and its crossing pads stay in place.";
+        internal const string CrossbuckOperations ="Move, rotate, enable, or disable this crossbuck. The crossing pad, the whistle signs, and the other crossbuck stay in place.";
         internal const string CrossbuckUse = "Decorative. This crossbuck marks the crossing for road users, and the game doesn't read it. The auto engineer sounds the horn at the crossing's pad marker, which stays in place. Moving or disabling the crossbuck doesn't affect game functions.";
         // The supported edits of a child object of a listed scene object.
         internal const string PartOperations = "Move, rotate, enable, or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves.";
@@ -765,7 +767,7 @@ namespace RailroaderScenePatcher {
         static readonly HashSet<string> EditableStructures = new HashSet<string>(StringComparer.Ordinal) {
             LocationSigns.Structure, BridgeScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure, CrossingCoverageScene.Structure, CrossingPadScene.Structure,
             SceneObjects.Structure, ChildObjects.Structure, StationMapIconRules.Structure, SpawnPoints.Structure,
-            ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure, ConstructionSceneryScene.Structure };
+            ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure, ConstructionSceneryScene.Structure, CrossingObjectScene.Structure };
         // Whether the object takes a replacement ID: a Generic track marker, or a milepost or crossing pad that is a mod
         // object, which holds a marker ID of its own from its placement.
         internal static bool TakesMarkerId(TargetIdentity identity) => identity != null && ModObjects.IsSceneMarker(identity.Structure) && (identity.Structure == TrackMarkerScene.Structure || ModObjects.Within(identity.Path));

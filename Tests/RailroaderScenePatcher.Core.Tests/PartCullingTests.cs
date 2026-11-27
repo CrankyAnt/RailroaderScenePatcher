@@ -141,20 +141,22 @@ static class PartCullingTests {
         Assert(Applies(h, Part("held-jetty", "Jetty", new[] { 1101.0, 10, 14 })) && Spheres(h).Single().Owner == h.Jetty, "A moved part whose bounds reach outside the sphere gets one");
     }
 
-    // A held part keeps its map placement when its group moves, so a group move changes which side of the culler's
-    // sphere it stands on. The ramp is held at 1103, 10, 20, three metres from the root.
+    // A held part keeps its own placement relative to its group and moves with it, so a group move keeps it on its side
+    // of the culler's sphere, and an own sphere moves with its part. The ramp is held at 1103, 10, 20, three metres from
+    // the root.
     static void WholeGroupMoveRecomputesOwnSpheres() {
         var f = Plain(); var root = Root(f); var (_, _, session) = Session(f);
         Assert(session.Edit(PartId("Ramp"), new Placement(new[] { 1103.0, 10, 20 }, Identity), null).Applied && Spheres(f).Count == 0, "A part held inside the sphere has no sphere of its own");
         Assert(session.Edit(GroupId, new Placement(new[] { 1200.0, 10, 20 }, Identity), null).Applied, "The group moves 100 m away");
-        var own = Spheres(f).Single();
-        Assert(own.Owner == f.Ramp && Near(f.World.Native.Sphere(own).Take(3).ToArray(), new[] { 1103.0, 10, 20 }), "A held part that the group move takes out of the culler's sphere gets its own sphere");
+        Assert(Spheres(f).Count == 0, "The held part moved with the group and stays inside the culler's sphere");
         Assert(Near(root.Registered, new[] { 200.0, 10, 20 }) && root.Radius == 10, "The culler's sphere follows the group at its radius");
-        Assert(session.Edit(GroupId, new Placement(new[] { 1100.0, 10, 20 }, Identity), null).Applied && Spheres(f).Count == 0 && root.Handler == null, "A held part that the group move brings back inside loses its own sphere");
-        // The other way round: the jetty is held 60 m out, and the group moves to it.
+        Assert(session.Edit(GroupId, new Placement(new[] { 1100.0, 10, 20 }, Identity), null).Applied && Spheres(f).Count == 0 && root.Handler == null, "Moved back, the held part still needs no sphere of its own");
+        // The jetty is held 60 m out: its own sphere goes with it wherever the group moves.
         Assert(session.Edit(PartId("Jetty"), new Placement(new[] { 1160.0, 10, 20 }, Identity), null).Applied && Spheres(f).Single().Owner == f.Jetty, "A part held outside has its own sphere");
-        Assert(session.Edit(GroupId, new Placement(new[] { 1158.0, 10, 20 }, Identity), null).Applied && Spheres(f).Single().Owner == f.Ramp, "The group move brings the jetty inside and takes the ramp out");
-        Assert(session.Edit(GroupId, new Placement(new[] { 1100.0, 10, 20 }, Identity), null).Applied && Spheres(f).Single().Owner == f.Jetty, "Moved back, the jetty has its own sphere again");
+        var carried = Spheres(f).Single();
+        Assert(session.Edit(GroupId, new Placement(new[] { 1158.0, 10, 20 }, Identity), null).Applied && Spheres(f).Single() == carried && Near(f.World.Native.Sphere(carried).Take(3).ToArray(), new[] { 1218.5, 10, 20 }),
+            "The group move takes the jetty and its own sphere along, and the ramp stays inside");
+        Assert(session.Edit(GroupId, new Placement(new[] { 1100.0, 10, 20 }, Identity), null).Applied && Spheres(f).Single().Owner == f.Jetty, "Moved back, the jetty keeps its own sphere");
         var sphere = Spheres(f).Single();
         Assert(session.Edit(PartId("Jetty"), new Placement(new[] { 1170.0, 10, 20 }, Identity), null).Applied && Spheres(f).Single() == sphere && Near(f.World.Native.Sphere(sphere).Take(3).ToArray(), new[] { 1170.5, 10, 20 }),
             "The own sphere moves with its part");

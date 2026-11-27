@@ -39,18 +39,17 @@ To move a crossing's masts and bell together, move the setup through its crossin
 2. On the **Placement** tab, choose **Numeric**, **Gizmo**, or **Snap**, as for a mast. **Follow** is unavailable because a grade-crossing setup uses fixed placement.
 3. Check the result in the world.
 
-The masts, with their lights and gates, and the bell move and rotate together. They keep their placement relative to each other. These objects stay where they are:
+The masts, with their lights and gates, and the bell move and rotate together. They keep their placement relative to each other and to the controller, including a mast or bell that you moved on its own. These objects stay where they are:
 
 - The crossing pads and the whistle signs. Their track bindings set their places. To move a pad, see [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md).
 - The detection spans. The crossing still detects trains on the same tracks. To change them, see [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md).
-- A mast or bell that you moved on its own. Its fixed placement keeps it at its map coordinates. To make it move with the setup again, select it and click **Remove modification**.
 - Lights, gates, and bells that a mod added to the crossing. Each stays at the placement that its addition records. To move one, edit it on the controller's **Connections** tab.
 
 The road and the track are native map data, so they don't move either.
 
 A duplicated crossing moves and rotates the same way. Its pads stay where they are, so rebind them if the track at the new location differs.
 
-The crossing's culler moves with the setup. A mast that stays behind, outside the culler's sphere, gets its own culling sphere, as described in the next section.
+The crossing's culler moves with the setup. A mast that you move outside the culler's sphere on its own gets its own culling sphere, as described in the next section.
 
 A crossing controller can't be disabled, so **Disable** stays unavailable on its **Object** tab.
 
@@ -83,7 +82,7 @@ Clicking the native **Save** button writes the modification to the edited mod's 
 
 ## What the file records
 
-A modification of a mast or bell records a fixed placement, an Enabled value, or both. It records no controller, key, track, or circuit. The equipment's logical binding to its crossing stays unchanged and is not part of the modification.
+A modification of a mast or bell records a fixed placement, an Enabled value, or both. It records no controller, key, track, or circuit. The equipment's logical binding to its crossing stays unchanged and is not part of the modification. Its `placement` is recorded relative to the crossing controller, as described under [the existing crossing mast and bell target](scene-patch-file-v1.md#existing-crossing-mast-and-bell).
 
 A whole move records a fixed placement in the crossing controller's modification, next to any crossing coverage and crossing equipment that the modification holds. See [the crossing target](scene-patch-file-v1.md#crossing).
 

@@ -395,13 +395,14 @@ static class GroundMaskTests {
         Assert(session.IncompleteOperation == null && session.Refusal(StationId) != null && Close(f.At(f.Group), Authored), "Undo brings the refused move back as refused: " + session.IncompleteOperation);
     }
 
-    // A part with a fixed placement keeps it when its group moves, and so does the mask it holds: nothing is rebuilt.
+    // A part with its own placement moves with its group and keeps its placement relative to it, and the mask it holds
+    // is registered again where it stands.
     static void HeldMaskPartStaysWhenItsGroupMoves() {
         var f = new Stop(onPart: true);
-        var held = new[] { 1150.0, 10, 60 };
+        var held = new[] { 1150.0, 10, 60 }; var moved = new[] { 1160.0, 10, 60 };
         var result = f.Engine.Apply(Doc(PartMod("hold-foundation", Foundation, held), GroupMod("move-station", Near)));
         Assert(result.Outcomes.Values.All(o => o.Applied), "The part hold and the group move apply: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Error)));
-        Assert(Close(f.At(f.Group), Near) && Close(f.At(f.Slab), held) && f.RegisteredOnceAt(held, 30), "The held part keeps its mask where it is: " + f.Where());
+        Assert(Close(f.At(f.Group), Near) && Close(f.At(f.Slab), moved) && f.RegisteredOnceAt(moved, 30), "The held part moves with its group, and its mask is registered where it stands: " + f.Where());
     }
 
     // A mask that flattens the terrain height moves with its holder like any other mask: a move of the group, of the

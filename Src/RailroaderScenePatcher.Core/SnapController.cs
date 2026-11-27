@@ -56,7 +56,9 @@ namespace RailroaderScenePatcher.Core {
             var resolved = scene.Resolve(target);
             if (resolved == null || resolved.Count != 1) throw new InvalidOperationException(resolved == null || resolved.Count == 0 ? PatchEngine.TargetMissing : PatchEngine.TargetAmbiguous);
             inspected.Validate(scene, target, resolved[0]);
+            // The snap works in map coordinates: an object with its own placement in a frame reads it as recorded there.
             var prior = scene.Read(resolved[0]).Placement;
+            if (scene is IRecordedPlacementScene recorded) prior = recorded.InMap(resolved[0], prior);
             PatchEngine.CheckPlacement(prior.Position, prior.Rotation);
             var position = TrackSnapGeometry.Position(geometry, prior.Position);
             PatchEngine.CheckPlacement(position, prior.Rotation);

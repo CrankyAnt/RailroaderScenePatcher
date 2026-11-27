@@ -16,15 +16,20 @@ namespace RailroaderScenePatcher.Core {
         readonly InspectedTarget original;
         InspectedTarget expected;
         readonly ObjectState before;
+        // Where the target stood in map coordinates when the gesture began. The gizmo works in map coordinates; an object
+        // with its own placement in a frame reads and takes its recorded placement (IRecordedPlacementScene).
+        readonly Placement beforeInMap;
         readonly object snapshot;
+        // The map placement of the last preview.
         Placement desired;
         bool active = true, mutated, writingPreview;
         public bool Active => active;
         // The failure of the restoration after a cancelled gesture, which leaves the target guarded; null while every
         // restoration verified. A preview or completion that fails cancels the gesture and can set it too.
         public string CleanupFailure { get; private set; }
-        public Placement Initial => Copy(before.Placement);
-        public Placement Current => Copy(desired ?? before.Placement);
+        public Placement Initial => Copy(beforeInMap);
+        public Placement Current => Copy(desired ?? beforeInMap);
+        Placement Recorded(Placement inMap) => scene is IRecordedPlacementScene recorded ? recorded.Recorded(target, inMap) : inMap;
         public PlacementGesture(PatchEngine engine, PatchEditingSession session, TargetIdentity identity, InspectedTarget inspected) {
             this.engine = engine ?? throw new ArgumentNullException(nameof(engine));
             this.session = session ?? throw new ArgumentNullException(nameof(session));
@@ -43,6 +48,7 @@ namespace RailroaderScenePatcher.Core {
             if (own.Length > 1) throw new InvalidOperationException(PatchEditingSession.SeveralModifications);
             foreach (var item in own) PatchEngine.Parse(item);
             before = scene.Read(target);
+            beforeInMap = scene is IRecordedPlacementScene placed ? placed.InMap(target, before.Placement) : before.Placement;
             // A placement the scene refuses, such as the move of a lake surface drawn from a static batch, refuses the
             // gesture before any preview mutates the target.
             engine.CheckRelationships(target, new ObjectState(before.Placement, null));
@@ -58,8 +64,9 @@ namespace RailroaderScenePatcher.Core {
                 engine.GuardMutation(identity, target, maps, expected);
                 mutated = true; writingPreview = true;
                 // The preview sets the placement alone: activity stays as it is, including an explicit disable.
-                scene.Apply(target, new ObjectState(checkedPlacement, null).LeavingActivity());
-                if (!SamePlacement(scene.Read(target).Placement, checkedPlacement)) throw new InvalidOperationException("Gizmo preview did not verify");
+                var recorded = Recorded(checkedPlacement);
+                scene.Apply(target, new ObjectState(recorded, null).LeavingActivity());
+                if (!SamePlacement(scene.Read(target).Placement, recorded)) throw new InvalidOperationException("Gizmo preview did not verify");
                 expected = Observed();
                 writingPreview = false; desired = checkedPlacement; result.Applied = true;
             } catch (Exception e) {
@@ -90,7 +97,7 @@ namespace RailroaderScenePatcher.Core {
                 engine.GuardMutation(identity, target, maps, expected);
                 var restored = mutated;
                 Restore(); active = false;
-                if (desired == null || Unchanged(before.Placement, desired)) { engine.AwaitOutput(target); return new Outcome { Applied = true, Unchanged = true, ResolvedTarget = target }; }
+                if (desired == null || Unchanged(beforeInMap, desired)) { engine.AwaitOutput(target); return new Outcome { Applied = true, Unchanged = true, ResolvedTarget = target }; }
                 // The guard above checked the target against what the previews made of it, and the restoration verified
                 // the captured placement within the read-back tolerance. A native transform can read that placement back a unit
                 // in the last place off, which the inspection compares exactly, so the edit binds to the target as
