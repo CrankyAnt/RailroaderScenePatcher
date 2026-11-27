@@ -36,9 +36,9 @@ static class DuplicateTests {
     static void TheCrossingNodeIsDuplicatedWithoutASelectedRow() {
         var crossing = DuplicateState.Inactive(null, null, null, sourceExists: true, checkPending: false);
         Assert(crossing == null, "Duplicate is active on a crossing node whose crossing exists: " + crossing);
-        Assert(DuplicateState.Inactive(null, null, null, sourceExists: false, checkPending: false) == "The inspected object no longer exists. Refresh the inventory.", "A source that is gone keeps its reason");
+        Assert(DuplicateState.Inactive(null, null, null, sourceExists: false, checkPending: false) == "This object no longer exists. Click Refresh.", "A source that is gone keeps its reason");
         Assert(DuplicateState.Inactive("Own reason.", "Blocked.", "Locked.", false, true) == "Own reason.", "The object's own reason comes first");
-        Assert(DuplicateState.Inactive(null, "Blocked.", "Locked.", false, true) == "Blocked. The recovery choices are in the session details.", "A blocked session comes next");
+        Assert(DuplicateState.Inactive(null, "Blocked.", "Locked.", false, true) == "Blocked. Open Session details for recovery options.", "A blocked session comes next");
         Assert(DuplicateState.Inactive(null, null, "Locked.", false, true) == "Locked.", "Then what blocks editing");
         Assert(DuplicateState.Inactive(null, null, null, true, true) == "Wait for the scene check to finish.", "Then a pending scene check");
     }
@@ -140,7 +140,7 @@ static class DuplicateTests {
         var icon = Map.Observations(out _).First(r => r.Family == SceneFamilies.StationMapIcon);
         Assert(DuplicateState.Reason(icon, new[] { SceneFamilies.StationMapIcon }) == null, "A station map icon can be duplicated");
         var starter = Map.Observations(out _).First(r => r.Family == SceneFamilies.StarterPlacement);
-        Assert(DuplicateState.Reason(starter, null) == "No start setup uses a mod object.", "A starter placement marker shows its reason: " + DuplicateState.Reason(starter, null));
+        Assert(DuplicateState.Reason(starter, null) == "New game setups can't use mod objects.", "A starter placement marker shows its reason: " + DuplicateState.Reason(starter, null));
         var part = Row(ModObjectTests.Station + "/Mask");
         Assert(part.GroupPath == ModObjectTests.Station && DuplicateState.Reason(part, null) == null, "A part can be duplicated: " + DuplicateState.Reason(part, null));
         // A Generic track marker and a milepost are duplicated: the placing click gives the copy a marker ID of its own.
@@ -355,6 +355,6 @@ static class DuplicateTests {
             Assert(ReferenceEquals(chosen, other) && !window.State.Open && window.State.Selecting == null && window.State.Ghost == null, "Confirming cancels the duplicate and gives the selected object");
             Assert(window.Modifications == 0 && window.World.ModObject == null && !window.Session.IsDirty(false), "Confirming adds nothing");
         }
-        Assert(DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot") == "To inspect Bryson Depot, discard the unplaced mod object made from Alarka Jct Station.", "The question names both objects: " + DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot"));
+        Assert(DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot") == "Discard the unplaced mod object made from Alarka Jct Station and inspect Bryson Depot?", "The question names both objects: " + DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot"));
     }
 }

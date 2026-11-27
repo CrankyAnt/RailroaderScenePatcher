@@ -143,7 +143,7 @@ namespace RailroaderScenePatcher {
                 }, escapeDismisses: true, width: 600, onCancel: dismiss => Choose(false, dismiss));
             } catch (Exception e) {
                 duplicate.KeepDuplicate();
-                feedback.Report(DuplicatePlace, "Couldn't open the Cancel Duplicate question. " + e.GetBaseException().Message.TrimEnd('.') + ". Click Cancel to discard the unplaced mod object.");
+                feedback.Report(DuplicatePlace, "Couldn't ask whether to cancel Duplicate. " + e.GetBaseException().Message.TrimEnd('.') + ". Click Cancel to discard the unplaced mod object.");
             }
             return true;
         }

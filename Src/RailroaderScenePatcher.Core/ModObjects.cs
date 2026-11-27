@@ -70,13 +70,13 @@ namespace RailroaderScenePatcher.Core {
         const string Open = " [mod object ", Close = "]";
         public const string Unavailable = "Mod objects are unavailable in this scene.";
         public const string NeedsPlacement = "Invalid mod object: a mod object needs a placement.";
-        public const string TargetShape = "Invalid mod object: the target must name the source's scene and component. Its structure must match the source's, except that a part's mod object uses scene-object-v1. Its path must end with [mod object <mod ID> <modification ID>], with the ID of the mod that supplies the scene patch file.";
+        public const string TargetShape = "Invalid mod object. Use the source's scene, component, and structure in the target. If the source is a part, use scene-object-v1 for the structure. End the target path with [mod object <mod ID> <modification ID>]. Use the ID of the mod that supplies the scene patch file.";
         public const string SourceMissing = "The source of this mod object doesn't match any object in the loaded map.";
         public const string SourceAmbiguous = "The source of this mod object matches more than one object in the loaded map.";
         public const string InvalidBuild = "Invalid mod object: the source's build must be a non-empty string.";
-        // The Player log warning of a mod object built from an identical instance because its original is missing.
+        // The Player log warning when the patcher uses another map object because the original is missing.
         public static string FallbackWarning(string scenePatchFile, string id, string original, string instance) =>
-            "Mod object " + id + " in " + scenePatchFile + ": its source " + original + " isn't in the loaded map, so the patcher built the mod object from the identical object " + instance + ".";
+            "The patcher built mod object " + id + " in " + scenePatchFile + " from " + instance + " because its source " + original + " isn't in the loaded map.";
         public const string Taken = "Another object already has this mod object's path.";
         public const string NeedsMarkerId = "Invalid mod object: a mod object that is a scene marker needs a marker ID of its own.";
         // The member of a duplicated spawn point's modification that holds its teleport name, and its refusals.

@@ -423,7 +423,7 @@ namespace RailroaderScenePatcher {
             GameObject Copied(object item, bool inside) {
                 if (!(item is GameObject target) || target == null) return null;
                 if (inside) return target.transform.IsChildOf(made.transform) ? target : null;
-                return target.transform.IsChildOf(from.transform) ? twin(target) ?? throw new InvalidOperationException("Couldn't find the mod object's match for " + target.name + ".") : null;
+                return target.transform.IsChildOf(from.transform) ? twin(target) ?? throw new InvalidOperationException("Couldn't find a match for " + target.name + " in the mod object.") : null;
             }
             void Set(object list, bool inside, bool active) { foreach (var item in Items(list)) Copied(item, inside)?.SetActive(active); }
             IEnumerable<Component> Switches(string type, bool inside) {

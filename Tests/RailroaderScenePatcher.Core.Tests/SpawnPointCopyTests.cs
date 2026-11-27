@@ -237,7 +237,8 @@ static class SpawnPointCopyTests {
         Assert(MapSpawns.First(p => p != Alarka) == AlarkaJct, "Alarka Jct is the first loaded spawn point in the fixed order");
         Assert(result.Outcomes[Key].Applied && ReferenceEquals(world.BuiltFrom.Single(), world.At(AlarkaJct)), "The copy is built from Alarka Jct: " + result.Outcomes[Key].Error);
         Assert(world.At(Made).Name == "Bryson Yard" && world.At(Made).Priority == -6 && world.At(Made).Radius == 3, "It takes its teleport name, ranks below the map, and keeps the radius of the spawn point it is built from");
-        Assert(log.At(LogLevel.Warning).Single() == ModObjects.FallbackWarning(Mod, Key, Alarka, AlarkaJct), "The Player log names the fallback: " + String.Join(" | ", log.PlayerLines));
+        Assert(log.At(LogLevel.Warning).Single() == $"The patcher built mod object {Key} in {Mod} from {AlarkaJct} because its source {Alarka} isn't in the loaded map.",
+            "The Player log names the fallback: " + String.Join(" | ", log.PlayerLines));
     }
 
     // A copy never stands in for another copy's original, even where the host lists copies first and the copy's

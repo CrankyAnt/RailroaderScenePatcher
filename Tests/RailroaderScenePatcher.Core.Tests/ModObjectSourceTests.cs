@@ -122,9 +122,8 @@ static class ModObjectSourceTests {
         Assert(world.Builder.BuiltFrom.Count == 1 && ReferenceEquals(world.Builder.BuiltFrom[0], world.At[Dillsboro]), "The mod object is built from the first identical instance in the fixed order, not the nearer one at Bryson");
         var warnings = log.At(LogLevel.Warning).ToArray();
         Assert(warnings.Length == 1 && log.PlayerLines.Count() == 1, "The Player log holds one warning: " + String.Join(" | ", log.PlayerLines));
-        Assert(warnings[0].Contains(Key) && warnings[0].Contains(Station) && warnings[0].Contains(Dillsboro) && warnings[0].Contains("author/pack"),
+        Assert(warnings[0] == $"The patcher built mod object {Key} in author/pack from {Dillsboro} because its source {Station} isn't in the loaded map.",
             "The warning names the mod object, its scene patch file, the missing original and the instance: " + warnings[0]);
-        Assert(warnings[0] == ModObjects.FallbackWarning("author/pack", Key, Station, Dillsboro), "The warning has its wording: " + warnings[0]);
         // Applying the file again builds nothing more and warns no more.
         var again = RecordingLog.Capture(false, () => result = world.Engine.Apply(Doc(ModObject(Key, Station, Made)), "author/pack"));
         Assert(result.Outcomes[Key].Applied && world.Builder.BuiltFrom.Count == 1 && !again.PlayerLines.Any(), "Applying again builds nothing and warns nothing: " + String.Join(" | ", again.PlayerLines));

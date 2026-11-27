@@ -485,7 +485,7 @@ static class GroundMaskTests {
         var stuck = new Stop(flattens: true, curveOffset: offset);
         stuck.Mask.StuckHeight = Registered(stuck)[1];
         var refused = stuck.Engine.Apply(Doc(GroupMod("raise-station", new[] { Authored[0], Authored[1] + 5, Authored[2] }))).Outcomes["raise-station"];
-        Assert(!refused.Applied && refused.Error.Contains("the height of the ground mask on Rhodo Station did not follow it") && Close(stuck.At(stuck.Group), Authored),
+        Assert(!refused.Applied && refused.Error.Contains("The ground mask did not follow: wrong height for Rhodo Station") && Close(stuck.At(stuck.Group), Authored),
             "A curve that does not follow is refused and the station stays: " + refused.Error);
     }
 

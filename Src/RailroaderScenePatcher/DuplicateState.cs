@@ -22,11 +22,11 @@ namespace RailroaderScenePatcher {
     // known, with Place and Cancel; Placing waits for the left click that places the object. Until that click nothing
     // of the mod object exists: no object, no outliner entry and no entry in the scene patch file.
     internal sealed class DuplicateState {
-        internal const string Label = "Duplicate", Tip = "Copy this object as a mod object and place it in the world.";
+        internal const string Label = "Duplicate", Tip = "Create a mod object from this object and place it in the world.";
         internal const string PlaceLabel = "Place", PlaceTip = "Show a ghost at the pointer. Left-click the ground to place the object there.";
         internal const string ReleaseLabel = "Release", ReleaseTip = "Hide the ghost and return to the Place button. Nothing is placed.";
         internal const string CancelLabel = "Cancel", CancelTip = "Discard the unplaced mod object and return to the source object.";
-        internal const string BlankInstruction = "Move the camera to where you want to put the mod object, then click Place.";
+        internal const string BlankInstruction = "Move the camera to the new location, then click Place.";
         internal const string PlacingInstruction = "Left-click the ground to place the object. Click Release or press Esc to stop placing.";
         internal const string PointerInstruction = "Left-click to place";
         // The font size of the pointer instruction at UI scale 1.
@@ -73,7 +73,7 @@ namespace RailroaderScenePatcher {
         // The mod's own crossing is removed there with Remove modification, as any mod object is.
         internal const string CrossingField = "Crossing", NotThisMods = "This mod doesn't change this object.", Removed = "Mod object removed. Click Save when you're done.";
         // Why Duplicate is inactive for an object, or null: the short reasons of its tooltip.
-        internal const string StarterMarker = "No start setup uses a mod object.",
+        internal const string StarterMarker = "New game setups can't use mod objects.",
             InspectionOnly = "You can only inspect this object.",
             OtherFamily = "This family can't be duplicated.", HoldsOtherFamily = "It contains objects that can't be duplicated.";
         // The families whose objects a copy rebuilds soundly: a scene object with what stands below it, a part, which
@@ -98,13 +98,13 @@ namespace RailroaderScenePatcher {
         // The line below that heading: the select instruction, or none while a crossing node is selected, since the
         // crossing is the selection.
         internal static string EmptyInstruction(string crossingNodeLabel) => String.IsNullOrEmpty(crossingNodeLabel) ? CommandBand.SelectInstruction : null;
-        internal const string Gone = "The inspected object no longer exists. Refresh the inventory.";
+        internal const string Gone = "This object no longer exists. Click Refresh.";
         // Why Duplicate is inactive in the window, or null, in this order: the object's own reason, a blocked session,
         // what blocks editing (no editing, a locked file, a pending world selection, an active gizmo), a source that
         // no longer exists and a pending scene check. sourceExists is about the source of Duplicate, which for a
         // crossing without signals is its outliner node's crossing object, not an inspected row.
         internal static string Inactive(string rule, string sessionBlocked, string editBlock, bool sourceExists, bool checkPending) =>
-            rule ?? (sessionBlocked != null ? sessionBlocked + " The recovery choices are in the session details." : null) ?? editBlock
+            rule ?? (sessionBlocked != null ? sessionBlocked + " Open Session details for recovery options." : null) ?? editBlock
             ?? (!sourceExists ? Gone : null) ?? (checkPending ? "Wait for the scene check to finish." : null);
         // familiesBelow: the families of the listed objects at or below the object.
         internal static string Reason(SceneObservation selected, IEnumerable<string> familiesBelow) {
@@ -126,7 +126,7 @@ namespace RailroaderScenePatcher {
         // The question that a selection in the outliner asks while the mod object is unplaced, with its title and choices.
         internal const string SelectTitle = "Cancel Duplicate?", KeepChoice = "Keep duplicating", CancelChoice = "Cancel Duplicate";
         internal static string SelectQuestion(SceneObservation source, string selectedName) =>
-            "To inspect " + selectedName + ", discard the unplaced mod object made from " + source.DisplayName + ".";
+            "Discard the unplaced mod object made from " + source.DisplayName + " and inspect " + selectedName + "?";
         // The title of the blank object window: it names the duplicated source.
         internal static string Title(SceneObservation source) => "Duplicating " + source.DisplayName;
 

@@ -118,9 +118,9 @@ namespace RailroaderScenePatcher.Core {
                 // Like is compared with like: the registration with the one a registration made at the holder's
                 // current pose would hold. Without that, the holder's place counts on the ground, and the height is
                 // not judged.
-                if (Flat(registration.Centre, mask.Expected ?? mask.Centre) > CentreTolerance) return "the center of the ground mask on " + mask.Holder + " did not follow it";
-                if (mask.Flattens && mask.Expected != null && Math.Abs(registration.Centre[1] - mask.Expected[1]) > CentreTolerance) return "the height of the ground mask on " + mask.Holder + " did not follow it";
-                if (!SameAxis(registration.Axis, mask.Axis)) return "the rotation of the ground mask on " + mask.Holder + " did not follow it";
+                if (Flat(registration.Centre, mask.Expected ?? mask.Centre) > CentreTolerance) return "wrong center position for " + mask.Holder;
+                if (mask.Flattens && mask.Expected != null && Math.Abs(registration.Centre[1] - mask.Expected[1]) > CentreTolerance) return "wrong height for " + mask.Holder;
+                if (!SameAxis(registration.Axis, mask.Axis)) return "wrong rotation for " + mask.Holder;
             }
             return null;
         }
