@@ -29,7 +29,7 @@ namespace RailroaderScenePatcher {
         // path gives it; for any other object its name.
         internal static string PathName(Transform t) => pathNames.Count != 0 && pathNames.TryGetValue(t.gameObject, out var name) ? name : t.name;
         // Gives a mod object this patcher built its object name in the game, or with null its path name again. The game's
-        // teleport command and quick search read the object name; the patcher keeps finding the object by its path.
+        // teleport command reads the object name; the patcher keeps finding the object by its path.
         public void Name(object modObject, string name) {
             var made = modObject as GameObject;
             if (made == null || !standing.Contains(made)) throw new InvalidOperationException("This object is not a mod object of this patcher.");
@@ -195,10 +195,15 @@ namespace RailroaderScenePatcher {
         // The loaded objects of the source's scene with its component and the build, in the fixed order: by hierarchy
         // path in ordinal order, then by sibling index. Mod objects and what stands below them are not listed.
         public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) {
-            var found = new List<KeyValuePair<Transform, string>>();
             if (source == null || build == null || !build.StartsWith(BuildVersion, StringComparison.Ordinal)) return Array.Empty<SourceInstance>();
             var sizeText = build.Substring(BuildVersion.Length).Split(':')[0];
             if (!Int32.TryParse(sizeText, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var size)) return Array.Empty<SourceInstance>();
+            return Loaded(source, (go, objects) => objects == size && BuildOf(go) == build);
+        }
+        // Every loaded object of the source's scene with its component, whatever its build, in the same fixed order.
+        public IReadOnlyList<SourceInstance> Instances(TargetIdentity source) => source == null ? Array.Empty<SourceInstance>() : Loaded(source, (go, objects) => true);
+        IReadOnlyList<SourceInstance> Loaded(TargetIdentity source, Func<GameObject, int, bool> keep) {
+            var found = new List<KeyValuePair<Transform, string>>();
             var component = Native.Type(source.Component);
             if (component == null) return Array.Empty<SourceInstance>();
             for (var i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++) {
@@ -208,9 +213,9 @@ namespace RailroaderScenePatcher {
                 foreach (var root in loaded.GetRootGameObjects()) if (root != null) Size(root.transform, sizes);
                 foreach (var pair in sizes) {
                     var go = pair.Key.gameObject;
-                    if (pair.Value != size || go.GetComponent(component) == null || IsModObject(go)) continue;
+                    if (go.GetComponent(component) == null || IsModObject(go)) continue;
                     var path = BoardScene.PathOf(pair.Key);
-                    if (ModObjects.Within(path) || BuildOf(go) != build) continue;
+                    if (ModObjects.Within(path) || !keep(go, pair.Value)) continue;
                     found.Add(new KeyValuePair<Transform, string>(pair.Key, path));
                 }
             }
@@ -341,7 +346,7 @@ namespace RailroaderScenePatcher {
             for (var i = 0; paired && i < sources.Length; i++) paired = (sources[i] == null) == (copies[i] == null) && (sources[i] == null || sources[i].GetType() == copies[i].GetType());
             Component Twin(Component source) { var at = paired && source != null ? Array.IndexOf(sources, source) : -1; return at < 0 ? null : copies[at]; }
             void Step(string what, Action run) {
-                try { run(); } catch (Exception e) { PatcherLog.Debug("A mod object's copy could not be prepared (" + what + "): " + e.GetBaseException().Message); }
+                try { run(); } catch (Exception e) { PatcherLog.Debug("A mod object could not be prepared (" + what + "): " + e.GetBaseException().Message); }
             }
             string TypeOf(Component component) => component == null ? null : component.GetType().FullName;
             // A renderer culler keeps only the renderers that are enabled when it starts: the ones its source culler
@@ -418,7 +423,7 @@ namespace RailroaderScenePatcher {
             GameObject Copied(object item, bool inside) {
                 if (!(item is GameObject target) || target == null) return null;
                 if (inside) return target.transform.IsChildOf(made.transform) ? target : null;
-                return target.transform.IsChildOf(from.transform) ? twin(target) ?? throw new InvalidOperationException("Couldn't find the copy of " + target.name + ".") : null;
+                return target.transform.IsChildOf(from.transform) ? twin(target) ?? throw new InvalidOperationException("Couldn't find the mod object's match for " + target.name + ".") : null;
             }
             void Set(object list, bool inside, bool active) { foreach (var item in Items(list)) Copied(item, inside)?.SetActive(active); }
             IEnumerable<Component> Switches(string type, bool inside) {

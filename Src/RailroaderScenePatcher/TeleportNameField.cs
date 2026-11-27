@@ -4,12 +4,12 @@ using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
     // The teleport name field on the Object tab of a duplicated spawn point. The teleport name becomes the copy's object
-    // name in the game, by which the console's teleport command and the quick search find it, as they find the map's own
+    // name in the game, by which the console's teleport command finds it, as it finds the map's own
     // spawn points by theirs. The field is empty after placing; while it stays empty, the tab says how hard the copy is
     // to reach.
     internal static class TeleportNameField {
         internal const string Label = "Teleport name";
-        internal const string Tip = "To teleport here, type /tp followed by this name in the console. Put names with spaces in quotation marks. You can also use the name in quick search.";
+        internal const string Tip = "To teleport here, type /tp followed by this name in the console. Put names with spaces in quotation marks.";
         internal const string SetLabel = "Set";
         internal const string SetTip = "Set the name to the text in the field. To remove the name, clear the field and click Set.";
         internal const string OtherMod = "Only the mod that placed this spawn point can name it.";

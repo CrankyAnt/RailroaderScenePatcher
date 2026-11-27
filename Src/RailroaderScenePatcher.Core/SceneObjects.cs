@@ -167,8 +167,9 @@ namespace RailroaderScenePatcher.Core {
         static IEnumerable<(string, IHierarchyNode, string)> Roots(IHierarchyNode category, string categoryPath) {
             if (category.Name != LargeScenery) { foreach (var root in category.Children) yield return (null, root, categoryPath + "/" + root.Name); yield break; }
             foreach (var town in category.Children) {
-                // A scene object there that is itself an object of the game, such as Almond Bridge, is the top scene object.
-                if (GroupItself(town)) { yield return (town.Name, town, categoryPath + "/" + town.Name); continue; }
+                // A scene object there that is itself an object of the game, such as Almond Bridge, is the top scene object,
+                // and so is a mod object there, such as a part copied from Almond Bridge: it is never a folder of a place.
+                if (GroupItself(town) || ModObjects.IsPath(town.Name)) { yield return (town.Name, town, categoryPath + "/" + town.Name); continue; }
                 foreach (var root in town.Children) yield return (town.Name, root, categoryPath + "/" + town.Name + "/" + root.Name);
             }
         }

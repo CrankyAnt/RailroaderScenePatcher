@@ -27,6 +27,9 @@ namespace RailroaderScenePatcher.Core {
         // the scene's fixed order: by hierarchy path in ordinal order, then by sibling index. Never ordered by distance.
         // Mod objects are not listed.
         IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build);
+        // Every loaded object in the source's scene with the source's component, whatever its build, in the same fixed
+        // order. Mod objects are not listed. A duplicated spawn point whose original is missing takes the first of them.
+        IReadOnlyList<SourceInstance> Instances(TargetIdentity source);
     }
     // A scene whose mod objects hold scene markers below them: the pads of a duplicated crossing. Each takes a marker
     // ID of its own before it starts, as a mod object that is a scene marker does, so no pad of the source loses its
@@ -45,7 +48,7 @@ namespace RailroaderScenePatcher.Core {
         bool IsModObject(object controller);
     }
     // A scene that gives a mod object an object name of its own in the game: a duplicated spawn point's teleport name,
-    // by which the game's teleport command and quick search find it. The identity of the mod object stays its target
+    // by which the game's teleport command finds it. The identity of the mod object stays its target
     // path, which ends with its mark: the scene keeps resolving the object, and the objects below it, by that path.
     public interface IModObjectNames {
         // Gives the mod object the object name, or with null the name its target path gives it.
@@ -67,7 +70,7 @@ namespace RailroaderScenePatcher.Core {
         const string Open = " [mod object ", Close = "]";
         public const string Unavailable = "Mod objects are unavailable in this scene.";
         public const string NeedsPlacement = "Invalid mod object: a mod object needs a placement.";
-        public const string TargetShape = "Invalid mod object: the target must name the source's scene and component. Its structure must match the source's, except that a part's copy uses scene-object-v1. Its path must end with [mod object <mod ID> <modification ID>], with the ID of the mod that supplies the scene patch file.";
+        public const string TargetShape = "Invalid mod object: the target must name the source's scene and component. Its structure must match the source's, except that a part's mod object uses scene-object-v1. Its path must end with [mod object <mod ID> <modification ID>], with the ID of the mod that supplies the scene patch file.";
         public const string SourceMissing = "The source of this mod object doesn't match any object in the loaded map.";
         public const string SourceAmbiguous = "The source of this mod object matches more than one object in the loaded map.";
         public const string InvalidBuild = "Invalid mod object: the source's build must be a non-empty string.";

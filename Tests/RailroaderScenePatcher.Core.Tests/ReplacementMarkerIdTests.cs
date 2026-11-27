@@ -133,6 +133,15 @@ static class ReplacementMarkerIdTests {
         var underlying = new World(); underlying.Yard.Id = "Underlyin1";  // Only the inactive Yard Limit holds it, without a registration.
         var own = underlying.Session.GenerateMarkerId(yard, Draws("Underlyin1", "Freeid0002"), out _);
         Assert(own == "Freeid0002", "The marker's own underlying ID is not generated: " + own);
+        // A crossing mod object that failed to build holds its pad IDs only in the file's partMarkerIds.
+        const string Pad = "{\"scene\":\"" + Scene + "\",\"path\":\"World/Roads/Missing Crossing\",\"component\":\"" + CrossingCoverageScene.ComponentType + "\",\"structure\":\"" + CrossingCoverageScene.Structure + "\"}";
+        var crossing = new Store { Patch = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"mod-object-crossing\":{\"target\":"
+            + Pad.Replace("Missing Crossing", "Missing Crossing [mod object author:pack mod-object-crossing]") + ",\"source\":" + Pad
+            + ",\"partMarkerIds\":[\"Padsused01\",\"Padsused02\"],\"placement\":{\"mode\":\"fixed\",\"position\":[1,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}" };
+        var pads = new World(crossing);
+        Assert(pads.Session.Blocked == null, "The scene patch file with the crossing mod object opens: " + pads.Session.Blocked);
+        var free = pads.Session.GenerateMarkerId(yard, Draws("Padsused01", "Padsused02", "Freeid0003"), out reason);
+        Assert(free == "Freeid0003" && reason == null, "The file's part marker IDs are skipped as well: " + free + " / " + reason);
     }
     // A refusal that every draw would meet ends the search with its reason: unread map objects, an object that takes no
     // replacement ID; a world in which every draw is used ends after the attempts with an instruction.

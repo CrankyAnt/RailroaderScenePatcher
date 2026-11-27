@@ -616,9 +616,13 @@ namespace RailroaderScenePatcher.Core {
             SourceInstance instead = null;
             // The one exception to the exactly-one rule (ADR 0008): a missing original gives way to the first loaded
             // instance with the same model and build, in the scene's fixed order. An ambiguous original does not.
-            // No mod object stands in for another one's original.
-            if (unresolved == TargetMissing && parsed.SourceBuild != null && scene is IModObjectSources identical)
-                instead = identical.Identical(parsed.Source, parsed.SourceBuild)?.FirstOrDefault(i => i?.Handle != null && !ModObjects.Within(i.Path) && !IsBuilt(i.Handle));
+            // A duplicated spawn point takes the first loaded map spawn point in that order, whatever its build and
+            // with or without the source's build in the file. No mod object stands in for another one's original.
+            if (unresolved == TargetMissing && scene is IModObjectSources identical) {
+                var candidates = parsed.Identity.Structure == SpawnPoints.Structure ? identical.Instances(parsed.Source)
+                    : parsed.SourceBuild != null ? identical.Identical(parsed.Source, parsed.SourceBuild) : null;
+                instead = candidates?.FirstOrDefault(i => i?.Handle != null && !ModObjects.Within(i.Path) && !IsBuilt(i.Handle));
+            }
             if (source == null && instead == null) throw new InvalidOperationException(unresolved == TargetMissing ? ModObjects.SourceMissing : ModObjects.SourceAmbiguous);
             var placement = Evaluate(parsed.State).Placement;
             // A scene marker never takes its source's marker ID: a second holder would take the source's registration.

@@ -22,13 +22,47 @@ namespace RailroaderScenePatcher {
     // known, with Place and Cancel; Placing waits for the left click that places the object. Until that click nothing
     // of the mod object exists: no object, no outliner entry and no entry in the scene patch file.
     internal sealed class DuplicateState {
-        internal const string Label = "Duplicate", Tip = "Make a copy of this object and place it in the world.";
+        internal const string Label = "Duplicate", Tip = "Copy this object as a mod object and place it in the world.";
         internal const string PlaceLabel = "Place", PlaceTip = "Show a ghost at the pointer. Left-click the ground to place the object there.";
         internal const string ReleaseLabel = "Release", ReleaseTip = "Hide the ghost and return to the Place button. Nothing is placed.";
-        internal const string CancelLabel = "Cancel", CancelTip = "Discard the unplaced copy and return to the source object.";
-        internal const string BlankInstruction = "Move the camera to where you want to put the copy, then click Place.";
+        internal const string CancelLabel = "Cancel", CancelTip = "Discard the unplaced mod object and return to the source object.";
+        internal const string BlankInstruction = "Move the camera to where you want to put the mod object, then click Place.";
         internal const string PlacingInstruction = "Left-click the ground to place the object. Click Release or press Esc to stop placing.";
         internal const string PointerInstruction = "Left-click to place";
+        // The font size of the pointer instruction at UI scale 1.
+        internal const int PointerFontSize = 14;
+        // Where the placing cross and its instruction stand, in screen pixels with y down. Box and Label are x, y, width,
+        // height. The cross's arms start CrossGap from the pointer and are CrossArm long and CrossThickness wide.
+        internal sealed class PointerMarkLayout {
+            internal int FontSize;
+            internal double[] Box, Label;
+            internal double CrossGap, CrossArm, CrossThickness;
+        }
+        // The placing cross and its instruction at the game's UI scale, CanvasSettingsApplicator.EffectiveCanvasScale, by
+        // which the game's canvas and its pointer callout are scaled. The box stands where the game puts that callout
+        // (UITooltipController.UpdateCallout): its top-left corner 12 units right of and 4 units below the pointer, in
+        // units of the UI scale, moved back inside the screen at the right and bottom edges; it never moves to the other
+        // side of the pointer. measure gives the text's width and line height at a font size, as GUIStyle.CalcSize does.
+        // The label is drawn without wrapping and rounded up from the measured size, so the whole instruction shows on
+        // one line.
+        internal static PointerMarkLayout PointerMark(double[] pointer, double scale, Func<int, (double Width, double Height)> measure, double screenWidth, double screenHeight) {
+            if (!(scale > 0) || Double.IsInfinity(scale)) scale = 1;
+            double Px(double units) => Math.Max(1, Math.Round(units * scale));
+            var font = Math.Max(1, (int)Math.Round(PointerFontSize * scale));
+            var text = measure(font);
+            double labelWidth = Math.Ceiling(text.Width) + 1, labelHeight = Math.Ceiling(text.Height);
+            double padX = Px(6), padY = Px(3);
+            double boxWidth = labelWidth + 2 * padX, boxHeight = labelHeight + 2 * padY;
+            var x = pointer[0] + CalloutRight * scale;
+            var y = pointer[1] + CalloutBelow * scale;
+            if (x + boxWidth > screenWidth) x = screenWidth - boxWidth;
+            if (y + boxHeight > screenHeight) y = screenHeight - boxHeight;
+            return new PointerMarkLayout {
+                FontSize = font, CrossGap = Px(4), CrossArm = Px(10), CrossThickness = Math.Max(2, Px(2)),
+                Box = new[] { x, y, boxWidth, boxHeight }, Label = new[] { x + padX, y + padY, labelWidth, labelHeight } };
+        }
+        // The offset of the game's pointer callout from the pointer, in units of the UI scale (UITooltipController).
+        internal const double CalloutRight = 12, CalloutBelow = 4;
         internal const string LockReason = "Place the object or click Cancel first.";
         internal const string NoGround = "There's no ground under the pointer. Move it over the ground and left-click.";
         internal const string NotPlaced = "Not placed";
@@ -39,7 +73,7 @@ namespace RailroaderScenePatcher {
         // The mod's own crossing is removed there with Remove modification, as any mod object is.
         internal const string CrossingField = "Crossing", NotThisMods = "This mod doesn't change this object.", Removed = "Mod object removed. Click Save when you're done.";
         // Why Duplicate is inactive for an object, or null: the short reasons of its tooltip.
-        internal const string StarterMarker = "No start setup uses the copy.",
+        internal const string StarterMarker = "No start setup uses a mod object.",
             InspectionOnly = "You can only inspect this object.",
             OtherFamily = "This family can't be duplicated.", HoldsOtherFamily = "It contains objects that can't be duplicated.";
         // The families whose objects a copy rebuilds soundly: a scene object with what stands below it, a part, which
@@ -92,7 +126,7 @@ namespace RailroaderScenePatcher {
         // The question that a selection in the outliner asks while the mod object is unplaced, with its title and choices.
         internal const string SelectTitle = "Cancel Duplicate?", KeepChoice = "Keep duplicating", CancelChoice = "Cancel Duplicate";
         internal static string SelectQuestion(SceneObservation source, string selectedName) =>
-            "To inspect " + selectedName + ", discard the unplaced copy of " + source.DisplayName + ".";
+            "To inspect " + selectedName + ", discard the unplaced mod object made from " + source.DisplayName + ".";
         // The title of the blank object window: it names the duplicated source.
         internal static string Title(SceneObservation source) => "Duplicating " + source.DisplayName;
 

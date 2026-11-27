@@ -143,7 +143,7 @@ namespace RailroaderScenePatcher {
                 }, escapeDismisses: true, width: 600, onCancel: dismiss => Choose(false, dismiss));
             } catch (Exception e) {
                 duplicate.KeepDuplicate();
-                feedback.Report(DuplicatePlace, "Couldn't open the Cancel Duplicate question. " + e.GetBaseException().Message.TrimEnd('.') + ". Click Cancel to discard the copy.");
+                feedback.Report(DuplicatePlace, "Couldn't open the Cancel Duplicate question. " + e.GetBaseException().Message.TrimEnd('.') + ". Click Cancel to discard the unplaced mod object.");
             }
             return true;
         }
@@ -231,25 +231,43 @@ namespace RailroaderScenePatcher {
             inspectorTab.Value = ObjectTab;
         }
         // The pointer mark while placing: a cross at the pointer with the instruction beside it.
-        GUIStyle placingLabel;
+        // The label style of the pointer instruction for each font size it was drawn or measured at: one line without
+        // wrapping or padding, so the label rectangle is the measured text, rounded up, and no word moves to a second
+        // line that the box would cut off. Each size has a style of its own, so measuring changes no style in use.
+        readonly Dictionary<int, GUIStyle> placingLabels = new Dictionary<int, GUIStyle>();
+        GUIStyle PlacingLabel(int fontSize) {
+            if (!placingLabels.TryGetValue(fontSize, out var style))
+                placingLabels[fontSize] = style = new GUIStyle(GUI.skin.label) {
+                    fontSize = fontSize, alignment = TextAnchor.MiddleLeft, wordWrap = false, clipping = TextClipping.Overflow,
+                    padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0), normal = { textColor = Color.white } };
+            return style;
+        }
+        static Rect Of(double[] r) => new Rect((float)r[0], (float)r[1], (float)r[2], (float)r[3]);
+        // The game's UI scale, by which its canvas and its pointer callout are drawn; 1 where it can't be read.
+        static float UiScale() {
+            try { return Game.Settings.CanvasSettingsApplicator.EffectiveCanvasScale; } catch (Exception) { return 1f; }
+        }
         void DrawPlacingMark() {
             if (!PlacingModObject || presentation == null || !presentation.IsOpen || Event.current.type != EventType.Repaint) return;
             var pointer = Event.current.mousePosition;
             if (presentation.PanelBounds.Contains(pointer)) return;
             if (StationMapIconRules.ShowsMapIcon(duplicate.Source) && duplicate.Ghost is double[] ghost && duplicate.Source.Handle is GameObject icon && icon != null)
                 WorldMapIcon.Draw(icon, NativeInventory.ScenePosition(new Vector3((float)ghost[0], (float)ghost[1], (float)ghost[2]), NativeInventory.MovesWithOrigin(icon.transform)), null);
-            if (placingLabel == null) placingLabel = new GUIStyle(GUI.skin.label) { fontSize = 14, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
+            var content = new GUIContent(DuplicateState.PointerInstruction);
+            var mark = DuplicateState.PointerMark(new double[] { pointer.x, pointer.y }, UiScale(), size => {
+                var measured = PlacingLabel(size).CalcSize(content);
+                return (measured.x, measured.y);
+            }, Screen.width, Screen.height);
             var before = GUI.color;
             GUI.color = new Color(1f, .82f, .2f, 1f);
             var white = Texture2D.whiteTexture;
-            GUI.DrawTexture(new Rect(pointer.x - 14, pointer.y - 1, 10, 2), white); GUI.DrawTexture(new Rect(pointer.x + 4, pointer.y - 1, 10, 2), white);
-            GUI.DrawTexture(new Rect(pointer.x - 1, pointer.y - 14, 2, 10), white); GUI.DrawTexture(new Rect(pointer.x - 1, pointer.y + 4, 2, 10), white);
-            var size = placingLabel.CalcSize(new GUIContent(DuplicateState.PointerInstruction));
-            var box = new Rect(pointer.x + 18, pointer.y + 10, size.x + 12, size.y + 4);
+            float gap = (float)mark.CrossGap, arm = (float)mark.CrossArm, thick = (float)mark.CrossThickness;
+            GUI.DrawTexture(new Rect(pointer.x - gap - arm, pointer.y - thick / 2, arm, thick), white); GUI.DrawTexture(new Rect(pointer.x + gap, pointer.y - thick / 2, arm, thick), white);
+            GUI.DrawTexture(new Rect(pointer.x - thick / 2, pointer.y - gap - arm, thick, arm), white); GUI.DrawTexture(new Rect(pointer.x - thick / 2, pointer.y + gap, thick, arm), white);
             GUI.color = new Color(.106f, .098f, .086f, .92f);
-            GUI.DrawTexture(box, white);
+            GUI.DrawTexture(Of(mark.Box), white);
             GUI.color = before;
-            GUI.Label(new Rect(box.x + 6, box.y + 2, size.x, size.y), DuplicateState.PointerInstruction, placingLabel);
+            GUI.Label(Of(mark.Label), content, PlacingLabel(mark.FontSize));
         }
     }
 }

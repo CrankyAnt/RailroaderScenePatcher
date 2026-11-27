@@ -114,7 +114,7 @@ An inactive object's name is italic and followed by `inactive`. A row's tooltip 
 
 ### Objects that share a hierarchy path
 
-The map can contain two objects at the same hierarchy path, such as a `Loc:` board at each end of a place or the two `Speed - Alarka Branch` signs. The outliner distinguishes them with the game's name and a sequence number, such as `Loc: Andrews (1)` and `Loc: Andrews (2)`. Along the main line, the numbers run west to east, from Andrews towards Sylva. On the Alarka branch, they run from the Alarka end towards Alarka Jct. The number follows the object's original map position, so moving it doesn't change the number. The object's name and path in the game remain the same.
+The map can contain two objects at the same hierarchy path, such as a `Loc:` board at each end of a place or the two `Speed - Alarka Branch` signs. The outliner distinguishes them with the game's name and a sequence number, such as `Loc: Andrews (1)` and `Loc: Andrews (2)`. Along the main line, the numbers run west to east, from Andrews toward Sylva. On the Alarka branch, they run from the Alarka end toward Alarka Jct. The number follows the object's original map position, so moving it doesn't change the number. The object's name and path in the game remain the same.
 
 A scene patch file identifies one of these objects by its path and a key. On the **Object** tab, **Identity** shows the key below the path. An object with a track marker uses **Target marker ID**. Any other object uses **Target map position**, the coordinates where the game placed it. **Copy ID** copies the key beside the path as `markerId` or `mapPosition`. See [objects that share a hierarchy path](scene-patch-file-v1.md#objects-that-share-a-hierarchy-path).
 

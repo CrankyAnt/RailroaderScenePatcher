@@ -769,14 +769,16 @@ namespace RailroaderScenePatcher.Core {
         }
         // A random replacement ID for the object that Set replacement ID would take now, or null with the reason: letters
         // and digits only, unused by every scene marker, registration and map object of the world, by the replacement ID
-        // of another modification in the scene patch file, and other than the object's underlying ID. next draws a number
-        // from 0 up to but not including its argument. Nothing changes.
+        // or crossing pad marker IDs of another modification in the scene patch file, and other than the object's
+        // underlying ID. next draws a number from 0 up to but not including its argument. Nothing changes.
         public string GenerateMarkerId(TargetIdentity target, Func<int, int> next, out string reason) {
             string underlying = null;
             try { underlying = engine.Underlying(engine.ResolveUnique(target))?.MarkerId; } catch (Exception) { }
             var file = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var item in scenePatchFile?.Items ?? Enumerable.Empty<JObject>())
+            foreach (var item in scenePatchFile?.Items ?? Enumerable.Empty<JObject>()) {
                 if (item[ReplacementMarkerIds.Member]?.Type == JTokenType.String) file.Add((string)item[ReplacementMarkerIds.Member]);
+                foreach (var part in (item[ModObjects.PartMarkerIdsMember] as JArray)?.Where(t => t.Type == JTokenType.String) ?? Enumerable.Empty<JToken>()) file.Add((string)part);
+            }
             return ReplacementMarkerIds.Generate(next, id =>
                 id == underlying ? ReplacementMarkerIds.UsedBy(id, id)
                 : file.Contains(id) ? ReplacementMarkerIds.Shared(id)

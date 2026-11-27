@@ -442,6 +442,7 @@ static class SceneObjectTests {
     static SceneObjectVerdict At(IReadOnlyList<SceneObjectVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
     public static void Run() {
         ListsSimpleTopObjects();
+        APartModObjectDirectlyBelowLargeSceneryIsATopObject();
         LeavesOutGroupsThatHoldAnExcludedKind();
         CoverageRulesKeepObjectsOut();
         CrossingContainersHoldTheirChildren();
@@ -738,6 +739,22 @@ static class SceneObjectTests {
         Assert(At(verdicts, "World/Map Labels/Station Icons") == null && At(verdicts, "World/Map Labels/Station Icons/Bryson")?.Disposition == GroupDisposition.ExistingFamily, "The station icons keep their family");
     }
     // A top scene object is one level below a World category holder, and below World/Large Scenery one level below a town.
+    // A part copied from a group that stands directly below World/Large Scenery, such as Almond Bridge, stands beside
+    // that group as a mod object. It is a top scene object of its own though its renderers stand on its children, never
+    // a folder of a place whose children are listed instead.
+    static void APartModObjectDirectlyBelowLargeSceneryIsATopObject() {
+        var made = ModObjects.Path("World/Large Scenery/Deck", "author/pack", "mod-object-deck");
+        var world = new Node("World", new Node("Large Scenery",
+            new Node("Almond Bridge", new Node("Deck", new Node("Mesh").Solid())).Solid(),
+            new Node(ModObjects.NameOf(made), new Node("Mesh").Solid())));
+        var verdicts = SceneObjectRules.Classify(world);
+        Assert(At(verdicts, "World/Large Scenery/Almond Bridge")?.Disposition == GroupDisposition.Group, "Almond Bridge is a top scene object");
+        Assert(At(verdicts, made)?.Disposition == GroupDisposition.Group, "The part's mod object is a top scene object: " + String.Join(", ", verdicts.Select(v => v.Path + "=" + v.Disposition)));
+        Assert(At(verdicts, made + "/Mesh") == null, "Its child is a part of it, not a top scene object");
+        // The place rule then lists it under the place at its position, not at Almond.
+        var places = ScenePlaces.From(new[] { new PlaceSource(PlaceSourceKind.MapDataArea, "Almond", new double[] { 0, 0 }), new PlaceSource(PlaceSourceKind.MapDataArea, "Bryson", new double[] { 4000, 5000 }) });
+        Assert(places.Of(made, new double[] { 4010, 5010 })?.Name == "Bryson", "The part's mod object is listed under the place at its position");
+    }
     static void ListsSimpleTopObjects() {
         var world = new Node("World",
             new Node("Large Scenery", new Node("Bryson", new Node("Bryson House Track", new Node("Platform").Solid()))),

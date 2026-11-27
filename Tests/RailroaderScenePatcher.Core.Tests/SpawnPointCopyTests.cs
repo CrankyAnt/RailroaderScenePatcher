@@ -8,8 +8,8 @@ using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // A duplicated spawn point: a teleport point under the name its modder gives it. The teleport name is a value of the
-// copy's own modification and becomes the copy's object name in the game, by which the console's teleport command and
-// the quick search find it; the target path, ending with the mark, stays its identity. The copy takes a priority below
+// copy's own modification and becomes the copy's object name in the game, by which the console's teleport command
+// finds it; the target path, ending with the mark, stays its identity. The copy takes a priority below
 // every map spawn point and keeps its source's radius; when its original is missing, the first loaded spawn point in
 // the fixed order is its source, never another copy. The spawn points are those of the base map fixture.
 static class SpawnPointCopyTests {
@@ -63,10 +63,13 @@ static class SpawnPointCopyTests {
             foreach (var pair in Spawns.Objects.Where(p => p.Value.Contains(modObject)).ToArray()) Spawns.Objects.Remove(pair.Key);
             Marks.Remove((Spawn)modObject);
         }
-        public string BuildOf(object source) => source is Spawn ? "v1:1:spawn-point" : null;
-        public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) =>
+        // Each map spawn point has a build of its own, as spawn points with different models or radii do.
+        public string BuildOf(object source) => source is Spawn spawn ? "v1:1:spawn-point-" + spawn.Name : null;
+        public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) => Instances().Where(i => BuildOf(i.Handle) == build).ToArray();
+        public IReadOnlyList<SourceInstance> Instances(TargetIdentity source) => Instances().ToArray();
+        IEnumerable<SourceInstance> Instances() =>
             (ListsCopies ? Marks.Keys.Select(c => new SourceInstance("World/POIs/" + c.Name, c)) : Enumerable.Empty<SourceInstance>())
-                .Concat(Loaded.Where(p => At(p.Key) != null).Select(p => new SourceInstance(p.Key, p.Value))).ToArray();
+                .Concat(Loaded.Where(p => At(p.Key) != null).Select(p => new SourceInstance(p.Key, p.Value)));
         public void Name(object modObject, string name) { var copy = (Spawn)modObject; copy.Name = name ?? Marks[copy]; }
         public string NameOf(object modObject) => ((Spawn)modObject).Name;
         public IReadOnlyList<int> MapPriorities(string scene) => Loaded.Where(p => At(p.Key) != null).Select(p => p.Value.Priority).ToArray();
@@ -80,8 +83,8 @@ static class SpawnPointCopyTests {
     }
     static JObject Modifications(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"];
     static string Target(string path) => "{\"scene\":\"" + Scene + "\",\"path\":\"" + path + "\",\"component\":\"" + SpawnPoints.Component + "\",\"structure\":\"" + SpawnPoints.Structure + "\"}";
-    static string ModObject(string key, string source, string extra = "") =>
-        "\"" + key + "\":{\"target\":" + Target(ModObjects.Path(source, Mod, key)) + ",\"source\":" + Target(source).TrimEnd('}') + ",\"build\":\"v1:1:spawn-point\"}"
+    static string ModObject(string key, string source, string extra = "", bool build = true) =>
+        "\"" + key + "\":{\"target\":" + Target(ModObjects.Path(source, Mod, key)) + ",\"source\":" + Target(source).TrimEnd('}') + (build ? ",\"build\":\"v1:1:spawn-point-" + ModObjects.NameOf(source) + "\"" : "") + "}"
         + ",\"placement\":{\"mode\":\"fixed\",\"position\":[4493,12,5415],\"rotation\":[0,0,0,1]}" + extra + ",\"dependsOn\":[]}";
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
 
@@ -221,11 +224,16 @@ static class SpawnPointCopyTests {
     }
 
     // With Alarka missing, the copy is built from the first loaded spawn point in the fixed order, Alarka Jct, not a
-    // nearer one, with the fallback warning.
+    // nearer one, with the fallback warning. Every map spawn point is eligible, whatever its build and whether or not the
+    // file records the source's build.
     static void AMissingOriginalFallsBackToTheFirstMapSpawnPoint() {
+        foreach (var build in new[] { true, false }) AMissingOriginalFallsBackToTheFirstMapSpawnPoint(build);
+    }
+    static void AMissingOriginalFallsBackToTheFirstMapSpawnPoint(bool build) {
         var world = new World(new[] { Alarka });
+        Assert(world.Identical(Id(Alarka), "v1:1:spawn-point-Alarka").Count == 0, "No loaded spawn point has the build of Alarka");
         ScenePatchFileResult result = null;
-        var log = RecordingLog.Capture(false, () => result = world.Engine.Apply(Doc(ModObject(Key, Alarka, ",\"teleportName\":\"Bryson Yard\"")), Mod));
+        var log = RecordingLog.Capture(false, () => result = world.Engine.Apply(Doc(ModObject(Key, Alarka, ",\"teleportName\":\"Bryson Yard\"", build)), Mod));
         Assert(MapSpawns.First(p => p != Alarka) == AlarkaJct, "Alarka Jct is the first loaded spawn point in the fixed order");
         Assert(result.Outcomes[Key].Applied && ReferenceEquals(world.BuiltFrom.Single(), world.At(AlarkaJct)), "The copy is built from Alarka Jct: " + result.Outcomes[Key].Error);
         Assert(world.At(Made).Name == "Bryson Yard" && world.At(Made).Priority == -6 && world.At(Made).Radius == 3, "It takes its teleport name, ranks below the map, and keeps the radius of the spawn point it is built from");
@@ -262,6 +270,7 @@ static class SpawnPointCopyTests {
         Assert(!TeleportNameField.Shows(map) && TeleportNameField.Note(map) == null && SpawnPoints.TeleportName(map) == null, "A map spawn point has no teleport name field");
         Assert(TeleportNameField.EmptyNote.Contains("full object name") && TeleportNameField.EmptyNote.Contains("hard to enter"), "The note says the copy is reachable only by its full object name, which is hard to enter");
         Assert(TeleportNameField.Tip.Contains("quotation marks") && TeleportNameField.Tip.Contains("/tp"), "The tooltip names the console command and the quotation marks for a space");
+        Assert(TeleportNameField.Tip.IndexOf("quick search", StringComparison.OrdinalIgnoreCase) < 0, "The tooltip promises no quick search, which Railroader 0.6.3 can't open: " + TeleportNameField.Tip);
     }
 
     // Once the teleport name is set, the outliner and the inspector heading show it, as they show a map spawn point's

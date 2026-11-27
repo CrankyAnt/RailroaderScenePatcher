@@ -56,6 +56,7 @@ static class ModObjectMarkerTests {
         public string BuildOf(object source) => source is FakeMarker m && Builds.TryGetValue(m, out var build) ? build : null;
         public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) =>
             Loaded.Where(p => BuildOf(p.Value) == build).Select(p => new SourceInstance(p.Key, p.Value)).ToArray();
+        public IReadOnlyList<SourceInstance> Instances(TargetIdentity source) => Loaded.Select(p => new SourceInstance(p.Key, p.Value)).ToArray();
         public Builder(FakeMarkerWorld world) { this.world = world; }
         public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
             if (world.Objects.TryGetValue(identity.Path, out var standing) && standing.Count != 0) throw new InvalidOperationException(ModObjects.Taken);

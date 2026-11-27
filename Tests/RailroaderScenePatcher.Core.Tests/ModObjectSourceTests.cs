@@ -46,6 +46,7 @@ static class ModObjectSourceTests {
         public string BuildOf(object source) => source is FakeGroup group && Builds.TryGetValue(group, out var build) ? build : null;
         public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) =>
             Loaded.Where(p => p.Value != null && BuildOf(p.Value) == build).Select(p => new SourceInstance(p.Key, p.Value)).ToArray();
+        public IReadOnlyList<SourceInstance> Instances(TargetIdentity source) => Loaded.Where(p => p.Value != null).Select(p => new SourceInstance(p.Key, p.Value)).ToArray();
     }
     sealed class World {
         public readonly FakeGroupWorld Groups = new FakeGroupWorld();
@@ -235,6 +236,7 @@ static class ModObjectSourceTests {
         public string BuildOf(object source) { var path = Objects.FirstOrDefault(p => p.Value.Contains(source)).Key; return path != null && Builds.TryGetValue(path, out var build) ? build : null; }
         public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) =>
             Order.Where(p => Objects.ContainsKey(p) && Builds.TryGetValue(p, out var b) && b == build).Select(p => new SourceInstance(p, Objects[p][0])).ToArray();
+        public IReadOnlyList<SourceInstance> Instances(TargetIdentity source) => Order.Where(p => Objects.ContainsKey(p)).Select(p => new SourceInstance(p, Objects[p][0])).ToArray();
         // A loaded map with the Dillsboro station and its clock, without Alarka Jct, where the original stood.
         public static PartScene WithoutOriginal() {
             var scene = new PartScene { Maps = new[] { "map" } };

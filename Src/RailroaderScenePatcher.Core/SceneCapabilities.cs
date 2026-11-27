@@ -26,6 +26,8 @@ namespace RailroaderScenePatcher.Core {
         public string BuildOf(object source) => (ModObjectWorld as IModObjectSources)?.BuildOf(source);
         public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) =>
             (ModObjectWorld as IModObjectSources)?.Identical(source, build) ?? Array.Empty<SourceInstance>();
+        public IReadOnlyList<SourceInstance> Instances(TargetIdentity source) =>
+            (ModObjectWorld as IModObjectSources)?.Instances(source) ?? Array.Empty<SourceInstance>();
         public void Name(object modObject, string name) => (ModObjectWorld as IModObjectNames ?? throw new InvalidOperationException(ModObjects.NamesUnavailable)).Name(modObject, name);
         public string NameOf(object modObject) => (ModObjectWorld as IModObjectNames)?.NameOf(modObject);
         // Supplied by the host: the priorities of spawn points. Without it no spawn point is duplicated.

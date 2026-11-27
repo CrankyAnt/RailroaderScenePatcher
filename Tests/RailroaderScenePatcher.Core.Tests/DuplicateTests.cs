@@ -68,6 +68,7 @@ static class DuplicateTests {
         TheCrossingNodeIsDuplicatedWithoutASelectedRow();
         TheHeadingNamesTheSelectedCrossingNode();
         TheGhostShowsWhatTheSourcesCullersSwitchedOff();
+        ThePointerInstructionFitsAtEveryUiScale();
         Console.WriteLine("PASS: duplicate");
     }
 
@@ -95,6 +96,42 @@ static class DuplicateTests {
         Assert(PlacingGhostRules.ShownWhenPlaced(mast, null, n => n.Parent, n => n.Active, culled) == false, "Without a source nothing is shown");
     }
 
+    // #153 game finding: "Left-click to place" beside the placing cross was cut off by its box. The test covers UI scales
+    // 0.75 to 2 in steps of 0.05, the bounds CanvasSettingsApplicator allows (its maximum also depends on the screen
+    // height), on three screen sizes. At each, the instruction scales with the UI as the game's pointer callout does, is
+    // drawn on one line in a label at least as wide and tall as the measured text rounded up, and stays in its box. The
+    // box stands where the game puts its callout: 12 and 4 units right of and below the pointer, clear of the cross,
+    // and near the right or bottom edge moved back inside the screen without moving to the other side of the pointer.
+    // The measure is fractional, as Unity's CalcSize is; a label exactly that wide would wrap the last word.
+    static void ThePointerInstructionFitsAtEveryUiScale() {
+        (double, double) Measure(int fontSize) => (fontSize * 0.5371 * DuplicateState.PointerInstruction.Length, fontSize * 1.1499);
+        bool Overlaps(double[] a, double x, double y, double w, double h) => a[0] < x + w && x < a[0] + a[2] && a[1] < y + h && y < a[1] + a[3];
+        foreach (var (width, height) in new[] { (2560.0, 1440.0), (1920.0, 1080.0), (1280.0, 720.0) })
+            for (var step = 15; step <= 40; step++) {
+                var scale = step * 0.05;
+                var middle = new[] { width / 2, height / 2 };
+                foreach (var pointer in new[] { middle, new[] { width - 2, height - 2 }, new[] { 2.0, 2 } }) {
+                    var mark = DuplicateState.PointerMark(pointer, scale, Measure, width, height);
+                    var text = Measure(mark.FontSize);
+                    var at = scale.ToString("0.00") + " at " + pointer[0] + "," + pointer[1] + " on " + width + "x" + height;
+                    Assert(mark.FontSize == (int)Math.Round(DuplicateState.PointerFontSize * scale), "The font scales with the UI: " + mark.FontSize + " at " + at);
+                    Assert(mark.Label[2] >= Math.Ceiling(text.Item1) && mark.Label[3] >= Math.Ceiling(text.Item2), "The whole instruction fits its label on one line at " + at);
+                    Assert(mark.Box[0] <= mark.Label[0] && mark.Box[1] <= mark.Label[1] && mark.Box[0] + mark.Box[2] >= mark.Label[0] + mark.Label[2] && mark.Box[1] + mark.Box[3] >= mark.Label[1] + mark.Label[3],
+                        "The box holds the whole label at " + at);
+                    Assert(mark.Box[0] >= 0 && mark.Box[1] >= 0 && mark.Box[0] + mark.Box[2] <= width && mark.Box[1] + mark.Box[3] <= height, "The box stays on the screen at " + at);
+                    if (pointer == middle) {
+                        Assert(mark.Box[0] == pointer[0] + 12 * scale && mark.Box[1] == pointer[1] + 4 * scale, "The box stands at the game's callout offset at " + at);
+                        double g = mark.CrossGap, a = mark.CrossArm, t = mark.CrossThickness, px = pointer[0], py = pointer[1];
+                        var arms = new[] { (px - g - a, py - t / 2, a, t), (px + g, py - t / 2, a, t), (px - t / 2, py - g - a, t, a), (px - t / 2, py + g, t, a) };
+                        Assert(!arms.Any(r => Overlaps(mark.Box, r.Item1, r.Item2, r.Item3, r.Item4)), "The box stands clear of the cross at " + at);
+                    } else if (pointer[0] > middle[0]) {
+                        Assert(mark.Box[0] + mark.Box[2] == width && mark.Box[1] + mark.Box[3] == height, "Near the right and bottom edges the box is moved back to them at " + at);
+                        Assert(mark.Box[0] < pointer[0] && mark.Box[0] + mark.Box[2] > pointer[0], "The box doesn't move to the other side of the pointer at " + at);
+                    }
+                }
+            }
+    }
+
     // Duplicate is offered for a scene object and a station map icon. A starter placement marker shows its short
     // reason, and so does every object a plain copy would not rebuild soundly.
     static void DuplicateIsInactiveWhereItDoesNotApply() {
@@ -103,7 +140,7 @@ static class DuplicateTests {
         var icon = Map.Observations(out _).First(r => r.Family == SceneFamilies.StationMapIcon);
         Assert(DuplicateState.Reason(icon, new[] { SceneFamilies.StationMapIcon }) == null, "A station map icon can be duplicated");
         var starter = Map.Observations(out _).First(r => r.Family == SceneFamilies.StarterPlacement);
-        Assert(DuplicateState.Reason(starter, null) == "No start setup uses the copy.", "A starter placement marker shows its reason: " + DuplicateState.Reason(starter, null));
+        Assert(DuplicateState.Reason(starter, null) == "No start setup uses a mod object.", "A starter placement marker shows its reason: " + DuplicateState.Reason(starter, null));
         var part = Row(ModObjectTests.Station + "/Mask");
         Assert(part.GroupPath == ModObjectTests.Station && DuplicateState.Reason(part, null) == null, "A part can be duplicated: " + DuplicateState.Reason(part, null));
         // A Generic track marker and a milepost are duplicated: the placing click gives the copy a marker ID of its own.
@@ -318,6 +355,6 @@ static class DuplicateTests {
             Assert(ReferenceEquals(chosen, other) && !window.State.Open && window.State.Selecting == null && window.State.Ghost == null, "Confirming cancels the duplicate and gives the selected object");
             Assert(window.Modifications == 0 && window.World.ModObject == null && !window.Session.IsDirty(false), "Confirming adds nothing");
         }
-        Assert(DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot") == "To inspect Bryson Depot, discard the unplaced copy of Alarka Jct Station.", "The question names both objects: " + DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot"));
+        Assert(DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot") == "To inspect Bryson Depot, discard the unplaced mod object made from Alarka Jct Station.", "The question names both objects: " + DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot"));
     }
 }
