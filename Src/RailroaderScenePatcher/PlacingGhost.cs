@@ -60,6 +60,18 @@ namespace RailroaderScenePatcher {
             foreach (var prop in Props(from).Where(p => Kept(p.transform) && Active(p, from.transform, culled) && Unloaded(p)))
                 if (Load(prop, frame)) loads++;
             if (count == 0 && loads == 0) PatcherLog.Debug("The placing ghost of " + from.name + " has no mesh to show; the pointer mark stands alone.");
+            else if (count != 0) PatcherLog.Debug(() => "The placing ghost of " + from.name + " shows " + count + (count == 1 ? " mesh" : " meshes") + ", at most " + ShownNumber.Text(Reach()) + " m across the ground from the pointer.");
+        }
+        // How far the farthest ghost part stands from the pointer across the ground, in metres: a source whose origin
+        // lies away from its meshes, such as the crossing object of a crossing without signals at its pad with the
+        // crossbucks on either side, shows them that far from the pointer mark.
+        double Reach() {
+            var reach = 0.0;
+            for (var i = 0; i < root.transform.childCount; i++) {
+                var at = root.transform.GetChild(i).localPosition;
+                reach = Math.Max(reach, Math.Sqrt(at.x * at.x + at.z * at.z));
+            }
+            return reach;
         }
         // Adds a ghost part for each mesh renderer at and below model that keep accepts, except the farther levels of a
         // level-of-detail group, placed by place relative to the source's frame. Returns how many parts it added.

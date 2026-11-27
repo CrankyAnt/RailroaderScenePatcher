@@ -70,6 +70,22 @@ namespace RailroaderScenePatcher.Core {
         public Placement Placement { get; }
         // The supplying mod's identifier.
         public string Scope { get; }
+        // The name of the wrapper the game builds the addition in, which the inventory lists as the added object: the
+        // supplying mod's identifier, with '/' as ':' since a hierarchy path separates names with '/', and the ID. An ID
+        // holds no space (IdProblem), so the last space ends the identifier.
+        public const string WrapperPrefix = "CrankyAnt Scene Patcher equipment ";
+        public string WrapperName => WrapperPrefix + PathSafe(Scope) + " " + Id;
+        // Whether the path names the wrapper of an addition that the mod with the identifier scope supplied. False for a
+        // null scope: without an edited mod no addition is its.
+        public static bool AddedBy(string path, string scope) {
+            if (path == null || scope == null) return false;
+            var name = path.Substring(path.LastIndexOf('/') + 1);
+            if (!name.StartsWith(WrapperPrefix, StringComparison.Ordinal)) return false;
+            var rest = name.Substring(WrapperPrefix.Length);
+            var space = rest.LastIndexOf(' ');
+            return space >= 0 && String.Equals(rest.Substring(0, space), PathSafe(scope), StringComparison.Ordinal);
+        }
+        static string PathSafe(string text) => (text ?? "").Replace('/', ':');
         internal string Key => Scope + "\n" + Id;
         internal EquipmentAddition In(string scope) => new EquipmentAddition(Id, Pattern, Source, Placement, scope);
         internal EquipmentAddition At(Placement placement) => new EquipmentAddition(Id, Pattern, Source, placement, Scope);

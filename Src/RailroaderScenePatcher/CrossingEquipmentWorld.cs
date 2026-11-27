@@ -47,7 +47,6 @@ namespace RailroaderScenePatcher {
     internal sealed class CrossingEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificationDiagnostics {
         const string LampType = "Track.KeyValueLampMaterialController", GateType = "RollingStock.Controls.KeyValueBoolAnimator", OwnerType = "KeyValue.Runtime.KeyValueObject",
             CullerType = CullerTypes.GameObjectCuller, SpanType = "Track.TrackSpan", BellType = "Audio.IntegerLoopingPlayer", AnimatorType = "UnityEngine.Animator", TransformerType = "Helpers.WorldTransformer";
-        internal const string WrapperPrefix = "CrankyAnt Scene Patcher equipment ";
         readonly Type controller, lamp, gate, keyOwner, culler, span, bell, animator, transformer;
         readonly FieldInfo lampKey, lampTargets, lampMaterials, gateKey, gateClip, cullerObjects, cullerState, lampObserver, gateObserver;
         readonly FieldInfo materialShared, materialProperty;
@@ -201,7 +200,6 @@ namespace RailroaderScenePatcher {
             var owned = (OwnedEquipment)addition;
             return new EquipmentAddition(owned.Id, owned.Pattern, owned.Source, null, owned.Scope);
         }
-        static string Safe(string text) => new string(text.Select(c => c == '/' ? ':' : c).ToArray());
         Component CullerOf(GameObject target) {
             var cullers = target.GetComponents(culler);
             if (cullers.Length > 1) throw new InvalidOperationException("The crossing controller holds several cullers; the copy's culling would be ambiguous");
@@ -215,7 +213,7 @@ namespace RailroaderScenePatcher {
             var problem = SourceProblem(device, destination, addition.Pattern);
             if (problem != null) throw new InvalidOperationException("The source does not conform: " + problem);
             var cull = CullerOf(destination);
-            var wrapper = new GameObject(WrapperPrefix + Safe(addition.Scope) + " " + addition.Id) { hideFlags = HideFlags.DontSave };
+            var wrapper = new GameObject(addition.WrapperName) { hideFlags = HideFlags.DontSave };
             wrapper.SetActive(false);
             IList list = null; GameObject copy = null;
             try {
@@ -255,7 +253,7 @@ namespace RailroaderScenePatcher {
             // Unity releases a bell's audio on scene unload only for a bell that was active, so a bell is built only beneath
             // an active controller. SourceProblem refuses that before any change; this guards the construction itself.
             if (!destination.activeInHierarchy) throw new InvalidOperationException("The crossing controller is inactive, so an added bell would not start");
-            var wrapper = new GameObject(WrapperPrefix + Safe(addition.Scope) + " " + addition.Id) { hideFlags = HideFlags.DontSave };
+            var wrapper = new GameObject(addition.WrapperName) { hideFlags = HideFlags.DontSave };
             wrapper.SetActive(false);
             GameObject player = null;
             try {

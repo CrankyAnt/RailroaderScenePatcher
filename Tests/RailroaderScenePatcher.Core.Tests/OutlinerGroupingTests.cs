@@ -130,7 +130,7 @@ static class OutlinerGroupingTests {
             Func<SceneObservation, bool> changed = row => TargetIdentity.SameObject(target, row.Identity);
             Check(inventory.Entries.All(row => !changed(row)), "no row is the crossing object's own target");
             bool Added(SceneObservation row) => InventoryPresentationState.IsAdded(row, modId);
-            var rows = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(changed, modId), null);
+            var rows = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(changed, modId, null), null);
             Check(rows.Select(r => r.Identity.Path).SequenceEqual(copied.Select(r => r.Identity.Path)), "the Changed filter lists the copy's crossbucks and pad and no object of the source or of the second mod (got " + String.Join(", ", rows.Select(r => r.Identity.Path)) + ")");
             Check(copied.All(Added) && !own.Any(Added) && !theirs.Any(Added), "the copy's parts are added objects; the source's and the second mod's copy's are not");
             Check(CommandBand.RowText(CommandBand.RowMarkers(false, changed(copied[0]), Added(copied[0])), "Sign-Crossing0 (1)") == "+ Sign-Crossing0 (1)"
@@ -139,20 +139,63 @@ static class OutlinerGroupingTests {
             var tree = OutlinerGrouping.Build(rows, inventory.Entries, "", true, null);
             Check(tree.Listed == copied.Length && OutlinerGrouping.Summary(tree, inventory.Entries) == copied.Length + " of " + inventory.Entries.Count + " objects", "the Changed count line counts the copy's rows (got " + OutlinerGrouping.Summary(tree, inventory.Entries) + ")");
             // Edited by the second mod, its copy is the added one and the first mod's is not.
-            var second = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(row => false, secondMod), null);
+            var second = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(row => false, secondMod, null), null);
             Check(second.SequenceEqual(theirs) && theirs.All(r => InventoryPresentationState.IsAdded(r, secondMod)) && !copied.Any(r => InventoryPresentationState.IsAdded(r, secondMod)), "for the second mod only its own copy is added and listed under Changed");
             // Without an edited mod no mod object is added and Changed lists nothing.
-            Check(OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(null, null), null).Count == 0
+            Check(OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(null, null, null), null).Count == 0
                 && !copied.Concat(theirs).Any(r => InventoryPresentationState.IsAdded(r, null) || InventoryPresentationState.IsAdded(r, "")), "without an edited mod nothing is added or listed under Changed");
             // Any other mod object of the edited mod counts as added with its parts; a light the patcher added to a
             // crossing is added whatever the edited mod, as before.
             var other = ModObjects.Path(Dealer, modId, "mod-object-bryson-coal-dealer");
             var light = Entry(Allen + "/Signal 1 copy", SceneFamilies.AddedEquipment, 0, 0);
             Check(Added(Entry(other, Baked, 0, 0)) && Added(Entry(other + "/Heap", Baked, 0, 0, groupPath: other)) && !Added(Entry(Dealer, Baked, 0, 0)) && !Added(null)
-                && InventoryPresentationState.IsAdded(light, secondMod) && InventoryPresentationState.IsAdded(light, null) && !InventoryPresentationState.ChangedOrMade(row => false, modId)(light),
-                "every mod object of the edited mod with its parts is added and a map object is not; an added light keeps its + and is listed under Changed only when the mod changes it");
+                && InventoryPresentationState.IsAdded(light, secondMod) && InventoryPresentationState.IsAdded(light, null) && !InventoryPresentationState.ChangedOrMade(row => false, modId, null)(light),
+                "every mod object of the edited mod with its parts is added and a map object is not; an added light keeps its + and, without the edited mod's scope, is not listed under Changed");
             Check(ModObjects.MadeBy(copy, modId) && ModObjects.MadeBy(copy + "/Crossing Pad", modId) && !ModObjects.MadeBy(foreign, modId) && !ModObjects.MadeBy(Stenzel, modId) && !ModObjects.MadeBy(copy, null),
                 "a mod object is the mod's whose ID its mark carries");
+        } finally {
+            OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();
+        }
+    }
+    // A light, gate or bell the patcher added for the edited mod is listed under Changed with its crossing controller,
+    // which the mod changes; one another mod added keeps its + but is not listed. The wrapper the game lists as the added
+    // object carries the supplying mod's ID in its name, as in the game: "CrankyAnt Scene Patcher equipment
+    // crankyant:crossing-detection-fixture signal-1-added" below Grade Crossing - Bryson Everett.
+    static void AddedEquipmentOfTheEditedModIsListedUnderChanged() {
+        const string edited = "crankyant/fixed-placement-fixture", secondMod = "othermod/rail-extras";
+        var controller = Entry(Allen, "Grade crossing controller", 25100, -700);
+        var light = Entry(Allen + "/CrankyAnt Scene Patcher equipment crankyant:fixed-placement-fixture signal-1-a", SceneFamilies.AddedEquipment, 25104, -704, displayName: "Signal 1 (added: signal-1-a)");
+        var bell = Entry(Allen + "/CrankyAnt Scene Patcher equipment crankyant:fixed-placement-fixture bell", SceneFamilies.AddedBell, 25105, -705, displayName: "Brass bell (added: bell)");
+        var theirLight = Entry(Allen + "/CrankyAnt Scene Patcher equipment othermod:rail-extras signal-1-a", SceneFamilies.AddedEquipment, 25106, -706, displayName: "Signal 1 (added: signal-1-a)");
+        // A mod whose ID starts with the edited mod's ID is another mod.
+        var longer = Entry(Allen + "/CrankyAnt Scene Patcher equipment crankyant:fixed-placement-fixture-2 signal-1-b", SceneFamilies.AddedEquipment, 25107, -707, displayName: "Signal 1 (added: signal-1-b)");
+        var mast = Entry(Allen + "/Signal 1/Signal 1", "Crossing mast", 25102, -702);
+        var scene = new Inventory();
+        scene.Objects.AddRange(new[] { controller, mast, light, bell, theirLight, longer });
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        OutlinerGrouping.InvalidatePlaces();
+        OutlinerGrouping.Scene = new World();
+        OutlinerGrouping.LogPending = false;
+        try {
+            // The addition lives in the controller's modification: the scene patch file targets the controller alone.
+            Func<SceneObservation, bool> changed = row => ReferenceEquals(row, controller);
+            string Paths(IEnumerable<SceneObservation> rows) => String.Join(", ", rows.Select(r => r.Identity.Path));
+            var rows = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(changed, "crankyant/scene-patcher", edited), null);
+            Check(rows.SequenceEqual(new[] { controller, light, bell }), "the Changed filter lists the controller with the light and bell the edited mod added, and not another mod's (got " + Paths(rows) + ")");
+            var tree = OutlinerGrouping.Build(rows, inventory.Entries, "", true, null);
+            Check(OutlinerGrouping.Summary(tree, inventory.Entries) == "3 of 6 objects", "the Changed count line counts the added light and bell (got " + OutlinerGrouping.Summary(tree, inventory.Entries) + ")");
+            Check(new[] { light, bell, theirLight, longer }.All(r => InventoryPresentationState.IsAdded(r, "crankyant/scene-patcher")) && !InventoryPresentationState.IsAdded(mast, "crankyant/scene-patcher"),
+                "every added light, gate or bell keeps its +, whichever mod added it");
+            // Edited by the second mod, its light is listed and the first mod's are not.
+            var second = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(row => false, "crankyant/scene-patcher", secondMod), null);
+            Check(second.SequenceEqual(new[] { theirLight }), "for the second mod only its own added light is listed under Changed (got " + Paths(second) + ")");
+            // Without an edited mod no added equipment is listed.
+            Check(OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(null, null, null), null).Count == 0, "without an edited mod Changed lists nothing");
+            // The game names the wrapper with the same rule the outliner reads.
+            var addition = new EquipmentAddition("signal-1-a", EquipmentAddition.LightGatePattern, new EquipmentSource(SceneName, Allen + "/Signal 1/Signal 1"), null, edited);
+            Check(Allen + "/" + addition.WrapperName == light.Identity.Path && EquipmentAddition.AddedBy(light.Identity.Path, edited) && !EquipmentAddition.AddedBy(theirLight.Identity.Path, edited)
+                && !EquipmentAddition.AddedBy(longer.Identity.Path, edited) && !EquipmentAddition.AddedBy(mast.Identity.Path, edited) && !EquipmentAddition.AddedBy(light.Identity.Path, null),
+                "an added object's wrapper name carries the supplying mod's ID (got " + addition.WrapperName + ")");
         } finally {
             OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();
         }
@@ -315,6 +358,7 @@ static class OutlinerGroupingTests {
         InspectionOnlyRowsStandUnderTheirCategory();
         AMovedObjectIsListedWhereItNowStands();
         AModObjectAndItsPartsCountAsAdded();
+        AddedEquipmentOfTheEditedModIsListedUnderChanged();
         Console.WriteLine("PASS: outliner grouping");
     }
 }

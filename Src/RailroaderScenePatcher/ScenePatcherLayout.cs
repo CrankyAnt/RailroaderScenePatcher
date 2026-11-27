@@ -384,6 +384,9 @@ namespace RailroaderScenePatcher {
         bool IsAddedEquipment(SceneObservation entry) => CommandBand.IsAddedFamily(entry?.Family);
         // The edited mod's ID, or null while no mod is edited.
         string EditedModId { get { try { return attachment?.Session.ModId; } catch { return null; } } }
+        // The key the edited mod's scene patch file is applied under, which scopes the lights, gates and bells it adds,
+        // or null while no mod is edited.
+        string EditedScenePatchFileKey { get { try { return attachment?.Session.ScenePatchFileKey; } catch { return null; } } }
         bool IsAdded(SceneObservation entry) => InventoryPresentationState.IsAdded(entry, EditedModId);
         bool IsChanged(SceneObservation entry) {
             try { return attachment != null && attachment.Session.IsChanged(entry.Identity); } catch { return false; }
@@ -449,7 +452,7 @@ namespace RailroaderScenePatcher {
             shown = Array.Empty<SceneObservation>();
             var narrowed = !String.IsNullOrEmpty(filter) || outlinerFilter != OutlinerFilter.All;
             try {
-                shown = OutlinerGrouping.Rows(inventory, filter, outlinerFilter, InventoryPresentationState.ChangedOrMade(IsChanged, EditedModId), OutlinerTrackPoint);
+                shown = OutlinerGrouping.Rows(inventory, filter, outlinerFilter, InventoryPresentationState.ChangedOrMade(IsChanged, EditedModId, EditedScenePatchFileKey), OutlinerTrackPoint);
                 return OutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, OutlinerTrackPoint);
             } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The patcher couldn't build the scene object outliner. Report this to the patcher maintainer.", e); return null; }
         }
