@@ -36,20 +36,20 @@ namespace RailroaderScenePatcher {
         // What Remove modification says for a mod object: the object itself goes, not only a change of it.
         internal const string RemoveTip = "Remove this mod object from the map. Your edits of its parts are removed with it.";
         // Why Duplicate is inactive for an object, or null: the short reasons of its tooltip.
-        internal const string StarterMarker = "No start setup reads a duplicated marker.", Part = "A part is duplicated with its group.",
-            InspectionOnly = "Inspection-only objects have no edits.", Bridge = "Bridges can't be duplicated.",
+        internal const string StarterMarker = "No start setup reads a duplicated marker.",
+            InspectionOnly = "Inspection-only objects have no edits.",
             OtherFamily = "This family can't be duplicated.", HoldsOtherFamily = "It holds objects that can't be duplicated.";
-        // The families whose objects a plain copy rebuilds soundly: a scene object with what stands below it, and a
-        // station map icon. An object with a marker ID, a track binding or detection needs more than a copy.
-        static readonly string[] Copied = { SceneFamilies.SceneObject, SceneFamilies.ChildObject, SceneFamilies.StationMapIcon };
+        // The families whose objects a copy rebuilds soundly: a scene object with what stands below it, a part, which
+        // becomes an object of its own, a station map icon, a location sign, which registers its own ground mask at its
+        // place, and the Ela bridge. A copy of a bridge stands fully built and no construction controller switches it.
+        // An object with a marker ID, a track binding or detection needs more than a copy.
+        static readonly string[] Copied = { SceneFamilies.SceneObject, SceneFamilies.ChildObject, SceneFamilies.StationMapIcon, SceneFamilies.LocationSign, SceneFamilies.Bridge };
         // familiesBelow: the families of the listed objects at or below the object.
         internal static string Reason(SceneObservation selected, IEnumerable<string> familiesBelow) {
             if (selected == null) return null;
             if (selected.Family == SceneFamilies.StarterPlacement) return StarterMarker;
             if (selected.InspectionOnly != null) return InspectionOnly;
-            if (selected.GroupPath != null || selected.Family == SceneFamilies.ChildObject) return Part;
-            if (selected.Bridge != BridgeKind.None) return Bridge;
-            if (selected.Family != SceneFamilies.SceneObject && selected.Family != SceneFamilies.StationMapIcon) return OtherFamily;
+            if (!Copied.Contains(selected.Family, StringComparer.Ordinal)) return OtherFamily;
             return (familiesBelow ?? Enumerable.Empty<string>()).Any(family => family != null && !Copied.Contains(family, StringComparer.Ordinal)) ? HoldsOtherFamily : null;
         }
         // The question that a selection in the outliner asks while the mod object is unplaced, with its title and choices.
@@ -114,7 +114,7 @@ namespace RailroaderScenePatcher {
         // One frame while placing. Only a left click on the world places: the object goes to the map point under it,
         // with the source's rotation. Returns the target of the placed mod object, or null while none was placed. A
         // click that places nothing, on no ground or refused by the edit, returns to the blank window with its reason.
-        internal TargetIdentity Tick(IPlacingPointer pointer, Func<TargetIdentity, Placement, Outcome> place) {
+        internal TargetIdentity Tick(IPlacingPointer pointer, Func<SceneObservation, Placement, Outcome> place) {
             if (Step != DuplicateStep.Placing || pointer == null || place == null) return null;
             var at = pointer.Pointer;
             Ghost = at == null ? null : pointer.MapPoint(at);
@@ -122,7 +122,7 @@ namespace RailroaderScenePatcher {
             if (click == null) return null;
             var point = pointer.MapPoint(click);
             if (point == null) { Message = NoGround; return null; }
-            var outcome = place(Source.Identity, new Placement(point, Source.Rotation.ToArray()));
+            var outcome = place(Source, new Placement(point, Source.Rotation.ToArray()));
             if (outcome == null || !outcome.Applied) {
                 Step = DuplicateStep.Blank; Ghost = null;
                 Message = outcome?.Error ?? "The object could not be placed.";

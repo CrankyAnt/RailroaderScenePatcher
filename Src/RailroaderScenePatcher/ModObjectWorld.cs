@@ -36,11 +36,14 @@ namespace RailroaderScenePatcher {
             if (from == null) throw new InvalidOperationException("The source of this mod object is not a scene object.");
             if (placement?.Position == null || placement.Rotation == null || placement.Position.Length != 3 || placement.Rotation.Length != 4) throw new InvalidOperationException(ModObjects.NeedsPlacement);
             if (BoardScene.LoadedAt(identity.Scene, identity.Path).Count != 0) throw new InvalidOperationException(ModObjects.Taken);
-            // The mod object stands in its source's parent: the engine gives the path there, also when the source is an
-            // identical instance in another parent than the original's.
+            // The mod object stands in the parent its path names, which the engine gives: its source's parent, or for a
+            // part's copy the parent of the part's group, an object above the source, also when the source is an
+            // identical instance in another parent than the original's. Its path is that parent's path and its own name.
+            var within = ModObjects.ParentOf(identity.Path);
             var parent = from.transform.parent;
+            while (parent != null && BoardScene.PathOf(parent) != within) parent = parent.parent;
             var above = parent == null ? null : BoardScene.PathOf(parent);
-            if (from.scene.name != identity.Scene || (above != null && !identity.Path.StartsWith(above + "/", StringComparison.Ordinal)))
+            if (from.scene.name != identity.Scene || above != within)
                 throw new InvalidOperationException("The target of this mod object doesn't stand beside its source. " + ModObjects.TargetShape);
             var name = above == null ? identity.Path : identity.Path.Substring(above.Length + 1);
             var map = new Vector3(Checked(placement.Position[0]), Checked(placement.Position[1]), Checked(placement.Position[2]));
@@ -212,6 +215,56 @@ namespace RailroaderScenePatcher {
                     for (var child = prop.childCount - 1; child >= 0; child--) UnityEngine.Object.DestroyImmediate(prop.GetChild(child).gameObject);
                 }
             });
+            // Unlike the steps above, this one must hold: a copy that a switch of the game still followed would not
+            // be standalone, so a failure refuses the build.
+            StandBuilt(from, made, source => paired && Array.IndexOf(sources, source.transform) is int at && at >= 0 ? ((Transform)copies[at]).gameObject : null);
+        }
+
+        // The switches of the game that set objects active or inactive (Railroader 0.6.3). A construction controller
+        // (Game.Mow.TrackConstructionScenery.UpdateVisibility) sets the targets of its entries by the construction state of
+        // its track segments, which base-game progression drives: a map feature enables their track groups
+        // (MapFeatureManager.UpdateGraphGroups, Graph.SetGroupEnabled) and a construction milestone sets their state
+        // (TrackConstructionMilestone). A map feature also sets gameObjectsEnableOnUnlock by whether it is unlocked
+        // (MapFeatureManager.UpdateFeatureForUnlocked), a progression controller its two lists by its progression state
+        // (ProgressionEntityObjectController), and a map object activation its own object by its unlock key.
+        const string MapFeatureType = GroupWorld.MapFeatureType, ProgressionType = GroupWorld.ProgressionControllerType, MapObjectActivationType = SceneObjectRules.MapObject;
+        static IEnumerable<object> Items(object list) => list as System.Collections.IEnumerable == null ? Enumerable.Empty<object>() : ((System.Collections.IEnumerable)list).Cast<object>();
+        static object Member(object owner, string name) {
+            var field = owner.GetType().GetField(name, Native.Flags) ?? throw new MissingFieldException(owner.GetType().FullName, name);
+            return field.GetValue(owner);
+        }
+        // A mod object stands built and active from its placement, whatever the progression and the construction state,
+        // and no switch of the game ever sets it: every object of the copy that a switch names takes the activity it has
+        // with all track complete, every feature unlocked and every progression enabled, and the switches inside the
+        // copy, whose lists Unity pointed at the copy's own objects, are removed. Switches elsewhere keep naming the source.
+        // twin gives the copy's object for an object of the source, or null.
+        static void StandBuilt(GameObject from, GameObject made, Func<GameObject, GameObject> twin) {
+            GameObject Copied(object item, bool inside) {
+                if (!(item is GameObject target) || target == null) return null;
+                if (inside) return target.transform.IsChildOf(made.transform) ? target : null;
+                return target.transform.IsChildOf(from.transform) ? twin(target) ?? throw new InvalidOperationException("The copy of " + target.name + " couldn't be found.") : null;
+            }
+            void Set(object list, bool inside, bool active) { foreach (var item in Items(list)) Copied(item, inside)?.SetActive(active); }
+            IEnumerable<Component> Switches(string type, bool inside) {
+                var found = Native.Type(type);
+                if (found == null) return Enumerable.Empty<Component>();
+                return inside ? made.GetComponentsInChildren(found, true)
+                    : Resources.FindObjectsOfTypeAll(found).OfType<Component>().Where(c => c != null && c.gameObject.scene.IsValid() && c.gameObject.scene.isLoaded && !c.transform.IsChildOf(made.transform));
+            }
+            foreach (var inside in new[] { false, true }) {
+                foreach (var controller in Switches(SceneObjectRules.ConstructionController, inside))
+                    foreach (var entry in Items(Member(controller, "entries")))
+                        Set(Member(entry, "targets"), inside, ConstructionSegmentRule.ShownWhenComplete(Member(entry, "condition")?.ToString(), Convert.ToInt32(Member(entry, "trackConstructionState"))));
+                foreach (var feature in Switches(MapFeatureType, inside)) Set(Member(feature, "gameObjectsEnableOnUnlock"), inside, true);
+                foreach (var controller in Switches(ProgressionType, inside)) {
+                    Set(Member(controller, "activeOnProgressionEnabled"), inside, true);
+                    Set(Member(controller, "inactiveOnProgressionEnabled"), inside, false);
+                }
+            }
+            foreach (var type in new[] { SceneObjectRules.ConstructionController, MapFeatureType, ProgressionType, MapObjectActivationType })
+                foreach (var own in Switches(type, true)) UnityEngine.Object.DestroyImmediate(own);
+            // The copy itself starts active, whatever a switch did to its source.
+            if (!made.activeSelf) made.SetActive(true);
         }
 
         public void Remove(object modObject) {

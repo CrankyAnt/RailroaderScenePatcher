@@ -21,18 +21,20 @@ namespace RailroaderScenePatcher.Core {
         }
         // Whether the active scene patch file makes the object: read from the file alone, as IsChanged is.
         public bool IsModObject(TargetIdentity target) => ModObjectKey(target) != null;
-        // The scene object a duplicate of the object is built from: the object itself, or for a mod object of this
-        // scene patch file its own source, so a mod object never depends on another mod object.
+        // The scene object a duplicate of the object is built from: the object itself, for a mod object of this scene
+        // patch file its own source, and for an object below a mod object the map's object it was copied from, so a mod
+        // object never depends on another mod object.
         public TargetIdentity DuplicateSource(TargetIdentity target) {
             var key = ModObjectKey(target);
-            if (key == null) return target;
+            if (key == null) return target == null || !ModObjects.Within(target.Path) ? target : new TargetIdentity(target.Scene, ModObjects.Plain(target.Path), target.Component, target.Structure);
             try { return PatchEngine.Parse((JObject)scenePatchFile.Modifications[key], scenePatchFileKey, key).Source ?? target; }
             catch (InvalidOperationException) { return target; }
         }
         // The placing click of Duplicate: makes a mod object from the inspected object and places it. The scene patch
         // file gets its modification, under a new key that is the mod object's identity in this mod; the scene gets
-        // the object. A refusal leaves both as they were. The outcome names the new object's target.
-        public Outcome PlaceModObject(TargetIdentity inspectedObject, Placement placement, InspectedTarget inspected = null) {
+        // the object. A refusal leaves both as they were. The outcome names the new object's target. group is the path
+        // of the inspected object's group when it is a part: the part's copy then stands beside that group, on its own.
+        public Outcome PlaceModObject(TargetIdentity inspectedObject, Placement placement, InspectedTarget inspected = null, string group = null) {
             const string name = "Place mod object";
             var outcome = new Outcome();
             try {
@@ -44,7 +46,8 @@ namespace RailroaderScenePatcher.Core {
                 inspected?.Validate(scene, inspectedObject, origin);
                 var from = DuplicateSource(inspectedObject);
                 var key = NewId(new TargetIdentity(from.Scene, ModObjects.Plain(from.Path), from.Component), ModObjects.KeyPrefix);
-                var identity = new TargetIdentity(from.Scene, ModObjects.Path(from.Path, modId, key), from.Component, from.Structure);
+                var beside = ModObjects.Beside(ModObjects.Within(inspectedObject.Path) && group == null ? inspectedObject.Path : from.Path, group);
+                var identity = new TargetIdentity(from.Scene, ModObjects.Path(beside, modId, key), from.Component, ModObjects.StructureOf(from.Structure));
                 var value = new JObject { ["target"] = identity.ToJson(), [ModObjects.SourceMember] = SourceJson(inspectedObject, from, origin), ["placement"] = FixedJson(at), ["dependsOn"] = new JArray() };
                 outcome.ResolvedTarget = Establish(key, identity, value);
                 outcome.Target = identity;

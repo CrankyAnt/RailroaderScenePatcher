@@ -51,6 +51,10 @@ namespace RailroaderScenePatcher.Core {
         public const string RequiredVersion = "0.5.0";
         public const string NoDetach = "The rail bridge's construction segments can't be detached because the bridge needs them. " + WindowGuidance.SelectBridgeTrackSegments;
         public const string NoRelationship = "This object has no supported construction-segment relationship.";
+        // Whether the game's construction controller (Game.Mow.TrackConstructionScenery, Railroader 0.6.3) shows an
+        // entry's objects while all its track is complete: the complete state is 0, an Equal entry shows at its own
+        // state and a NoOverlap entry while the state shares no flag with its own. A copy of a bridge stands so.
+        public static bool ShownWhenComplete(string condition, int state) => condition == "NoOverlap" || (condition == "Equal" && state == 0);
         internal static string Missing(string id) => "Construction segment " + id + " is missing on the loaded track. No other segment is used.";
         internal static string Ambiguous(string id) => "Construction segment " + id + " matches more than one segment on the loaded track. No other segment is used.";
         // Refuses, before any mutation, a setting the object does not support: a detach, and a reference with a segment that

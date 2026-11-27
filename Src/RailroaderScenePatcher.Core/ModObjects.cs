@@ -95,6 +95,26 @@ namespace RailroaderScenePatcher.Core {
                 while (IsName(segments[i])) segments[i] = segments[i].Substring(0, segments[i].LastIndexOf(Open, StringComparison.Ordinal));
             return String.Join("/", segments);
         }
+        // The structure of a mod object made from a source of the structure: a part's copy is a scene object of its own.
+        public static string StructureOf(string sourceStructure) => sourceStructure == ChildObjects.Structure ? SceneObjects.Structure : sourceStructure;
+        // The path a mod object made from the source is named after and stands beside. A part's copy stands beside the
+        // part's group, in the group's parent, under the part's own name; any other copy stands beside its source.
+        // group is the path of the source's group, or null for an object that is no part.
+        public static string Beside(string sourcePath, string group) {
+            var source = Plain(sourcePath);
+            var parent = group == null ? null : ParentOf(Plain(group));
+            return group == null ? source : parent == null ? NameOf(source) : parent + "/" + NameOf(source);
+        }
+        // The parent a mod object stands in when it is built from the object at builtFrom: as many levels above that
+        // object as its written target's parent stands above its written source. A copy stands beside its source, and a
+        // part's copy beside the source part's group, also when an identical instance stands in for the original.
+        // Without that relation it stands beside the object it is built from.
+        public static string StandsIn(string target, string source, string builtFrom) {
+            string written = ParentOf(target), above = ParentOf(source), parent = ParentOf(builtFrom);
+            if (written == null || above == null || !(above + "/").StartsWith(written + "/", StringComparison.Ordinal)) return parent;
+            for (var at = above; at != written && parent != null; at = ParentOf(at)) parent = ParentOf(parent);
+            return parent;
+        }
         // The name of a mod object in its parent: the last segment of its path.
         public static string NameOf(string path) => path.Substring(path.LastIndexOf('/') + 1);
         public static string ParentOf(string path) { var slash = path.LastIndexOf('/'); return slash < 0 ? null : path.Substring(0, slash); }

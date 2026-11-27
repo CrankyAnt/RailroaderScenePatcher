@@ -615,9 +615,10 @@ namespace RailroaderScenePatcher.Core {
             if (source == null && instead == null) throw new InvalidOperationException(unresolved == TargetMissing ? ModObjects.SourceMissing : ModObjects.SourceAmbiguous);
             var placement = Evaluate(parsed.State).Placement;
             // The mod object stands beside the object it is built from, under the name its target gives it: beside its
-            // original, or beside the identical instance in that instance's parent. No parent is created.
+            // original, or beside the identical instance in that instance's parent; a part's copy beside the group of
+            // that part. No parent is created.
             var from = source != null ? parsed.Source.Path : instead.Path;
-            var parent = ModObjects.ParentOf(from);
+            var parent = ModObjects.StandsIn(parsed.Identity.Path, parsed.Source.Path, from);
             var root = (parent == null ? "" : parent + "/") + ModObjects.NameOf(parsed.Identity.Path);
             var built = builder.Build(parsed.Identity.At(root), source ?? instead.Handle, placement) ?? throw new InvalidOperationException(ModObjects.Unavailable);
             if (source == null) PatcherLog.Warning(ModObjects.FallbackWarning(scenePatchFileKey, parsed.Id, parsed.Source.Path, instead.Path));
@@ -934,7 +935,7 @@ namespace RailroaderScenePatcher.Core {
                     written = (JObject)written.DeepClone(); written.Remove(ModObjects.BuildMember);
                 }
                 source = ParseTarget(written);
-                if (identity.Keyed || identity.PadMarkerId != null || identity.Scene != source.Scene || identity.Component != source.Component || identity.Structure != source.Structure || !ModObjects.IsPath(identity.Path))
+                if (identity.Keyed || identity.PadMarkerId != null || identity.Scene != source.Scene || identity.Component != source.Component || identity.Structure != ModObjects.StructureOf(source.Structure) || !ModObjects.IsPath(identity.Path))
                     throw new InvalidPatchDefinitionException(ModObjects.TargetShape);
                 if (item["placement"] == null) throw new InvalidPatchDefinitionException(ModObjects.NeedsPlacement);
             }

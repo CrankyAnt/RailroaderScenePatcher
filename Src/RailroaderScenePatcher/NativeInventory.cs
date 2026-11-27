@@ -268,7 +268,7 @@ namespace RailroaderScenePatcher {
                 if (type == ExistingEquipmentScene.BellComponent) return BellFamily;
                 return type == ExistingEquipmentScene.GateComponent && CrossingDeviceWorld.OnLightObject(c.transform) ? null : MastFamily;
             }
-            if (type == BoardScene.CullerType && BridgeWorld.SupportedPaths.Contains(BoardScene.PathOf(c.transform))) return "Bridge";
+            if (type == BoardScene.CullerType && BridgeWorld.Supports(BoardScene.PathOf(c.transform))) return "Bridge";
             if (type == BoardScene.CullerType && Get(go, BoardScene.MaskType) != null && Get(go, Marker) == null) return "Location sign";
             if (type == ConstructionScenery && BoardScene.PathOf(c.transform) == ConstructionSceneryWorld.ElaPath) return CommandBand.ConstructionSceneryFamily;
             if (type == StationMapIconRules.Component && StationMapIconRules.Listed(BoardScene.PathOf(c.transform))) return StationMapIconRules.Family;

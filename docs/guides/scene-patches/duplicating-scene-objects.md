@@ -2,20 +2,18 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Duplicate a scene object
 
-Duplicate makes a new object from an object of the map and places it where you click. The new object is a mod object: your mod makes it, and the game's own object stays as it is. Use it to give a new station an existing station building, or to add a station map icon.
+Duplicate makes a new object from an object of the map and places it where you click. The new object is a mod object: your mod makes it, and the game's own object stays as it is. Use it to give a new station an existing station building, to add a station map icon, a location sign or a bridge.
 
 ## Before you start
 
 - Open the native map editor and the Scene Patcher window, and choose the mod to edit.
 - Inspect the object to duplicate. **Duplicate** is on the **Object** tab.
 
-**Duplicate** is available for a group, such as a station building with its parts, and for a station map icon. For every other object the button is inactive, and its tooltip gives the reason:
+**Duplicate** is available for a group, such as a station building with its parts, for a single part of a group, for a station map icon, for a location sign and for a bridge, a road bridge or a rail bridge. For every other object the button is inactive, and its tooltip gives the reason:
 
 | Object | Reason |
 | --- | --- |
 | Starter placement marker | No start setup reads a duplicated marker. |
-| Part of a group | A part is duplicated with its group. Duplicate the group. |
-| Bridge | Bridges can't be duplicated. |
 | Inspection-only object | Inspection-only objects have no edits. |
 | Any other family, such as a track marker or a crossing | This family can't be duplicated. |
 | Group that holds an object of such a family | It holds objects that can't be duplicated. |
@@ -36,13 +34,19 @@ Duplicate makes a new object from an object of the map and places it where you c
 
 After the click, the window shows the new object with all four tabs. The outliner lists it under the place where it stands.
 
+What the new object is depends on what you duplicated:
+
+- A part becomes an object of its own. It stands beside the group it came from, not in it, and moving that group leaves it where it is.
+- A location sign gets its own ground mask at its new place, and the terrain there follows it.
+- A bridge stands fully built and active, whatever the construction or progression state of the bridge you duplicated, and neither ever switches it. A rail bridge brings no track: lay ordinary track over it in the native map editor.
+
 To end without a new object, click **Cancel**. The window shows the object you started from. Closing the Scene Patcher window or reloading the map also ends Duplicate.
 
 If you select another object in the outliner before you place the object, Scene Patcher asks whether to cancel Duplicate. Click **Cancel Duplicate** to end it and inspect the object you selected, or **Keep duplicating** to stay in the blank object window.
 
 ## Edit or remove a mod object
 
-A mod object takes the edits of its family: move, rotate, enable or disable it like any other group or station map icon. You can duplicate it again; the new object is made from the same object of the map.
+A mod object takes the edits of its family: move, rotate, enable or disable it like any other object of that family. You can duplicate it again; the new object is made from the same object of the map.
 
 To remove a mod object, inspect it and click **Remove modification**. The object leaves the map, together with your edits of its parts.
 

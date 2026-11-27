@@ -77,7 +77,26 @@ static class ModObjectSourceTests {
         PlacingWritesTheBuildOfTheSource();
         CanonicalSaveOrdersTheBuild();
         AFallbackModObjectIsFoundByItsMarkWithItsParts();
+        APartCopyStandsBesideTheGroupOfItsSource();
         Console.WriteLine("PASS: mod object sources");
+    }
+
+    // A part's copy stands beside the group of the part it is built from: beside its original's group, or, with the
+    // original part missing, beside the group of the identical part, never inside that group. A copy so built is as
+    // standalone as one built from its original.
+    static void APartCopyStandsBesideTheGroupOfItsSource() {
+        const string part = Station + "/Mask", other = Dillsboro + "/Mask";
+        var made = "World/Large Scenery/Alarka Jct/" + "Mask [mod object author:pack mod-object-mask]";
+        string Item() => "\"mod-object-mask\":{\"target\":" + Target(made) + ",\"source\":" + Source(part, Build).Replace(SceneObjects.Structure, ChildObjects.Structure)
+            + ",\"placement\":{\"mode\":\"fixed\",\"position\":[4493,12,5415],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+        var world = new World((other, 1000, Build));
+        var result = world.Engine.Apply(Doc(Item()), "author/pack");
+        var beside = "World/Large Scenery/Dillsboro/" + ModObjects.NameOf(made);
+        Assert(result.Outcomes["mod-object-mask"].Applied && world.Stands(beside) && !world.Stands(Dillsboro + "/" + ModObjects.NameOf(made)),
+            "The part's copy stands beside the identical part's group: " + result.Outcomes["mod-object-mask"].Error + " " + String.Join(", ", world.Groups.Objects.Keys));
+        Assert(ReferenceEquals(world.Builder.BuiltFrom.Single(), world.At[other]), "It is built from the identical part");
+        Assert(ModObjects.StandsIn(made, part, part) == "World/Large Scenery/Alarka Jct" && ModObjects.StandsIn(made, part, other) == "World/Large Scenery/Dillsboro"
+            && ModObjects.StandsIn(Made, Station, Dillsboro) == "World/Large Scenery/Dillsboro", "A copy keeps its distance above its source");
     }
 
     // With its original loaded, the mod object is built from the original, even where an identical instance comes

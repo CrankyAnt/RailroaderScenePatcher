@@ -42,9 +42,11 @@ namespace RailroaderScenePatcher {
             return field.GetValue(owner);
         }
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
-        internal static bool IsSupported(GameObject g) => Loaded(g) && SupportedPaths.Contains(BoardScene.PathOf(g.transform));
+        // A supported bridge, or a mod object made from one: a copy stands under its source's path with its mark.
+        internal static bool Supports(string path) => SupportedPaths.Contains(ModObjects.Plain(path));
+        internal static bool IsSupported(GameObject g) => Loaded(g) && Supports(BoardScene.PathOf(g.transform));
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
-            if (identity.Component != BoardScene.CullerType || !SupportedPaths.Contains(identity.Path)) return Array.Empty<object>();
+            if (identity.Component != BoardScene.CullerType || !Supports(identity.Path)) return Array.Empty<object>();
             return BoardScene.LoadedAt(identity.Scene, identity.Path).Where(g => Loaded(g) && g.GetComponent(culler) != null).Cast<object>().ToArray();
         }
         public void CheckPattern(object target) {

@@ -54,16 +54,30 @@ static class DuplicateTests {
         var starter = Map.Observations(out _).First(r => r.Family == SceneFamilies.StarterPlacement);
         Assert(DuplicateState.Reason(starter, null) == "No start setup reads a duplicated marker.", "A starter placement marker shows its reason: " + DuplicateState.Reason(starter, null));
         var part = Row(ModObjectTests.Station + "/Mask");
-        Assert(DuplicateState.Reason(part, null) == DuplicateState.Part, "A part is duplicated with its group: " + DuplicateState.Reason(part, null));
+        Assert(part.GroupPath == ModObjectTests.Station && DuplicateState.Reason(part, null) == null, "A part can be duplicated: " + DuplicateState.Reason(part, null));
         var marker = Map.Observations(out _).First(r => r.Family == SceneFamilies.TrackMarker);
         Assert(DuplicateState.Reason(marker, null) == DuplicateState.OtherFamily, "A track marker needs more than a copy: " + DuplicateState.Reason(marker, null));
         Assert(DuplicateState.Reason(station, new[] { SceneFamilies.SceneObject, SceneFamilies.TrackMarker }) == DuplicateState.HoldsOtherFamily, "A group that holds a track marker is not copied");
-        var bridge = Map.Observations(out _).FirstOrDefault(r => r.Bridge != BridgeKind.None);
-        Assert(bridge != null && DuplicateState.Reason(bridge, null) == DuplicateState.Bridge, "A bridge is not duplicated");
+        // A location sign, a road bridge and a rail bridge scene object can be duplicated; the controller beside the
+        // Ela bridge is no bridge and stays with its bridge.
+        var sign = Row("World/Signs/Loc: Alarka");
+        Assert(sign.Family == SceneFamilies.LocationSign && DuplicateState.Reason(sign, new[] { SceneFamilies.LocationSign }) == null, "A location sign can be duplicated: " + DuplicateState.Reason(sign, new[] { SceneFamilies.LocationSign }));
+        var road = Row("World/Large Scenery/Almond/Almond Road Bridge");
+        Assert(road.Bridge == BridgeKind.Road && DuplicateState.Reason(road, new[] { SceneFamilies.SceneObject, SceneFamilies.ChildObject }) == null, "A road bridge can be duplicated: " + DuplicateState.Reason(road, null));
+        foreach (var path in new[] { "World/Large Scenery/Almond Bridge", "World/Large Scenery/Bryson/Bridge 1" }) {
+            var rail = Row(path);
+            Assert(rail.Bridge == BridgeKind.Rail && DuplicateState.Reason(rail, new[] { SceneFamilies.SceneObject, SceneFamilies.ChildObject }) == null, "A rail bridge scene object can be duplicated: " + path + " " + DuplicateState.Reason(rail, null));
+        }
+        var ela = Row("World/Large Scenery/Ela/Ela Bridge");
+        Assert(ela.Family == SceneFamilies.Bridge && DuplicateState.Reason(ela, new[] { SceneFamilies.Bridge }) == null, "The Ela bridge can be duplicated: " + DuplicateState.Reason(ela, new[] { SceneFamilies.Bridge }));
+        var scenery = Row("World/Large Scenery/Ela/Ela Bridge Scenery");
+        Assert(DuplicateState.Reason(scenery, null) == DuplicateState.OtherFamily, "The Ela bridge's construction controller is not duplicated: " + DuplicateState.Reason(scenery, null));
+        foreach (var path in new[] { "World/Mile Posts/T-45.1 Origin", "World/POIs/Alarka" })
+            Assert(DuplicateState.Reason(Row(path), null) == DuplicateState.OtherFamily, "Mileposts and spawn points stay as they are: " + path);
         var only = Map.Observations(out _).FirstOrDefault(r => r.InspectionOnly != null);
         Assert(only == null || DuplicateState.Reason(only, null) == DuplicateState.InspectionOnly, "An inspection-only object is not duplicated");
         Assert(DuplicateState.Reason(null, null) == null, "Without an object there is no reason");
-        foreach (var reason in new[] { DuplicateState.StarterMarker, DuplicateState.Part, DuplicateState.InspectionOnly, DuplicateState.Bridge, DuplicateState.OtherFamily, DuplicateState.HoldsOtherFamily })
+        foreach (var reason in new[] { DuplicateState.StarterMarker, DuplicateState.InspectionOnly, DuplicateState.OtherFamily, DuplicateState.HoldsOtherFamily })
             Assert(reason.Length <= 45 && reason.EndsWith(".", StringComparison.Ordinal), "A reason is short and a sentence: " + reason);
     }
 
@@ -90,7 +104,7 @@ static class DuplicateTests {
         // One frame of the window with the recorded input.
         public TargetIdentity Play(Frame frame) {
             Pointer.Now = frame;
-            return State.Tick(Pointer, (source, placement) => { Clicks++; return Session.PlaceModObject(source, placement); });
+            return State.Tick(Pointer, (source, placement) => { Clicks++; return Session.PlaceModObject(source.Identity, placement, null, source.GroupPath); });
         }
     }
 
