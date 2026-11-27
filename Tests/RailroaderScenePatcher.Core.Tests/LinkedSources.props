@@ -1,0 +1,30 @@
+<!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
+<!-- SPDX-License-Identifier: MIT -->
+<!-- The window sources that the core tests compile with them, shared by the core test project and the fault test project. -->
+<Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/InventoryPresentationState.cs" Link="InventoryPresentationState.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/OutlineTree.cs" Link="OutlineTree.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/OutlinerGrouping.cs" Link="OutlinerGrouping.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/OutlinerCrossings.cs" Link="OutlinerCrossings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/EditFeedback.cs" Link="EditFeedback.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/FilePanelState.cs" Link="FilePanelState.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/GuidedTaskState.cs" Link="GuidedTaskState.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/DuplicateState.cs" Link="DuplicateState.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/TeleportNameField.cs" Link="TeleportNameField.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/EnteredEditValues.cs" Link="EnteredEditValues.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/CoverageFormFields.cs" Link="CoverageFormFields.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/CommandBand.cs" Link="CommandBand.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/SupportedEdits.cs" Link="SupportedEdits.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/EditReasons.cs" Link="EditReasons.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/CompactRail.cs" Link="CompactRail.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/RequestQueue.cs" Link="RequestQueue.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/SuppliedDefinitions.cs" Link="SuppliedDefinitions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/InspectedOutput.cs" Link="InspectedOutput.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/HierarchyDependencies.cs" Link="HierarchyDependencies.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/MarkerPattern.cs" Link="MarkerPattern.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/NativeMarkerLocation.cs" Link="NativeMarkerLocation.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/NativeMarkerWarnings.cs" Link="NativeMarkerWarnings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/InstanceSubscription.cs" Link="InstanceSubscription.cs" />
+  </ItemGroup>
+</Project>
