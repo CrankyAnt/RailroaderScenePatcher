@@ -64,6 +64,11 @@ namespace RailroaderScenePatcher.Core {
     public interface ITrackPoseScene {
         TrackPose TrackPose(TrackAnchor anchor);
     }
+    // The game's own lookup from a map position to the track: the track location nearest to the position within the
+    // radius the native map editor reprojects a track-anchored object with, or null when no track lies within it.
+    public interface ITrackPointLookup {
+        TrackLocation TrackAt(double[] position);
+    }
     // Quaternions in x, y, z, w order, as the game stores them.
     internal static class Quaternion {
         internal static double Length(IReadOnlyList<double> q) => Math.Sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);

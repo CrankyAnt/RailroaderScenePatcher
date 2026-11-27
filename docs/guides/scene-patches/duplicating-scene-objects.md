@@ -2,20 +2,21 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Duplicate a scene object
 
-Duplicate makes a new object from an object of the map and places it where you click. The new object is a mod object: your mod makes it, and the game's own object stays as it is. Use it to give a new station an existing station building, to add a station map icon, a location sign or a bridge.
+Duplicate makes a new object from an object of the map and places it where you click. The new object is a mod object: your mod makes it, and the game's own object stays as it is. Use it to give a new station an existing station building, to add a station map icon, a location sign or a bridge, or to give a new siding its own speed sign, whistle sign or milepost.
 
 ## Before you start
 
 - Open the native map editor and the Scene Patcher window, and choose the mod to edit.
 - Inspect the object to duplicate. **Duplicate** is on the **Object** tab.
 
-**Duplicate** is available for a group, such as a station building with its parts, for a single part of a group, for a station map icon, for a location sign and for a bridge, a road bridge or a rail bridge. For every other object the button is inactive, and its tooltip gives the reason:
+**Duplicate** is available for a group, such as a station building with its parts, for a single part of a group, for a station map icon, for a location sign, for a bridge, a road bridge or a rail bridge, and for a Generic track marker and a milepost. For every other object the button is inactive, and its tooltip gives the reason:
 
 | Object | Reason |
 | --- | --- |
 | Starter placement marker | No start setup reads a duplicated marker. |
 | Inspection-only object | Inspection-only objects have no edits. |
-| Any other family, such as a track marker or a crossing | This family can't be duplicated. |
+| Generic track marker or milepost that Scene Patcher can't edit | The reason that Supported edits gives for it. |
+| Any other family, such as a crossing | This family can't be duplicated. |
 | Group that holds an object of such a family | It holds objects that can't be duplicated. |
 
 ## Duplicate and place the object
@@ -39,6 +40,7 @@ What the new object is depends on what you duplicated:
 - A part becomes an object of its own. It stands beside the group it came from, not in it, and moving that group leaves it where it is.
 - A location sign gets its own ground mask at its new place, and the terrain there follows it.
 - A bridge stands fully built and active, whatever the construction or progression state of the bridge you duplicated, and neither ever switches it. A rail bridge brings no track: lay ordinary track over it in the native map editor.
+- A Generic track marker or milepost gets a marker ID of its own, which no other scene marker uses, so the object you duplicated keeps its registration. It binds to the track that the game finds at the placed position: the nearest track within 25 metres. Its **Connections** tab shows that track. Where no track lies within 25 metres, the new object stays unbound and the outliner lists it under **Problems** until you set its binding on the **Connections** tab. To give it another marker ID, use **Set replacement ID** on the **Connections** tab; a mod object always keeps an ID of its own, so **Clear replacement ID** is unavailable. A copy of an origin milepost is never the origin of its prefix: the milepost you duplicated stays the origin.
 
 To end without a new object, click **Cancel**. The window shows the object you started from. Closing the Scene Patcher window or reloading the map also ends Duplicate.
 

@@ -368,7 +368,7 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(ExistingEquipmentScene.BellStructure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to change existing crossing equipment: " + e.GetBaseException().Message);
                 }
-                try { capabilities.Tracks = trackPoses = new NativeTrackPoses(); }
+                try { capabilities.Tracks = trackPoses = new NativeTrackPoses(); capabilities.TrackLookup = trackPoses; }
                 catch (Exception e) { PatcherLog.Debug("The patcher couldn't prepare to place objects along tracks: " + e.GetBaseException().Message); }
                 PatcherLog.Debug("Finished checking which changes the patcher can make in game version " + Application.version + ".");
                 ApplyScenePatchFiles();

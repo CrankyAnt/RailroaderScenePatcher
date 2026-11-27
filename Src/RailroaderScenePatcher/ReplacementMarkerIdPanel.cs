@@ -15,7 +15,8 @@ namespace RailroaderScenePatcher {
         const string MarkerIdPlace = "Marker ID";
         // The replacement ID field of the inspected marker.
         readonly string[] markerIdFields = { "" };
-        bool IsGenericMarker => selected?.Identity.Structure == TrackMarkerScene.Structure;
+        // A generic track marker, or a milepost that is a mod object: an object that takes a replacement ID.
+        bool IsGenericMarker => CommandBand.TakesMarkerId(selected?.Identity);
         // The ID the inspected marker holds now: read from the scene for a generic track marker, otherwise from the
         // inventory's binding line of the marker, so a marker that takes no replacement ID still shows its ID. Empty for
         // any other object.
@@ -73,7 +74,7 @@ namespace RailroaderScenePatcher {
                 var provider = set.RectTransform.GetComponent<UI.Tooltips.UITooltipProvider>() ?? set.RectTransform.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
                 provider.DynamicTooltipInfo = () => new TooltipInfo("Set replacement marker ID", CommandBand.Tooltip("Give this marker the ID in the field. Its registration moves to the new ID. Every other holder of the old ID keeps its registration.", setReason()));
                 typed.Add(() => { if (set.RectTransform != null) set.Inactive(setReason() != null); });
-                var clear = CommandBand.ClearMarkerIdReason(IsStarter ? StarterEditBlock() : EditBlock(), HasMarkerIdValue(identity));
+                var clear = CommandBand.ClearMarkerIdReason(IsStarter ? StarterEditBlock() : EditBlock() ?? (attachment?.Session.IsModObject(identity) == true ? ModObjects.KeepsMarkerId : null), HasMarkerIdValue(identity));
                 Button(row, CommandBand.ClearMarkerId, () => Edit(MarkerIdPlace, "Clearing the marker ID value", (edit, inspection) => edit.SetMarkerId(identity, null, inspection)))
                     .Inactive(clear != null).Tooltip("Clear replacement marker ID", CommandBand.Tooltip("Clear this mod's replacement ID to return the marker to its underlying ID.", clear));
                 row.Spacer();

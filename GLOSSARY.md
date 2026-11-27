@@ -371,7 +371,7 @@ The identifier under which the game registers a scene marker. The scene markers 
 A marker ID that more than one scene marker holds.
 
 **Replacement ID**:
-A new, unique marker ID that repairs a duplicate marker ID by replacing the ID of one of its holders.
+A new, unique marker ID that repairs a duplicate marker ID by replacing the ID of one of its holders. A mod object that is a scene marker holds a marker ID of its own from its placement; a replacement ID changes it.
 
 **Starter placement marker**:
 A scene object that a new-game car placement reads for its track location. Its object position is not used.

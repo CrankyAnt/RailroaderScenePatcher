@@ -31,7 +31,7 @@ namespace RailroaderScenePatcher {
         }
         static float Checked(double value) => Math.Abs(value) <= Single.MaxValue && !Double.IsNaN(value) ? (float)value : throw new InvalidOperationException("A coordinate exceeds the game's numeric precision.");
 
-        public object Build(TargetIdentity identity, object source, Placement placement) {
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
             var from = source as GameObject;
             if (from == null) throw new InvalidOperationException("The source of this mod object is not a scene object.");
             if (placement?.Position == null || placement.Rotation == null || placement.Position.Length != 3 || placement.Rotation.Length != 4) throw new InvalidOperationException(ModObjects.NeedsPlacement);
@@ -59,6 +59,12 @@ namespace RailroaderScenePatcher {
                 // progression or an explicit disable made of its source.
                 if (!made.activeSelf) made.SetActive(true);
                 Prepare(from, made);
+                // A scene marker takes its own marker ID before it starts: under its source's ID its start would replace
+                // the source's registration in the track graph, which holds one entry per ID and segment.
+                if (markerId != null) {
+                    var marker = made.GetComponent(Native.Type(TrackMarkerWorld.MarkerType)) ?? throw new InvalidOperationException("The source of this mod object holds no track marker for its marker ID.");
+                    (marker.GetType().GetField("id", Native.Flags) ?? throw new MissingFieldException(TrackMarkerWorld.MarkerType, "id")).SetValue(marker, markerId);
+                }
                 // Entering its parent starts its components, at its placement.
                 made.transform.SetParent(parent, true);
                 if (parent == null) UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(made, from.scene);
@@ -201,6 +207,15 @@ namespace RailroaderScenePatcher {
                 for (var i = 0; paired && i < copies.Length; i++) {
                     if (TypeOf(copies[i]) != NightLightType) continue;
                     if (Field(copies[i], "light")?.GetValue(copies[i]) is Light light && light != null && Field(sources[i], "_lightIntensityMultiplier")?.GetValue(sources[i]) is float full) light.intensity = full;
+                }
+            });
+            // A copy takes no game role of its source: a milepost copy is never the origin of its prefix.
+            Step("game roles", () => {
+                foreach (var copy in copies) {
+                    if (copy == null) continue;
+                    foreach (var field in ModObjects.NotCopied.Where(f => f.Key == TypeOf(copy)))
+                        if (Field(copy, field.Value) is FieldInfo info && info.FieldType == typeof(bool)) info.SetValue(copy, false);
+                        else throw new MissingFieldException(field.Key, field.Value);
                 }
             });
             // The copy moves with the origin through its parent; a registration of its own would shift it twice.

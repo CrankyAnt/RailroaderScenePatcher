@@ -34,7 +34,7 @@ static class ModObjectTests {
         readonly FakeGroupWorld world;
         public int Builds, Removes;
         public Builder(FakeGroupWorld world) { this.world = world; }
-        public object Build(TargetIdentity identity, object source, Placement placement) {
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
             if (world.Objects.TryGetValue(identity.Path, out var standing) && standing.Count != 0) throw new InvalidOperationException(ModObjects.Taken);
             // A part's copy is a group of its own beside the part's group, with no parts and no culler of the group.
             var part = source as FakePart;
@@ -267,7 +267,7 @@ static class ModObjectTests {
     sealed class BoardBuilder : IModObjectScene {
         readonly FakeBoardWorld world;
         public BoardBuilder(FakeBoardWorld world) { this.world = world; }
-        public object Build(TargetIdentity identity, object source, Placement placement) {
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
             if (world.Find(identity.Scene, identity.Path).Count != 0) throw new InvalidOperationException(ModObjects.Taken);
             var from = (FakeBoard)source;
             return world.Add(new FakeBoard { Scene = identity.Scene, Path = identity.Path, Position = (double[])placement.Position.Clone(), Rotation = (double[])placement.Rotation.Clone(), Masks = from.Masks, Flattens = from.Flattens, Parent = from.Parent });
@@ -344,7 +344,7 @@ static class ModObjectTests {
     sealed class BridgeBuilder : IModObjectScene {
         readonly FakeBridgeWorld world;
         public BridgeBuilder(FakeBridgeWorld world) { this.world = world; }
-        public object Build(TargetIdentity identity, object source, Placement placement) {
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
             if (world.Objects.ContainsKey(identity.Path)) throw new InvalidOperationException(ModObjects.Taken);
             var from = (FakeBridge)source;
             var made = new FakeBridge { Position = new[] { placement.Position[0] - world.Origin, placement.Position[1], placement.Position[2] }, Rotation = (double[])placement.Rotation.Clone(),
@@ -389,7 +389,7 @@ static class ModObjectTests {
     // below it.
     sealed class PlainScene : Scene, IModObjectScene {
         public int Removes;
-        public object Build(TargetIdentity identity, object source, Placement placement) {
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
             var from = Objects.Single(p => p.Value.Contains(source)).Key;
             foreach (var pair in Objects.Where(p => p.Key == from || p.Key.StartsWith(from + "/", StringComparison.Ordinal)).ToArray()) {
                 var box = (Box)pair.Value[0];

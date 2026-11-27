@@ -13,11 +13,11 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IModObjectScene, IModObjectSources, IDisposable {
+    public sealed class SceneCapabilities : ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, ITrackPointLookup, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IModObjectScene, IModObjectSources, IDisposable {
         // Supplied by the host: what builds and removes mod objects. Without it no mod object is built.
         public IModObjectScene ModObjectWorld { get; set; }
-        public object Build(TargetIdentity identity, object source, Placement placement) =>
-            (ModObjectWorld ?? throw new InvalidOperationException(ModObjects.Unavailable)).Build(identity, source, placement);
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) =>
+            (ModObjectWorld ?? throw new InvalidOperationException(ModObjects.Unavailable)).Build(identity, source, placement, markerId);
         // The model and build of objects, from what builds mod objects; without it no mod object has a fallback source.
         public string BuildOf(object source) => (ModObjectWorld as IModObjectSources)?.BuildOf(source);
         public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) =>
@@ -63,6 +63,9 @@ namespace RailroaderScenePatcher.Core {
         }
         // The native track graph, for track-following placement of any capability's objects. Null leaves the mode unavailable.
         public ITrackPoseScene Tracks { get; set; }
+        // The game's lookup from a map position to the track; without one no track is found.
+        public ITrackPointLookup TrackLookup { get; set; }
+        public TrackLocation TrackAt(double[] position) => TrackLookup?.TrackAt(position);
         public TrackPose TrackPose(TrackAnchor anchor) => (Tracks ?? throw new InvalidOperationException("Track-following placement is unavailable: the track graph is not available")).TrackPose(anchor);
         public void Add(IScene capability) { capabilities.Add(capability ?? throw new ArgumentNullException(nameof(capability))); }
         // Records a capability whose required game functions are missing. Targets naming its structure fail with the reason.
@@ -124,6 +127,12 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<string> MarkerIdUsers(object target, string id) => Owner(target) is IMarkerIdScene ids ? ids.MarkerIdUsers(target, id) : Array.Empty<string>();
         public bool RewritesRegistration(object target, ObjectState state) => Owner(target) is IMarkerIdScene ids && ids.RewritesRegistration(target, state);
         public string MarkerIdRefusal(object target, string id) => Owner(target) is IMarkerIdScene ids ? ids.MarkerIdRefusal(target, id) : ReplacementMarkerIds.NotSupported;
+        // An identical instance that stands in for a missing original was resolved by no capability: the marker ID
+        // capabilities read the ids of every scene marker alike, so the first of them checks it.
+        public string NewMarkerIdRefusal(object source, string id) {
+            var ids = source != null && owners.TryGetValue(source, out var owner) ? owner as IMarkerIdScene : capabilities.OfType<IMarkerIdScene>().FirstOrDefault();
+            return ids == null ? ReplacementMarkerIds.NotSupported : ids.NewMarkerIdRefusal(source, id);
+        }
         public void Apply(object target, ObjectState state) { Owner(target).Apply(target, state); }
         public bool Restore(object target, object snapshot) => Owner(target).Restore(target, snapshot);
         // Relationships belong to the adapter that resolved the object; an adapter without them refuses any relationship.

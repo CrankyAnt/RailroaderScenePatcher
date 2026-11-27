@@ -51,7 +51,7 @@ namespace RailroaderScenePatcher.Core {
     // as for a Generic track marker. Physical placement and binding stay separate settings. The post keeps its model,
     // mile value and display, and the origin cache keeps its entry: every write is checked against the state before it,
     // and a difference fails the write, which the engine then restores.
-    public sealed class MilepostScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IDependentOutputScene {
+    public sealed class MilepostScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IDependentOutputScene, IMarkerIdScene {
         public const string Structure = "milepost-v1", RequiredVersion = VersionRequirement.Delivery, Component = "Helpers.MilePost";
         readonly MarkerRelationship relationship;
         readonly IMilepostWorld world;
@@ -59,9 +59,15 @@ namespace RailroaderScenePatcher.Core {
         readonly MaskFollowing masks;
         public MilepostScene(IMilepostWorld world, Capability capability, GroundMasks masks = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world));
-            relationship = new MarkerRelationship(world, Structure, new Preserved(world));
+            relationship = new MarkerRelationship(world, Structure, new Preserved(world), modObjects: true);
             Capability = capability; this.masks = new MaskFollowing(masks);
         }
+        // A milepost that is a mod object holds a marker ID of its own and takes a replacement ID; a milepost of the map
+        // takes none.
+        public IReadOnlyList<string> MarkerIdUsers(object target, string id) => relationship.IdUsers(target, id);
+        public bool RewritesRegistration(object target, ObjectState state) => relationship.RewritesRegistration(target, state);
+        public string MarkerIdRefusal(object target, string id) => relationship.MarkerIdRefusal(target, id);
+        public string NewMarkerIdRefusal(object source, string id) => relationship.NewMarkerIdRefusal(source, id);
         public DependentOutput Output(object target) => masks.Output(target);
         public void RetryOutput(object target) => masks.RetryOutput(target);
         public IEnumerable<string> MapIds => relationship.MapIds;
@@ -69,7 +75,14 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => identity.Component == Component ? relationship.Resolve(identity) : Array.Empty<object>();
         public bool StillIdentifies(object target, TargetIdentity identity) => identity.Component == Component && relationship.StillIdentifies(target, identity);
         public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, Component, RequiredVersion);
-        public void Preflight(object target) => relationship.Preflight(target);
+        // A milepost that is a mod object is never the origin of its prefix: the game takes the first post with the
+        // origin flag that it finds for a prefix as that prefix's origin, so a second one would change a game scene object's
+        // role. The host clears the flag on the copy (ModObjects.NotCopied); a mod object that still holds it is refused.
+        public const string ModObjectOrigin = "A mod object can't be the origin milepost of its prefix.";
+        public void Preflight(object target) {
+            relationship.Preflight(target);
+            if (world is IModObjectMarkers made && made.IsModObject(target) && world.Milepost(target).Origin) throw new InvalidOperationException(ModObjectOrigin);
+        }
         public void PreflightPlacement(object target) => relationship.PreflightPlacement(target);
         public void CheckRelationships(object target, ObjectState state) => relationship.CheckRelationships(target, state);
         public object Capture(object target) => relationship.Capture(target);

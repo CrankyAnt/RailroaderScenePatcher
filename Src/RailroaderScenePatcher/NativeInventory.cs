@@ -452,11 +452,13 @@ namespace RailroaderScenePatcher {
                 // What the game needs from this kind's binding decides whether its state is a problem; the setups say
                 // whether a new-game car placement reads it whatever its activity, and which ones do.
                 var reading = starters.Reading(marker, kind, family == "Crossing pad marker");
+                // A milepost or Generic track marker that a mod placed needs the binding it got at placement.
+                var need = BindingRules.NeedAt(reading.Need, BoardScene.PathOf(go.transform));
                 if (reading.Note != null) problems.Add(reading.Note);
                 var follower = Get(go, Relative);
                 var follows = follower != null && Field(follower, "targetActiveFollowsTrackGroup") is bool flag && flag;
                 var before = problems.Count;
-                MarkerLocation(Field(marker, "_location"), reading.Need, enabled, follows, bindings, problems, segmentIds, graphError);
+                MarkerLocation(Field(marker, "_location"), need, enabled, follows, bindings, problems, segmentIds, graphError);
                 if (reading.Need == BindingNeed.ReadAnyway) anyway.AddRange(problems.Skip(before));
                 // Every setup and car placement that reads a starter placement marker, with its cars and wreck setting.
                 bindings.AddRange(reading.Readers);

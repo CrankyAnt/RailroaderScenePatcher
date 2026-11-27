@@ -9,9 +9,11 @@ namespace RailroaderScenePatcher.Core {
     // capability of its family resolves and edits it like any other object of that family.
     public interface IModObjectScene {
         // Builds the mod object of the identity from the source object, at the placement, and returns it. Afterwards
-        // the identity resolves to that object alone. The source is read and never changed. It throws, and leaves
-        // nothing behind, when the object cannot be built or another object already stands under the identity.
-        object Build(TargetIdentity identity, object source, Placement placement);
+        // the identity resolves to that object alone. The source is read and never changed. A mod object that is a
+        // scene marker holds markerId as its marker ID before it starts, so it never registers under its source's.
+        // It throws, and leaves nothing behind, when the object cannot be built or another object already stands
+        // under the identity.
+        object Build(TargetIdentity identity, object source, Placement placement, string markerId);
         // Removes a mod object this scene built, with everything below it.
         void Remove(object modObject);
     }
@@ -47,6 +49,16 @@ namespace RailroaderScenePatcher.Core {
         public static string FallbackWarning(string scenePatchFile, string id, string original, string instance) =>
             "Mod object " + id + " in " + scenePatchFile + ": its source " + original + " isn't in the loaded map, so the patcher built it from the identical object " + instance + ".";
         public const string Taken = "Another object already stands at the path of this mod object.";
+        public const string NeedsMarkerId = "Invalid mod object: a mod object that is a scene marker needs a marker ID of its own.";
+        public const string KeepsMarkerId = "A mod object keeps a marker ID of its own.";
+        // The fields a copy never takes from its source, with the value the copy holds instead: the origin flag of a
+        // milepost. Helpers.MilePost.Origin caches, per prefix, the first loaded post with the flag that
+        // FindObjectsByType returns, in no fixed order, so a copy with the flag could become its prefix's origin.
+        public static readonly IReadOnlyList<KeyValuePair<string, string>> NotCopied = new[] { new KeyValuePair<string, string>("Helpers.MilePost", "origin") };
+        // Whether a mod object of the structure is a scene marker: it holds a marker ID of its own.
+        public static bool IsSceneMarker(string structure) => structure == TrackMarkerScene.Structure || structure == MilepostScene.Structure || structure == CrossingPadScene.Structure;
+        // Whether a mod object of the structure binds at placement to the track the game finds at its position.
+        public static bool BindsAtPlacement(string structure) => structure == TrackMarkerScene.Structure || structure == MilepostScene.Structure;
         // A slash would split the name into two path segments.
         static string Safe(string text) => (text ?? "").Replace('/', ':');
         // The path of the mod object that the mod makes from the source under the modification key.

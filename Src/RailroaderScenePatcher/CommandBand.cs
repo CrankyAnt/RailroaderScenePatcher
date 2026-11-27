@@ -766,6 +766,9 @@ namespace RailroaderScenePatcher {
             LocationSigns.Structure, BridgeScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure, CrossingCoverageScene.Structure, CrossingPadScene.Structure,
             SceneObjects.Structure, ChildObjects.Structure, StationMapIconRules.Structure, SpawnPoints.Structure,
             ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure, ConstructionSceneryScene.Structure };
+        // Whether the object takes a replacement ID: a generic track marker, or a milepost that is a mod object, which
+        // holds a marker ID of its own from its placement.
+        internal static bool TakesMarkerId(TargetIdentity identity) => identity != null && (identity.Structure == TrackMarkerScene.Structure || identity.Structure == MilepostScene.Structure && ModObjects.Within(identity.Path));
         internal static bool EditableStructure(string structure) => structure != null && EditableStructures.Contains(structure);
         // Whether the Connections tab offers crossing coverage for an object: its Crossing coverage section with Edit
         // circuit and Edit detection addition, and the coverage choices of the compact rail. Only a crossing controller

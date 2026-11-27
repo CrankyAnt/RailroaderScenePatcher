@@ -344,7 +344,13 @@ namespace RailroaderScenePatcher.Core {
         // when the game has not loaded them, which refuses every replacement ID.
         IEnumerable<string> MapObjectIds { get; }
     }
-    // A capability whose objects take a replacement ID: the supported generic track markers.
+    // A marker world that tells the mod objects among its markers apart: a mod object that is a scene marker holds a
+    // marker ID of its own from its placement, which Set replacement marker ID changes, whatever its family.
+    public interface IModObjectMarkers {
+        bool IsModObject(object marker);
+    }
+    // A capability whose objects take a replacement ID: the supported generic track markers, and the mileposts that are
+    // mod objects.
     public interface IMarkerIdScene {
         // The scene markers and registrations other than the target that use the id, by name.
         IReadOnlyList<string> MarkerIdUsers(object target, string id);
@@ -355,6 +361,9 @@ namespace RailroaderScenePatcher.Core {
         // Why the marker cannot take this replacement ID in the world as it is, or null, as the edit checks it before
         // mutation. The marker's own ID is no change and passes.
         string MarkerIdRefusal(object target, string id);
+        // Why a mod object made from the source cannot hold the id as its own marker ID, or null: the id passes the
+        // rules of a replacement ID, differs from the source's and no scene marker, registration or map object uses it.
+        string NewMarkerIdRefusal(object source, string id);
     }
     // The rules of a replacement ID, which repairs a duplicate marker ID: one holder takes an id that is not empty,
     // does not begin with a prefix the game uses for its own registrations, and that no other scene marker, graph
@@ -434,6 +443,7 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<string> MarkerIdUsers(object target, string id) => relationship.IdUsers(target, id);
         public bool RewritesRegistration(object target, ObjectState state) => relationship.RewritesRegistration(target, state);
         public string MarkerIdRefusal(object target, string id) => relationship.MarkerIdRefusal(target, id);
+        public string NewMarkerIdRefusal(object source, string id) => relationship.NewMarkerIdRefusal(source, id);
         public DependentOutput Output(object target) => masks.Output(target);
         public void RetryOutput(object target) => masks.RetryOutput(target);
         public IEnumerable<string> MapIds => relationship.MapIds;
@@ -472,30 +482,45 @@ namespace RailroaderScenePatcher.Core {
         readonly ITrackMarkerWorld world;
         readonly string structure;
         readonly IMarkerConsumer consumer;
-        // The marker IDs of a capability whose markers take a replacement ID, or null.
+        // The marker IDs of the world, whether or not its markers take a replacement ID.
         readonly IMarkerIdWorld ids;
-        internal MarkerRelationship(ITrackMarkerWorld world, string structure, IMarkerConsumer consumer, bool replaceable = false) {
+        // Whether a marker takes a replacement ID: every marker of a replaceable capability, and a mod object of a
+        // capability that takes ids for mod objects, which holds a marker ID of its own from its placement.
+        readonly Func<object, bool> replaceable;
+        internal MarkerRelationship(ITrackMarkerWorld world, string structure, IMarkerConsumer consumer, bool replaceable = false, bool modObjects = false) {
             this.world = world ?? throw new ArgumentNullException(nameof(world)); this.structure = structure; this.consumer = consumer;
-            ids = replaceable ? world as IMarkerIdWorld : null;
+            ids = world as IMarkerIdWorld;
+            this.replaceable = replaceable ? (Func<object, bool>)(target => true)
+                : modObjects ? (target => world is IModObjectMarkers made && made.IsModObject(target)) : (Func<object, bool>)(target => false);
+        }
+        // The marker IDs of a marker that takes a replacement ID, or null.
+        IMarkerIdWorld Ids(object target) => ids != null && replaceable(target) ? ids : null;
+        // Why a new scene marker made from the source cannot hold the id, or null: the id passes the rules of a
+        // replacement ID, differs from the source's own, and no scene marker, registration or map object uses it.
+        internal string NewMarkerIdRefusal(object source, string id) {
+            if (ids == null) return ReplacementMarkerIds.NotSupported;
+            var problem = ReplacementMarkerIds.Problem(id);
+            if (problem != null) return problem;
+            return id == ids.MarkerId(source) ? ReplacementMarkerIds.UsedBy(id, world.IdHolders(source)?.Holders.FirstOrDefault(h => ReferenceEquals(h.Handle, source))?.Name ?? ReplacementMarkerIds.ForeignOwner) : Unavailable(ids, source, id);
         }
         // The refusal for a holder of a duplicate marker ID; a marker that takes a replacement ID offers it.
-        string Refused(MarkerIdHolders holders, object target) => ids == null ? holders.Refusal(target) : holders.Refusal(target) + " " + ReplacementMarkerIds.Offer;
-        string Mismatched(MarkerIdHolders holders, object target, string difference) => ids == null ? holders.Mismatch(target, difference) : holders.Mismatch(target, difference) + " " + ReplacementMarkerIds.Offer;
-        internal IReadOnlyList<string> IdUsers(object target, string id) => ids?.IdUsers(id, target) ?? Array.Empty<string>();
+        string Refused(MarkerIdHolders holders, object target) => Ids(target) == null ? holders.Refusal(target) : holders.Refusal(target) + " " + ReplacementMarkerIds.Offer;
+        string Mismatched(MarkerIdHolders holders, object target, string difference) => Ids(target) == null ? holders.Mismatch(target, difference) : holders.Mismatch(target, difference) + " " + ReplacementMarkerIds.Offer;
+        internal IReadOnlyList<string> IdUsers(object target, string id) => Ids(target)?.IdUsers(id, target) ?? Array.Empty<string>();
         // The settings CheckRelationships refuses for a holder of a duplicate marker ID, read as a setting rather than a
         // change: a value equal to the current one counts too, so a later load in another order still finds it.
         internal bool RewritesRegistration(object target, ObjectState state) =>
             state != null && (state.Active.HasValue || state.Marker != null || state.Placement?.Following != null || world.DependentProblem(target) != null);
         // Why the marker cannot take this replacement ID, or null; its own ID is no change, as CheckRelationships treats it.
         internal string MarkerIdRefusal(object target, string id) {
-            if (ids == null) return ReplacementMarkerIds.Problem(id) ?? ReplacementMarkerIds.NotSupported;
-            return id == ids.MarkerId(target) ? null : Unavailable(target, id);
+            if (Ids(target) == null) return ReplacementMarkerIds.Problem(id) ?? ReplacementMarkerIds.NotSupported;
+            return id == Ids(target).MarkerId(target) ? null : Unavailable(Ids(target), target, id);
         }
         // Why the marker cannot take this replacement ID in the world as it is, or null.
-        string Unavailable(object target, string id) {
+        string Unavailable(IMarkerIdWorld ids, object target, string id) {
             var problem = ReplacementMarkerIds.Problem(id);
             if (problem != null) return problem;
-            var user = IdUsers(target, id).FirstOrDefault();
+            var user = ids.IdUsers(id, target).FirstOrDefault();
             if (user != null) return ReplacementMarkerIds.UsedBy(id, user);
             // Unread map objects fail closed: an ID the check could not cover is not taken.
             var mapObjects = ids.MapObjectIds;
@@ -504,8 +529,8 @@ namespace RailroaderScenePatcher.Core {
         }
         // Gives the marker another id: its own registration moves to the new id, and no other holder of the old id loses its registration.
         void Rename(object target, string id) {
-            ids.UnregisterOwn(target);
-            ids.SetMarkerId(target, id);
+            Ids(target).UnregisterOwn(target);
+            Ids(target).SetMarkerId(target, id);
             if (world.Registers(target) && Resolvable(world.Location(target))) world.Register(target);
         }
         internal IEnumerable<string> MapIds => world.MapIds;
@@ -544,10 +569,10 @@ namespace RailroaderScenePatcher.Core {
             // for the rest of the modification.
             var renames = false;
             if (state?.MarkerId != null) {
-                if (ids == null) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.NotSupported);
+                if (Ids(target) == null) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.NotSupported);
                 var unavailable = MarkerIdRefusal(target, state.MarkerId);
                 if (unavailable != null) throw new InvalidPatchDefinitionException(unavailable);
-                renames = state.MarkerId != ids.MarkerId(target);
+                renames = state.MarkerId != Ids(target).MarkerId(target);
             }
             // Before mutation, what the write would refuse for a holder of a duplicate marker ID: a change of its activity,
             // binding or track-following placement, and a dependent cache the write would correct by re-registering it.
@@ -594,9 +619,9 @@ namespace RailroaderScenePatcher.Core {
             if (group == null) return active.HasValue && active.Value != world.Active(target);
             return active == false ? !group.Held || world.Active(target) : group.Held;
         }
-        internal object Capture(object target) => new Snapshot { Location = world.Location(target), Position = world.Position(target), Rotation = world.Rotation(target), Active = world.Active(target), Held = world.GroupActivity(target)?.Held == true, Consumer = consumer?.Capture(target), Id = ids?.MarkerId(target) };
+        internal object Capture(object target) => new Snapshot { Location = world.Location(target), Position = world.Position(target), Rotation = world.Rotation(target), Active = world.Active(target), Held = world.GroupActivity(target)?.Held == true, Consumer = consumer?.Capture(target), Id = Ids(target)?.MarkerId(target) };
         // The activity of a group follower is group-driven (null) unless the explicit-disable hold is installed.
-        internal ObjectState Read(object target) => new ObjectState(new Placement(world.Position(target), world.Rotation(target)), ReadActive(target), MarkerBinding.Of(world.Location(target))).WithMarkerId(ids?.MarkerId(target));
+        internal ObjectState Read(object target) => new ObjectState(new Placement(world.Position(target), world.Rotation(target)), ReadActive(target), MarkerBinding.Of(world.Location(target))).WithMarkerId(Ids(target)?.MarkerId(target));
         bool? ReadActive(object target) {
             var group = world.GroupActivity(target);
             return group == null || group.Held ? world.Active(target) : (bool?)null;
@@ -644,7 +669,7 @@ namespace RailroaderScenePatcher.Core {
         // own registration under the new id; otherwise it changes last, after the activity and binding changed under the
         // id the marker holds alone, which is how a restoration or removal returns a duplicate marker ID.
         bool Write(object target, TrackLocation location, double[] position, double[] rotation, bool? active, bool rebind, bool following, bool explicitApply, string markerId = null) {
-            var renaming = ids != null && markerId != null && markerId != ids.MarkerId(target);
+            var renaming = Ids(target) != null && markerId != null && markerId != Ids(target).MarkerId(target);
             var renamed = false;
             if (renaming && Holders(target)?.Duplicate == true) { Rename(target, markerId); renaming = false; renamed = true; }
             var group = world.GroupActivity(target);
@@ -675,7 +700,7 @@ namespace RailroaderScenePatcher.Core {
             return written || renamed;
         }
         string Verify(object target, TrackLocation location, Placement placement, bool? active, bool following, bool explicitApply, string markerId = null) {
-            if (ids != null && markerId != null && ids.MarkerId(target) != markerId) return "the marker ID is " + ids.MarkerId(target) + ", expected " + markerId;
+            if (Ids(target) != null && markerId != null && Ids(target).MarkerId(target) != markerId) return "the marker ID is " + Ids(target).MarkerId(target) + ", expected " + markerId;
             if (!TrackLocation.Same(world.Location(target), location)) return "the serialized location is " + (world.Location(target)?.ToString() ?? "detached") + ", expected " + (location?.ToString() ?? "detached");
             var group = world.GroupActivity(target);
             if (group == null ? world.Active(target) != active : group.Held != (active == false)) return "activity differs";

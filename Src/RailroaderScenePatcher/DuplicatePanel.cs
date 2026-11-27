@@ -153,7 +153,7 @@ namespace RailroaderScenePatcher {
             placingPointer.Click = inputBlocker?.WorldClick;
             var message = duplicate.Message;
             TargetIdentity placed = null;
-            try { placed = duplicate.Tick(placingPointer, (from, placement) => attachment.Session.PlaceModObject(from.Identity, placement, null, from.GroupPath)); }
+            try { placed = duplicate.Tick(placingPointer, (from, placement) => attachment.Session.PlaceModObject(from.Identity, placement, null, from.GroupPath, markerIdRandom.Next)); }
             catch (Exception e) { duplicate.End(); feedback.Report(DuplicatePlace, "The object couldn't be placed: " + e.GetBaseException().Message.TrimEnd('.') + "."); }
             if (placed != null) {
                 placedModObject = placed;

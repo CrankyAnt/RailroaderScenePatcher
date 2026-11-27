@@ -44,13 +44,18 @@ namespace RailroaderScenePatcher {
         // place, and the Ela bridge. A copy of a bridge stands fully built and no construction controller switches it.
         // An object with a marker ID, a track binding or detection needs more than a copy.
         static readonly string[] Copied = { SceneFamilies.SceneObject, SceneFamilies.ChildObject, SceneFamilies.StationMapIcon, SceneFamilies.LocationSign, SceneFamilies.Bridge };
+        // The families of scene markers a mod object is made of: the placing click gives it a marker ID of its own and
+        // binds it to the track the game finds at its position.
+        static readonly string[] Marked = { SceneFamilies.TrackMarker, SceneFamilies.Milepost };
         // familiesBelow: the families of the listed objects at or below the object.
         internal static string Reason(SceneObservation selected, IEnumerable<string> familiesBelow) {
             if (selected == null) return null;
             if (selected.Family == SceneFamilies.StarterPlacement) return StarterMarker;
             if (selected.InspectionOnly != null) return InspectionOnly;
-            if (!Copied.Contains(selected.Family, StringComparer.Ordinal)) return OtherFamily;
-            return (familiesBelow ?? Enumerable.Empty<string>()).Any(family => family != null && !Copied.Contains(family, StringComparer.Ordinal)) ? HoldsOtherFamily : null;
+            if (!Copied.Contains(selected.Family, StringComparer.Ordinal) && !Marked.Contains(selected.Family, StringComparer.Ordinal)) return OtherFamily;
+            // A marker the patcher cannot edit takes no marker ID of its own, so it is not duplicated either.
+            if (Marked.Contains(selected.Family, StringComparer.Ordinal) && !CommandBand.EditableStructure(selected.Identity.Structure)) return CommandBand.EditReason(selected.Operations);
+            return (familiesBelow ?? Enumerable.Empty<string>()).Any(family => family != null && family != selected.Family && !Copied.Contains(family, StringComparer.Ordinal)) ? HoldsOtherFamily : null;
         }
         // The question that a selection in the outliner asks while the mod object is unplaced, with its title and choices.
         internal const string SelectTitle = "Cancel Duplicate?", KeepChoice = "Keep duplicating", CancelChoice = "Cancel Duplicate";

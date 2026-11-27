@@ -664,7 +664,11 @@ namespace RailroaderScenePatcher.Core {
                 // An ID equal to the underlying one returns the marker to it, which is what clearing this mod's value does:
                 // it takes the same refusals, so it cannot leave a holder's settings or another holder's modification
                 // without the replacement ID they need.
-                var clearing = id == null || (existing?[ReplacementMarkerIds.Member] != null && id == engine.Underlying(engine.ResolveUnique(target))?.MarkerId);
+                // A mod object that is a scene marker holds its marker ID from its own modification: it takes another
+                // one, and never returns to its source's.
+                var modObject = existing?[ModObjects.SourceMember] != null;
+                if (modObject && id == null) throw new InvalidOperationException(ModObjects.KeepsMarkerId);
+                var clearing = !modObject && (id == null || (existing?[ReplacementMarkerIds.Member] != null && id == engine.Underlying(engine.ResolveUnique(target))?.MarkerId));
                 if (clearing) {
                     if (existing?[ReplacementMarkerIds.Member] == null) throw new InvalidOperationException("This mod doesn't set a replacement ID for this marker, so there's nothing to clear.");
                     var rest = (JObject)existing.DeepClone();

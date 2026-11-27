@@ -32,6 +32,12 @@ namespace RailroaderScenePatcher.Core {
             : markerType == "Flare" ? BindingNeed.Never
             : BindingNeed.Optional;
 
+        // What a mod object needs from its binding: a milepost or Generic track marker that a mod placed binds to the
+        // track the game finds at its position, so an empty binding is a problem while it is enabled.
+        public static BindingNeed OfModObject(BindingNeed need) => need == BindingNeed.Optional ? BindingNeed.Required : need;
+        // What the marker at the hierarchy path needs: a mod object's need, or else the kind's own.
+        public static BindingNeed NeedAt(BindingNeed need, string path) => ModObjects.Within(path) ? OfModObject(need) : need;
+
         // Whether a kind is listed in the inventory at all. A signal marker is out of scope, the native map editor owns
         // the track anchor of a map object, and the builder photo marker has no role in play.
         public static bool Listed(string markerType, bool nativeMapObject, bool builderPhoto) => markerType != "Signal" && !nativeMapObject && !builderPhoto;

@@ -9,7 +9,7 @@ namespace RailroaderScenePatcher {
     // graph's position and rotation at that distance from the named end; its forward axis points away from that end
     // along the segment. An endpoint uses the node's own position and rotation. Segment and node IDs are keys of the
     // graph's lookups, so an anchor is unique or missing.
-    internal sealed class NativeTrackPoses : ITrackPoseScene {
+    internal sealed class NativeTrackPoses : ITrackPoseScene, ITrackPointLookup {
         const string GraphType = "Track.Graph", SegmentType = "Track.TrackSegment", LocationType = "Track.Location";
         readonly Type graph, location, end;
         internal NativeTrackPoses() {
@@ -73,6 +73,24 @@ namespace RailroaderScenePatcher {
             for (var i = 1; i < args.Length; i++) args[i] = parameters[i].DefaultValue;
             var result = methods[0].Invoke(shared, args);
             return Pose((Vector3)Native.Read(result, "Position"), (Quaternion)Native.Read(result, "Rotation"), anchor);
+        }
+        // The radius within which the native map editor reprojects a track-anchored object onto the track after a move
+        // (Game.MapEditor.ObjectsEditor.ReprojectTrackAnchor).
+        internal const float LookupRadius = 25f;
+        // The game's own lookup from a map position to the track: Graph.TryGetLocationFromGamePoint takes, over every
+        // segment whose group is enabled, the nearest point within the radius, the earlier segment on a tie. Map
+        // coordinates are game coordinates. Null when no track lies within the radius.
+        public TrackLocation TrackAt(double[] position) {
+            var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
+            var lookup = graph.GetMethod("TryGetLocationFromGamePoint", Native.Flags, null, new[] { typeof(Vector3), typeof(float), location.MakeByRefType() }, null)
+                ?? throw new MissingMethodException(GraphType, "TryGetLocationFromGamePoint");
+            var args = new object[] { new Vector3((float)position[0], (float)position[1], (float)position[2]), LookupRadius, null };
+            if (!(bool)lookup.Invoke(shared, args)) return null;
+            var found = args[2];
+            var segment = Native.Read(Native.Read(found, "segment"), "id") as string;
+            if (String.IsNullOrEmpty(segment)) return null;
+            var end = Convert.ToString(Native.Read(found, "end")) == "A" ? "a" : "b";
+            return new TrackLocation(segment, end, Math.Round((float)Native.Read(found, "distance"), 3));
         }
         // The location on the segment nearest to a world position, measured from end a, sampled every half metre.
         internal TrackLocation Nearest(string segmentId, Vector3 world) {

@@ -34,7 +34,10 @@ namespace RailroaderScenePatcher.Core {
         // file gets its modification, under a new key that is the mod object's identity in this mod; the scene gets
         // the object. A refusal leaves both as they were. The outcome names the new object's target. group is the path
         // of the inspected object's group when it is a part: the part's copy then stands beside that group, on its own.
-        public Outcome PlaceModObject(TargetIdentity inspectedObject, Placement placement, InspectedTarget inspected = null, string group = null) {
+        // A mod object that is a scene marker gets a marker ID of its own, drawn with next as Generate draws one; a
+        // milepost or Generic track marker binds to the track the game finds at the placed position, and stays unbound
+        // where the game finds none.
+        public Outcome PlaceModObject(TargetIdentity inspectedObject, Placement placement, InspectedTarget inspected = null, string group = null, Func<int, int> next = null) {
             const string name = "Place mod object";
             var outcome = new Outcome();
             try {
@@ -48,7 +51,15 @@ namespace RailroaderScenePatcher.Core {
                 var key = NewId(new TargetIdentity(from.Scene, ModObjects.Plain(from.Path), from.Component), ModObjects.KeyPrefix);
                 var beside = ModObjects.Beside(ModObjects.Within(inspectedObject.Path) && group == null ? inspectedObject.Path : from.Path, group);
                 var identity = new TargetIdentity(from.Scene, ModObjects.Path(beside, modId, key), from.Component, ModObjects.StructureOf(from.Structure));
-                var value = new JObject { ["target"] = identity.ToJson(), [ModObjects.SourceMember] = SourceJson(inspectedObject, from, origin), ["placement"] = FixedJson(at), ["dependsOn"] = new JArray() };
+                var value = new JObject { ["target"] = identity.ToJson(), [ModObjects.SourceMember] = SourceJson(inspectedObject, from, origin) };
+                if (ModObjects.IsSceneMarker(identity.Structure)) value[ReplacementMarkerIds.Member] = NewMarkerId(engine.ResolveUnique(from), next);
+                value["placement"] = FixedJson(at);
+                if (ModObjects.BindsAtPlacement(identity.Structure)) {
+                    var track = (scene as ITrackPointLookup)?.TrackAt(at.Position);
+                    value["relationships"] = new JObject { ["trackMarker"] = track == null ? new JObject { ["detach"] = true }
+                        : new JObject { ["segment"] = track.Segment, ["end"] = track.End, ["distance"] = track.Distance } };
+                }
+                value["dependsOn"] = new JArray();
                 outcome.ResolvedTarget = Establish(key, identity, value);
                 outcome.Target = identity;
                 var generation = versionGeneration; var keyGeneration = KeyGeneration(key);
@@ -58,6 +69,17 @@ namespace RailroaderScenePatcher.Core {
                 try { ModObjectsChanged?.Invoke(); } catch { }
             } catch (Exception e) { Fail(outcome, e); }
             return outcome;
+        }
+        static readonly Random MarkerIdRandom = new Random();
+        // A marker ID for a mod object made from the source: one that the source, every other scene marker, registration
+        // and map object, and the replacement IDs of the scene patch file leave free.
+        string NewMarkerId(object source, Func<int, int> next) {
+            if (!(scene is IMarkerIdScene markers)) throw new InvalidOperationException(ReplacementMarkerIds.NotSupported);
+            var file = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in scenePatchFile?.Items ?? Enumerable.Empty<JObject>())
+                if (item[ReplacementMarkerIds.Member]?.Type == JTokenType.String) file.Add((string)item[ReplacementMarkerIds.Member]);
+            var id = ReplacementMarkerIds.Generate(next ?? MarkerIdRandom.Next, candidate => file.Contains(candidate) ? ReplacementMarkerIds.Shared(candidate) : markers.NewMarkerIdRefusal(source, candidate), out var reason);
+            return id ?? throw new InvalidOperationException(reason);
         }
         // The source of a new mod object, with the model and build by which a later load finds an identical instance when
         // the original is missing. A mod object of this scene patch file passes on its own source as written, build

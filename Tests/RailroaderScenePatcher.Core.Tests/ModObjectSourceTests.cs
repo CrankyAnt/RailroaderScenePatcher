@@ -35,7 +35,7 @@ static class ModObjectSourceTests {
         public readonly Dictionary<FakeGroup, string> Builds = new Dictionary<FakeGroup, string>();
         public readonly List<object> BuiltFrom = new List<object>();
         public Builder(FakeGroupWorld world) { this.world = world; }
-        public object Build(TargetIdentity identity, object source, Placement placement) {
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
             if (world.Objects.TryGetValue(identity.Path, out var standing) && standing.Count != 0) throw new InvalidOperationException(ModObjects.Taken);
             var made = new FakeGroup { Position = new[] { placement.Position[0] - world.Origin, placement.Position[1], placement.Position[2] }, Rotation = (double[])placement.Rotation.Clone() };
             world.Objects[identity.Path] = new List<object> { made };
@@ -215,7 +215,7 @@ static class ModObjectSourceTests {
         public readonly List<string> Order = new List<string>();
         public readonly Dictionary<string, string> Builds = new Dictionary<string, string>(StringComparer.Ordinal);
         public int Made, Removes;
-        public object Build(TargetIdentity identity, object source, Placement placement) {
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
             if (Objects.ContainsKey(identity.Path)) throw new InvalidOperationException(ModObjects.Taken);
             var from = Objects.Single(p => p.Value.Contains(source)).Key;
             foreach (var pair in Objects.Where(p => p.Key == from || p.Key.StartsWith(from + "/", StringComparison.Ordinal)).ToArray()) {

@@ -55,8 +55,15 @@ static class DuplicateTests {
         Assert(DuplicateState.Reason(starter, null) == "No start setup reads a duplicated marker.", "A starter placement marker shows its reason: " + DuplicateState.Reason(starter, null));
         var part = Row(ModObjectTests.Station + "/Mask");
         Assert(part.GroupPath == ModObjectTests.Station && DuplicateState.Reason(part, null) == null, "A part can be duplicated: " + DuplicateState.Reason(part, null));
-        var marker = Map.Observations(out _).First(r => r.Family == SceneFamilies.TrackMarker);
-        Assert(DuplicateState.Reason(marker, null) == DuplicateState.OtherFamily, "A track marker needs more than a copy: " + DuplicateState.Reason(marker, null));
+        // A Generic track marker and a milepost are duplicated: the placing click gives the copy a marker ID of its own.
+        var marker = Map.Observations(out _).First(r => r.Family == SceneFamilies.TrackMarker && r.Identity.Structure == TrackMarkerScene.Structure);
+        Assert(DuplicateState.Reason(marker, new[] { SceneFamilies.TrackMarker }) == null, "A Generic track marker can be duplicated: " + DuplicateState.Reason(marker, null));
+        var post = Map.Observations(out _).First(r => r.Family == SceneFamilies.Milepost && r.Identity.Structure == MilepostScene.Structure);
+        Assert(DuplicateState.Reason(post, new[] { SceneFamilies.Milepost }) == null, "A milepost can be duplicated: " + DuplicateState.Reason(post, new[] { SceneFamilies.Milepost }));
+        var pad = Map.Observations(out _).First(r => r.Family == SceneFamilies.CrossingPad);
+        Assert(DuplicateState.Reason(pad, null) != null, "A crossing pad is not duplicated here");
+        var shared = Map.Observations(out _).FirstOrDefault(r => r.Family == SceneFamilies.TrackMarker && r.Identity.Structure == null && r.GroupPath == null);
+        Assert(shared == null || DuplicateState.Reason(shared, null) == CommandBand.EditReason(shared.Operations), "A marker the patcher cannot edit is not duplicated: " + (shared == null ? "" : DuplicateState.Reason(shared, null)));
         Assert(DuplicateState.Reason(station, new[] { SceneFamilies.SceneObject, SceneFamilies.TrackMarker }) == DuplicateState.HoldsOtherFamily, "A group that holds a track marker is not copied");
         // A location sign, a road bridge and a rail bridge scene object can be duplicated; the controller beside the
         // Ela bridge is no bridge and stays with its bridge.
@@ -72,8 +79,9 @@ static class DuplicateTests {
         Assert(ela.Family == SceneFamilies.Bridge && DuplicateState.Reason(ela, new[] { SceneFamilies.Bridge }) == null, "The Ela bridge can be duplicated: " + DuplicateState.Reason(ela, new[] { SceneFamilies.Bridge }));
         var scenery = Row("World/Large Scenery/Ela/Ela Bridge Scenery");
         Assert(DuplicateState.Reason(scenery, null) == DuplicateState.OtherFamily, "The Ela bridge's construction controller is not duplicated: " + DuplicateState.Reason(scenery, null));
-        foreach (var path in new[] { "World/Mile Posts/T-45.1 Origin", "World/POIs/Alarka" })
-            Assert(DuplicateState.Reason(Row(path), null) == DuplicateState.OtherFamily, "Mileposts and spawn points stay as they are: " + path);
+        // A milepost is duplicated with a marker ID of its own (#163); a spawn point stays as it is.
+        Assert(DuplicateState.Reason(Row("World/Mile Posts/T-45.1 Origin"), new[] { SceneFamilies.Milepost }) == null, "A milepost can be duplicated");
+        Assert(DuplicateState.Reason(Row("World/POIs/Alarka"), null) == DuplicateState.OtherFamily, "A spawn point stays as it is");
         var only = Map.Observations(out _).FirstOrDefault(r => r.InspectionOnly != null);
         Assert(only == null || DuplicateState.Reason(only, null) == DuplicateState.InspectionOnly, "An inspection-only object is not duplicated");
         Assert(DuplicateState.Reason(null, null) == null, "Without an object there is no reason");

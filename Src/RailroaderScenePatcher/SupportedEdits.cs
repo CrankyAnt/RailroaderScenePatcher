@@ -96,7 +96,7 @@ namespace RailroaderScenePatcher {
             // An object that holds a track binding: its own reason when the patcher does not edit it, as for every other edit.
             if (HoldsBinding(entry.Family)) edits.Add(new Edit(Binding, Binding, editable && EditsBinding(structure) ? null : own ?? CommandBand.EditReason(entry.Operations)));
             if (EditsBinding(structure))
-                edits.Add(new Edit(MarkerId, MarkerId, own ?? (structure == TrackMarkerScene.Structure ? live?.MarkerIdReason : EditReasons.Replacement)));
+                edits.Add(new Edit(MarkerId, MarkerId, own ?? (CommandBand.TakesMarkerId(entry.Identity) ? live?.MarkerIdReason : EditReasons.Replacement)));
             return InScene(edits, live);
         }
         static IReadOnlyList<Edit> InScene(IReadOnlyList<Edit> edits, Live live) => live?.Present == false

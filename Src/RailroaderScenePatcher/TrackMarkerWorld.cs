@@ -18,7 +18,7 @@ namespace RailroaderScenePatcher {
     // A colocated TrackRelativePosition whose activity follows the track group subscribes to the graph's group event for
     // the bound segment's group. This adapter observes the group again after a rebinding and holds an explicitly disabled
     // object inactive by replacing the relative position's activation callback, so a group activation cannot reach it.
-    internal class TrackMarkerWorld : ITrackMarkerWorld, IDisableRefusal, ITrackMarkerDiagnostics, ITargetConfirmation, IPlacementPattern, IMarkerIdWorld {
+    internal class TrackMarkerWorld : ITrackMarkerWorld, IDisableRefusal, ITrackMarkerDiagnostics, ITargetConfirmation, IPlacementPattern, IMarkerIdWorld, IModObjectMarkers {
         readonly NativeMarkerWarnings warningHistory = new NativeMarkerWarnings();
         readonly NativeCurrentWarnings currentWarnings = new NativeCurrentWarnings();
         internal const string MarkerType = "Track.TrackMarker";
@@ -93,6 +93,8 @@ namespace RailroaderScenePatcher {
         internal static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         internal static Component Get(GameObject go, string type) => go.GetComponents<Component>().FirstOrDefault(c => c != null && c.GetType().FullName == type);
         static object Graph() => Native.Read(Native.Type(GraphType), "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
+        // A mod object this patcher built holds a marker ID of its own, which a replacement ID changes whatever its family.
+        public bool IsModObject(object target) => ModObjectWorld.IsModObject(target as GameObject);
         internal Component MarkerOf(object target) => ((GameObject)target).GetComponent(marker) ?? throw new InvalidOperationException("The object no longer holds a track marker");
         // The loaded objects at the path that hold a marker. Starting from the marker components avoids building the path of
         // every loaded object; an object with several markers is one match, as before.

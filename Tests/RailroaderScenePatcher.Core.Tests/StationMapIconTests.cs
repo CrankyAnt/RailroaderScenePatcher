@@ -159,7 +159,7 @@ static class StationMapIconTests {
     sealed class IconBuilder : IModObjectScene {
         readonly IconWorld world;
         public IconBuilder(IconWorld world) { this.world = world; }
-        public object Build(TargetIdentity identity, object source, Placement placement) {
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
             if (world.Objects.ContainsKey(identity.Path)) throw new InvalidOperationException(ModObjects.Taken);
             var made = new FakeIcon { Position = new[] { placement.Position[0] - world.Origin, placement.Position[1], placement.Position[2] }, Rotation = (double[])placement.Rotation.Clone(), Parent = ((FakeIcon)source).Parent };
             world.Objects[identity.Path] = new List<object> { made }; world.Registered.Add(made);
