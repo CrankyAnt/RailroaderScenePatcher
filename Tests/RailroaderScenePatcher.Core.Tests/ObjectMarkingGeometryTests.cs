@@ -164,6 +164,21 @@ static class ObjectMarkingGeometryTests {
             "the node's frame encloses both crossbucks and the pad: " + whole.Bounds);
         var piece = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, boxes, Camera, View, null);
         Check(piece.Bounds.HasValue && piece.Bounds.Value.Max.X < 6, "framed by the piece at its marker, as before, only the pad is framed: " + piece.Bounds);
+        // At Old River Rd each crossing object also holds its whistle signs, Generic track markers up to 500 m down the
+        // track. Counted, they set the boxes apart and the crossing had no frame at all; they stay out of its frame.
+        var renderers = new[] {
+            new { Part = Box("crossbuck (1)", 35, 2, 100, .3, 2, .3), Families = new[] { SceneFamilies.SceneObject } },
+            new { Part = Box("crossbuck (2)", -14, 2, 100, .3, 2, .3), Families = new[] { SceneFamilies.SceneObject } },
+            new { Part = Box("pad", 3, 0, 100, 14, .3, 7), Families = new[] { SceneFamilies.CrossingPad } },
+            new { Part = Box("whistle sign E", 506, 1.3, 130, .2, 1.3, .3), Families = new[] { SceneFamilies.TrackMarker } },
+            new { Part = Box("whistle sign W", 24, 1.3, 90, .2, 1.3, .2), Families = new[] { SceneFamilies.TrackMarker } },
+        };
+        var counted = renderers.Where(r => ObjectMarkingGeometry.WholeCounts(CrossingObjectScene.Family, r.Families)).Select(r => r.Part).ToArray();
+        Check(counted.Select(p => p.Name).SequenceEqual(new[] { "crossbuck (1)", "crossbuck (2)", "pad" }), "a crossing object's frame counts its crossbucks and pad and leaves its whistle signs out: " + String.Join(", ", counted.Select(p => p.Name)));
+        var oldRiver = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, counted, Camera, View, null, ObjectMarkingGeometry.FrameDistance, null, true);
+        Check(oldRiver.Frame.HasValue && oldRiver.Bounds.Value.Min.X <= -14.29 && oldRiver.Bounds.Value.Max.X >= 35.29 && oldRiver.Bounds.Value.Max.X < 100, "the Old River Rd crossing gets a frame around its crossbucks and pad: " + oldRiver.Bounds);
+        var spread = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, renderers.Select(r => r.Part).ToArray(), Camera, View, null, ObjectMarkingGeometry.FrameDistance, null, true);
+        Check(!spread.Frame.HasValue, "with its whistle signs counted, its boxes stand apart and it gets no frame, as the game test saw");
     }
 
     // A renderer outlines its object whether or not the game's distance culling shows it now: on, or off only through

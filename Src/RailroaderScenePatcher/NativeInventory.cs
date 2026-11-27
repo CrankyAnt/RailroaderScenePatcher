@@ -437,16 +437,20 @@ namespace RailroaderScenePatcher {
             var runtime = new List<string>();
             var components = go.GetComponentsInChildren<Component>(true);
             var hierarchyComponents = new List<HierarchyComponent>();
-            // A crossing pad's builder generates its mesh into a container and destroys whatever is there first.
-            Transform container = null;
-            if (family == "Crossing pad marker") try { container = Field(Get(go, "Track.TrackCurveMeshBuilder"), "meshContainer") as Transform; } catch { }
+            // A crossing pad's builder generates its mesh into a container and destroys whatever is there first. The
+            // containers of every pad at or below the object count: a crossing object or a crossing controller holds pads.
+            var containers = new List<Transform>();
+            var builder = Native.Type("Track.TrackCurveMeshBuilder");
+            if (builder != null)
+                foreach (var held in go.GetComponentsInChildren(builder, true))
+                    try { if (held != null && Field(held, "meshContainer") is Transform filled && filled != null) containers.Add(filled); } catch { }
             foreach (var child in components) {
                 if (child == null) { problems.Add("Missing script in inspected hierarchy"); continue; }
                 if (child is Transform) continue;
                 // An object the game created while running is not saved with the scene: the audio pool parents its
                 // sources under a crossing bell while it is audible and takes them back when it is not, and pad
                 // generation replaces a crossing pad's mesh objects. Such a child and everything on it is runtime state.
-                var below = container != null && child.transform != container && child.transform.IsChildOf(container);
+                var below = HierarchyDependencies.BelowContainer(child.transform, containers, t => t.parent);
                 if (HierarchyDependencies.IsOutput(Transient(child.transform, go.transform), below)) {
                     runtime.Add((below ? "Generated pad object " : "Runtime object ") + Label(child));
                     continue;

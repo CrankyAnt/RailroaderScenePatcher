@@ -561,8 +561,10 @@ namespace RailroaderScenePatcher.Core {
         // crossing controller's frame leaves out its whistle signs, which are no part of its setup
         // (Complexes.Of), and its detection spans, which are invisible; the masts with their gates, the bell
         // and the pads count. Everything below another object framed whole counts.
+        // The crossing object of a crossing without signals leaves out its whistle signs as well: they stand in it, up to
+        // hundreds of metres along the track, and are no part of its complex either.
         public static bool WholeCounts(string family, IEnumerable<string> families) =>
-            family != ControllerFamily || families == null || !families.Any(f => f == SceneFamilies.TrackMarker || f == "Track span");
+            (family != ControllerFamily && family != CrossingObjectScene.Family) || families == null || !families.Any(f => f == SceneFamilies.TrackMarker || f == "Track span");
         // Where a marker with a frame stands on screen, from its world point projected to x and y: on that point
         // whenever it lies in front of the camera, also outside the frame's rectangle or the view, so it stays on its
         // world point as the camera zooms and turns; the center of the visible part of a frame larger than the view

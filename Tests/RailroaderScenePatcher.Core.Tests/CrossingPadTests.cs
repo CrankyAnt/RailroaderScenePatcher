@@ -178,6 +178,23 @@ static class CrossingPadTests {
             throw new Exception("A saved mesh, a generated mesh and no mesh under the pad's container give the same dependency lines: " + String.Join(" | ", lines));
         if (lines.Any(line => line.Contains("Curve Mesh")) || lines.Length != 3) throw new Exception("The pad's dependencies name no mesh component: " + String.Join(" | ", lines));
         if (RailroaderScenePatcher.HierarchyDependencies.IsOutput(false, false)) throw new Exception("A saved component outside the container is authored");
+        // A crossing object at Alarka Jct holds its crossbucks and the pad of its crossing. The pad generates its mesh
+        // after the world loads, with no edit: the mesh below the pad's container is output for the crossing object too,
+        // so the first edit after the load is not refused as a stale inventory. The pad itself and a crossbuck stay.
+        var parents = new Dictionary<string, string> { ["crossing/Sign-Crossing0 (1)"] = "crossing", ["crossing/Crossing Pad"] = "crossing", ["crossing/Crossing Pad/Curve Mesh"] = "crossing/Crossing Pad", ["crossing"] = null };
+        string Up(string node) => parents.TryGetValue(node, out var up) ? up : null;
+        var padContainers = new[] { "crossing/Crossing Pad" };
+        if (!RailroaderScenePatcher.HierarchyDependencies.BelowContainer("crossing/Crossing Pad/Curve Mesh", padContainers, Up)) throw new Exception("The pad's generated mesh is output for the crossing object that holds the pad");
+        if (RailroaderScenePatcher.HierarchyDependencies.BelowContainer("crossing/Crossing Pad", padContainers, Up) || RailroaderScenePatcher.HierarchyDependencies.BelowContainer("crossing/Sign-Crossing0 (1)", padContainers, Up)
+            || RailroaderScenePatcher.HierarchyDependencies.BelowContainer("crossing/Crossing Pad/Curve Mesh", new string[0], Up))
+            throw new Exception("The container itself, a crossbuck and a hierarchy without pads are authored");
+        RailroaderScenePatcher.HierarchyComponent Held(string path, string type, bool createdAtRuntime) =>
+            new RailroaderScenePatcher.HierarchyComponent(path + " [" + type + "]", null, RailroaderScenePatcher.HierarchyDependencies.IsOutput(createdAtRuntime, RailroaderScenePatcher.HierarchyDependencies.BelowContainer(path, padContainers, Up)));
+        RailroaderScenePatcher.HierarchyComponent[] Crossing(bool generated) => new[] { Held("crossing/Sign-Crossing0 (1)", "Helpers.Culling.SimpleCuller", false), Held("crossing/Crossing Pad", "Track.TrackMarker", false),
+            Held("crossing/Crossing Pad/Curve Mesh", "UnityEngine.MeshFilter", generated) };
+        string[] Authored(RailroaderScenePatcher.HierarchyComponent[] all) => RailroaderScenePatcher.HierarchyDependencies.Describe(false, all.Where(c => !c.Generated)).ToArray();
+        if (!Authored(Crossing(false)).SequenceEqual(Authored(Crossing(true))) || Authored(Crossing(true)).Any(line => line.Contains("Curve Mesh")))
+            throw new Exception("The crossing object's dependency lines name no pad mesh and stay the same when the pad generates it: " + String.Join(" | ", Authored(Crossing(false))));
     }
     static void UnknownGeneratedSourceIsRegeneratedOnce() {
         var (world, pad, rear, scene) = Setup();

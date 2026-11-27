@@ -26,6 +26,15 @@ namespace RailroaderScenePatcher {
         // destroys every child of its container when it generates, so a mesh object that was saved with the scene
         // there is replaced the first time the pad comes into view; it is output as well.
         internal static bool IsOutput(bool createdAtRuntime, bool belowOutputContainer) => createdAtRuntime || belowOutputContainer;
+        // Whether a node stands below one of the containers that the mesh builders of an inspected hierarchy generate into,
+        // never the container itself: those of every crossing pad at or below the inspected object, so the pads of a
+        // crossing controller or a crossing object generating their meshes change neither of them.
+        internal static bool BelowContainer<T>(T node, IEnumerable<T> containers, Func<T, T> parent) where T : class {
+            var held = (containers ?? Enumerable.Empty<T>()).Where(c => c != null).ToArray();
+            if (node == null || held.Length == 0 || held.Contains(node)) return false;
+            for (var up = parent(node); up != null; up = parent(up)) if (held.Contains(up)) return true;
+            return false;
+        }
         // Whether a component is one the game adds to an authored object while it runs. An animator of crossing
         // equipment, such as a signal's or a gate's KeyValueBoolAnimator, gets a playable-graph adapter beside its
         // Animator the first time it animates, which is when the camera first comes near. Such a component was not
