@@ -79,9 +79,9 @@ static class DuplicateTests {
         Assert(ela.Family == SceneFamilies.Bridge && DuplicateState.Reason(ela, new[] { SceneFamilies.Bridge }) == null, "The Ela bridge can be duplicated: " + DuplicateState.Reason(ela, new[] { SceneFamilies.Bridge }));
         var scenery = Row("World/Large Scenery/Ela/Ela Bridge Scenery");
         Assert(DuplicateState.Reason(scenery, null) == DuplicateState.OtherFamily, "The Ela bridge's construction controller is not duplicated: " + DuplicateState.Reason(scenery, null));
-        // A milepost is duplicated with a marker ID of its own (#163); a spawn point stays as it is.
+        // A milepost is duplicated with a marker ID of its own (#163), and a spawn point with a teleport name of its own.
         Assert(DuplicateState.Reason(Row("World/Mile Posts/T-45.1 Origin"), new[] { SceneFamilies.Milepost }) == null, "A milepost can be duplicated");
-        Assert(DuplicateState.Reason(Row("World/POIs/Alarka"), null) == DuplicateState.OtherFamily, "A spawn point stays as it is");
+        Assert(DuplicateState.Reason(Row("World/POIs/Alarka"), new[] { SceneFamilies.SpawnPoint }) == null, "A spawn point can be duplicated: " + DuplicateState.Reason(Row("World/POIs/Alarka"), new[] { SceneFamilies.SpawnPoint }));
         var only = Map.Observations(out _).FirstOrDefault(r => r.InspectionOnly != null);
         Assert(only == null || DuplicateState.Reason(only, null) == DuplicateState.InspectionOnly, "An inspection-only object is not duplicated");
         Assert(DuplicateState.Reason(null, null) == null, "Without an object there is no reason");

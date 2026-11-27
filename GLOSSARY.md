@@ -322,6 +322,9 @@ A sphere, with a centre and a radius, that the game keeps for culling the object
 **Scene spawn point**:
 A scene object that marks a player spawn location used for starting, teleporting and rescue. It is distinct from a native spawn.
 
+**Teleport name**:
+The name a mod object made from a scene spawn point has as its object name in the game, by which the console's teleport command and the quick search find it. It is a value of the mod object's modification; the mod object's identity stays its target path.
+
 **Station map icon**:
 A scene object that shows a station on the map.
 

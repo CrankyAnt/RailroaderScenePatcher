@@ -386,7 +386,7 @@ namespace RailroaderScenePatcher {
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             // A new game reads its start spawn point before the world load, so the spawn point capability is ready with the runtime.
-            try { capabilities.Add(spawnScene = new SpawnPointScene(new SpawnPointWorld(), Capability.Unchecked, groundMasks)); }
+            try { var spawnWorld = new SpawnPointWorld(); capabilities.Add(spawnScene = new SpawnPointScene(spawnWorld, Capability.Unchecked, groundMasks)); capabilities.SpawnPriorities = spawnWorld; }
             catch (Exception e) {
                 capabilities.AddUnavailable(SpawnPoints.Structure, e.GetBaseException().Message);
                 PatcherLog.Debug("The patcher couldn't prepare to change spawn points: " + e.GetBaseException().Message);

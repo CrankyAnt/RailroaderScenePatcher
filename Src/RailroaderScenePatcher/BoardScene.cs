@@ -56,7 +56,9 @@ namespace RailroaderScenePatcher {
             tiles = new InstanceSubscription(t => tileEvent.AddEventHandler(t, tileHandler), t => tileEvent.RemoveEventHandler(t, tileHandler));
             tiles.Bind(terrain);
         }
-        internal static string PathOf(Transform t) => t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name;
+        // A mod object with an object name of its own, such as a duplicated spawn point's teleport name, stands in the
+        // path under the name its target path gives it, so it and the objects below it keep their identity.
+        internal static string PathOf(Transform t) => t.parent == null ? ModObjectWorld.PathName(t) : PathOf(t.parent) + "/" + ModObjectWorld.PathName(t);
         static GameObject Board(object board) => board as GameObject ?? throw new InvalidOperationException("The board no longer exists");
         public IReadOnlyList<object> Find(string scene, string path) =>
             LoadedAt(scene, path).Where(g => g != null && g.GetComponent(culler) != null).Cast<object>().ToArray();
@@ -74,7 +76,7 @@ namespace RailroaderScenePatcher {
             return listed ? found : Everywhere(scene, path);
         }
         static void Descend(Transform transform, string rest, List<GameObject> found) {
-            var name = transform.name;
+            var name = ModObjectWorld.PathName(transform);
             if (rest == name) { found.Add(transform.gameObject); return; }
             if (rest.Length <= name.Length || rest[name.Length] != '/' || !rest.StartsWith(name, StringComparison.Ordinal)) return;
             var below = rest.Substring(name.Length + 1);

@@ -310,6 +310,8 @@ namespace RailroaderScenePatcher.Core {
             internal TargetIdentity Source;
             // For a mod object, the model and build of its source as the placing click recorded it; null when unknown.
             internal string SourceBuild;
+            // For a duplicated spawn point, the object name it has in the game: its teleport name; null for its mark name.
+            internal string TeleportName;
         }
         // The start of an attempt trace line: the debug output of one engine stage, as JSON that the native observation
         // and the attempt summary read.
@@ -453,6 +455,8 @@ namespace RailroaderScenePatcher.Core {
             unavailable = null;
             try {
                 var parsed = Parse(entry, "", id); var identity = parsed.Identity;
+                // A duplicated spawn point is built at the world load; below every map spawn point, no new game starts there.
+                if (parsed.Source != null) return false;
                 if (identity.Component != SpawnPoints.Component || identity.Structure != null && identity.Structure != SpawnPoints.Structure) return false;
                 var state = parsed.State;
                 if (parsed.Dependencies.Length != 0 || state.Placement?.Following != null || state.Marker != null || state.Coverage != null || state.Equipment != null ||
@@ -610,8 +614,9 @@ namespace RailroaderScenePatcher.Core {
             SourceInstance instead = null;
             // The one exception to the exactly-one rule (ADR 0008): a missing original gives way to the first loaded
             // instance with the same model and build, in the scene's fixed order. An ambiguous original does not.
+            // No mod object stands in for another one's original.
             if (unresolved == TargetMissing && parsed.SourceBuild != null && scene is IModObjectSources identical)
-                instead = identical.Identical(parsed.Source, parsed.SourceBuild)?.FirstOrDefault(i => i?.Handle != null);
+                instead = identical.Identical(parsed.Source, parsed.SourceBuild)?.FirstOrDefault(i => i?.Handle != null && !ModObjects.Within(i.Path) && !IsBuilt(i.Handle));
             if (source == null && instead == null) throw new InvalidOperationException(unresolved == TargetMissing ? ModObjects.SourceMissing : ModObjects.SourceAmbiguous);
             var placement = Evaluate(parsed.State).Placement;
             // A scene marker never takes its source's marker ID: a second holder would take the source's registration.
@@ -628,10 +633,29 @@ namespace RailroaderScenePatcher.Core {
             var parent = ModObjects.StandsIn(parsed.Identity.Path, parsed.Source.Path, from);
             var root = (parent == null ? "" : parent + "/") + ModObjects.NameOf(parsed.Identity.Path);
             var built = builder.Build(parsed.Identity.At(root), source ?? instead.Handle, placement, markerId) ?? throw new InvalidOperationException(ModObjects.Unavailable);
+            try { Prepare(parsed, built, source ?? instead.Handle); }
+            catch { try { builder.Remove(built); } catch { } throw; }
             if (source == null) PatcherLog.Warning(ModObjects.FallbackWarning(scenePatchFileKey, parsed.Id, parsed.Source.Path, instead.Path));
             standingRoots[ModObjects.MarkOf(root)] = root;
             BuiltFor(scenePatchFileKey)[parsed.Id] = built;
             return built;
+        }
+        bool IsBuilt(object handle) => builtObjects.Values.Any(built => built.Values.Any(o => ReferenceEquals(o, handle)));
+        // What a mod object of its family takes after it is built: a spawn point's copy a priority below every map spawn
+        // point, and its teleport name as its object name. Its radius stays its source's.
+        void Prepare(Modification parsed, object built, object source) {
+            if (parsed.Identity.Structure != SpawnPoints.Structure) return;
+            if (!(scene is ISpawnPointPriorities priorities)) throw new InvalidOperationException(SpawnPointCopies.Unavailable);
+            var priority = SpawnPointCopies.Priority(priorities.MapPriorities(parsed.Identity.Scene), priorities.Priority(source));
+            priorities.SetPriority(built, priority);
+            if (priorities.Priority(built) != priority) throw new InvalidOperationException("The priority of the duplicated spawn point did not verify.");
+            if (parsed.TeleportName != null) Name(built, parsed.TeleportName);
+        }
+        // Gives a mod object its object name in the game, or with null its mark name, and checks it.
+        internal void Name(object modObject, string name) {
+            if (!(scene is IModObjectNames names)) throw new InvalidOperationException(ModObjects.NamesUnavailable);
+            names.Name(modObject, name);
+            if (name != null && names.NameOf(modObject) != name) throw new InvalidOperationException("The object name of the mod object did not verify.");
         }
         // Where each mod object this engine built stands, by its mark. A target written below a mod object resolves where
         // the mod object stands, whatever parent the written path names.
@@ -911,7 +935,7 @@ namespace RailroaderScenePatcher.Core {
             if (dependencies == null || dependencies.Any(x => x.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)x))) throw new InvalidOperationException("Invalid dependencies");
             return dependencies.Select(x => (string)x).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         }
-        internal static readonly string[] Known = { "target", ModObjects.SourceMember, ReplacementMarkerIds.Member, "placement", "active", "relationships", "starterPlacement", "dependsOn" };
+        internal static readonly string[] Known = { "target", ModObjects.SourceMember, ModObjects.TeleportNameMember, ReplacementMarkerIds.Member, "placement", "active", "relationships", "starterPlacement", "dependsOn" };
         // The modifications of a scene patch file by key, in ordinal key order.
         internal static SortedDictionary<string, JObject> Entries(JObject modifications) {
             var entries = new SortedDictionary<string, JObject>(StringComparer.Ordinal);
@@ -946,6 +970,14 @@ namespace RailroaderScenePatcher.Core {
                     throw new InvalidPatchDefinitionException(ModObjects.TargetShape);
                 if (item["placement"] == null) throw new InvalidPatchDefinitionException(ModObjects.NeedsPlacement);
             }
+            string teleportName = null;
+            if (item[ModObjects.TeleportNameMember] != null) {
+                if (source == null || !ModObjects.TakesTeleportName(identity.Structure)) throw new InvalidPatchDefinitionException(ModObjects.TeleportNameOnlySpawnPoints);
+                if (!RequiredString(item, ModObjects.TeleportNameMember)) throw new InvalidPatchDefinitionException(ModObjects.TeleportNameNotAString);
+                teleportName = (string)item[ModObjects.TeleportNameMember];
+                var problem = ModObjects.TeleportNameProblem(teleportName);
+                if (problem != null) throw new InvalidPatchDefinitionException(problem);
+            }
             Placement checkedPlacement = null;
             if (item["placement"] != null) {
                 var placement = item["placement"] as JObject;
@@ -967,7 +999,7 @@ namespace RailroaderScenePatcher.Core {
             var starter = item["starterPlacement"] == null ? null : ParseStarter(item["starterPlacement"]);
             var markerId = item[ReplacementMarkerIds.Member] == null ? null : ParseMarkerId(item[ReplacementMarkerIds.Member]);
             if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && equipment == null && starter == null && segments == null && markerId == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments).WithMarkerId(markerId), Dependencies = dependencies, Source = source, SourceBuild = build };
+            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments).WithMarkerId(markerId), Dependencies = dependencies, Source = source, SourceBuild = build, TeleportName = teleportName };
         }
         // A replacement ID: a non-empty string that does not begin with an id prefix the game reserves. Its
         // uniqueness depends on the world and is checked when the modification applies.

@@ -13,11 +13,28 @@ namespace RailroaderScenePatcher {
     // or beside the identical instance that stands in for a missing original. The inventory and the capability of its
     // family then find it at that path like any object of the map. The scene asset is never
     // changed: the copy lives until its scene unloads or its modification leaves, and each load builds it again.
-    internal sealed class ModObjectWorld : IModObjectScene, IModObjectSources {
+    internal sealed class ModObjectWorld : IModObjectScene, IModObjectSources, IModObjectNames {
         // The mod objects that stand now. Unity reports a destroyed object as null, so an unloaded world leaves none.
         static readonly HashSet<GameObject> standing = new HashSet<GameObject>();
         // Whether this patcher built the object as a mod object.
         internal static bool IsModObject(GameObject go) => go != null && standing.Contains(go);
+        // The mod objects with an object name of their own, with the name their target path gives them.
+        static readonly Dictionary<GameObject, string> pathNames = new Dictionary<GameObject, string>();
+        // The name of the object in a hierarchy path: for a mod object with an object name of its own, the name its target
+        // path gives it; for any other object its name.
+        internal static string PathName(Transform t) => pathNames.Count != 0 && pathNames.TryGetValue(t.gameObject, out var name) ? name : t.name;
+        // Gives a mod object this patcher built its object name in the game, or with null its path name again. The game's
+        // teleport command and quick search read the object name; the patcher keeps finding the object by its path.
+        public void Name(object modObject, string name) {
+            var made = modObject as GameObject;
+            if (made == null || !standing.Contains(made)) throw new InvalidOperationException("This object is not a mod object of this patcher.");
+            pathNames.Keys.Where(go => go == null).ToList().ForEach(go => pathNames.Remove(go));
+            if (!pathNames.TryGetValue(made, out var pathName)) pathName = made.name;
+            if (name == null || name == pathName) { pathNames.Remove(made); made.name = pathName; }
+            else { pathNames[made] = pathName; made.name = name; }
+            GroupWorld.Invalidate();
+        }
+        public string NameOf(object modObject) => (modObject as GameObject)?.name;
         // A copy is made below an inactive holder, so none of its components starts before the copy has its name and
         // stands at its placement.
         static GameObject holder;
@@ -285,6 +302,7 @@ namespace RailroaderScenePatcher {
         public void Remove(object modObject) {
             var made = modObject as GameObject;
             standing.Remove(made);
+            if (made != null) pathNames.Remove(made);
             standing.RemoveWhere(go => go == null);
             if (made == null) return;
             // Disabling first lets its components leave what they registered with, such as the map and the cullers;

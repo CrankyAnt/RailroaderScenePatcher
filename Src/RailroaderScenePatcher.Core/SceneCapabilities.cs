@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, ITrackPointLookup, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IModObjectScene, IModObjectSources, IDisposable {
+    public sealed class SceneCapabilities : ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, ITrackPointLookup, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IModObjectScene, IModObjectSources, IModObjectNames, ISpawnPointPriorities, IDisposable {
         // Supplied by the host: what builds and removes mod objects. Without it no mod object is built.
         public IModObjectScene ModObjectWorld { get; set; }
         public object Build(TargetIdentity identity, object source, Placement placement, string markerId) =>
@@ -22,6 +22,14 @@ namespace RailroaderScenePatcher.Core {
         public string BuildOf(object source) => (ModObjectWorld as IModObjectSources)?.BuildOf(source);
         public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) =>
             (ModObjectWorld as IModObjectSources)?.Identical(source, build) ?? Array.Empty<SourceInstance>();
+        public void Name(object modObject, string name) => (ModObjectWorld as IModObjectNames ?? throw new InvalidOperationException(ModObjects.NamesUnavailable)).Name(modObject, name);
+        public string NameOf(object modObject) => (ModObjectWorld as IModObjectNames)?.NameOf(modObject);
+        // Supplied by the host: the priorities of spawn points. Without it no spawn point is duplicated.
+        public ISpawnPointPriorities SpawnPriorities { get; set; }
+        ISpawnPointPriorities Priorities => SpawnPriorities ?? throw new InvalidOperationException(SpawnPointCopies.Unavailable);
+        public IReadOnlyList<int> MapPriorities(string scene) => Priorities.MapPriorities(scene);
+        public int Priority(object spawnPoint) => Priorities.Priority(spawnPoint);
+        public void SetPriority(object spawnPoint, int priority) => Priorities.SetPriority(spawnPoint, priority);
         // The capability that resolved the object lets go of it first, so it keeps nothing for an object that is gone.
         public void Remove(object modObject) {
             Release(modObject);

@@ -341,6 +341,7 @@ class Program {
         CoalLoaderTests.Run();
         GroundMaskTests.Run();
         SpawnPointTests.Run();
+        SpawnPointCopyTests.Run();
         RailBridgeTests.Run();
         RoadBridgeTests.Run();
         ConstructionSegmentTests.Run();

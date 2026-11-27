@@ -719,6 +719,34 @@ namespace RailroaderScenePatcher {
             var origin = InventoryPresentationState.ObjectOrigin(selected);
             Line(builder, "<style=FieldLabel>" + Literal(origin.Label) + "</style> " + Literal(origin.Value), origin.Label, origin.Value, LineHeight);
         }
+        // The teleport name field of a duplicated spawn point, with Set beside it, and the note while it is empty. The
+        // field keeps what the modder typed until another object is inspected.
+        string teleportNameEntry; TargetIdentity teleportNameFor;
+        const string TeleportNamePlace = "Teleport name", SetTeleportNameAction = "Set teleport name";
+        void DrawTeleportName(UIPanelBuilder builder) {
+            var identity = selected.Identity;
+            if (teleportNameFor == null || !TargetIdentity.SameObject(teleportNameFor, identity)) { teleportNameFor = identity; teleportNameEntry = TeleportNameField.Value(selected); }
+            var block = attachment != null && !attachment.Session.IsModObject(identity) ? TeleportNameField.OtherMod : EditBlock();
+            FieldLabel(builder, TeleportNameField.Label);
+            builder.HStack(row => {
+                if (block != null) Line(row, Literal(TeleportNameField.Value(selected)), TeleportNameField.Label, block, 30).FlexibleWidth();
+                else {
+                    var input = row.AddInputField(teleportNameEntry ?? "", value => teleportNameEntry = value);
+                    var field = input.GetComponent<TMP_InputField>();
+                    FreeText(field);
+                    field.onValueChanged.AddListener(value => teleportNameEntry = value);
+                    input.Tooltip(TeleportNameField.Label, TeleportNameField.Tip);
+                    input.FlexibleWidth();
+                }
+                Button(row, TeleportNameField.SetLabel, () => {
+                    var entered = teleportNameEntry;
+                    var refusal = TeleportNameField.Refusal(entered);
+                    if (refusal != null) { feedback.Refuse(TeleportNamePlace, SetTeleportNameAction, refusal); return; }
+                    Edit(TeleportNamePlace, SetTeleportNameAction, (session, inspection) => session.SetTeleportName(identity, entered, inspection));
+                }).Inactive(block != null).Tooltip(TeleportNameField.SetLabel, CommandBand.Tooltip(TeleportNameField.SetTip, block));
+            });
+            if (TeleportNameField.Note(selected) is string note) PlainLabel(builder, note);
+        }
         // The Object tab: what the object is, whether it is enabled, and what was detected about it.
         void DrawObject(UIPanelBuilder builder) {
             DrawOrigin(builder);
@@ -779,6 +807,8 @@ namespace RailroaderScenePatcher {
                 Section(builder, "Use in the game");
                 PlainLabel(builder, CommandBand.UseInGame(selected, selected.GroupPath != null ? InventoryPresentationState.GroupOf(inventory, selected) : null));
             }
+            // A duplicated spawn point has a teleport name of its own: the name players reach it by.
+            if (TeleportNameField.Shows(selected)) DrawTeleportName(builder);
             // A spawn point names each use the game has for it: the default start, rescue, teleport,
             // and the start setups that name it.
             if (selected.Family == SpawnPoints.Family) {
@@ -2007,7 +2037,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and location signs", "Moving a bridge moves the whole bridge. Its track scenery stays in place. Moving a location sign or an object that holds a scene ground mask regenerates its terrain output." },
                     new[] { "Groups and parts", "Moving a group also moves its parts. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
-                    new[] { "Spawn points", "The game reads a spawn point's current location each time a player starts, is rescued, or teleports. A disabled spawn point isn't offered, except by a start setup that names it." } },
+                    new[] { "Spawn points", "The game reads a spawn point's current location each time a player starts, is rescued, or teleports. A disabled spawn point isn't offered, except by a start setup that names it. A spawn point you duplicate ranks below the map's spawn points; give it a teleport name on the Object tab so players can reach it." } },
                 Guides = new[] { new[] { "Fixed placement", RecoveryGuidance.NumericPlacementGuide }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
                     new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Location signs", "moving-location-signs.md" }, new[] { "Groups and parts", "moving-scene-objects.md" }, new[] { "Spawn points", "moving-spawn-points.md" },
                     new[] { "Station map icons", "moving-station-map-icons.md" }, new[] { "Existing crossing equipment", "moving-crossing-equipment.md" } } },

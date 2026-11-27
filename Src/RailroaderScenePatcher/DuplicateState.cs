@@ -42,8 +42,9 @@ namespace RailroaderScenePatcher {
         // The families whose objects a copy rebuilds soundly: a scene object with what stands below it, a part, which
         // becomes an object of its own, a station map icon, a location sign, which registers its own ground mask at its
         // place, and the Ela bridge. A copy of a bridge stands fully built and no construction controller switches it.
+        // A spawn point's copy takes a priority below every map spawn point and a teleport name of its own.
         // An object with a marker ID, a track binding or detection needs more than a copy.
-        static readonly string[] Copied = { SceneFamilies.SceneObject, SceneFamilies.ChildObject, SceneFamilies.StationMapIcon, SceneFamilies.LocationSign, SceneFamilies.Bridge };
+        static readonly string[] Copied = { SceneFamilies.SceneObject, SceneFamilies.ChildObject, SceneFamilies.StationMapIcon, SceneFamilies.LocationSign, SceneFamilies.Bridge, SceneFamilies.SpawnPoint };
         // The families of scene markers a mod object is made of: the placing click gives it a marker ID of its own and
         // binds it to the track the game finds at its position.
         static readonly string[] Marked = { SceneFamilies.TrackMarker, SceneFamilies.Milepost };

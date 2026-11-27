@@ -11,7 +11,7 @@ using UnityEngine;
 namespace RailroaderScenePatcher {
     // The scene spawn points (Character.SpawnPoint) in the loaded scenes. The game reads a spawn point's transform when
     // it starts, rescues or teleports a player, so a placement writes the transform and nothing else follows.
-    internal sealed class SpawnPointWorld : ISpawnPointWorld {
+    internal sealed class SpawnPointWorld : ISpawnPointWorld, ISpawnPointPriorities {
         const string SetupType = "Game.Progression.SetupDescriptor", NativeSpawns = "Game.MapSpawns";
         readonly Type spawn;
         internal SpawnPointWorld() {
@@ -55,6 +55,16 @@ namespace RailroaderScenePatcher {
             if ((NativeInventory.MapPosition(scene, moves) - map).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Converting the position to scene coordinates and back changed the map coordinates.");
             go.transform.SetPositionAndRotation(scene, rotation);
         }
+        // The priorities of the scene's loaded map spawn points, enabled or not; the patcher's mod objects are left out.
+        public IReadOnlyList<int> MapPriorities(string scene) =>
+            Resources.FindObjectsOfTypeAll(spawn).OfType<Component>().Where(c => c != null && Loaded(c.gameObject) && c.gameObject.scene.name == scene && !InModObject(c.transform))
+                .Select(PriorityOf).ToArray();
+        static bool InModObject(Transform t) { for (; t != null; t = t.parent) if (ModObjectWorld.IsModObject(t.gameObject)) return true; return false; }
+        FieldInfo PriorityField => spawn.GetField("priority", Native.Flags);
+        int PriorityOf(Component point) => Convert.ToInt32(PriorityField.GetValue(point));
+        Component Point(object spawnPoint) => (spawnPoint as GameObject)?.GetComponent(spawn) ?? throw new InvalidOperationException("This object has no scene spawn point.");
+        public int Priority(object spawnPoint) => PriorityOf(Point(spawnPoint));
+        public void SetPriority(object spawnPoint, int priority) => PriorityField.SetValue(Point(spawnPoint), priority);
         static float Checked(double value) { var f = (float)value; if (Single.IsNaN(f) || Single.IsInfinity(f)) throw new InvalidOperationException("A coordinate exceeds the game's numeric precision."); return f; }
         // The binding lines of a spawn point for the inventory: its name, its priority and every start setup the game
         // can use that names it. The game finds setups with FindObjectsByType, so only setups active in the hierarchy

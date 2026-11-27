@@ -27,6 +27,15 @@ namespace RailroaderScenePatcher.Core {
         // Mod objects are not listed.
         IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build);
     }
+    // A scene that gives a mod object an object name of its own in the game: a duplicated spawn point's teleport name,
+    // by which the game's teleport command and quick search find it. The identity of the mod object stays its target
+    // path, which ends with its mark: the scene keeps resolving the object, and the objects below it, by that path.
+    public interface IModObjectNames {
+        // Gives the mod object the object name, or with null the name its target path gives it.
+        void Name(object modObject, string name);
+        // The object name the mod object has in the game now.
+        string NameOf(object modObject);
+    }
     // A loaded object that can stand in for a missing original, with the hierarchy path the log names it by.
     public sealed class SourceInstance {
         public SourceInstance(string path, object handle) { Path = path; Handle = handle; }
@@ -50,6 +59,17 @@ namespace RailroaderScenePatcher.Core {
             "Mod object " + id + " in " + scenePatchFile + ": its source " + original + " isn't in the loaded map, so the patcher built it from the identical object " + instance + ".";
         public const string Taken = "Another object already stands at the path of this mod object.";
         public const string NeedsMarkerId = "Invalid mod object: a mod object that is a scene marker needs a marker ID of its own.";
+        // The member of a duplicated spawn point's modification that holds its teleport name, and its refusals.
+        public const string TeleportNameMember = "teleportName";
+        public const string TeleportNameNotAString = "Invalid teleport name: a teleport name must be a non-empty string.";
+        public const string TeleportNameOnlySpawnPoints = "Invalid teleport name: only a duplicated spawn point takes a teleport name.";
+        public const string TeleportNameSlash = "A teleport name can't contain a slash (/), because a slash splits the hierarchy path.";
+        public const string NamesUnavailable = "Object names of mod objects are unavailable in this scene.";
+        // Why the text can't be a teleport name, or null. Null and empty text clear the teleport name and pass.
+        public static string TeleportNameProblem(string name) =>
+            name == null || name.Length == 0 ? null : name.Trim().Length == 0 ? TeleportNameNotAString : name.IndexOf('/') >= 0 ? TeleportNameSlash : null;
+        // Whether a mod object of the structure takes a teleport name.
+        public static bool TakesTeleportName(string structure) => structure == SpawnPoints.Structure;
         public const string KeepsMarkerId = "A mod object keeps a marker ID of its own.";
         // The fields a copy never takes from its source, with the value the copy holds instead: the origin flag of a
         // milepost. Helpers.MilePost.Origin caches, per prefix, the first loaded post with the flag that

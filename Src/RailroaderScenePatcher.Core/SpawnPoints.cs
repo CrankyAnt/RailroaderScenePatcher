@@ -43,6 +43,13 @@ namespace RailroaderScenePatcher.Core {
         public static string SetupsUnreadBinding(string reason) => SetupsUnreadPrefix + reason;
         static IEnumerable<string> After(IEnumerable<string> lines, string prefix) =>
             (lines ?? Enumerable.Empty<string>()).Where(line => line != null && line.StartsWith(prefix, StringComparison.Ordinal)).Select(line => line.Substring(prefix.Length));
+        // The teleport name of a duplicated spawn point: its object name in the game, from its bindings, where that
+        // differs from the name its target path gives it; null for any other object and for a copy without one.
+        public static string TeleportName(SceneObservation entry) {
+            if (entry == null || entry.Family != Family || !ModObjects.IsPath(entry.Identity.Path)) return null;
+            var name = After(entry.Bindings, NamePrefix).FirstOrDefault();
+            return String.IsNullOrEmpty(name) || name == ModObjects.NameOf(entry.Identity.Path) ? null : name;
+        }
         // The priority from the bindings, or null when they hold none.
         public static int? Priority(IEnumerable<string> bindings) =>
             Int32.TryParse(After(bindings, PriorityPrefix).FirstOrDefault(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : (int?)null;
@@ -100,6 +107,23 @@ namespace RailroaderScenePatcher.Core {
                     + ", so it isn't known whether a new company game using this setup starts here or at a native spawn."
                 : setupStart + "." + disabledToo);
             return uses;
+        }
+    }
+    // The priority of duplicated spawn points. SpawnPoint.All sorts by priority, highest first, and the default start
+    // without a setup takes the first, so a copy below every map spawn point never becomes a new game's start, and in
+    // /tp a map spawn point of the same name comes first.
+    public interface ISpawnPointPriorities {
+        // The priorities of the scene's loaded map spawn points, enabled or not; mod objects are not listed.
+        IReadOnlyList<int> MapPriorities(string scene);
+        int Priority(object spawnPoint);
+        void SetPriority(object spawnPoint, int priority);
+    }
+    public static class SpawnPointCopies {
+        public const string Unavailable = "Duplicated spawn points are unavailable: the priorities of the map's spawn points can't be read.";
+        // One below the lowest map priority; without map spawn points, one below the source's own.
+        public static int Priority(IEnumerable<int> mapPriorities, int sourcePriority) {
+            var lowest = (mapPriorities ?? Enumerable.Empty<int>()).DefaultIfEmpty(sourcePriority).Min();
+            return lowest == Int32.MinValue ? Int32.MinValue : lowest - 1;
         }
     }
     // A spawn point's place in the game's order of active spawn points; see SpawnPoints.Rank.

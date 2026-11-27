@@ -696,6 +696,33 @@ namespace RailroaderScenePatcher.Core {
                 return value;
             }, null, "marker-id-");
         }
+        // Sets the teleport name of a duplicated spawn point: the object name the game's teleport command and quick
+        // search find it by. Empty text clears it, and the copy takes the name its target path gives it again. The
+        // target path, ending with its mark, stays its identity, so the modifications below it keep their targets.
+        public Outcome SetTeleportName(TargetIdentity target, string name, InspectedTarget inspected) {
+            name = name?.Trim();
+            if (name?.Length == 0) name = null;
+            return Change(name == null ? "Clear teleport name" : "Set teleport name", target, inspected, existing => {
+                if (existing?[ModObjects.SourceMember] == null || !ModObjects.TakesTeleportName(target?.Structure)) throw new InvalidPatchDefinitionException(ModObjects.TeleportNameOnlySpawnPoints);
+                var problem = ModObjects.TeleportNameProblem(name);
+                if (problem != null) throw new InvalidPatchDefinitionException(problem);
+                var value = (JObject)existing.DeepClone();
+                if (name == null) value.Remove(ModObjects.TeleportNameMember); else value[ModObjects.TeleportNameMember] = name;
+                return value;
+            }, null, "teleport-name-");
+        }
+        // The teleport name the active scene patch file gives the duplicated spawn point, or null. Read from the file alone.
+        public string TeleportNameOf(TargetIdentity target) {
+            var key = ModObjectKey(target);
+            var token = key == null ? null : scenePatchFile.Modifications[key]?[ModObjects.TeleportNameMember];
+            return token?.Type == JTokenType.String ? (string)token : null;
+        }
+        // A duplicated spawn point takes the object name its modification gives: its teleport name, or its mark name.
+        void NameModObject(object target, JObject entry) {
+            if (entry?[ModObjects.SourceMember] == null || !(entry["target"] is JObject made) || made["structure"]?.Type != JTokenType.String || !ModObjects.TakesTeleportName((string)made["structure"])) return;
+            var token = entry[ModObjects.TeleportNameMember];
+            engine.Name(target, token?.Type == JTokenType.String ? (string)token : null);
+        }
         // The marker ID the generic track marker holds now, or null for any other object.
         public string MarkerIdOf(TargetIdentity target) {
             try { return scene.Read(engine.ResolveUnique(target))?.MarkerId; } catch (Exception) { return null; }
@@ -1196,10 +1223,12 @@ namespace RailroaderScenePatcher.Core {
                 // this mod leaves the modification: the edit is a revert of that setting. An edit that leaves the
                 // scene patch file as it is changes nothing and adds no step to the native history, as a native field ignores
                 // a value equal to the one it shows.
-                // An edit of a mod object keeps the source it is built from.
+                // An edit of a mod object keeps the source it is built from, and its teleport name: an edit that builds its
+                // value afresh knows neither, while Set teleport name starts from the whole modification.
                 if (value != null && existing?[ModObjects.SourceMember] != null && value[ModObjects.SourceMember] == null) {
                     if (value.Parent != null) value = (JObject)value.DeepClone();
                     value[ModObjects.SourceMember] = existing[ModObjects.SourceMember].DeepClone();
+                    if (existing[ModObjects.TeleportNameMember] != null) value[ModObjects.TeleportNameMember] = existing[ModObjects.TeleportNameMember].DeepClone();
                 }
                 var normal = Normalised(existing, value, engine.Underlying(resolved));
                 outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !PreservingJson.SameModification(normal, value));
@@ -1529,8 +1558,10 @@ namespace RailroaderScenePatcher.Core {
                 FaultInjection.TripAfterMutation();
 #endif
                 if (!Same(scene.Read(target), desired)) throw new InvalidOperationException("Applied state did not verify");
+                NameModObject(target, value);
             } catch (Exception e) {
                 scenePatchFile.Replace(key, current);
+                if (mutating) try { NameModObject(target, current); } catch { }
                 // What the scene patch file holds was refused before any mutation: its desired state, relationships or
                 // effective coverage. A guard that the object changed during the checks is no such refusal.
                 if (!mutating && !contentChecked) contentRefusal = e.Message;
