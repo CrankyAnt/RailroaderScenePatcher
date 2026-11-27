@@ -40,16 +40,7 @@ namespace RailroaderScenePatcher {
             r != null && (CrossingEquipmentFamilies.Contains(r.Family) || IsCrossbuck(r) || IsCrossingTrackMarker(r));
 
         // The marker ID of a crossing pad or track marker, or the pad marker ID that names a crossbuck.
-        static string MarkerIdOf(SceneObservation row) {
-            if (!String.IsNullOrEmpty(row.Identity.PadMarkerId)) return row.Identity.PadMarkerId;
-            foreach (var line in row.Bindings) {
-                if (!line.StartsWith("Marker id=", StringComparison.Ordinal)) continue;
-                var rest = line.Substring(10); var end = rest.IndexOf(';');
-                var id = (end < 0 ? rest : rest.Substring(0, end)).Trim();
-                return id.Length == 0 ? null : id;
-            }
-            return null;
-        }
+        static string MarkerIdOf(SceneObservation row) => !String.IsNullOrEmpty(row.Identity.PadMarkerId) ? row.Identity.PadMarkerId : row.MarkerId;
         static int CrossingChildRank(SceneObservation row) {
             switch (row?.Family) {
                 case null: return 99;

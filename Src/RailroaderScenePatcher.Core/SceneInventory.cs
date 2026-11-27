@@ -28,6 +28,11 @@ namespace RailroaderScenePatcher.Core {
     public interface IOwnedObjectScene {
         bool IsOwned(object handle);
     }
+    // A scene that names the object an observed object stands in directly: its parent in the hierarchy. It reads the
+    // object behind the handle and nothing else; null when that object is gone.
+    public interface IHolderScene {
+        object HolderOf(object handle);
+    }
     // A scene that checks scene objects for the inventory with a rule that can leave them out, as the scene object rule
     // checks the objects below World. It gives one value per checked object: null for an object it lists, otherwise the
     // reason it leaves the object out.
@@ -180,6 +185,20 @@ namespace RailroaderScenePatcher.Core {
         // it, before this mod moved it; null for every other object. Presentation metadata: the outliner numbers the
         // objects of one path by it (SharedPathSequence), so a move does not renumber them.
         public IReadOnlyList<double> GamePosition { get; }
+        // The binding line that holds a scene marker's marker ID, such as "Marker ID=Mlm1; type=Generic".
+        public const string MarkerIdLine = "Marker ID=";
+        // The binding line the inventory writes for a scene marker's marker ID and kind.
+        public static string MarkerIdBinding(string id, string type) => MarkerIdLine + id + "; type=" + type;
+        // The marker ID a scene marker's binding line holds, or null.
+        public string MarkerId {
+            get {
+                var line = Bindings.FirstOrDefault(b => b.StartsWith(MarkerIdLine, StringComparison.Ordinal));
+                if (line == null) return null;
+                var end = line.IndexOf(';');
+                var id = (end < 0 ? line.Substring(MarkerIdLine.Length) : line.Substring(MarkerIdLine.Length, end - MarkerIdLine.Length)).Trim();
+                return id.Length == 0 ? null : id;
+            }
+        }
         public SceneObservation(object handle, TargetIdentity identity, string family, bool active, IEnumerable<double> position,
             IEnumerable<double> rotation, IEnumerable<string> bindings, IEnumerable<string> dependencies, IEnumerable<string> problems, string operations,
             IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null, string category = null, string subcategory = null, string holderPath = null, string storage = null, BridgeKind bridge = BridgeKind.None, IEnumerable<string> information = null, IEnumerable<double> gamePosition = null) {
@@ -317,12 +336,17 @@ namespace RailroaderScenePatcher.Core {
                 if (target == null || new[] { "scene", "path", "component" }.Any(k => target[k]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)target[k])) ||
                     (target["structure"] != null && target["structure"].Type != JTokenType.String)) problems.Add("Invalid target identity");
                 else {
-                    matches = Entries.Count(e => TargetIdentity.SameObject(target, e.Identity) && (target["structure"] == null || e.Identity.Structure == (string)target["structure"]));
+                    // A crossing object has no entry of its own: its crossbucks and pads in the snapshot show it.
+                    matches = (string)target["structure"] == CrossingObjectScene.Structure ? CrossingObjects(target)
+                        : Entries.Count(e => TargetIdentity.SameObject(target, e.Identity) && (target["structure"] == null || e.Identity.Structure == (string)target["structure"]));
                     if (matches != 1) problems.Add(matches == 0 ? "Target is missing or has no inspection adapter" : "Target is ambiguous");
                 }
                 results.Add(new DefinitionInspection(id, matches, dependencies, problems));
             }
             return results.AsReadOnly();
+        }
+        int CrossingObjects(JObject target) {
+            try { return CrossingObjectScene.Observed(Entries, PatchEngine.ParseTarget(target), scene is IHolderScene holders ? holders.HolderOf : (Func<object, object>)null); } catch (InvalidOperationException) { return 0; }
         }
         // Replaces one entry by a new observation of the same object: the object an edit or a history step of this patcher
         // changed. Every other entry stays as it was compared. Returns the new entry, or null when the scene cannot

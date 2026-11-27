@@ -194,6 +194,7 @@ static class ModObjectCrossingTests {
         ASinglePadIsDuplicatedUnbound();
         ACrossingWithoutSignalsIsDuplicatedAsOneGroup();
         CrossingsAtOnePathAreToldApartByPadMarkerId();
+        TheSuppliedDefinitionOfACopiedCrossingMatchesItsCopy();
         TheCrossingNodeNamesItsCrossingObject();
         ADuplicatedCrossingNodeIsNamedByItsPlace();
         DuplicateIsOfferedForACrossingAndAPad();
@@ -462,6 +463,108 @@ static class ModObjectCrossingTests {
         Assert(!none.Applied && other.Builder.BuiltFrom.Count == 0, "A pad marker ID no crossing holds matches none: " + none.Error);
     }
 
+    // The inventory as the native discovery lists it: a crossing object is no observation of its own, its crossbucks
+    // and its pads are, and each pad names the object it stands in.
+    sealed class Listed : IInspectionScene, IHolderScene {
+        public IEnumerable<string> MapIds => new[] { "map" };
+        public readonly List<SceneObservation> Objects = new List<SceneObservation>();
+        public readonly Dictionary<object, object> Holders = new Dictionary<object, object>();
+        public IEnumerable<SceneObservation> Discover() => Objects;
+        public object HolderOf(object handle) => Holders.TryGetValue(handle, out var holder) ? holder : null;
+    }
+    // The loaded crossing objects as Resolve finds them: each with the marker IDs of the pads directly in it.
+    sealed class Standing : ICrossingObjectWorld {
+        public readonly Dictionary<string, List<object>> Objects = new Dictionary<string, List<object>>();
+        public readonly Dictionary<object, string[]> Pads = new Dictionary<object, string[]>();
+        public IEnumerable<string> MapIds => new[] { "map" };
+        public IReadOnlyList<object> Find(string scene, string path) => Objects.TryGetValue(path, out var found) ? found : new List<object>();
+        public IReadOnlyList<string> PadMarkerIds(object crossing) => Pads[crossing];
+        public double[] Position(object crossing) => new double[] { 0, 0, 0 };
+        public double[] Rotation(object crossing) => Upright;
+        public bool Active(object crossing) => true;
+    }
+    static SceneObservation Crossbuck(string path, string padMarkerId = null) => new SceneObservation(new object(), new TargetIdentity(Scene, path, SceneObjects.ComponentType, SceneObjects.Structure, padMarkerId),
+        SceneObjectRules.Family, true, new double[] { 0, 0, 0 }, Upright, new string[0], new string[0], new string[0], "Fixed placement", category: SceneObjectCategories.GradeCrossing);
+    static SceneObservation PadRow(string path, string markerId) => new SceneObservation(new object(), PadId(path), SceneFamilies.CrossingPad, true,
+        new double[] { 0, 0, 0 }, Upright, new[] { SceneObservation.MarkerIdLine + markerId + "; type=Generic" }, new string[0], new string[0], "Fixed placement");
+    // Puts one crossing object at the path into the inventory and, unless inWorld is false, into the world Resolve
+    // reads: its crossbucks, each with the pad marker ID the native rule gives it, and a pad in it for each marker ID.
+    static void Stand(Listed listed, Standing world, string path, string[] padIds, int crossbucks = 2, string crossbuckPadId = null, bool inWorld = true) {
+        var crossing = new object();
+        if (inWorld) {
+            if (!world.Objects.TryGetValue(path, out var at)) world.Objects[path] = at = new List<object>();
+            at.Add(crossing); world.Pads[crossing] = padIds;
+        }
+        for (var i = 0; i < crossbucks; i++) listed.Objects.Add(Crossbuck(path + "/Sign-Crossing0 (" + (i + 1) + ")", crossbuckPadId));
+        foreach (var id in padIds) { var pad = PadRow(path + "/Crossing Pad", id); listed.Objects.Add(pad); listed.Holders[pad.Handle] = crossing; }
+    }
+    static string ScenePatchFile(TargetIdentity target) {
+        var json = new JObject { ["scene"] = target.Scene, ["path"] = target.Path, ["component"] = target.Component, ["structure"] = target.Structure };
+        if (target.PadMarkerId != null) json[TargetIdentity.PadMarkerMember] = target.PadMarkerId;
+        return "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"crossing\":{\"target\":" + json.ToString(Newtonsoft.Json.Formatting.None) + ",\"dependsOn\":[]}}}";
+    }
+    // Session details and the engine count the same crossing objects for the target.
+    static void Agrees(Listed listed, Standing world, TargetIdentity target, int expected, string situation) {
+        var inventory = new SceneInventory(listed); inventory.Refresh();
+        var status = inventory.InspectScenePatchFile(ScenePatchFile(target)).Single();
+        var resolved = new CrossingObjectScene(world, Capability.Unchecked).Resolve(target).Count;
+        var problem = expected == 1 ? null : expected == 0 ? "Target is missing or has no inspection adapter" : "Target is ambiguous";
+        Assert(status.MatchCount == expected && resolved == expected && (problem == null ? status.Problems.Count == 0 : status.Problems.Contains(problem)),
+            situation + ": Session details counts " + status.MatchCount + " (" + String.Join(", ", status.Problems) + "), the engine " + resolved + ", expected " + expected);
+    }
+
+    // Right after Save, Session details lists the duplicate of a crossing without signals as its modification matching
+    // one object, as the engine finds it: a crossing object is known by the pads directly in it, and a mod object also
+    // without one. A copy built beside an identical instance stands at another parent with the same mark and matches as
+    // well. Crossings that share a path are told apart by the objects their pads stand in, so a crossing with two pad
+    // IDs or with crossbucks that carry no pad marker ID still counts as one of several, and a pad marker ID names the
+    // crossing whose pads hold it, at a shared path or not. Crossbucks without a pad are no crossing object.
+    static void TheSuppliedDefinitionOfACopiedCrossingMatchesItsCopy() {
+        var world = new World();
+        var session = world.Session(out var store, out _);
+        var placed = session.PlaceModObject(CrossingObjectScene.Identity(Scene, AlarkaPath), new Placement(AtNewSiding, Upright), null, null, Draws());
+        Assert(placed.Applied, "The crossing is duplicated: " + placed.Error);
+        session.BeginSave(); session.CompleteNativeSave();
+        var copy = placed.Target.Path;
+        var listed = new Listed(); var standing = new Standing();
+        Stand(listed, standing, AlarkaPath, new[] { "Malk" });
+        Stand(listed, standing, copy, new[] { Draw(0) });
+        var inventory = new SceneInventory(listed); inventory.Refresh();
+        string Status(SceneInventory current) => String.Join("; ", current.InspectScenePatchFile(store.Patch).Select(d => d.Id + " matches " + d.MatchCount + " " + String.Join(", ", d.Problems)));
+        var definition = inventory.InspectScenePatchFile(store.Patch).Single();
+        Assert(definition.MatchCount == 1 && definition.Problems.Count == 0, "The saved duplicate matches its copy: " + Status(inventory));
+        Agrees(listed, standing, placed.Target, 1, "The copy");
+        Agrees(listed, standing, CrossingObjectScene.Identity(Scene, AlarkaPath, "Malk"), 1, "A pad marker ID at a path of its own");
+        Agrees(listed, standing, CrossingObjectScene.Identity(Scene, AlarkaPath, "Mgone"), 0, "A pad marker ID no pad holds");
+        var elsewhere = new Listed();
+        var moved = "World/Roads Elsewhere/" + copy.Substring(copy.LastIndexOf('/') + 1);
+        Stand(elsewhere, new Standing(), moved, new[] { Draw(0) });
+        var built = new SceneInventory(elsewhere); built.Refresh();
+        Assert(built.InspectScenePatchFile(store.Patch).Single().MatchCount == 1, "A copy that stands at another parent matches by its mark: " + Status(built));
+        var padless = new Listed(); var padlessWorld = new Standing();
+        Stand(padless, padlessWorld, copy, new string[0]);
+        Agrees(padless, padlessWorld, placed.Target, 1, "A mod object without a pad");
+        Agrees(padless, padlessWorld, CrossingObjectScene.Identity(Scene, copy, Draw(0)), 0, "A pad marker ID in a mod object without a pad");
+        var gone = new SceneInventory(new Listed()); gone.Refresh();
+        definition = gone.InspectScenePatchFile(store.Patch).Single();
+        Assert(definition.MatchCount == 0 && definition.Problems.Contains("Target is missing or has no inspection adapter"), "Without the copy's rows it matches none: " + Status(gone));
+        var noPad = new Listed(); var noPadWorld = new Standing();
+        Stand(noPad, noPadWorld, AlarkaPath, new string[0], inWorld: false);
+        Agrees(noPad, noPadWorld, CrossingObjectScene.Identity(Scene, AlarkaPath), 0, "Crossbucks without a pad outside a mod object");
+        var shared = new Listed(); var sharedWorld = new Standing();
+        Stand(shared, sharedWorld, OldRiverPath, new[] { "Mold1" }, crossbuckPadId: "Mold1");
+        Stand(shared, sharedWorld, OldRiverPath, new[] { "Mold2", "Mold3" });
+        Agrees(shared, sharedWorld, CrossingObjectScene.Identity(Scene, OldRiverPath), 2, "A shared path with a crossing of two pad IDs");
+        Agrees(shared, sharedWorld, CrossingObjectScene.Identity(Scene, OldRiverPath, "Mold3"), 1, "The second pad ID of a crossing");
+        Agrees(shared, sharedWorld, CrossingObjectScene.Identity(Scene, OldRiverPath, "Mold1"), 1, "The pad ID of a crossing at a shared path");
+        var unnamed = new Listed(); var unnamedWorld = new Standing();
+        Stand(unnamed, unnamedWorld, OldRiverPath, new[] { "Mold1" }, crossbucks: 1);
+        Stand(unnamed, unnamedWorld, OldRiverPath, new[] { "Mold2" }, crossbucks: 0);
+        Agrees(unnamed, unnamedWorld, CrossingObjectScene.Identity(Scene, OldRiverPath), 2, "A shared path whose crossbucks carry no pad marker ID");
+        Agrees(unnamed, unnamedWorld, CrossingObjectScene.Identity(Scene, OldRiverPath, "Mold2"), 1, "A pad ID at a shared path whose crossbucks carry none");
+        Assert(InventoryPresentationState.MarkerIdLine == SceneObservation.MarkerIdLine && PadRow("p", "Mx").MarkerId == "Mx", "A pad's marker ID is read from the binding line the inventory writes");
+    }
+
     // The outliner's node of a crossing without signals names its crossing object: the scene, the path the members
     // stand in and, where crossings share that path, the pad marker ID of the crossing. Duplicate starts from it.
     static void TheCrossingNodeNamesItsCrossingObject() {
@@ -480,10 +583,18 @@ static class ModObjectCrossingTests {
                 listed.Add(new SceneObservation(new object(), new TargetIdentity(Scene, OldRiverPath + "/" + sign, SceneObjects.ComponentType, SceneObjects.Structure, id), SceneFamilies.SceneObject, true,
                     new double[] { 5350, 10, 5747 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement", category: SceneObjectCategories.GradeCrossing));
             listed.Add(new SceneObservation(new object(), PadId(OldRiverPath + "/Crossing Pad"), SceneFamilies.CrossingPad, true, new double[] { 5350, 10, 5747 }, new double[] { 0, 0, 0, 1 },
-                new[] { "Marker id=" + id + "; segment=Nnew; end=a; distance=20" }, Array.Empty<string>(), Array.Empty<string>(), "binding"));
+                new[] { SceneObservation.MarkerIdBinding(id, "Generic"), "Marker segment=Nnew; end=a; distance=20" }, Array.Empty<string>(), Array.Empty<string>(), "binding"));
         }
-        var shared = OutlinerGrouping.Build(listed, listed, "", false, null).GroupNodes.Values.Where(n => n.Identity?.Path == OldRiverPath).Select(n => n.Identity.PadMarkerId).OrderBy(id => id).ToArray();
+        var logPending = OutlinerGrouping.LogPending;
+        OutlinerGrouping.Result built;
+        try { OutlinerGrouping.LogPending = true; built = OutlinerGrouping.Build(listed, listed, "", false, null); } finally { OutlinerGrouping.LogPending = logPending; }
+        var shared = built.GroupNodes.Values.Where(n => n.Identity?.Path == OldRiverPath).Select(n => n.Identity.PadMarkerId).OrderBy(id => id).ToArray();
         Assert(shared.SequenceEqual(new[] { "Mold1", "Mold2", "Mold3" }), "The three crossings below Old River Rd are named by their pad marker IDs: " + String.Join(",", shared));
+        // Each pad, with the marker ID line the inventory writes, stands in the node of its own crossing.
+        var unprotected = built.Crossings.Where(line => line.StartsWith("unprotected ", StringComparison.Ordinal) && line.Contains(OldRiverPath)).ToArray();
+        Assert(!built.Crossings.Any(line => line.StartsWith("unmatched", StringComparison.Ordinal)) && unprotected.Length == 3
+            && new[] { "Mold1", "Mold2", "Mold3" }.All(id => unprotected.Count(line => line.Contains("pad marker " + id) && line.Contains(SceneFamilies.CrossingPad + " ")) == 1),
+            "Each pad at the shared path joins its crossing's node: " + String.Join(" | ", built.Crossings));
         var crossing = new SceneObservation(new object(), alarka[0].Identity, CrossingObjectScene.Family, true, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), null);
         Assert(DuplicateState.Reason(crossing, new[] { SceneFamilies.SceneObject, SceneFamilies.ChildObject, SceneFamilies.CrossingPad, SceneFamilies.TrackMarker }) == null, "A crossing without signals can be duplicated: " + DuplicateState.Reason(crossing, null));
         Assert(DuplicateState.Reason(crossing, new[] { SceneFamilies.SceneObject, SceneFamilies.Milepost }) == DuplicateState.HoldsOtherFamily, "One that holds a milepost is not copied");

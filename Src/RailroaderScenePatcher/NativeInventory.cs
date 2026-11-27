@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace RailroaderScenePatcher {
     // Reads serialized bindings and direct references, never binding/cache getters or TryApply.
-    internal sealed class NativeInventory : ISteppedInspectionScene, IRelatedInspectionScene, IOwnedObjectScene, ICheckedObjectsScene {
+    internal sealed class NativeInventory : ISteppedInspectionScene, IRelatedInspectionScene, IOwnedObjectScene, ICheckedObjectsScene, IHolderScene {
         // The scene object rule's checks, for the window's reason on a map where it lists nothing. A failed read reports
         // no checks, so the window keeps its list.
         public IEnumerable<string> CheckedObjects() {
@@ -32,6 +32,8 @@ namespace RailroaderScenePatcher {
             var family = component == null ? null : Family(component);
             return family == null ? null : observer(component, family);
         }
+        // The object an observed object stands in: its parent, which holds a crossing pad as its crossing object.
+        public object HolderOf(object handle) => handle is GameObject go && go != null && go.transform.parent != null ? go.transform.parent.gameObject : null;
         // Added crossing equipment is the patcher's own runtime state, not inventory.
         // The wrapper of an addition is its added object and stays inventory; the copy's parts below it do not.
         public bool IsOwned(object handle) => handle is GameObject go && go != null && go.GetComponent<OwnedEquipment>() == null && OwnedEquipment.Of(go) != null;
@@ -448,7 +450,7 @@ namespace RailroaderScenePatcher {
             MarkerIdHolders markerHolders = null;
             if (marker != null) Read(() => {
                 var kind = Text(Field(marker, "type"));
-                bindings.Add(InventoryPresentationState.MarkerIdLine + Text(Field(marker, "id")) + "; type=" + kind);
+                bindings.Add(SceneObservation.MarkerIdBinding(Text(Field(marker, "id")), kind));
                 // What the game needs from this kind's binding decides whether its state is a problem; the setups say
                 // whether a new-game car placement reads it whatever its activity, and which ones do.
                 var reading = starters.Reading(marker, kind, family == "Crossing pad marker");

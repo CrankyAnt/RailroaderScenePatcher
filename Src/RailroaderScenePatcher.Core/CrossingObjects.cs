@@ -32,6 +32,29 @@ namespace RailroaderScenePatcher.Core {
         public CrossingObjectScene(ICrossingObjectWorld world, Capability capability) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; }
         // The identity of the crossing object at the path. padMarkerId names the crossing where crossings share the path.
         public static TargetIdentity Identity(string scene, string path, string padMarkerId = null) => new TargetIdentity(scene, path, ComponentType, Structure, String.IsNullOrEmpty(padMarkerId) ? null : padMarkerId);
+        // How many crossing objects an inventory shows for a target, by the rule Resolve uses. A crossing object is no
+        // observation of its own: the crossing pads directly in it are, and a crossing object is known by them. A path in
+        // a mod object compares by its mark, so a copy that stands at another parent counts as well. holderOf names the
+        // object a pad stands in, which tells crossings that share a path apart; without it every pad at a path counts
+        // for one crossing object. A target without a pad marker ID counts every crossing object at its path; with one,
+        // the crossing objects whose pads hold it. A mod object is a crossing object without a pad as well: it counts
+        // while an observation stands directly in it.
+        public static int Observed(IEnumerable<SceneObservation> entries, TargetIdentity target, Func<object, object> holderOf = null) {
+            if (entries == null || target == null || target.Component != ComponentType || target.Structure != Structure) return 0;
+            var below = ModObjects.Canonical(target.Path) + "/";
+            var members = entries.Where(e => e.Identity.Scene == target.Scene && ModObjects.Canonical(e.Identity.Path) is string path
+                && path.StartsWith(below, StringComparison.Ordinal) && path.IndexOf('/', below.Length) < 0).ToArray();
+            var crossings = new Dictionary<object, List<string>>();
+            foreach (var pad in members.Where(e => e.Family == SceneFamilies.CrossingPad)) {
+                var holder = holderOf == null ? below : holderOf(pad.Handle);
+                if (holder == null) continue;
+                if (!crossings.TryGetValue(holder, out var ids)) crossings[holder] = ids = new List<string>();
+                var id = pad.MarkerId;
+                if (!String.IsNullOrEmpty(id)) ids.Add(id);
+            }
+            if (crossings.Count == 0 && ModObjects.IsPath(target.Path) && members.Length != 0) crossings[below] = new List<string>();
+            return target.PadMarkerId == null ? crossings.Count : crossings.Values.Count(ids => ids.Contains(target.PadMarkerId, StringComparer.Ordinal));
+        }
         public IEnumerable<string> MapIds => world.MapIds;
         public Capability Capability { get; }
         // Only a target that names the structure: the component alone also names every scene object.

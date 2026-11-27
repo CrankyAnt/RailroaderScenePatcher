@@ -78,7 +78,7 @@ namespace RailroaderScenePatcher {
         internal const string CoverageRoot = "CrankyAnt Scene Patcher crossing coverage";
 
         const string MarkerIdKey = "ID";
-        internal const string MarkerIdLine = "Marker " + MarkerIdKey + "=";
+        internal const string MarkerIdLine = SceneObservation.MarkerIdLine;
 
         // The named values of a binding line of the form "Marker ID=Mlm1; type=Generic": the words before the first key
         // name the group ("Marker", "Track-relative", "Circuit 0"), and each "key=value" part follows in order. A part
