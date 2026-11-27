@@ -18,6 +18,26 @@ namespace RailroaderScenePatcher.Core {
             path != null && path.Length > IconsPath.Length + 1 && path.StartsWith(IconsPath + "/", StringComparison.Ordinal) && path.IndexOf('/', IconsPath.Length + 1) < 0;
         public const string Operations = "Move, rotate, enable, or disable this station map icon. Edit the station's track span, house, and station agent in the Map Editor.";
         public const string Dependency = "Map window: the map shows the icon at its position. Enabling the icon registers it with the map.";
+
+        // The map draws a station map icon only on its own layer, which the world camera does not show. While a station
+        // map icon is selected, and while a duplicated one is being placed, the world shows the map's icon instead:
+        // centred on its place, WorldIconHeight pixels high. It is presentation only: it reads nothing but the place and
+        // changes neither the icon's activity nor its registration with the map, so a switch of the game, such as
+        // progression, stays as it is. A switched-off icon shows it too, so the modder can place it.
+        public const double WorldIconHeight = 40;
+        // Whether the world shows the map's icon for this object while it is selected or being placed: a station map icon.
+        public static bool ShowsMapIcon(SceneObservation observation) => observation != null && observation.Family == Family;
+        // Where the map's icon is drawn on screen, in top-left pixels: centred on its place, projected to clip coordinates,
+        // WorldIconHeight high and aspect (the icon image's width over its height) times as wide. Null when the place lies
+        // behind the camera or its projection is not finite.
+        public static ScreenRect? WorldIcon(ClipPoint place, ScreenRect view, double aspect) {
+            if (!(place.W > 0) || !Finite(place.X) || !Finite(place.Y) || !(aspect > 0) || !Finite(aspect)) return null;
+            double x = view.X + (place.X / place.W + 1) * view.Width / 2, y = view.Y + (1 - place.Y / place.W) * view.Height / 2;
+            if (!Finite(x) || !Finite(y)) return null;
+            double halfHeight = WorldIconHeight / 2, halfWidth = halfHeight * aspect;
+            return ScreenRect.FromEdges((float)(x - halfWidth), (float)(y - halfHeight), (float)(x + halfWidth), (float)(y + halfHeight));
+        }
+        static bool Finite(double value) => !Double.IsNaN(value) && !Double.IsInfinity(value);
     }
     // A station map icon as the capability reads it: its own placement and activity in map coordinates, the object it
     // stands in, whether it is active with its parents, and whether the map has it registered. Registered is null while

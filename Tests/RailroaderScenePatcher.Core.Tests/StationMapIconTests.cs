@@ -29,6 +29,8 @@ static class StationMapIconTests {
         RefusalInScenePatchEditingLeavesTheFile();
         MinimumHoldsWithoutTheCapability();
         AStationMapIconCanBeDuplicated();
+        TheMapIconShowsAtItsPlaceWhileSelected();
+        TheMapIconIsTheGhostWhilePlacing();
         Console.WriteLine("PASS: station map icons");
     }
 
@@ -184,6 +186,71 @@ static class StationMapIconTests {
         var session = new PatchEditingSession(f.Engine, new NativeMapEditor(), new Store { Patch = doc }, "author/pack", "author/pack");
         Assert(session.Edit(Id(made), null, false).Applied && !icon.Active && !f.World.Registered.Contains(icon), "A duplicated icon is disabled like any station map icon");
         Assert(session.Remove(Id(made)).Applied && !f.World.Objects.ContainsKey(made) && f.World.Registered.Contains(f.BrysonIcon), "Remove modification removes the duplicated icon and leaves the source");
+    }
+    // The world view of the map icon tests: a 2560 by 1440 screen and a camera at eye looking along +Z with a 90 degree
+    // vertical field, in Unity's clip convention.
+    static readonly ScreenRect View = new ScreenRect(0, 0, 2560, 1440);
+    static Func<IReadOnlyList<double>, ClipPoint> CameraAt(double x, double y, double z) =>
+        p => new ClipPoint((p[0] - x) * View.Height / View.Width, p[1] - y, p[2] - z - 0.6, p[2] - z);
+    static bool At(ScreenRect? rect, double left, double top, double right, double bottom) =>
+        rect.HasValue && Math.Abs(rect.Value.X - left) < .01 && Math.Abs(rect.Value.Y - top) < .01 && Math.Abs(rect.Value.Right - right) < .01 && Math.Abs(rect.Value.Bottom - bottom) < .01;
+    static string Show(ScreenRect? rect) => rect.HasValue ? rect.Value.X + "," + rect.Value.Y + "-" + rect.Value.Right + "," + rect.Value.Bottom : "none";
+    static SceneObservation Observed(Icons f, FakeIcon icon, string path) {
+        var state = f.World.Observe(icon).Root;
+        return new SceneObservation(icon, Id(path), StationMapIconRules.Family, state.Active != false, state.Placement.Position, state.Placement.Rotation, new string[0], new string[0], new string[0], StationMapIconRules.Operations);
+    }
+
+    // While a station map icon is selected, the world shows the map's icon centred on its place: 40 pixels high and as
+    // wide as the icon's image is for that height. It follows a move, shows also for an icon that is switched off,
+    // and reading it changes neither the icon's activity nor its registration with the map, so the progression switch
+    // stays as it is. Other families show no map icon, and an icon behind the camera is not drawn.
+    static void TheMapIconShowsAtItsPlaceWhileSelected() {
+        var f = new Icons();
+        var bryson = Observed(f, f.BrysonIcon, Bryson);
+        Assert(StationMapIconRules.ShowsMapIcon(bryson), "A selected station map icon shows the map's icon in the world");
+        var group = new SceneObservation(new object(), new TargetIdentity(SceneName, "World/Large Scenery/Bryson", "UnityEngine.Transform", SceneObjects.Structure), SceneFamilies.SceneObject, true,
+            new[] { 1000.0, 80, 400 }, Upright, new string[0], new string[0], new string[0], "Placement");
+        Assert(!StationMapIconRules.ShowsMapIcon(group) && !StationMapIconRules.ShowsMapIcon(null), "A scene object shows no map icon");
+        var eye = CameraAt(1000, 80, 300);
+        var icon = StationMapIconRules.WorldIcon(eye(f.At(f.BrysonIcon)), View, 1);
+        Assert(At(icon, 1260, 700, 1300, 740), "The square icon stands centred on Bryson's place: " + Show(icon));
+        var wide = StationMapIconRules.WorldIcon(eye(f.At(f.BrysonIcon)), View, 2);
+        Assert(At(wide, 1240, 700, 1320, 740), "An icon image twice as wide as high is drawn 80 by 40 pixels: " + Show(wide));
+        var session = new PatchEditingSession(f.Engine, new NativeMapEditor(), new Store(), "author/pack", "author/pack");
+        Assert(session.Edit(Id(Bryson), new Placement(BrysonTarget, Upright), null).Applied, "The Bryson icon moves");
+        var moved = StationMapIconRules.WorldIcon(eye(f.At(f.BrysonIcon)), View, 1);
+        Assert(At(moved, 2385, 700, 2425, 740), "The icon follows the move to its new place: " + Show(moved));
+        Assert(session.Edit(Id(Bryson), null, false).Applied, "The Bryson icon is switched off");
+        var off = Observed(f, f.BrysonIcon, Bryson);
+        Assert(StationMapIconRules.ShowsMapIcon(off) && At(StationMapIconRules.WorldIcon(eye(off.Position), View, 1), 2385, 700, 2425, 740),
+            "A switched-off icon still shows the map's icon at its place while it is selected");
+        Assert(!f.BrysonIcon.Active && !f.World.Registered.Contains(f.BrysonIcon) && f.CochranIcon.Active && f.World.Registered.Contains(f.CochranIcon),
+            "Showing the map's icon leaves activity and registration as the edits and the game set them: " + f.Where());
+        Assert(StationMapIconRules.WorldIcon(CameraAt(1000, 80, 600)(f.At(f.BrysonIcon)), View, 1) == null, "An icon behind the camera is not drawn");
+    }
+
+    // The pointer while a duplicated station map icon is placed: over the world at (1280, 900), where the ground's map
+    // point is (1600, 75, 900).
+    sealed class GroundPointer : IPlacingPointer {
+        public double[] Pointer => new[] { 1280.0, 900 };
+        public double[] WorldClick => null;
+        public double[] MapPoint(double[] screen) => new[] { 1600.0, 75, 900 };
+    }
+    // While a duplicated station map icon is being placed, the map's icon is the ghost: it stands centred on the
+    // ground under the pointer and moves with it. The ghost of a scene object is its meshes, never a map icon.
+    static void TheMapIconIsTheGhostWhilePlacing() {
+        var f = new Icons();
+        var duplicate = new DuplicateState();
+        duplicate.Begin(Observed(f, f.BrysonIcon, Bryson));
+        Assert(DuplicateState.Reason(duplicate.Source, new string[0]) == null, "A station map icon can be duplicated");
+        duplicate.Place();
+        Assert(duplicate.Tick(new GroundPointer(), (from, placement) => throw new InvalidOperationException("nothing is clicked")) == null, "Moving the pointer places nothing");
+        Assert(StationMapIconRules.ShowsMapIcon(duplicate.Source) && duplicate.Ghost != null, "The ghost of a duplicated station map icon is the map's icon");
+        var ghost = StationMapIconRules.WorldIcon(CameraAt(1600, 75, 800)(duplicate.Ghost), View, 1);
+        Assert(At(ghost, 1260, 700, 1300, 740), "The map's icon stands centred on the ground under the pointer: " + Show(ghost));
+        Assert(f.World.Objects.Values.Sum(list => list.Count) == 2 && f.BrysonIcon.Active && f.World.Registered.Count == 2, "Nothing is built while the ghost is on the pointer: " + f.Where());
+        duplicate.Release();
+        Assert(duplicate.Ghost == null, "Release takes the map's icon off the pointer");
     }
     sealed class Icons {
         public readonly IconWorld World = new IconWorld();

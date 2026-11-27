@@ -160,7 +160,8 @@ namespace RailroaderScenePatcher {
                 feedback.Report(DuplicatePlace, DuplicateState.Placed);
                 ModObjectsChanged();
             }
-            if (PlacingModObject && duplicate.Ghost != null) {
+            // A station map icon has no mesh in the world: its ghost is the map's icon, drawn with the pointer mark.
+            if (PlacingModObject && duplicate.Ghost != null && !StationMapIconRules.ShowsMapIcon(duplicate.Source)) {
                 var turn = duplicate.Source.Rotation;
                 try { placingGhost.Show(source, duplicate.Ghost, new Quaternion((float)turn[0], (float)turn[1], (float)turn[2], (float)turn[3])); }
                 catch (Exception e) { placingGhost.Clear(); PatcherLog.Debug("The placing ghost is unavailable: " + e.GetBaseException().Message); }
@@ -191,6 +192,8 @@ namespace RailroaderScenePatcher {
             if (!PlacingModObject || presentation == null || !presentation.IsOpen || Event.current.type != EventType.Repaint) return;
             var pointer = Event.current.mousePosition;
             if (presentation.PanelBounds.Contains(pointer)) return;
+            if (StationMapIconRules.ShowsMapIcon(duplicate.Source) && duplicate.Ghost is double[] ghost && duplicate.Source.Handle is GameObject icon && icon != null)
+                WorldMapIcon.Draw(icon, NativeInventory.ScenePosition(new Vector3((float)ghost[0], (float)ghost[1], (float)ghost[2]), NativeInventory.MovesWithOrigin(icon.transform)), null);
             if (placingLabel == null) placingLabel = new GUIStyle(GUI.skin.label) { fontSize = 14, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
             var before = GUI.color;
             GUI.color = new Color(1f, .82f, .2f, 1f);

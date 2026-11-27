@@ -26,7 +26,7 @@ Duplicate makes a new object from an object of the map and places it where you c
 
 1. Move the camera to where the object goes. The camera moves as always, and the native map editor stays available. The other controls of the Scene Patcher window, **Select in world** among them, wait until you place the object or click **Cancel**.
 
-1. Click **Place**. A ghost of the object, a copy that is shown only, stands on the ground under the pointer and follows it, with the instruction **Left-click to place**. Over the Scene Patcher window, or where no ground is, the ghost is hidden.
+1. Click **Place**. A ghost of the object, a copy that is shown only, stands on the ground under the pointer and follows it, with the instruction **Left-click to place**. Over the Scene Patcher window, or where no ground is, the ghost is hidden. For a station map icon, the ghost is the map's icon.
 
 1. Left-click the ground. The object is placed where the ghost stands, with the rotation of the object you duplicated.
 

@@ -1078,7 +1078,11 @@ namespace RailroaderScenePatcher {
                     worldLabelBacking = new Texture2D(1, 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
                     worldLabelBacking.SetPixel(0, 0, new Color(.106f, .098f, .086f, 1)); worldLabelBacking.Apply();
                 }
-                selection.Draw(selected, presentation.WorldUiBounds(), worldLabelBacking, InspectedTrackPoint(), InspectedCut());
+                var covered = presentation.WorldUiBounds();
+                // A selected station map icon shows the map's icon at its place, below its marking.
+                if (StationMapIconRules.ShowsMapIcon(selected) && selected.Handle is GameObject icon && icon != null)
+                    WorldMapIcon.Draw(icon, icon.transform.position, covered);
+                selection.Draw(selected, covered, worldLabelBacking, InspectedTrackPoint(), InspectedCut());
             }
             catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
         }
