@@ -948,10 +948,21 @@ namespace RailroaderScenePatcher {
                 Field(builder, "Track point", point == null ? "None: " + (FocusUnavailable() ?? StarterPlacements.NoTrackPoint) : String.Join(", ", point.Select(CommandBand.Number)))
                     .Tooltip("Track point", "Where the start setup places the front of this marker's car cut, in map coordinates. Focus goes here.");
             }
+            // A group that can't be moved as a whole says why, and shows its placement as text: it has no mode or action
+            // that would do anything.
+            var refusal = SupportedEdits.WholeMoveRefusal(selected);
+            if (refusal != null) {
+                PlainLabel(builder, refusal);
+                for (var group = 0; group < 2; group++) {
+                    builder.Spacer(6f);
+                    ValueRow(builder, CommandBand.PlacementGroups[group], CommandBand.PlacementUnits[group], CommandBand.Axes, placementFields, group * 3, moveBlock, null, column => true);
+                }
+                return;
+            }
             var tips = new[] { "Enter a position in map coordinates and a rotation in degrees.", "Drag the native map editor's Move or Rotate gizmo in the world.",
                 "Move the object once onto a chosen track or endpoint.", "Keep the object's placement relative to a chosen track or endpoint." };
             builder.AddSegmentedControlCompact(segments => {
-                for (var i = 0; i < PlacementModes.Length; i++) {
+                foreach (var i in SupportedEdits.PlacementModes(selected)) {
                     var mode = i;
                     // A mode that cannot be used on the inspected object is inactive and says why, in the words of
                     // Supported edits. Numeric stays open to show the placement, its fields unavailable with the reason.
@@ -1666,6 +1677,8 @@ namespace RailroaderScenePatcher {
             switch (id) {
                 case PlacementTab:
                     block = (selected == null ? null : EditUnavailable(SupportedEdits.Move)) ?? block;
+                    // A group that can't be moved as a whole offers no placement mode, and so no action.
+                    if (selected != null && SupportedEdits.PlacementModes(selected).Count == 0) return new Act[0];
                     // An object whose placement stands as running lines keeps Apply and Read, inactive with the reason.
                     if (placementMode == 0 || IsPad) {
                         var placementBlock = block;

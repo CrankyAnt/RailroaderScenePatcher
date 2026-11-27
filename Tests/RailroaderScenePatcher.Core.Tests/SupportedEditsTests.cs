@@ -37,7 +37,48 @@ static class SupportedEditsTests {
         EveryPatternRefusalNamesItsReason();
         AnAbsentSceneBlocksEveryEdit();
         LiveReasonsStayShortAndMatchTheirControls();
+        GroupsThatCantMoveAsAWholeSayWhyOnThePlacementTab();
         Console.WriteLine("PASS: supported edits");
+    }
+
+    // A group that holds a station click spot, or a construction controller outside a rail bridge, can't be moved as a
+    // whole. The base map holds neither, so each kind is a real base-map group with that object added below it: Alarka
+    // Jct Station with a station click spot, Alarka Depot with a construction controller. Each lists no edit, and its
+    // Placement tab gives the whole reason why it can't be moved as a whole instead of placement modes and actions.
+    static void GroupsThatCantMoveAsAWholeSayWhyOnThePlacementTab() {
+        const string station = "World/Large Scenery/Alarka Jct/Alarka Jct Station", depot = "World/Large Scenery/Alarka/Alarka Depot";
+        var map = new BaseMapFixture(new[] {
+            new BaseMapObject { Listed = false, Path = station + "/Station Agent", Components = new[] { "Model.StationAgent", "UnityEngine.BoxCollider" }, At = new[] { 1733.0, 1473 } },
+            new BaseMapObject { Listed = false, Path = depot + "/Construction", Components = new[] { SceneObjectRules.ConstructionController }, At = new[] { 4180.0, -3133 } },
+        });
+        var plain = new BaseMapFixture();
+        foreach (var (path, reason, shortReason) in new[] {
+            (station, SceneObjectRules.StationAgentReason, "Station click spots are native map data"),
+            (depot, SceneObjectRules.ConstructionOutsideBridge, "It holds a construction controller"),
+        }) {
+            var verdict = map.Verdicts.Single(v => v.Path == path);
+            Check(verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Reason == reason && verdict.ReasonIsSentence, path + " is inspection only with its settled reason: " + verdict.Reason);
+            Check(plain.Verdicts.Single(v => v.Path == path).Disposition == GroupDisposition.Group, path + " is a listed group without the added object");
+            Check(reason.StartsWith("This group can't be moved as a whole because it contains ", StringComparison.Ordinal), "the reason says why the group can't be moved as a whole: " + reason);
+            // The entry as the native inventory lists an inspection-only top scene object: no structure, and its
+            // inspection-only line as its operations.
+            var o = map.Objects.First(m => m.Listed && m.Path == path);
+            var only = CommandBand.GroupInspectionOnly(verdict, o.Family);
+            var entry = Entry(o.Family, null, only, path, only: only);
+            var edits = SupportedEdits.Of(entry, new SupportedEdits.Live { Present = true, Enabled = true });
+            Check(Shown(entry, new SupportedEdits.Live { Present = true, Enabled = true }) == "Unavailable: | • " + shortReason + ": " + Placed, path + " lists no edit: " + Shown(entry));
+            // The Placement tab: the reason as text, and no placement mode or action that would do nothing.
+            Check(SupportedEdits.WholeMoveRefusal(entry) == reason, path + ": the Placement tab gives the whole reason: " + SupportedEdits.WholeMoveRefusal(entry));
+            Check(SupportedEdits.PlacementModes(entry).Count == 0, path + ": the Placement tab offers no placement mode");
+            Check(SupportedEdits.ReasonOf(edits, SupportedEdits.Move) == shortReason, path + ": the placement values carry the short reason");
+        }
+        // Other objects keep their placement modes: a listed group, and an object of a family without edits, whose
+        // Numeric mode shows its placement with the other modes inactive.
+        var group = plain.Objects.First(m => m.Listed && m.Path == station);
+        var listed = Entry(group.Family, SceneObjects.Structure, CommandBand.GroupOperations, station);
+        Check(SupportedEdits.WholeMoveRefusal(listed) == null && SupportedEdits.PlacementModes(listed).SequenceEqual(new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode }), "a listed group keeps its placement modes");
+        var noFamily = Entry("Unrecognised family", null, CommandBand.InspectionOnly("Unrecognised family", false), only: CommandBand.InspectionOnly("Unrecognised family", false));
+        Check(SupportedEdits.WholeMoveRefusal(noFamily) == null && SupportedEdits.PlacementModes(noFamily).Count == 4, "an inspection-only family keeps its modes");
     }
 
     static void LiveReasonsStayShortAndMatchTheirControls() {

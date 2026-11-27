@@ -798,6 +798,10 @@ namespace RailroaderScenePatcher {
             if (verdict?.ReasonIsSentence == true) return NotEditableAsGroupPrefix + verdict.Reason;
             return NotYetSupported(verdict?.Reason ?? "this " + family.ToLowerInvariant());
         }
+        // The settled reason of a group that is not editable as a group, from its inspection-only line, or null for any
+        // other line: the whole sentence without the "Not editable as a group" label.
+        internal static string NotEditableAsGroup(string inspectionOnly) =>
+            inspectionOnly != null && inspectionOnly.StartsWith(NotEditableAsGroupPrefix, StringComparison.Ordinal) ? inspectionOnly.Substring(NotEditableAsGroupPrefix.Length) : null;
         // The families of a light or gate and of a bell this patcher added: supported families whose edits live on their
         // crossing's Connections tab, not on the object itself.
         internal const string AddedEquipmentFamily = SceneFamilies.AddedEquipment, AddedBellFamily = SceneFamilies.AddedBell;

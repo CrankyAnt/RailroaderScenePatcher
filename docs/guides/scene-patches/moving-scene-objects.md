@@ -23,7 +23,7 @@ A group contains only the objects saved below its top scene object in the scene.
 
 Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
-Groups containing spawn points or a crossing pad are also marked `inspection only` and can't move as a whole. Edit their spawn points in the **Spawn point** family and the pad in the **Crossing pad marker** family. A group that holds track markers is listed; see [groups with track markers](#groups-with-track-markers). A group marked `inspection only` stays under its category in the outliner. A group that fits no category stands under **Unclassified**. These groups list no parts.
+Groups containing spawn points or a crossing pad are also marked `inspection only` and can't move as a whole. Edit their spawn points in the **Spawn point** family and the pad in the **Crossing pad marker** family. The **Placement** tab of a group that can't move as a whole, such as one that contains a station click spot or a construction controller outside a rail bridge, gives the reason and shows the group's position and rotation, without placement modes or actions. A group that holds track markers is listed; see [groups with track markers](#groups-with-track-markers). A group marked `inspection only` stays under its category in the outliner. A group that fits no category stands under **Unclassified**. These groups list no parts.
 
 ## Which parts are listed
 

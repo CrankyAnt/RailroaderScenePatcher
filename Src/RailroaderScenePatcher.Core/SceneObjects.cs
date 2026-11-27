@@ -210,8 +210,8 @@ namespace RailroaderScenePatcher.Core {
         // a map icon elsewhere is in no family and has no edit.
         public const string MapIconReason = "This group contains a map icon, which the patcher can't move with the group.";
         // Why a group with a station click spot is left out: in Railroader 0.6.3 station click spots are native map data,
-        // which the native map editor edits.
-        public const string StationAgentReason = "This group contains a station click spot. It's native map data, which you edit in the Map Editor.";
+        // which the native map editor edits. The group's Placement tab gives this reason instead of its controls.
+        public const string StationAgentReason = "This group can't be moved as a whole because it contains a station click spot, which is native map data. Edit station click spots in the Map Editor.";
         // Why a group with a crossing pad outside a crossing is left out: its track binding places the pad, so the pad
         // can't move with the group. A track marker without a pad moves with its group and keeps its binding.
         public const string CrossingPadReason = "This group can't be moved as a whole because it contains a crossing pad, which its track binding places. " + WindowGuidance.EditCrossingPadSeparately;
@@ -239,8 +239,9 @@ namespace RailroaderScenePatcher.Core {
         // The construction controller of a rail bridge (Game.Mow.TrackConstructionScenery): it switches the objects of
         // its entries on and off by the construction state of the track segments it names, wherever it stands.
         public const string ConstructionController = "Game.Mow.TrackConstructionScenery";
-        // Why a group that holds a construction controller but is no supported rail bridge construction is left out.
-        public const string ConstructionOutsideBridge = "This group contains a construction controller but isn't a supported rail bridge. You can't edit it as a group.";
+        // Why a group that holds a construction controller but is no supported rail bridge construction is left out. The
+        // group's Placement tab gives this reason instead of its controls.
+        public const string ConstructionOutsideBridge = "This group can't be moved as a whole because it contains a construction controller and isn't a supported rail bridge.";
         // Why a rail bridge or a part of one takes no track-following placement: its track is native map
         // data, and the bridge is placed onto the moved track with fixed placement.
         public const string RailBridgeNoFollowing = "Rail bridges use fixed placement. They don't support track-following placement.";

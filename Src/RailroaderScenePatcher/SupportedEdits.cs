@@ -113,6 +113,15 @@ namespace RailroaderScenePatcher {
         // keepsNumeric is false, as for a crossing pad or crossing equipment that cannot be edited; its fields then
         // carry the reason of Move.
         internal static string ModeBlock(IEnumerable<Edit> edits, int mode, bool keepsNumeric) => mode == CommandBand.NumericMode && keepsNumeric ? null : ModeReason(edits, mode);
+        static readonly int[] AllModes = { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode };
+        // Why the group can't be moved as a whole, as the whole sentence its Placement tab shows, or null: a group that a
+        // settled rule leaves out of its family, such as one that holds a station click spot or a construction controller
+        // outside a rail bridge. Such a group has no placement edit at all, so the tab names the reason and shows its
+        // placement as text, without placement modes or actions that would do nothing.
+        internal static string WholeMoveRefusal(SceneObservation entry) => CommandBand.NotEditableAsGroup(entry?.InspectionOnly);
+        // The placement modes the Placement tab offers as buttons, each active or inactive with its reason (ModeBlock),
+        // and the actions of the open mode with them: none for a group that can't be moved as a whole.
+        internal static IReadOnlyList<int> PlacementModes(SceneObservation entry) => WholeMoveRefusal(entry) != null ? Array.Empty<int>() : AllModes;
         // Supported edits as the Object tab shows it: one line with the available edits, then one line for each reason
         // with the edits it holds back, the reason in the words of their controls' tooltips.
         internal static IReadOnlyList<string> Lines(IReadOnlyList<Edit> edits) {
