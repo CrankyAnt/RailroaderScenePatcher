@@ -32,7 +32,7 @@ static class HelpWindowTests {
             Check(index > previous && words.Count(word => word == heading) == 1, "Object help names each reason group once in order: " + heading);
             previous = index;
         }
-        Check(words[words.IndexOf("Supported edits") + 1].Contains("disabled control's tooltip"), "Supported edits explains the disabled control's reason");
+        Check(words[words.IndexOf("Supported edits") + 1].Contains("Hover over a disabled control to see the same reason."), "Supported edits explains the disabled control's reason");
         var activity = words[words.IndexOf("Activity set by the game") + 1];
         Check(activity.Contains("When available, Clear activity"), "Track group help does not offer Clear activity for every object whose activity follows a track group");
         var elsewhere = words[words.IndexOf("Edit elsewhere") + 1];
