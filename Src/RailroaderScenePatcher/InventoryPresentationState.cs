@@ -33,6 +33,19 @@ namespace RailroaderScenePatcher {
             return changed;
         }
 
+        // Whether the outliner marks the object as added, with "+" on its row and + ADDED on the state line: a light,
+        // gate or bell the patcher added to a crossing, or a mod object, with each of its parts, that the edited mod
+        // made (modId; its mark carries the mod's ID). A mod object of another mod, and every mod object while no mod
+        // is edited, is not added. A detection addition adds a circuit to an existing crossing and is no added object.
+        internal static bool IsAdded(SceneObservation entry, string modId) => entry != null && (CommandBand.IsAddedFamily(entry.Family) || IsOwnModObject(entry, modId));
+        // Whether the object is a mod object, or a part of one, that the edited mod made.
+        internal static bool IsOwnModObject(SceneObservation entry, string modId) => entry != null && ModObjects.MadeBy(entry.Identity?.Path, modId);
+        // What the Changed filter lists: what the edited mod's scene patch file modifies (changed) and the mod objects
+        // it made with their parts. A mod object's own row is also changed, since its modification targets it; a
+        // crossing without signals has no row for its crossing object, which its modification targets, so only this
+        // lists its crossbucks and pad. Without an edited mod nothing is listed.
+        internal static Func<SceneObservation, bool> ChangedOrMade(Func<SceneObservation, bool> changed, string modId) =>
+            entry => changed != null && changed(entry) || IsOwnModObject(entry, modId);
         // Whether the filter lets an entry through. changed tells whether the edited mod modifies an entry; without
         // it nothing is changed.
         internal static bool Passes(SceneObservation entry, OutlinerFilter filter, Func<SceneObservation, bool> changed) =>

@@ -132,6 +132,9 @@ namespace RailroaderScenePatcher.Core {
             return null;
         }
         public static bool Within(string path) => RootOf(path) != null;
+        // Whether the path names or lies in a mod object that the mod made: its mark carries the mod's ID. A mod
+        // object of another mod, or no mod, is not the mod's.
+        public static bool MadeBy(string path, string modId) => !String.IsNullOrEmpty(modId) && MarkOf(path) != null && PlacementKey(path).Mod == Safe(modId);
         // The mark of the mod object that the path names or lies in, such as "[mod object author:pack key]", or null.
         // The mark holds the mod and the modification key, so it names one mod object wherever it stands.
         public static string MarkOf(string path) {

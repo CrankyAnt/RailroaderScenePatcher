@@ -67,7 +67,32 @@ static class DuplicateTests {
         SelectingAnotherObjectAsksFirst();
         TheCrossingNodeIsDuplicatedWithoutASelectedRow();
         TheHeadingNamesTheSelectedCrossingNode();
+        TheGhostShowsWhatTheSourcesCullersSwitchedOff();
         Console.WriteLine("PASS: duplicate");
+    }
+
+    // #161/#164: the ghost of a protected crossing shows what its copy will show. The crossing controller's game-object
+    // culler switches the masts and gates off while the source is out of view (Railroader 0.6.3,
+    // GameObjectCuller.CullingSphereStateChanged), and the copy switches them on until its own culler decides
+    // (ModObjectWorld), so the ghost shows them too. An object switched off otherwise stays out, and the source's own
+    // activity does not count. Fictional hierarchy after the Grade Crossing - Bryson Everett of the base-game map fixture.
+    sealed class Node { public string Name; public Node Parent; public bool Active = true; }
+    static void TheGhostShowsWhatTheSourcesCullersSwitchedOff() {
+        var crossing = new Node { Name = "Grade Crossing - Bryson Everett", Active = false };
+        var signal = new Node { Name = "Signal 1", Parent = crossing, Active = false };
+        var mast = new Node { Name = "Signal 1 mesh", Parent = signal };
+        var gate = new Node { Name = "Gate 1", Parent = crossing, Active = false };
+        var arm = new Node { Name = "Gate arm", Parent = gate };
+        var spare = new Node { Name = "Spare light", Parent = crossing, Active = false };
+        var lamp = new Node { Name = "Spare lamp", Parent = spare };
+        var crossbuck = new Node { Name = "Crossbuck", Parent = crossing };
+        var culled = new HashSet<Node> { signal, gate };
+        bool Shown(Node node) => PlacingGhostRules.ShownWhenPlaced(node, crossing, n => n.Parent, n => n.Active, culled);
+        Assert(Shown(mast) && Shown(arm), "The masts and gates the crossing's culler switched off stand in the ghost");
+        Assert(!Shown(lamp), "An object switched off by no culler of the source stays out of the ghost");
+        Assert(Shown(crossbuck) && Shown(crossing), "The source's own activity does not count");
+        Assert(!PlacingGhostRules.ShownWhenPlaced(mast, crossing, n => n.Parent, n => n.Active, null), "Without the culler's list the switched-off mast stays out");
+        Assert(PlacingGhostRules.ShownWhenPlaced(mast, null, n => n.Parent, n => n.Active, culled) == false, "Without a source nothing is shown");
     }
 
     // Duplicate is offered for a scene object and a station map icon. A starter placement marker shows its short

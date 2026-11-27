@@ -39,10 +39,12 @@ namespace RailroaderScenePatcher {
         }
 
         // The ghost holds one plain mesh renderer for each mesh the source shows, placed relative to the source's own
-        // position and rotation. Of a level-of-detail group only the nearest level is taken, so the levels do not
-        // overlap. A prop instance, such as a station building, holds its model only while the game shows it near the
-        // camera (Railroader 0.6.3, Helpers.PropInstance.CullingSphereStateChanged); for one without its model the
-        // ghost loads that model the way the game does and adds its meshes when the load completes.
+        // position and rotation. What the source's cullers switched off, such as the masts and gates of a crossing out
+        // of view, counts as shown, as in the placed object. Of a level-of-detail group only the nearest level is
+        // taken, so the levels do not overlap. A prop instance, such as a station building, holds its model only while
+        // the game shows it near the camera (Railroader 0.6.3, Helpers.PropInstance.CullingSphereStateChanged); for one
+        // without its model the ghost loads that model the way the game does and adds its meshes when the load
+        // completes.
         void Build(GameObject from) {
             Clear();
             source = from;
@@ -52,9 +54,10 @@ namespace RailroaderScenePatcher {
             // What the placed object will not hold, such as the whistle signs of a crossing, is no part of the ghost.
             var left = ModObjectWorld.NotHeld(from).Where(go => go != null).Select(go => go.transform).ToArray();
             bool Kept(Transform t) => !left.Any(gone => t.IsChildOf(gone));
-            var count = Add(from.transform, renderer => Kept(renderer.transform) && ActiveBelow(renderer.transform, from.transform), renderer => frame * renderer.transform.localToWorldMatrix);
+            var culled = Culled(from);
+            var count = Add(from.transform, renderer => Kept(renderer.transform) && ShownWhenPlaced(renderer.transform, from.transform, culled), renderer => frame * renderer.transform.localToWorldMatrix);
             var loads = 0;
-            foreach (var prop in Props(from).Where(p => Kept(p.transform) && Active(p, from.transform) && Unloaded(p)))
+            foreach (var prop in Props(from).Where(p => Kept(p.transform) && Active(p, from.transform, culled) && Unloaded(p)))
                 if (Load(prop, frame)) loads++;
             if (count == 0 && loads == 0) PatcherLog.Debug("The placing ghost of " + from.name + " has no mesh to show; the pointer mark stands alone.");
         }
@@ -96,15 +99,32 @@ namespace RailroaderScenePatcher {
             return type == null ? Enumerable.Empty<Component>() : from.GetComponentsInChildren(type, true).Where(c => c != null);
         }
         // Whether the prop instance is active below the source, as the placed object will hold it: the component is
-        // enabled and every object from it up to the source is active. A prop that the game or a patch switched off
-        // loads no model there, so the ghost loads none either. The source's own activity does not count, since the
-        // ghost stands for the placed object, not for the source where it stands.
-        static bool Active(Component prop, Transform source) => !(prop is Behaviour behaviour && !behaviour.enabled) && ActiveBelow(prop.transform, source);
-        // Whether every object from t up to the source is active, so the placed object shows it. A renderer the game
-        // switched off by itself, such as a loaded prop's renderer away from the camera, still counts: the placed object
-        // shows it where it stands, and the ghost stands for that.
-        static bool ActiveBelow(Transform t, Transform source) {
-            for (; t != null && t != source; t = t.parent) if (!t.gameObject.activeSelf) return false;
+        // enabled and the placed object shows its object. A prop that the game or a patch switched off loads no model
+        // there, so the ghost loads none either.
+        static bool Active(Component prop, Transform source, ICollection<Transform> culled) => !(prop is Behaviour behaviour && !behaviour.enabled) && ShownWhenPlaced(prop.transform, source, culled);
+        // Whether the placed object shows t (PlacingGhostRules.ShownWhenPlaced): every object from t up to the source
+        // is active or switched by one of the source's cullers. The cullers of a crossing controller switch its masts
+        // and gates off while the source is out of view, which is where it mostly stands while its copy is placed. A
+        // renderer the game switched off by itself, such as a loaded prop's renderer away from the camera, still
+        // counts: the placed object shows it where it stands, and the ghost stands for that.
+        static bool ShownWhenPlaced(Transform t, Transform source, ICollection<Transform> culled) =>
+            PlacingGhostRules.ShownWhenPlaced(t, source, at => at.parent, at => at.gameObject.activeSelf, culled);
+        // The objects at and below the source that its cullers switch, which the copy switches on until its own cullers
+        // decide (ModObjectWorld): the objects on a game-object culler's list and a simple culler's own object.
+        static HashSet<Transform> Culled(GameObject from) {
+            var culled = new HashSet<Transform>();
+            var switcher = Native.Type(CullerTypes.GameObjectCuller);
+            if (switcher != null) foreach (var culler in from.GetComponentsInChildren(switcher, true)) {
+                if (culler == null || !(switcher.GetField("gameObjects", Native.Flags)?.GetValue(culler) is System.Collections.IEnumerable listed)) continue;
+                foreach (var item in listed) if (item is GameObject go && go != null && go.transform.IsChildOf(from.transform)) culled.Add(go.transform);
+            }
+            var simple = Native.Type(CullerTypes.SimpleCuller);
+            if (simple != null) foreach (var culler in from.GetComponentsInChildren(simple, true)) if (culler != null) culled.Add(culler.transform);
+            return culled;
+        }
+        // Whether every object from t up to model is active: the loaded model of a prop shows such an object.
+        static bool ActiveBelow(Transform t, Transform model) {
+            for (; t != null && t != model; t = t.parent) if (!t.gameObject.activeSelf) return false;
             return true;
         }
         // Whether the prop instance holds no model now. A prop whose state can't be read counts as loaded: the ghost

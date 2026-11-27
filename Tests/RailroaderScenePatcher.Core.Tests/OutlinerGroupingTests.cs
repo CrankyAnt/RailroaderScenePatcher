@@ -102,6 +102,61 @@ static class OutlinerGroupingTests {
             OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();
         }
     }
+    // #160/#164: a mod object that the edited mod made counts as added with its parts. The modification of a crossing
+    // without signals targets its crossing object (crossing-object-v1), which has no row of its own: its crossbucks and
+    // pad are the rows. They carry "+" and the Changed filter lists them, as it lists every mod object of the edited
+    // mod, while the source's own crossbucks are neither added nor listed there. A copy that a second mod made is that
+    // mod's: no "+" and no place under Changed. Without an edited mod nothing is added or listed. Fictional crossings at
+    // the Stenzel path.
+    static void AModObjectAndItsPartsCountAsAdded() {
+        const string modId = "crankyant/scene-patcher", secondMod = "othermod/rail-extras";
+        var copy = ModObjects.Path(Stenzel, modId, "mod-object-crossing-unprotected---stenzel");
+        var foreign = ModObjects.Path(Stenzel, secondMod, "mod-object-crossing-unprotected---stenzel");
+        var copied = new[] {
+            Entry(copy + "/Sign-Crossing0 (1)", Baked, 12350, 5810, "Grade crossing"), Entry(copy + "/Sign-Crossing0 (2)", Baked, 12350, 5812, "Grade crossing"),
+            Entry(copy + "/Crossing Pad", "Crossing pad marker", 12350, 5814, problems: new[] { "The crossing pad isn't bound to a track." }),
+        };
+        var theirs = new[] { Entry(foreign + "/Sign-Crossing0 (1)", Baked, 12380, 5810, "Grade crossing"), Entry(foreign + "/Crossing Pad", "Crossing pad marker", 12380, 5814) };
+        var own = new[] { Entry(Stenzel + "/Sign-Crossing0 (1)", Baked, 12310, 5810, "Grade crossing"), Entry(Stenzel + "/Crossing Pad", "Crossing pad marker", 12310, 5814) };
+        var scene = new Inventory();
+        scene.Objects.AddRange(own.Concat(copied).Concat(theirs));
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        OutlinerGrouping.InvalidatePlaces();
+        OutlinerGrouping.Scene = new World();
+        OutlinerGrouping.LogPending = false;
+        try {
+            // The scene patch file's modification targets the crossing object, which matches none of these rows.
+            var target = CrossingObjectScene.Identity(SceneName, copy, null);
+            Func<SceneObservation, bool> changed = row => TargetIdentity.SameObject(target, row.Identity);
+            Check(inventory.Entries.All(row => !changed(row)), "no row is the crossing object's own target");
+            bool Added(SceneObservation row) => InventoryPresentationState.IsAdded(row, modId);
+            var rows = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(changed, modId), null);
+            Check(rows.Select(r => r.Identity.Path).SequenceEqual(copied.Select(r => r.Identity.Path)), "the Changed filter lists the copy's crossbucks and pad and no object of the source or of the second mod (got " + String.Join(", ", rows.Select(r => r.Identity.Path)) + ")");
+            Check(copied.All(Added) && !own.Any(Added) && !theirs.Any(Added), "the copy's parts are added objects; the source's and the second mod's copy's are not");
+            Check(CommandBand.RowText(CommandBand.RowMarkers(false, changed(copied[0]), Added(copied[0])), "Sign-Crossing0 (1)") == "+ Sign-Crossing0 (1)"
+                && CommandBand.RowMarkers(true, changed(copied[2]), Added(copied[2])) == "!+", "the copy's rows carry + before the name, after the problem marker");
+            Check(CommandBand.RowMarkers(false, changed(own[0]), Added(own[0])) == "" && CommandBand.RowMarkers(false, changed(theirs[0]), Added(theirs[0])) == "", "the source's rows and the second mod's rows carry no marker");
+            var tree = OutlinerGrouping.Build(rows, inventory.Entries, "", true, null);
+            Check(tree.Listed == copied.Length && OutlinerGrouping.Summary(tree, inventory.Entries) == copied.Length + " of " + inventory.Entries.Count + " objects", "the Changed count line counts the copy's rows (got " + OutlinerGrouping.Summary(tree, inventory.Entries) + ")");
+            // Edited by the second mod, its copy is the added one and the first mod's is not.
+            var second = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(row => false, secondMod), null);
+            Check(second.SequenceEqual(theirs) && theirs.All(r => InventoryPresentationState.IsAdded(r, secondMod)) && !copied.Any(r => InventoryPresentationState.IsAdded(r, secondMod)), "for the second mod only its own copy is added and listed under Changed");
+            // Without an edited mod no mod object is added and Changed lists nothing.
+            Check(OutlinerGrouping.Rows(inventory, "", OutlinerFilter.Changed, InventoryPresentationState.ChangedOrMade(null, null), null).Count == 0
+                && !copied.Concat(theirs).Any(r => InventoryPresentationState.IsAdded(r, null) || InventoryPresentationState.IsAdded(r, "")), "without an edited mod nothing is added or listed under Changed");
+            // Any other mod object of the edited mod counts as added with its parts; a light the patcher added to a
+            // crossing is added whatever the edited mod, as before.
+            var other = ModObjects.Path(Dealer, modId, "mod-object-bryson-coal-dealer");
+            var light = Entry(Allen + "/Signal 1 copy", SceneFamilies.AddedEquipment, 0, 0);
+            Check(Added(Entry(other, Baked, 0, 0)) && Added(Entry(other + "/Heap", Baked, 0, 0, groupPath: other)) && !Added(Entry(Dealer, Baked, 0, 0)) && !Added(null)
+                && InventoryPresentationState.IsAdded(light, secondMod) && InventoryPresentationState.IsAdded(light, null) && !InventoryPresentationState.ChangedOrMade(row => false, modId)(light),
+                "every mod object of the edited mod with its parts is added and a map object is not; an added light keeps its + and is listed under Changed only when the mod changes it");
+            Check(ModObjects.MadeBy(copy, modId) && ModObjects.MadeBy(copy + "/Crossing Pad", modId) && !ModObjects.MadeBy(foreign, modId) && !ModObjects.MadeBy(Stenzel, modId) && !ModObjects.MadeBy(copy, null),
+                "a mod object is the mod's whose ID its mark carries");
+        } finally {
+            OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();
+        }
+    }
     // A speed sign moved more than 500 metres is listed under the place where it now stands, right after the edit; one
     // moved less than 500 metres keeps the place its path names. A moved Loc: board leaves its place where the map put
     // the board: the place keeps the board's original position.
@@ -259,6 +314,7 @@ static class OutlinerGroupingTests {
         }
         InspectionOnlyRowsStandUnderTheirCategory();
         AMovedObjectIsListedWhereItNowStands();
+        AModObjectAndItsPartsCountAsAdded();
         Console.WriteLine("PASS: outliner grouping");
     }
 }

@@ -181,6 +181,8 @@ namespace RailroaderScenePatcher.Core {
         readonly INativeHistory history;
         readonly IStorage storage;
         readonly string modId;
+        // The ID of the edited mod, which the mod objects it places carry in their mark.
+        public string ModId => modId;
         // The key the engine applied this scene patch file under at world load; it scopes the identities of the scene patch file's additions.
         readonly string scenePatchFileKey;
         // The key this session's scene patch file is applied under: the scope of its additions.

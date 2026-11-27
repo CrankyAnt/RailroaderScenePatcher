@@ -379,9 +379,12 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { feedback.Report(EditFeedback.CopyIdPlace, "Could not copy the ID: " + e.GetBaseException().Message); }
         }
 
-        // A light, gate or bell the patcher added is an added object: the outliner marks it with "+" and the state line with
-        // + ADDED. A detection addition adds a circuit to an existing crossing and is not an added object.
-        bool IsAdded(SceneObservation entry) => CommandBand.IsAddedFamily(entry?.Family);
+        // A light, gate or bell the patcher added: its name is fitted to the width and stands for its path. Every added
+        // object, this mod's mod objects and their parts included, takes "+" and + ADDED (IsAdded).
+        bool IsAddedEquipment(SceneObservation entry) => CommandBand.IsAddedFamily(entry?.Family);
+        // The edited mod's ID, or null while no mod is edited.
+        string EditedModId { get { try { return attachment?.Session.ModId; } catch { return null; } } }
+        bool IsAdded(SceneObservation entry) => InventoryPresentationState.IsAdded(entry, EditedModId);
         bool IsChanged(SceneObservation entry) {
             try { return attachment != null && attachment.Session.IsChanged(entry.Identity); } catch { return false; }
         }
@@ -446,7 +449,7 @@ namespace RailroaderScenePatcher {
             shown = Array.Empty<SceneObservation>();
             var narrowed = !String.IsNullOrEmpty(filter) || outlinerFilter != OutlinerFilter.All;
             try {
-                shown = OutlinerGrouping.Rows(inventory, filter, outlinerFilter, IsChanged, OutlinerTrackPoint);
+                shown = OutlinerGrouping.Rows(inventory, filter, outlinerFilter, InventoryPresentationState.ChangedOrMade(IsChanged, EditedModId), OutlinerTrackPoint);
                 return OutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, OutlinerTrackPoint);
             } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The patcher couldn't build the scene object outliner. Report this to the patcher maintainer.", e); return null; }
         }
@@ -659,7 +662,7 @@ namespace RailroaderScenePatcher {
         // the width. The full window and the compact rail share it.
         RectTransform ObjectHeading(UIPanelBuilder builder) {
             var name = OutlinerGrouping.InspectorName(selected, inventory, OutlinerTrackPoint);
-            var added = IsAdded(selected);
+            var added = IsAddedEquipment(selected);
             var heading = Heading(builder, Literal(name), "Object", added ? name : selected.Identity.Path);
             if (added) FitEquipmentText(heading.GetComponent<TMP_Text>(), selected.Family, name, value => "<style=H3>" + Literal(value) + "</style>");
             return heading;
@@ -677,7 +680,7 @@ namespace RailroaderScenePatcher {
             var count = selected.Problems.Count == 0 ? null : selected.Problems.Count == 1 ? "1 problem" : selected.Problems.Count + " problems";
             if (count != null) text.Add(count);
             plain = String.Join("; ", text);
-            if (!IsAdded(selected)) plain += "\n" + selected.Identity.Path;
+            if (!IsAddedEquipment(selected)) plain += "\n" + selected.Identity.Path;
             var parts = CommandBand.StateParts(Literal(CommandBand.ShownFamily(selected)), selected.Active ? null : "Inactive", badges.Select(badge => badge.Markup),
                 selected.InspectionOnly == null ? null : "Inspection only", count == null ? null : "<color=" + Red + ">" + count + "</color>");
             return String.Join("   ", parts);
