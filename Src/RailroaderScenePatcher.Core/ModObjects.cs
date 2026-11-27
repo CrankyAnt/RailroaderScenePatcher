@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Collections.Generic;
 
 namespace RailroaderScenePatcher.Core {
     // A scene that builds mod objects: objects a mod created with Duplicate from a supported scene object. A mod
@@ -14,17 +15,37 @@ namespace RailroaderScenePatcher.Core {
         // Removes a mod object this scene built, with everything below it.
         void Remove(object modObject);
     }
+    // A scene that knows the model and build of its objects, so a mod object whose original is missing can be built from
+    // an identical instance (ADR 0008).
+    public interface IModObjectSources {
+        // The signature of the object's model and build, or null when the scene cannot compute it for this object.
+        string BuildOf(object source);
+        // The loaded objects in the source's scene with the source's component whose model and build equal the build, in
+        // the scene's fixed order: by hierarchy path in ordinal order, then by sibling index. Never ordered by distance.
+        // Mod objects are not listed.
+        IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build);
+    }
+    // A loaded object that can stand in for a missing original, with the hierarchy path the log names it by.
+    public sealed class SourceInstance {
+        public SourceInstance(string path, object handle) { Path = path; Handle = handle; }
+        public string Path { get; }
+        public object Handle { get; }
+    }
     // The texts and the hierarchy path of mod objects. A mod object's name ends with a mark that holds the supplying
     // mod and the modification's key, so its path is unique among the loaded objects and names no place: the place of
     // a mod object comes from where it stands.
     public static class ModObjects {
-        public const string SourceMember = "source", RequiredVersion = "0.5.0", KeyPrefix = "mod-object-";
+        public const string SourceMember = "source", BuildMember = "build", RequiredVersion = "0.5.0", KeyPrefix = "mod-object-";
         const string Open = " [mod object ", Close = "]";
         public const string Unavailable = "Mod objects are unavailable in this scene.";
         public const string NeedsPlacement = "Invalid mod object: a mod object needs a placement.";
         public const string TargetShape = "Invalid mod object: the target must name the source's scene, component and structure, and a path that ends with [mod object <ID>].";
         public const string SourceMissing = "The source of this mod object doesn't match any object in the loaded map.";
         public const string SourceAmbiguous = "The source of this mod object matches more than one object in the loaded map.";
+        public const string InvalidBuild = "Invalid mod object: the build of the source must be a non-empty string.";
+        // The Player log warning of a mod object built from an identical instance because its original is missing.
+        public static string FallbackWarning(string scenePatchFile, string id, string original, string instance) =>
+            "Mod object " + id + " in " + scenePatchFile + ": its source " + original + " isn't in the loaded map, so the patcher built it from the identical object " + instance + ".";
         public const string Taken = "Another object already stands at the path of this mod object.";
         // A slash would split the name into two path segments.
         static string Safe(string text) => (text ?? "").Replace('/', ':');
@@ -45,6 +66,27 @@ namespace RailroaderScenePatcher.Core {
             return null;
         }
         public static bool Within(string path) => RootOf(path) != null;
+        // The mark of the mod object that the path names or lies in, such as "[mod object author:pack key]", or null.
+        // The mark holds the mod and the modification key, so it names one mod object wherever it stands.
+        public static string MarkOf(string path) {
+            var root = RootOf(path);
+            if (root == null) return null;
+            var name = NameOf(root);
+            return name.Substring(name.LastIndexOf(Open, StringComparison.Ordinal) + 1);
+        }
+        // The path by which identities compare: a path in a mod object is its mark and the rest below it, because a mod
+        // object built beside an identical instance stands in another parent than its written target names. Any other
+        // path is itself.
+        public static string Canonical(string path) {
+            var root = RootOf(path);
+            return root == null ? path : MarkOf(root) + path.Substring(root.Length);
+        }
+        public static bool SamePath(string a, string b) => a == b || (a != null && b != null && Canonical(a) == Canonical(b));
+        // The path where the object stands, for a path written below a mod object that now stands at another root.
+        public static string Moved(string path, string standingRoot) {
+            var root = RootOf(path);
+            return root == null || standingRoot == null ? path : standingRoot + path.Substring(root.Length);
+        }
         // The path without the marks of mod objects: the path of the source, by which the rules name its kind.
         public static string Plain(string path) {
             if (path == null) return null;

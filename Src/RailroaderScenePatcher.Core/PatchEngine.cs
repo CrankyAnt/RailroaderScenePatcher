@@ -42,7 +42,7 @@ namespace RailroaderScenePatcher.Core {
         // Whether a target object of a scene patch file names this identity's object: the same scene, path, component,
         // pad marker ID and key. The structure is compared by the caller.
         internal static bool SameObject(JObject target, TargetIdentity identity) {
-            if (target == null || identity == null || (string)target["scene"] != identity.Scene || (string)target["path"] != identity.Path || (string)target["component"] != identity.Component
+            if (target == null || identity == null || (string)target["scene"] != identity.Scene || !ModObjects.SamePath((string)target["path"], identity.Path) || (string)target["component"] != identity.Component
                 || (target[PadMarkerMember]?.Type == JTokenType.String ? (string)target[PadMarkerMember] : null) != identity.PadMarkerId) return false;
             TargetIdentity other;
             try { other = PatchEngine.ParseTarget(target); } catch (InvalidOperationException) { return false; }
@@ -52,14 +52,16 @@ namespace RailroaderScenePatcher.Core {
         public string Label => Scene + "/" + Path + (PadMarkerId == null ? "" : " (pad marker " + PadMarkerId + ")") + (MarkerId == null ? "" : " (marker " + MarkerId + ")")
             + (MapPosition == null ? "" : " (at " + TargetKeys.Number(MapPosition[0]) + ", " + TargetKeys.Number(MapPosition[1]) + ")") + " [" + Component + "]";
         public static bool SameObject(TargetIdentity a, TargetIdentity b) =>
-            a != null && b != null && a.Scene == b.Scene && a.Path == b.Path && a.Component == b.Component && a.PadMarkerId == b.PadMarkerId && SameKey(a, b);
+            a != null && b != null && a.Scene == b.Scene && ModObjects.SamePath(a.Path, b.Path) && a.Component == b.Component && a.PadMarkerId == b.PadMarkerId && SameKey(a, b);
         static bool SameKey(TargetIdentity a, TargetIdentity b) =>
             a.MarkerId == b.MarkerId && (a.MapPosition == null) == (b.MapPosition == null) && (a.MapPosition == null || TargetKeys.Matches(a.MapPosition, b.MapPosition));
         // A text that tells identities apart, for a dictionary key: equal identities give the same text.
-        internal string Text => Scene + "|" + Path + "|" + Component + "|" + Structure + "|" + PadMarkerId + "|" + MarkerId + "|"
+        internal string Text => Scene + "|" + ModObjects.Canonical(Path) + "|" + Component + "|" + Structure + "|" + PadMarkerId + "|" + MarkerId + "|"
             + (MapPosition == null ? "" : TargetKeys.Number(MapPosition[0]) + "," + TargetKeys.Number(MapPosition[1]));
         // The same identity without its key: the objects at its path and component.
         internal TargetIdentity Unkeyed() => new TargetIdentity(Scene, Path, Component, Structure, PadMarkerId);
+        // The same identity at another path, keys included.
+        internal TargetIdentity At(string path) => new TargetIdentity(Scene, path, Component, Structure, PadMarkerId) { MarkerId = MarkerId, MapPosition = MapPosition };
         // The target object of a scene patch file for this identity.
         internal JObject ToJson() {
             var value = new JObject { ["scene"] = Scene, ["path"] = Path, ["component"] = Component };
@@ -306,6 +308,8 @@ namespace RailroaderScenePatcher.Core {
             internal string Id; internal TargetIdentity Identity; internal ObjectState State; internal string[] Dependencies;
             // For a mod object, the scene object it is built from; null for a modification of an existing target.
             internal TargetIdentity Source;
+            // For a mod object, the model and build of its source as the placing click recorded it; null when unknown.
+            internal string SourceBuild;
         }
         // The start of an attempt trace line: the debug output of one engine stage, as JSON that the native observation
         // and the attempt summary read.
@@ -602,18 +606,42 @@ namespace RailroaderScenePatcher.Core {
             if (!(scene is IModObjectScene builder)) throw new InvalidOperationException(ModObjects.Unavailable);
             var sources = Matches(parsed.Source);
             var unresolved = UnresolvedTarget(sources);
-            if (unresolved != null) throw new InvalidOperationException(unresolved == TargetMissing ? ModObjects.SourceMissing : ModObjects.SourceAmbiguous);
+            var source = unresolved == null ? sources[0] : null;
+            SourceInstance instead = null;
+            // The one exception to the exactly-one rule (ADR 0008): a missing original gives way to the first loaded
+            // instance with the same model and build, in the scene's fixed order. An ambiguous original does not.
+            if (unresolved == TargetMissing && parsed.SourceBuild != null && scene is IModObjectSources identical)
+                instead = identical.Identical(parsed.Source, parsed.SourceBuild)?.FirstOrDefault(i => i?.Handle != null);
+            if (source == null && instead == null) throw new InvalidOperationException(unresolved == TargetMissing ? ModObjects.SourceMissing : ModObjects.SourceAmbiguous);
             var placement = Evaluate(parsed.State).Placement;
-            var built = builder.Build(parsed.Identity, sources[0], placement) ?? throw new InvalidOperationException(ModObjects.Unavailable);
+            // The mod object stands beside the object it is built from, under the name its target gives it: beside its
+            // original, or beside the identical instance in that instance's parent. No parent is created.
+            var from = source != null ? parsed.Source.Path : instead.Path;
+            var parent = ModObjects.ParentOf(from);
+            var root = (parent == null ? "" : parent + "/") + ModObjects.NameOf(parsed.Identity.Path);
+            var built = builder.Build(parsed.Identity.At(root), source ?? instead.Handle, placement) ?? throw new InvalidOperationException(ModObjects.Unavailable);
+            if (source == null) PatcherLog.Warning(ModObjects.FallbackWarning(scenePatchFileKey, parsed.Id, parsed.Source.Path, instead.Path));
+            standingRoots[ModObjects.MarkOf(root)] = root;
             BuiltFor(scenePatchFileKey)[parsed.Id] = built;
             return built;
         }
+        // Where each mod object this engine built stands, by its mark. A target written below a mod object resolves where
+        // the mod object stands, whatever parent the written path names.
+        readonly Dictionary<string, string> standingRoots = new Dictionary<string, string>(StringComparer.Ordinal);
+        TargetIdentity Standing(TargetIdentity identity) {
+            var mark = ModObjects.MarkOf(identity.Path);
+            if (mark == null || !standingRoots.TryGetValue(mark, out var root)) return identity;
+            var path = ModObjects.Moved(identity.Path, root);
+            return path == identity.Path ? identity : identity.At(path);
+        }
         // Removes a mod object and everything this engine keeps for it and for the objects resolved below it.
         internal void RemoveModObject(string scenePatchFileKey, string id, object modObject) {
-            var path = identities.TryGetValue(modObject, out var known) ? known.Path : null;
+            var path = identities.TryGetValue(modObject, out var known) ? ModObjects.Canonical(known.Path) : null;
             (scene as IModObjectScene)?.Remove(modObject);
             BuiltFor(scenePatchFileKey).Remove(id);
-            foreach (var target in resolutionOrder.Where(t => ReferenceEquals(t, modObject) || (path != null && identities[t].Path.StartsWith(path + "/", StringComparison.Ordinal))).ToArray()) Forget(target);
+            var mark = known == null ? null : ModObjects.MarkOf(known.Path);
+            if (mark != null) standingRoots.Remove(mark);
+            foreach (var target in resolutionOrder.Where(t => ReferenceEquals(t, modObject) || (path != null && ModObjects.Canonical(identities[t].Path).StartsWith(path + "/", StringComparison.Ordinal))).ToArray()) Forget(target);
         }
         void Forget(object target) {
             try { (scene as IRetainedScene)?.Release(target); } catch { }
@@ -635,6 +663,7 @@ namespace RailroaderScenePatcher.Core {
         // The objects the identity names. A pad marker ID names a crossbuck at a shared path; every other target refuses
         // it with the reason, before anything is resolved.
         IReadOnlyList<object> Matches(TargetIdentity identity) {
+            identity = Standing(identity);
             if (identity.PadMarkerId != null) {
                 var refusal = scene is IPadMarkerIdentityScene accepting ? accepting.PadMarkerRefusal(identity) : TargetIdentity.PadMarkerNotAccepted;
                 if (refusal != null) throw new InvalidOperationException(refusal);
@@ -896,9 +925,15 @@ namespace RailroaderScenePatcher.Core {
             var dependencies = Dependencies(item);
             var identity = ParseTarget(item["target"] as JObject);
             // A mod object: the target names the object the mod makes, the source the scene object it is made from.
-            TargetIdentity source = null;
+            TargetIdentity source = null; string build = null;
             if (item[ModObjects.SourceMember] != null) {
-                source = ParseTarget(item[ModObjects.SourceMember] as JObject);
+                var written = item[ModObjects.SourceMember] as JObject;
+                if (written?[ModObjects.BuildMember] != null) {
+                    if (!RequiredString(written, ModObjects.BuildMember)) throw new InvalidPatchDefinitionException(ModObjects.InvalidBuild);
+                    build = (string)written[ModObjects.BuildMember];
+                    written = (JObject)written.DeepClone(); written.Remove(ModObjects.BuildMember);
+                }
+                source = ParseTarget(written);
                 if (identity.Keyed || identity.PadMarkerId != null || identity.Scene != source.Scene || identity.Component != source.Component || identity.Structure != source.Structure || !ModObjects.IsPath(identity.Path))
                     throw new InvalidPatchDefinitionException(ModObjects.TargetShape);
                 if (item["placement"] == null) throw new InvalidPatchDefinitionException(ModObjects.NeedsPlacement);
@@ -924,7 +959,7 @@ namespace RailroaderScenePatcher.Core {
             var starter = item["starterPlacement"] == null ? null : ParseStarter(item["starterPlacement"]);
             var markerId = item[ReplacementMarkerIds.Member] == null ? null : ParseMarkerId(item[ReplacementMarkerIds.Member]);
             if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && equipment == null && starter == null && segments == null && markerId == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments).WithMarkerId(markerId), Dependencies = dependencies, Source = source };
+            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments).WithMarkerId(markerId), Dependencies = dependencies, Source = source, SourceBuild = build };
         }
         // A replacement ID: a non-empty string that does not begin with an id prefix the game reserves. Its
         // uniqueness depends on the world and is checked when the modification applies.

@@ -180,10 +180,12 @@ namespace RailroaderScenePatcher.Core {
             static readonly Shape Relationships = new Shape { Known = new[] { "trackMarker", "crossingCoverage", "crossingEquipment", "constructionSegments" },
                 Member = name => name == "trackMarker" ? Location : name == "crossingCoverage" ? Coverage : name == "crossingEquipment" ? EquipmentEntries : name == "constructionSegments" ? ConstructionSegments : Unknown };
             static readonly Shape Target = new Shape { Known = new[] { "scene", "path", "component", "structure", TargetIdentity.PadMarkerMember, TargetIdentity.MarkerIdMember, TargetIdentity.MapPositionMember } };
+            // A mod object's source: the members of a target, then the model and build of the source.
+            static readonly Shape ModObjectSource = new Shape { Known = Target.Known.Concat(new[] { ModObjects.BuildMember }).ToArray() };
             static readonly Shape Dependencies = new Shape { SortedStrings = true };
             static readonly Shape Starter = new Shape { Known = new[] { "setup", "track", "wreck" }, Member = name => name == "track" ? Location : Unknown };
             static readonly Shape Modification = new Shape { Known = new[] { "target", ModObjects.SourceMember, "markerId", "relationships", "starterPlacement", "placement", "dependsOn", "active" },
-                Member = name => name == "target" || name == ModObjects.SourceMember ? Target : name == "relationships" ? Relationships : name == "starterPlacement" ? Starter : name == "placement" ? Placement : name == "dependsOn" ? Dependencies : Unknown };
+                Member = name => name == "target" ? Target : name == ModObjects.SourceMember ? ModObjectSource : name == "relationships" ? Relationships : name == "starterPlacement" ? Starter : name == "placement" ? Placement : name == "dependsOn" ? Dependencies : Unknown };
             static readonly Shape Modifications = new Shape { Member = name => Modification };
             static readonly Shape SceneTargetMap = new Shape { Known = new[] { "mapId" } };
             internal static readonly Shape ScenePatchFile = new Shape { Known = new[] { "formatVersion", "sourceMap", "modifications" },

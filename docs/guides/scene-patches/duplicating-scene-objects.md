@@ -50,11 +50,11 @@ The placing click is one step in the native map editor's history: Undo removes t
 
 ## What Save writes
 
-Save writes one modification for the mod object. It names the object of the map as `source`, the mod object's own path as `target`, and the placement. Each load builds the mod object again from its source. See [Mod objects](scene-patch-file-v1.md#mod-objects) in the format reference.
+Save writes one modification for the mod object. It names the object of the map as `source`, with a `build` that identifies its model and build, the mod object's own path as `target`, and the placement. Each load builds the mod object again from its source. When a game update removes that object of the map, the load builds the mod object from an identical object of the map instead, and the player log holds a warning that names both. See [Mod objects](scene-patch-file-v1.md#mod-objects) in the format reference.
 
 A duplicated station map icon is a visual object. It shows on the map at its place, and no station is linked to it. To add a station, create it in the native map editor.
 
 ## If something goes wrong
 
 - **The click places nothing.** The message in the blank object window gives the reason. Where no ground is under the pointer, left-click the ground.
-- **The mod object is missing after a load.** The Log names the modification and the reason, such as a source that no longer matches an object of the map. A mod object needs its source in the loaded map.
+- **The mod object is missing after a load.** The Log names the modification and the reason, such as a source that no longer matches an object of the map. A mod object needs its source, or an identical object, in the loaded map.

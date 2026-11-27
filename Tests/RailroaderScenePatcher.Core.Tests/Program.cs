@@ -335,6 +335,7 @@ class Program {
         LakeSurfaceTests.Run();
         StationMapIconTests.Run();
         ModObjectTests.Run();
+        ModObjectSourceTests.Run();
         DuplicateTests.Run();
         CoalLoaderTests.Run();
         GroundMaskTests.Run();

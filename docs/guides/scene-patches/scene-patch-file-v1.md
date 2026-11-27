@@ -101,18 +101,21 @@ A mod object is a new object that a mod makes from a scene object of the map. It
 ```json
 "mod-object-alarka-jct-station": {
   "target": { "scene": "BushnellWhittier-MapManager", "path": "World/Large Scenery/Alarka Jct/Alarka Jct Station [mod object author:pack mod-object-alarka-jct-station]", "component": "UnityEngine.Transform", "structure": "scene-object-v1" },
-  "source": { "scene": "BushnellWhittier-MapManager", "path": "World/Large Scenery/Alarka Jct/Alarka Jct Station", "component": "UnityEngine.Transform", "structure": "scene-object-v1" },
+  "source": { "scene": "BushnellWhittier-MapManager", "path": "World/Large Scenery/Alarka Jct/Alarka Jct Station", "component": "UnityEngine.Transform", "structure": "scene-object-v1", "build": "v1:12:3f9c0d6a51e2b7c48d0e1f2a3b4c5d6e" },
   "placement": { "mode": "fixed", "position": [4493.0, 12.0, 5415.0], "rotation": [0.0, 0.0, 0.0, 1.0] },
   "dependsOn": []
 }
 ```
 
 - The key of the modification is the mod object's ID. The mod assigns it, and it names one mod object in that mod's scene patch file.
-- `source` names the scene object that the mod object is built from. It accepts the members of a `target`, a key for a shared path included, and must match exactly one object in the loaded map. The patcher reads the source and never changes it.
+- `source` names the scene object that the mod object is built from, its original. It accepts the members of a `target`, a key for a shared path included. The patcher reads the source and never changes it.
+- `source.build` is optional: a non-empty string that identifies the original's model and build. The native map editor writes it at the placing click. It covers the components of the original and its parts in hierarchy order, with the meshes and materials they show; names of objects aren't part of it. Don't write or change it by hand.
 - `target` names the mod object itself. It holds the `scene`, `component`, and `structure` of the source and no key. Its `path` is the source's path followed by ` [mod object <mod ID> <modification ID>]`, with each `/` in the two IDs written as `:`. The native map editor writes this path; the mod object stands beside its source in the hierarchy under that name.
 - `placement` is required: a mod object has no place without it.
 
-Each load builds the mod object from its source, at its placement, and then applies the modification's other members to it, such as `active`. Applying the scene patch file again builds nothing more. A mod object that the scene patch file no longer holds is removed from a world that stays loaded.
+Each load builds the mod object from its original when the original matches exactly one object in the loaded map. When no object matches the original, the patcher builds the mod object from the first loaded object in the same scene with the same component and the same `build`, in a fixed order: by hierarchy path in ordinal order, then by the object's position among its siblings. Distance to the placement plays no part. The player log then holds a warning that names the mod object, its scene patch file, the original and the object the mod object was built from. Without `build`, or with no such object loaded, the mod object fails. A mod object built from such an object stands beside it, in that object's parent, under the name that its `target` path gives it; the patcher creates no parent. Its `target` stays as written. A target of the mod object or of an object below it matches by the mark ` [mod object <mod ID> <modification ID>]` and the path after it, so its edits keep applying wherever the mod object stands. Targets and crossing equipment sources have no such fallback.
+
+Each load builds the mod object at its placement, and then applies the modification's other members to it, such as `active`. Applying the scene patch file again builds nothing more. A mod object that the scene patch file no longer holds is removed from a world that stays loaded.
 
 A mod object takes the edits of its source's family, in its own modification. A modification of an object below a mod object, such as a part of a duplicated group, targets that object's path below the mod object's path. Its `dependsOn` names the mod object's modification, so the mod object is built first.
 
@@ -120,10 +123,11 @@ A mod object fails with its reason, and the other modifications still apply, in 
 
 | Reason | What to correct |
 | --- | --- |
-| `The source of this mod object doesn't match any object in the loaded map.` | Correct `source`, or remove the mod object. |
+| `The source of this mod object doesn't match any object in the loaded map.` | No object matches the original, and no loaded object has its `build`. Correct `source`, or remove the mod object. |
 | `The source of this mod object matches more than one object in the loaded map.` | Add the `markerId` or `mapPosition` key of the source; see [Objects that share a hierarchy path](#objects-that-share-a-hierarchy-path). |
 | `Invalid mod object: a mod object needs a placement.` | Add `placement`. |
 | `Invalid mod object: the target must name the source's scene, component and structure, and a path that ends with [mod object <ID>].` | Write `target` as described above. |
+| `Invalid mod object: the build of the source must be a non-empty string.` | Remove `build`, or duplicate the object again in the native map editor. |
 | `Another object already stands at the path of this mod object.` | Give the mod object a `target` path that no other object has. |
 
 A mod object's path names no place of the map: the outliner lists a mod object under the place where it stands. No game switch, such as progression, names a mod object, so none switches it.
@@ -732,7 +736,7 @@ When Save writes the scene patch file, it uses this order:
 - `sourceMap`: `mapId`, then unknown members.
 - The keys of `modifications`, `circuits`, `additions`, and `crossingEquipment` are in ordinal order.
 - A modification: `target`, `source`, `markerId`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
-- `target` and `source`: `scene`, `path`, `component`, `structure`, `padMarkerId`, `markerId`, `mapPosition`.
+- `target` and `source`: `scene`, `path`, `component`, `structure`, `padMarkerId`, `markerId`, `mapPosition`; in `source`, then `build`.
 - `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`, `constructionSegments`.
 - `constructionSegments`: `segments`, `detach`. The values of `segments` are in ordinal order when it is an array of strings.
 - `crossingCoverage`: `circuits`, `additions`.

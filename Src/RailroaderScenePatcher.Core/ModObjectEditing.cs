@@ -45,7 +45,7 @@ namespace RailroaderScenePatcher.Core {
                 var from = DuplicateSource(inspectedObject);
                 var key = NewId(new TargetIdentity(from.Scene, ModObjects.Plain(from.Path), from.Component), ModObjects.KeyPrefix);
                 var identity = new TargetIdentity(from.Scene, ModObjects.Path(from.Path, modId, key), from.Component, from.Structure);
-                var value = new JObject { ["target"] = identity.ToJson(), [ModObjects.SourceMember] = from.ToJson(), ["placement"] = FixedJson(at), ["dependsOn"] = new JArray() };
+                var value = new JObject { ["target"] = identity.ToJson(), [ModObjects.SourceMember] = SourceJson(inspectedObject, from, origin), ["placement"] = FixedJson(at), ["dependsOn"] = new JArray() };
                 outcome.ResolvedTarget = Establish(key, identity, value);
                 outcome.Target = identity;
                 var generation = versionGeneration; var keyGeneration = KeyGeneration(key);
@@ -55,6 +55,17 @@ namespace RailroaderScenePatcher.Core {
                 try { ModObjectsChanged?.Invoke(); } catch { }
             } catch (Exception e) { Fail(outcome, e); }
             return outcome;
+        }
+        // The source of a new mod object, with the model and build by which a later load finds an identical instance when
+        // the original is missing. A mod object of this scene patch file passes on its own source as written, build
+        // included; any other object gives its own build when the scene knows it.
+        JObject SourceJson(TargetIdentity inspectedObject, TargetIdentity from, object origin) {
+            var key = ModObjectKey(inspectedObject);
+            if (key != null && scenePatchFile.Modifications[key]?[ModObjects.SourceMember] is JObject written) return (JObject)written.DeepClone();
+            var json = from.ToJson();
+            var build = (scene as IModObjectSources)?.BuildOf(origin);
+            if (!String.IsNullOrEmpty(build)) json[ModObjects.BuildMember] = build;
+            return json;
         }
         // Puts the modification of a mod object into the scene patch file, builds the object and applies its state.
         // A failure removes the entry and whatever was built.
@@ -163,7 +174,7 @@ namespace RailroaderScenePatcher.Core {
             var root = ModObjects.RootOf(target.Path);
             if (root == null || root == target.Path) return value;
             var owner = scenePatchFile.Modifications.Properties().FirstOrDefault(p => p.Value is JObject item && item[ModObjects.SourceMember] != null
-                && item["target"] is JObject made && made["path"]?.Type == JTokenType.String && (string)made["path"] == root && made["scene"]?.Type == JTokenType.String && (string)made["scene"] == target.Scene)?.Name;
+                && item["target"] is JObject made && made["path"]?.Type == JTokenType.String && ModObjects.SamePath((string)made["path"], root) && made["scene"]?.Type == JTokenType.String && (string)made["scene"] == target.Scene)?.Name;
             if (owner == null) return value;
             var dependencies = (value["dependsOn"] as JArray)?.Where(d => d.Type == JTokenType.String).Select(d => (string)d).ToList() ?? new List<string>();
             if (dependencies.Contains(owner, StringComparer.Ordinal)) return value;
