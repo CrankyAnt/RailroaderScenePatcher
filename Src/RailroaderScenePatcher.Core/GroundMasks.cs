@@ -15,7 +15,8 @@ namespace RailroaderScenePatcher.Core {
     // One scene ground mask (a component in Map.Runtime.MaskComponents) at or below a top scene object or part, observed with
     // copied values. Positions are map coordinates.
     public sealed class GroundMaskState {
-        public GroundMaskState(string id, string holder, bool enabled, bool flattens, IEnumerable<double> centre, IEnumerable<double> axis, int modifiers, IEnumerable<GroundMaskRegistration> registrations, int missingKeys) {
+        public GroundMaskState(string id, string holder, bool enabled, bool flattens, IEnumerable<double> centre, IEnumerable<double> axis, int modifiers, IEnumerable<GroundMaskRegistration> registrations, int missingKeys, IEnumerable<double> expected = null) {
+            Expected = expected?.ToArray();
             Id = id ?? throw new ArgumentNullException(nameof(id)); Holder = holder; Enabled = enabled; Flattens = flattens; Centre = centre.ToArray(); Axis = axis?.ToArray();
             Modifiers = modifiers; Registrations = (registrations ?? Enumerable.Empty<GroundMaskRegistration>()).ToArray(); MissingKeys = missingKeys;
         }
@@ -30,6 +31,10 @@ namespace RailroaderScenePatcher.Core {
         // Where the mask's holder stands now, and the direction its shape has there; no axis for a shape without one.
         public IReadOnlyList<double> Centre { get; }
         public IReadOnlyList<double> Axis { get; }
+        // The centre a registration made now, at the holder's current pose, would hold, or null when it can't be read.
+        // A rectangle or circle shape holds its holder's place; a curve holds the centre of its bounds, which its shape,
+        // a turn, a pitch or a roll moves away from its holder.
+        public IReadOnlyList<double> Expected { get; }
         // How many terrain modifiers the component makes when it registers.
         public int Modifiers { get; }
         public IReadOnlyList<GroundMaskRegistration> Registrations { get; }
@@ -44,7 +49,8 @@ namespace RailroaderScenePatcher.Core {
         void Rebuild(object target, string id);
     }
     // Scene ground masks of scene objects with child objects. A mask registers its shape in the game's terrain system where its
-    // holder stood when it was enabled; after a move of the holder, the mask is rebuilt so that its registration follows,
+    // holder stood when it was enabled; after a move of the holder, the mask is rebuilt so that its registration follows
+    // (for a mask that flattens, a change of height alone too),
     // and the game regenerates terrain and vegetation at the old and the new place. A mask that flattens the terrain
     // height follows the same way: the game rebuilds a tile from its base heights and the masks registered there
     // (Railroader 0.6.3, MapMaskBase.ApplyModifiers, MaskComponentBase.OnDisable, TerrainBuilder.TerraformCore). That output is tracked by the
@@ -84,7 +90,7 @@ namespace RailroaderScenePatcher.Core {
                     // A rebuild that fails changes no registration, so it starts no terrain output.
                     world.Rebuild(scope, mask.Id);
                     foreach (var registration in mask.Registrations) output.Track(target, registration.Centre.ToArray());
-                    if (mask.Modifiers != 0) output.Track(target, mask.Centre.ToArray());
+                    if (mask.Modifiers != 0) output.Track(target, (mask.Expected ?? mask.Centre).ToArray());
                 }
                 // The component's own lifecycle registered or released the mask with the activity.
                 else if (was != null && (was.Registrations.Count == 0) != (mask.Registrations.Count == 0))
@@ -96,9 +102,9 @@ namespace RailroaderScenePatcher.Core {
         // Whether the edit left the mask as it was: its activity, its holder's place and direction, and its registrations.
         static bool Same(GroundMaskState was, GroundMaskState now) {
             if (was.Enabled != now.Enabled || was.MissingKeys != now.MissingKeys || was.Registrations.Count != now.Registrations.Count) return false;
-            if (Flat(was.Centre, now.Centre) > CentreTolerance || !SameAxis(was.Axis, now.Axis)) return false;
+            if (Distance(now.Flattens, was.Centre, now.Centre) > CentreTolerance || !SameAxis(was.Axis, now.Axis)) return false;
             for (var i = 0; i < now.Registrations.Count; i++)
-                if (Flat(was.Registrations[i].Centre, now.Registrations[i].Centre) > CentreTolerance || !SameAxis(was.Registrations[i].Axis, now.Registrations[i].Axis)) return false;
+                if (Distance(now.Flattens, was.Registrations[i].Centre, now.Registrations[i].Centre) > CentreTolerance || !SameAxis(was.Registrations[i].Axis, now.Registrations[i].Axis)) return false;
             return true;
         }
         static bool SameAxis(IReadOnlyList<double> a, IReadOnlyList<double> b) => (a == null) == (b == null) && (a == null || Turn(a, b) <= AxisToleranceDegrees);
@@ -109,11 +115,21 @@ namespace RailroaderScenePatcher.Core {
             if (!mask.Enabled) return mask.Registrations.Count == 0 ? null : "the disabled ground mask on " + mask.Holder + " still holds a registration";
             if (mask.Registrations.Count != mask.Modifiers) return "the ground mask on " + mask.Holder + " holds " + mask.Registrations.Count + " registrations instead of " + mask.Modifiers;
             foreach (var registration in mask.Registrations) {
-                if (Flat(registration.Centre, mask.Centre) > CentreTolerance) return "the center of the ground mask on " + mask.Holder + " did not follow it";
+                // Like is compared with like: the registration with the one a registration made at the holder's
+                // current pose would hold. Without that, the holder's place counts on the ground, and the height is
+                // not judged.
+                if (Flat(registration.Centre, mask.Expected ?? mask.Centre) > CentreTolerance) return "the center of the ground mask on " + mask.Holder + " did not follow it";
+                if (mask.Flattens && mask.Expected != null && Math.Abs(registration.Centre[1] - mask.Expected[1]) > CentreTolerance) return "the height of the ground mask on " + mask.Holder + " did not follow it";
                 if (!SameAxis(registration.Axis, mask.Axis)) return "the rotation of the ground mask on " + mask.Holder + " did not follow it";
             }
             return null;
         }
+        // How far apart two centres of one mask are: on the ground, and with height when withHeight, for a mask that
+        // flattens, since the game sets the terrain height to the height its registration holds
+        // (RectangleMapMask.MakeMaskDescriptor passes transform.position, and MapMaskBase.ApplyModifiers gives that shape
+        // to its HeightmapModifier). A mask that does not flatten makes no output that depends on its height.
+        static double Distance(bool withHeight, IReadOnlyList<double> a, IReadOnlyList<double> b) =>
+            withHeight ? Math.Sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2])) : Flat(a, b);
         static double Flat(IReadOnlyList<double> a, IReadOnlyList<double> b) => Math.Sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[2] - b[2]) * (a[2] - b[2]));
         // The angle between two ground directions, in degrees; a shape's axis has no front, so opposite directions agree.
         static double Turn(IReadOnlyList<double> a, IReadOnlyList<double> b) {

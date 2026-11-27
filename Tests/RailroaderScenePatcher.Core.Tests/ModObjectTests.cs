@@ -90,6 +90,7 @@ static class ModObjectTests {
         RemoveTakesTheModObjectAndItsLaterEdits();
         AModObjectIsListedWhereItStands();
         StationNameFollowsItsPlace();
+        PlacedModObjectsKeepTheirNumbers();
         CanonicalSaveOrdersAModObject();
         Console.WriteLine("PASS: mod objects");
     }
@@ -253,7 +254,7 @@ static class ModObjectTests {
         var station = session.PlaceModObject(Id(Station), new Placement(new[] { 3000.0, 12, 100 }, Upright));
         world.World.PartsAt[station.Target.Path + "/Mask"] = new List<object> { world.At(station.Target.Path).Parts[0] };
         var inner = session.PlaceModObject(PartId(station.Target.Path + "/Mask"), new Placement(new[] { 3100.0, 12, 100 }, Upright), null, station.Target.Path);
-        Assert(inner.Applied && inner.Target.Path == place + "Mask [mod object author:pack mod-object-mask-3]" && (string)Modifications(session)["mod-object-mask-3"]["source"]["path"] == Part && ((JArray)Modifications(session)["mod-object-mask-3"]["dependsOn"]).Count == 0,
+        Assert(inner.Applied && inner.Target.Path == place + "Mask [mod object author:pack mod-object-mask-4]" && (string)Modifications(session)["mod-object-mask-4"]["source"]["path"] == Part && ((JArray)Modifications(session)["mod-object-mask-4"]["dependsOn"]).Count == 0,
             "A part of a mod object is copied from the map's part: " + (inner.Error ?? Modifications(session).ToString(Newtonsoft.Json.Formatting.None)));
         session.BeginSave(); session.CompleteNativeSave();
         var next = new Loaded();
@@ -497,6 +498,71 @@ static class ModObjectTests {
             Assert(rebuilt.Outcomes[Key].Applied, "The saved scene patch file rebuilds the moved station");
             var rebuiltStation = ObserveModObject(reloaded);
             Assert(Label(rebuiltStation, entries.Concat(new[] { rebuiltStation }).ToArray()) == "Bryson Station (1)", "Loading preserves the move and yields the same shown name");
+        } finally {
+            OutlinerGrouping.Scene = null;
+            OutlinerGrouping.InvalidatePlaces();
+        }
+    }
+
+    // A placed mod object keeps its shown number when another of its kind is placed at its place, whatever the new one's
+    // source and after a removal: mod objects are numbered in the order they were placed, which the sequence of their
+    // modification key gives (ModObjects.NextKey above every mod object key of the file), not in the ordinal order of
+    // their paths. The session makes those keys, also after a Remove modification.
+    static void PlacedModObjectsKeepTheirNumbers() {
+        var scene = new PlainScene { Maps = new[] { "map" } };
+        foreach (var path in new[] { "Depot", "Shed" }) scene.Objects[path] = new List<object> { new Box { Position = new[] { 1.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } } };
+        var editor = new NativeMapEditor(); var keySession = new PatchEditingSession(new PatchEngine(scene), editor, new Store(), "author/pack", "author/pack"); editor.Session = keySession;
+        TargetIdentity At(string path) => new TargetIdentity("s", path, "c");
+        string PlaceKey(string path) {
+            var outcome = keySession.PlaceModObject(At(path), new Placement(new[] { 400.0 + scene.Objects.Count, 2, 3 }, new[] { 0.0, 0, 0, 1 }));
+            Assert(outcome.Applied, "The session places a mod object: " + outcome.Error);
+            return outcome.Target.Path.Substring(outcome.Target.Path.LastIndexOf(' ') + 1).TrimEnd(']');
+        }
+        var keys = new[] { PlaceKey("Depot"), PlaceKey("Shed"), PlaceKey("Depot") };
+        Assert(keys.SequenceEqual(new[] { "mod-object-depot", "mod-object-shed-2", "mod-object-depot-3" }), "Each placement takes a sequence above every mod object key: " + String.Join(", ", keys));
+        Assert(keySession.Remove(At(ModObjects.Path("Shed", "author/pack", keys[1]))).Applied && PlaceKey("Shed") == "mod-object-shed-4", "A removal frees no sequence for the next placement");
+
+        var map = new BaseMapFixture();
+        var destination = map.Objects.Single(o => o.TopSceneObject && o.Name == "Nantahala Station");
+        var alarka = map.Objects.Single(o => o.Listed && o.Path == Station);
+        var nantahala = map.Objects.Single(o => o.Listed && o.Path == destination.Path);
+        var entries = map.Observations(out var facts);
+        string Label(SceneObservation entry, IReadOnlyList<SceneObservation> all) {
+            var tree = OutlinerGrouping.Build(all, all, "", false, null);
+            IEnumerable<InventoryPresentationState.OutlineNode> Nodes(IEnumerable<InventoryPresentationState.OutlineNode> nodes) =>
+                nodes.SelectMany(node => new[] { node }.Concat(Nodes(node.Children)));
+            return Nodes(tree.Tops).Single(node => node.Row == entry).Label;
+        }
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        SceneObservation Placed(BaseMapObject source, int n) {
+            var stem = ModObjects.KeyPrefix + source.Name.ToLowerInvariant().Replace(' ', '-');
+            var key = ModObjects.NextKey(stem, used); used.Add(key);
+            var path = ModObjects.Path(source.Path, "author/pack", key);
+            var entry = new SceneObservation(path, Id(path), source.Family, true, new[] { destination.At[0] + n, 12, destination.At[1] }, Upright,
+                Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "Placement");
+            facts[entry] = source;
+            return entry;
+        }
+        OutlinerGrouping.InvalidatePlaces();
+        OutlinerGrouping.Scene = map.Scene(facts);
+        try {
+            var placed = new List<SceneObservation>();
+            var shown = new Dictionary<SceneObservation, string>();
+            void Place(BaseMapObject source) {
+                placed.Add(Placed(source, placed.Count + 1));
+                var all = entries.Concat(placed).ToArray();
+                foreach (var earlier in placed.Take(placed.Count - 1))
+                    Assert(Label(earlier, all) == shown[earlier], "A placed mod object keeps its shown name " + shown[earlier] + " after placement " + placed.Count + ", got " + Label(earlier, all) + " (" + earlier.Identity.Path + ")");
+                foreach (var entry in placed) shown[entry] = Label(entry, all);
+            }
+            for (var n = 1; n <= 10; n++) Place(n % 3 == 0 ? alarka : nantahala);
+            Assert(placed.Select(e => shown[e]).SequenceEqual(Enumerable.Range(2, 10).Select(n => "Nantahala Station (" + n + ")")), "The placed stations are numbered in placement order across sources: " + String.Join(", ", placed.Select(e => shown[e])));
+            // A removal renumbers the later ones once; placements after it change no shown number.
+            var gone = placed[3]; placed.Remove(gone); used.Remove(ModObjects.MarkOf(gone.Identity.Path).Split(' ').Last().TrimEnd(']'));
+            var remaining = entries.Concat(placed).ToArray();
+            foreach (var entry in placed) shown[entry] = Label(entry, remaining);
+            Place(nantahala); Place(alarka);
+            Assert(shown[placed[placed.Count - 1]] == "Nantahala Station (12)", "The last placement after the removal comes last: " + shown[placed[placed.Count - 1]]);
         } finally {
             OutlinerGrouping.Scene = null;
             OutlinerGrouping.InvalidatePlaces();

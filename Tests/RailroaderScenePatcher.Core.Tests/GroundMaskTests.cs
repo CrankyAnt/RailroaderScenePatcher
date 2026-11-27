@@ -19,6 +19,11 @@ class FakeMask {
     public int Modifiers = 1;
     // What the observation reports as that count, when the observer's model of the game disagrees with the game.
     public int? Reported;
+    // A curve shape: its registration centre is the centre of its bounds, at this offset in its holder's own axes, so a
+    // turn, a pitch or a roll of the holder moves it. Null for a shape centred on its holder.
+    public double[] CurveOffset;
+    // A curve that does not follow: each registration holds this height, wherever its holder stands.
+    public double? StuckHeight;
     public readonly List<string> Keys = new List<string>();
     internal bool Registered;
 }
@@ -57,8 +62,16 @@ class FakeMaskWorld : IGroundMaskWorld {
     void Invalidate(IReadOnlyList<double> at) { var tile = TileOf(at); if (!UnloadedTiles.Contains(tile)) PendingTiles.Add(tile); }
     void Register(FakeMask mask) {
         var at = At(mask);
-        for (var i = 0; i < mask.Modifiers; i++) { var key = "k" + nextKey++; Store[key] = new GroundMaskRegistration(at.Position, Axis(mask, at)); mask.Keys.Add(key); Invalidate(at.Position); }
+        var centre = Shape(mask, at);
+        if (mask.StuckHeight != null) centre[1] = mask.StuckHeight.Value;
+        for (var i = 0; i < mask.Modifiers; i++) { var key = "k" + nextKey++; Store[key] = new GroundMaskRegistration(centre, Axis(mask, at)); mask.Keys.Add(key); Invalidate(at.Position); }
         mask.Registered = true;
+    }
+    // The centre a registration made at the holder's pose holds.
+    static double[] Shape(FakeMask mask, Placement at) {
+        if (mask.CurveOffset == null) return at.Position.ToArray();
+        var turned = Turn.Rotate(at.Rotation, mask.CurveOffset);
+        return new[] { at.Position[0] + turned[0], at.Position[1] + turned[1], at.Position[2] + turned[2] };
     }
     void Release(FakeMask mask) {
         foreach (var key in mask.Keys) { if (Store.TryGetValue(key, out var held)) Invalidate(held.Centre); Store.Remove(key); }
@@ -78,7 +91,7 @@ class FakeMaskWorld : IGroundMaskWorld {
         return found.Select(mask => {
             var at = At(mask);
             return new GroundMaskState(mask.Id, mask.Holder, Active(mask), mask.Flattens, at.Position, Axis(mask, at), mask.Reported ?? mask.Modifiers,
-                mask.Keys.Where(Store.ContainsKey).Select(key => Store[key]), mask.Keys.Count(key => !Store.ContainsKey(key)));
+                mask.Keys.Where(Store.ContainsKey).Select(key => Store[key]), mask.Keys.Count(key => !Store.ContainsKey(key)), Shape(mask, at));
         }).ToArray();
     }
     public void Rebuild(object target, string id) {
@@ -133,7 +146,7 @@ sealed class HeldMaskTerrain : IGroundMaskWorld {
         if (Registered != null && registeredAxis == null) registeredAxis = Axis(at);
         if (Registered == null) registeredAxis = null;
         var registrations = Registered == null ? new GroundMaskRegistration[0] : new[] { new GroundMaskRegistration(Registered, registeredAxis) };
-        return new[] { new GroundMaskState("mask", HolderName, Active, true, Place, Axis(at), 1, registrations, 0) };
+        return new[] { new GroundMaskState("mask", HolderName, Active, true, Place, Axis(at), 1, registrations, 0, Place) };
     }
     public void Rebuild(object target, string id) {
         if (FailRebuild) throw new InvalidOperationException("mask injected");
@@ -162,14 +175,14 @@ static class GroundMaskTests {
         public readonly FakePart Slab, Seat;
         public readonly FakeMask Mask;
         public readonly PatchEngine Engine;
-        public Stop(bool onPart = false, bool flattens = false) {
+        public Stop(bool onPart = false, bool flattens = false, double[] curveOffset = null) {
             Terrain = new FakeMaskWorld(World); Masks = new GroundMasks(Terrain);
             Slab = Group.Add(new FakePart { Id = "Foundation#1", Offset = new[] { 0.0, 0, 4 } });
             Seat = Group.Add(new FakePart { Id = "Bench#2", Offset = new[] { 3.0, 0, 0 } });
             World.Objects[Station] = new List<object> { Group };
             World.PartsAt[Foundation] = new List<object> { Slab }; World.PartsAt[Bench] = new List<object> { Seat };
             World.SetActive(Group, true); World.Mutations = 0;
-            Mask = Terrain.Add(new FakeMask { Id = "mask", Holder = onPart ? "Foundation" : "Rhodo Station", Group = Group, On = onPart ? Slab : null, Degrees = 30, Flattens = flattens });
+            Mask = Terrain.Add(new FakeMask { Id = "mask", Holder = onPart ? "Foundation" : "Rhodo Station", Group = Group, On = onPart ? Slab : null, Degrees = 30, Flattens = flattens, CurveOffset = curveOffset });
             Terrain.BuildTiles();
             var holds = new PartHolds();
             var scene = new SceneCapabilities(() => World.Maps, null);
@@ -185,11 +198,11 @@ static class GroundMaskTests {
     }
     static string N(IEnumerable<double> values) => String.Join(",", values.Select(v => Math.Round(v, 3).ToString("R", CultureInfo.InvariantCulture)));
     static bool Close(IReadOnlyList<double> a, IReadOnlyList<double> b) => a != null && b != null && a.Count == b.Count && a.Zip(b, (x, y) => Math.Abs(x - y)).All(d => d <= 0.001);
-    static string Mod(string id, string path, string structure, double[] position = null, bool? active = null, double yaw = 0) =>
+    static string Mod(string id, string path, string structure, double[] position = null, bool? active = null, double yaw = 0, double[] rotation = null) =>
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
-        (position == null ? "" : ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + N(position) + "],\"rotation\":[" + String.Join(",", Turn.Yaw(yaw).Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "]}") +
+        (position == null ? "" : ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + N(position) + "],\"rotation\":[" + String.Join(",", (rotation ?? Turn.Yaw(yaw)).Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "]}") +
         (active == null ? "" : ",\"active\":" + (active.Value ? "true" : "false")) + ",\"dependsOn\":[]}";
-    static string GroupMod(string id, double[] position = null, bool? active = null, double yaw = 0) => Mod(id, Station, SceneObjects.Structure, position, active, yaw);
+    static string GroupMod(string id, double[] position = null, bool? active = null, double yaw = 0, double[] rotation = null) => Mod(id, Station, SceneObjects.Structure, position, active, yaw, rotation);
     static string PartMod(string id, string path, double[] position = null, bool? active = null, double yaw = 0) => Mod(id, path, ChildObjects.Structure, position, active, yaw);
     static string Doc(params string[] items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",", items) + "}}";
     static readonly TargetIdentity StationId = new TargetIdentity(SceneName, Station, SceneObjects.ComponentType, SceneObjects.Structure);
@@ -245,6 +258,8 @@ static class GroundMaskTests {
         SmallMovesDoNotLeaveTheMaskBehind();
         FailedSecondRebuildRestoresAndWaitsForTerrain();
         FlatteningMaskMovesWithItsHolder();
+        HeightOnlyMoveRebuildsTheFlatteningMask();
+        CurveMaskFollowsItsHolderPose();
         RefusedLoadMoveShowsAsRefused();
         ActivityReleasesAndRegistersTheMask();
         FailureAfterMutationRestoresTheMask(false);
@@ -407,6 +422,71 @@ static class GroundMaskTests {
             "A move of the part that holds the flattening mask carries it: " + outcome.Error + " " + part.Where());
         var hide = new Stop(flattens: true);
         Assert(hide.Engine.Apply(Doc(GroupMod("hide-station", active: false))).Outcomes["hide-station"].Applied && hide.Terrain.Store.Count == 0, "Disabling the station releases the flattening mask");
+    }
+
+    // A flattening mask sets the terrain height to its holder's height, so a move that changes only the height rebuilds
+    // the mask at the new height and tracks the terrain output at its place, as a move on the ground does. A mask that
+    // does not flatten registers at the new height only on its next rebuild, since the height changes none of its output.
+    static void HeightOnlyMoveRebuildsTheFlatteningMask() {
+        var f = new Stop(flattens: true);
+        var raised = new[] { 1100.0, 74, 20 };
+        var rebuilds = f.Terrain.Rebuilds;
+        var outcome = f.Engine.Apply(Doc(GroupMod("raise-station", raised))).Outcomes["raise-station"];
+        Assert(outcome.Applied && Close(f.At(f.Group), raised), "The height-only move applies: " + outcome.Error);
+        Assert(f.Terrain.Rebuilds == rebuilds + 1 && f.RegisteredOnceAt(raised, 30), "The flattening mask is rebuilt at the new height: " + f.Where());
+        var output = f.Masks.Output(f.Group);
+        Assert(output.Outstanding.Count == 1 && output.Outstanding.Single() == "terrain output at map x=1100, z=20", "The terrain output at the mask's place is tracked: " + String.Join("; ", output.Outstanding));
+        f.Terrain.BuildTiles(); f.Masks.Poll();
+        Assert(f.Masks.Output(f.Group).Settled && f.Masks.Output(f.Group).Completed.Count == 1, "The terrain write completes");
+        var lowered = new[] { 1100.0, 9.95, 20 };
+        Assert(new PatchEngine(Scene(f)).Apply(Doc(GroupMod("raise-station", lowered))).Outcomes["raise-station"].Applied && f.RegisteredOnceAt(lowered, 30) && f.Terrain.Rebuilds == rebuilds + 2,
+            "A move back down rebuilds it again: " + f.Where());
+        var plain = new Stop(); rebuilds = plain.Terrain.Rebuilds;
+        Assert(plain.Engine.Apply(Doc(GroupMod("raise-station", raised))).Outcomes["raise-station"].Applied && plain.Terrain.Rebuilds == rebuilds && plain.Masks.Output(plain.Group).Outstanding.Count == 0,
+            "A mask that does not flatten is not rebuilt for a height change: " + plain.Where());
+    }
+
+    // A flattening curve mask registers at the centre of its bounds, which its holder's pose places: a curve reaching
+    // ahead and bending up holds that centre away from the holder's height, and a pitch or a roll moves it. Its
+    // registration is compared with the one the holder's current pose would make, never with the holder's height, so a
+    // move, a height change, a pitch and a run of small steps each follow, and a curve that does not follow is refused.
+    static void CurveMaskFollowsItsHolderPose() {
+        var offset = new[] { 0.0, 3, 10 };
+        double[] Expected(double[] at, double[] rotation) { var t = Turn.Rotate(rotation, offset); return new[] { at[0] + t[0], at[1] + t[1], at[2] + t[2] }; }
+        double[] Registered(Stop stop) => stop.Terrain.Store[stop.Mask.Keys.Single()].Centre.ToArray();
+        var f = new Stop(flattens: true, curveOffset: offset);
+        var outcome = f.Engine.Apply(Doc(GroupMod("move-station", Far, yaw: 40))).Outcomes["move-station"];
+        Assert(outcome.Applied && Close(Registered(f), Expected(Far, Turn.Yaw(40))), "A move of a curve mask's holder applies and the curve follows: " + outcome.Error + " " + f.Where());
+        f.Terrain.BuildTiles(); f.Masks.Poll();
+        var raised = new[] { Far[0], Far[1] + 20, Far[2] };
+        var rebuilds = f.Terrain.Rebuilds;
+        outcome = new PatchEngine(Scene(f)).Apply(Doc(GroupMod("move-station", raised, yaw: 40))).Outcomes["move-station"];
+        Assert(outcome.Applied && f.Terrain.Rebuilds == rebuilds + 1 && Close(Registered(f), Expected(raised, Turn.Yaw(40))), "A height-only move rebuilds the curve at its new height: " + outcome.Error + " " + f.Where());
+        Assert(f.Masks.Output(f.Group).Outstanding.Count == 1, "The terrain output at its place is tracked: " + String.Join("; ", f.Masks.Output(f.Group).Outstanding));
+        f.Terrain.BuildTiles(); f.Masks.Poll();
+        // A pitch of the holder raises the curve's centre without raising the holder.
+        var pitch = Turn.Multiply(Turn.Yaw(40), new[] { Math.Sin(5 * Math.PI / 180), 0, 0, Math.Cos(5 * Math.PI / 180) });
+        rebuilds = f.Terrain.Rebuilds;
+        outcome = new PatchEngine(Scene(f)).Apply(Doc(GroupMod("move-station", raised, rotation: pitch))).Outcomes["move-station"];
+        Assert(outcome.Applied && f.Terrain.Rebuilds == rebuilds + 1 && Close(Registered(f), Expected(raised, pitch)), "A pitch of the holder applies and the curve follows: " + outcome.Error + " " + f.Where());
+        f.Terrain.BuildTiles(); f.Masks.Poll();
+        // Steps of 0.06 m each stay under the tolerance, but their sum does not: the curve is rebuilt once it lags.
+        rebuilds = f.Terrain.Rebuilds;
+        var at = raised.ToArray();
+        for (var step = 1; step <= 4; step++) {
+            at = new[] { at[0], at[1] + 0.06, at[2] };
+            outcome = new PatchEngine(Scene(f)).Apply(Doc(GroupMod("move-station", at, rotation: pitch))).Outcomes["move-station"];
+            Assert(outcome.Applied && Math.Abs(Registered(f)[1] - Expected(at, pitch)[1]) <= 0.1, "Step " + step + " keeps the curve within the tolerance of its holder's pose: " + outcome.Error + " " + f.Where());
+            f.Terrain.BuildTiles(); f.Masks.Poll();
+        }
+        Assert(f.Terrain.Rebuilds > rebuilds, "The small steps rebuild the curve once they add up");
+        Assert(new PatchEngine(Scene(f)).Apply(Doc(GroupMod("move-station", at, rotation: pitch))).Outcomes["move-station"].Applied && f.Masks.Output(f.Group).Settled, "A repeated application starts no terrain output");
+        // A curve whose rebuild leaves its height behind does not follow: the edit is refused and restored.
+        var stuck = new Stop(flattens: true, curveOffset: offset);
+        stuck.Mask.StuckHeight = Registered(stuck)[1];
+        var refused = stuck.Engine.Apply(Doc(GroupMod("raise-station", new[] { Authored[0], Authored[1] + 5, Authored[2] }))).Outcomes["raise-station"];
+        Assert(!refused.Applied && refused.Error.Contains("the height of the ground mask on Rhodo Station did not follow it") && Close(stuck.At(stuck.Group), Authored),
+            "A curve that does not follow is refused and the station stays: " + refused.Error);
     }
 
     // Disabling the group releases the mask through the component's own lifecycle; enabling registers it once again.
@@ -697,7 +777,7 @@ static class GroundMaskTests {
         public bool Flattens; public int Rebuilds;
         public MarkerTerrain(FakeMarkerWorld world, FakeMarker marker) { this.world = world; this.marker = marker; Registered.Add(world.Position(marker)); }
         public IReadOnlyList<GroundMaskState> Masks(object target) => !ReferenceEquals(target, marker) ? new GroundMaskState[0] : new[] {
-            new GroundMaskState("mask", "Mask", true, Flattens, world.Position(marker), new[] { 0.0, 0, 1 }, 1, Registered.Select(r => new GroundMaskRegistration(r, new[] { 0.0, 0, 1 })), 0) };
+            new GroundMaskState("mask", "Mask", true, Flattens, world.Position(marker), new[] { 0.0, 0, 1 }, 1, Registered.Select(r => new GroundMaskRegistration(r, new[] { 0.0, 0, 1 })), 0, world.Position(marker)) };
         public void Rebuild(object target, string id) { Rebuilds++; Registered.Clear(); Registered.Add(world.Position(marker)); }
         public bool TileLoaded(double[] position) => true;
         public void InvalidateTile(double[] position) { }

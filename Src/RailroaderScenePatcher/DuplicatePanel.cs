@@ -55,9 +55,8 @@ namespace RailroaderScenePatcher {
             string rule;
             try { rule = DuplicateState.Reason(subject, FamiliesBelow(subject)); }
             catch (Exception e) { rule = "The object couldn't be read: " + e.GetBaseException().Message.TrimEnd('.') + "."; }
-            if (rule != null) return rule;
-            if (attachment?.Session.Blocked != null) return attachment.Session.Blocked + " The recovery choices are in the session details.";
-            return StarterBlock() ?? (Requests.Pending ? "Wait for the scene check to finish." : null);
+            // The source's own existence counts, not the inspected row's: a crossing node has none (CrossingNodeSource).
+            return DuplicateState.Inactive(rule, attachment?.Session.Blocked, EditingBlock(), Alive(subject), Requests.Pending);
         }
         // The crossing object of the crossing node the outliner has selected, as the source of Duplicate, or null. A
         // crossing without signals has no row of its own: its node stands for the object its crossbucks and pads stand in.
@@ -68,6 +67,14 @@ namespace RailroaderScenePatcher {
             var at = NativeInventory.MapPosition(crossing.transform); var turn = crossing.transform.rotation;
             return new SceneObservation(crossing, node.Identity, CrossingObjectScene.Family, crossing.activeInHierarchy, new double[] { at.x, at.y, at.z }, new double[] { turn.x, turn.y, turn.z, turn.w },
                 Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), null, displayName: node.Label);
+        }
+        // The label of the selected crossing node while no row is inspected, which the inspector heading shows, or null.
+        string CrossingNodeLabel() => selected == null && crossingNode?.Identity != null ? crossingNode.Label : null;
+        // The inspector heading while no row is inspected: the selected crossing node's label with its crossing object's
+        // path in the tooltip, or No Selection.
+        RectTransform EmptyHeading(UIPanelBuilder builder) {
+            var label = CrossingNodeLabel();
+            return Heading(builder, Literal(DuplicateState.EmptyHeading(label)), "Object", DuplicateState.EmptyHeadingTooltip(label, crossingNode?.Identity?.Path));
         }
         // The selected crossing node in the inspector: the crossing's name, Duplicate, and Remove modification for a
         // crossing this mod made.

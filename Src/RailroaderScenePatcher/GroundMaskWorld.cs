@@ -20,7 +20,7 @@ namespace RailroaderScenePatcher {
         // The fields of one mask target (MaskTarget), the element of MapMaskBase.maskTargets.
         static readonly Type targetType = targets != null && targets.FieldType.IsGenericType ? targets.FieldType.GetGenericArguments()[0] : null;
         static readonly FieldInfo targetKind = targetType?.GetField("kind"), targetBiome = targetType?.GetField("biomeCode"), targetName = targetType?.GetField("maskName");
-        static readonly MethodInfo rebuild = maskBase?.GetMethod("Rebuild", Native.Flags, null, Type.EmptyTypes, null);
+        static readonly MethodInfo rebuild = maskBase?.GetMethod("Rebuild", Native.Flags, null, Type.EmptyTypes, null), make = shaped?.GetMethod("MakeMaskDescriptor", Native.Flags, null, Type.EmptyTypes, null);
         readonly BoardScene terrain;
         // Whether a world reads and rebuilds the masks in this load: without one, a group that holds a mask is refused.
         // The world that checked the members owns it. When the map context changes, the next host's world takes it
@@ -31,7 +31,7 @@ namespace RailroaderScenePatcher {
             this.terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
             // The members this world reads are checked here: a missing one fails the adapter with its name, not an edit.
             if (maskBase == null || shaped == null || rectangle == null) throw new InvalidOperationException("The ground mask types are unavailable.");
-            if (keys == null || rebuild == null) throw new MissingMemberException("The ground mask registration members are unavailable.");
+            if (keys == null || rebuild == null || make == null) throw new MissingMemberException("The ground mask registration members are unavailable.");
             if (flatten?.FieldType != typeof(bool) || targets == null || sizeX?.FieldType != typeof(float) || sizeZ?.FieldType != typeof(float) || degrees?.FieldType != typeof(float)) throw new MissingMemberException("The ground mask shape members are unavailable.");
             if (targetKind == null || targetBiome?.FieldType != typeof(int) || targetName == null || !targetName.FieldType.IsEnum) throw new MissingMemberException("The ground mask target members are unavailable.");
             availability.Take(this);
@@ -76,7 +76,19 @@ namespace RailroaderScenePatcher {
             var enabled = mask is Behaviour behaviour && behaviour.isActiveAndEnabled;
             // A mask of another kind than the shaped ones makes its modifiers in its own way: it counts what it holds.
             var modifiers = shaped.IsInstanceOfType(mask) ? Modifiers(mask) : held.Length;
-            return new GroundMaskState(IdOf(root, mask), mask.gameObject.name, enabled, Flattens(mask), new double[] { centre.x, centre.y, centre.z }, Axis(mask), modifiers, registrations, missing);
+            return new GroundMaskState(IdOf(root, mask), mask.gameObject.name, enabled, Flattens(mask), new double[] { centre.x, centre.y, centre.z }, Axis(mask), modifiers, registrations, missing, Expected(mask, centre));
+        }
+        // The centre a registration of the shaped mask made now would hold, in map coordinates: the shape the mask makes
+        // at its current pose (MapMaskBase.MakeMaskDescriptor, which only builds the descriptor), read as Registration
+        // reads a stored one, moved from the scene to the map by the holder's own offset. Null for another kind of mask
+        // or a shape that can't be read.
+        static double[] Expected(Component mask, Vector3 mapCentre) {
+            if (!shaped.IsInstanceOfType(mask)) return null;
+            try {
+                var fresh = Registration(make.Invoke(mask, null)).Centre;
+                var scene = mask.transform.position;
+                return new double[] { mapCentre.x + (fresh[0] - scene.x), mapCentre.y + (fresh[1] - scene.y), mapCentre.z + (fresh[2] - scene.z) };
+            } catch (Exception e) { PatcherLog.Debug("The shape of the ground mask on " + mask.gameObject.name + " can't be read: " + e.GetBaseException().Message); return null; }
         }
         // The terrain modifiers a shaped mask makes when it registers. Railroader 0.6.3, Map.Runtime.dll,
         // MapMaskBase.ApplyModifiers: one HeightmapModifier when flattenHeightmap is set, and one MaskModifier for each

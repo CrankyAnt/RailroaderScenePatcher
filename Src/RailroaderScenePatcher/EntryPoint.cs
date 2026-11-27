@@ -1369,12 +1369,14 @@ namespace RailroaderScenePatcher {
             : (GameObject)selected.Handle == null ? "The inspected object no longer exists. Refresh the inventory." : null);
         // Why the inspected starter placement marker's modification cannot be changed now, whatever the tab, or null: what
         // Remove modification and Recheck in the footer, and the track location on the Connections tab, wait for.
-        string StarterBlock() =>
+        string StarterBlock() => EditingBlock() ?? (Alive(selected) ? null : DuplicateState.Gone);
+        // What blocks every edit now, whatever is inspected, or null.
+        string EditingBlock() =>
             attachment == null ? (String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)
             : FileLockReason != null ? FileLockReason
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
-            : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
-            : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the inventory." : null;
+            : gizmo?.Active == true ? "Complete or cancel the gizmo to edit." : null;
+        static bool Alive(SceneObservation entry) => entry?.Handle is GameObject live && live != null;
         void ResetSnapState() { preparedSnap = null; choosingSnap = false; }
         void ResetConnectionsPreview() { choosingCoverageRole = null; preparedCoverage = null; preparedEquipment = null; }
         void ClearSnap() { ResetSnapState(); ResetConnectionsPreview(); EndWorldEditAction(); }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
     // A scene that builds mod objects: objects a mod created with Duplicate from a supported scene object. A mod
@@ -138,6 +139,41 @@ namespace RailroaderScenePatcher.Core {
             if (root == null) return null;
             var name = NameOf(root);
             return name.Substring(name.LastIndexOf(Open, StringComparison.Ordinal) + 1);
+        }
+        // Orders mod object paths in the order their mod objects were placed: by mod, then by the placement sequence of
+        // the modification key (Sequence), then ordinally. Duplicate gives each new mod object a sequence above every
+        // mod object key in the file (NextKey), so a placement never moves ahead of one placed before it, whatever its
+        // source and after a removal. Ordinal order would put the key -10 before -2 and both before the key itself.
+        public static readonly IComparer<string> PlacementOrder = Comparer<string>.Create((a, b) => {
+            var x = PlacementKey(a); var y = PlacementKey(b);
+            var order = StringComparer.Ordinal.Compare(x.Mod, y.Mod);
+            if (order == 0) order = x.Sequence.CompareTo(y.Sequence);
+            return order != 0 ? order : StringComparer.Ordinal.Compare(a, b);
+        });
+        static (string Mod, long Sequence) PlacementKey(string path) {
+            var mark = MarkOf(path);
+            if (mark == null) return (path ?? "", 0);
+            mark = mark.Substring(Open.Length - 1).TrimEnd(']');
+            var space = mark.LastIndexOf(' ');
+            return space < 0 ? ("", Sequence(mark)) : (mark.Substring(0, space), Sequence(mark.Substring(space + 1)));
+        }
+        // The placement sequence of a modification key: the number after its last hyphen, or 1 for a key without one,
+        // such as the first mod object of a file.
+        public static long Sequence(string key) {
+            var dash = key?.LastIndexOf('-') ?? -1;
+            if (dash > 0 && dash < key.Length - 1 && key.Length - dash <= 10 && key[dash + 1] != '0' && key.Substring(dash + 1).All(Char.IsDigit))
+                return Int64.Parse(key.Substring(dash + 1), System.Globalization.CultureInfo.InvariantCulture);
+            return 1;
+        }
+        // The key of a new mod object from its stem, such as mod-object-alarka-jct-station: the stem itself for the first
+        // mod object of the file, and otherwise the stem with a sequence above every mod object key the file holds, so
+        // a removal frees no number for a later placement.
+        public static string NextKey(string stem, ICollection<string> used) {
+            var held = used.Where(key => key.StartsWith(KeyPrefix, StringComparison.Ordinal)).ToArray();
+            if (held.Length == 0 && !used.Contains(stem)) return stem;
+            var n = Math.Max(1, held.Length == 0 ? 1 : held.Max(Sequence)) + 1;
+            while (used.Contains(stem + "-" + n)) n++;
+            return stem + "-" + n;
         }
         // The path by which identities compare: a path in a mod object is its mark and the rest below it, because a mod
         // object built beside an identical instance stands in another parent than its written target names. Any other

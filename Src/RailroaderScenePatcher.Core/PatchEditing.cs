@@ -1660,6 +1660,7 @@ namespace RailroaderScenePatcher.Core {
             // A name that already starts with the prefix, such as the starter placement marker starter-ewh-int2, keeps it once.
             var stem = name.Length == 0 ? prefix + "object" : name.StartsWith(prefix, StringComparison.Ordinal) ? name : prefix + name;
             var used = new HashSet<string>(scenePatchFile.Modifications.Properties().Select(m => m.Name), StringComparer.Ordinal);
+            if (prefix == ModObjects.KeyPrefix) return ModObjects.NextKey(stem, used);
             var id = stem;
             for (var n = 2; used.Contains(id); n++) id = stem + "-" + n;
             return id;

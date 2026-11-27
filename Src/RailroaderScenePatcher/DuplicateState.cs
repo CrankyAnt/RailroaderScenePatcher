@@ -55,6 +55,23 @@ namespace RailroaderScenePatcher {
         // controller, masts, lights, gates, bell and pads. Its detection spans, its whistle signs and what a mod added
         // to it stay with the original: the copy's detection starts empty.
         static readonly string[] CrossingHolds = Copied.Concat(SceneFamilies.Crossing).Concat(new[] { SceneFamilies.TrackMarker }).ToArray();
+        // The inspector heading while no row is inspected: the label of the selected crossing node, the node of a crossing
+        // without signals that has no row of its own, or No Selection.
+        internal static string EmptyHeading(string crossingNodeLabel) => String.IsNullOrEmpty(crossingNodeLabel) ? "No Selection" : crossingNodeLabel;
+        // That heading's tooltip: the full path of the selected crossing node's crossing object, as an inspected object's
+        // heading gives its path, or none for No Selection.
+        internal static string EmptyHeadingTooltip(string crossingNodeLabel, string crossingPath) => String.IsNullOrEmpty(crossingNodeLabel) || String.IsNullOrEmpty(crossingPath) ? null : crossingPath;
+        // The line below that heading: the select instruction, or none while a crossing node is selected, since the
+        // crossing is the selection.
+        internal static string EmptyInstruction(string crossingNodeLabel) => String.IsNullOrEmpty(crossingNodeLabel) ? CommandBand.SelectInstruction : null;
+        internal const string Gone = "The inspected object no longer exists. Refresh the inventory.";
+        // Why Duplicate is inactive in the window, or null, in this order: the object's own reason, a blocked session,
+        // what blocks editing (no editing, a locked file, a pending world selection, an active gizmo), a source that
+        // no longer exists and a pending scene check. sourceExists is about the source of Duplicate, which for a
+        // crossing without signals is its outliner node's crossing object, not an inspected row.
+        internal static string Inactive(string rule, string sessionBlocked, string editBlock, bool sourceExists, bool checkPending) =>
+            rule ?? (sessionBlocked != null ? sessionBlocked + " The recovery choices are in the session details." : null) ?? editBlock
+            ?? (!sourceExists ? Gone : null) ?? (checkPending ? "Wait for the scene check to finish." : null);
         // familiesBelow: the families of the listed objects at or below the object.
         internal static string Reason(SceneObservation selected, IEnumerable<string> familiesBelow) {
             if (selected == null) return null;

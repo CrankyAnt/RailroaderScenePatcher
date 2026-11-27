@@ -30,6 +30,30 @@ static class DuplicateTests {
         return rows.First(r => r.Identity.Path == path && (family == null || r.Family == family));
     }
 
+    // A crossing without signals has no row: its outliner node is the source of Duplicate while no row is inspected.
+    // Duplicate judges whether that source still exists, not the inspected row, so it is active on the node, and the
+    // reasons of the window still come in their order.
+    static void TheCrossingNodeIsDuplicatedWithoutASelectedRow() {
+        var crossing = DuplicateState.Inactive(null, null, null, sourceExists: true, checkPending: false);
+        Assert(crossing == null, "Duplicate is active on a crossing node whose crossing exists: " + crossing);
+        Assert(DuplicateState.Inactive(null, null, null, sourceExists: false, checkPending: false) == "The inspected object no longer exists. Refresh the inventory.", "A source that is gone keeps its reason");
+        Assert(DuplicateState.Inactive("Own reason.", "Blocked.", "Locked.", false, true) == "Own reason.", "The object's own reason comes first");
+        Assert(DuplicateState.Inactive(null, "Blocked.", "Locked.", false, true) == "Blocked. The recovery choices are in the session details.", "A blocked session comes next");
+        Assert(DuplicateState.Inactive(null, null, "Locked.", false, true) == "Locked.", "Then what blocks editing");
+        Assert(DuplicateState.Inactive(null, null, null, true, true) == "Wait for the scene check to finish.", "Then a pending scene check");
+    }
+    // While the node of a crossing without signals is selected and no row is inspected, the inspector heading names that
+    // crossing by its node label with the crossing object's full path in its tooltip, as it names an inspected object,
+    // and the select instruction is left out; without one the heading reads No Selection above the instruction.
+    static void TheHeadingNamesTheSelectedCrossingNode() {
+        Assert(DuplicateState.EmptyHeading("Crossing Unprotected") == "Crossing Unprotected", "The heading names the selected crossing node: " + DuplicateState.EmptyHeading("Crossing Unprotected"));
+        Assert(DuplicateState.EmptyHeading(null) == "No Selection" && DuplicateState.EmptyHeading("") == "No Selection", "Without a crossing node the heading reads No Selection");
+        const string path = "World/Large Scenery/Alarka Jct/Crossing Unprotected (1)";
+        Assert(DuplicateState.EmptyHeadingTooltip("Crossing Unprotected", path) == path, "The heading's tooltip gives the crossing object's full path, as for an inspected object");
+        Assert(DuplicateState.EmptyHeadingTooltip(null, path) == null && DuplicateState.EmptyHeadingTooltip("", null) == null, "No Selection has no tooltip");
+        Assert(DuplicateState.EmptyInstruction("Crossing Unprotected") == null, "A selected crossing node is a selection: no select instruction below its heading");
+        Assert(DuplicateState.EmptyInstruction(null) == CommandBand.SelectInstruction && DuplicateState.EmptyInstruction("") == CommandBand.SelectInstruction, "Without a selection the select instruction shows");
+    }
     internal static void Run() {
         DuplicateIsInactiveWhereItDoesNotApply();
         DuplicateIsNoSupportedEdit();
@@ -41,6 +65,8 @@ static class DuplicateTests {
         ReleaseAndEscRemoveTheGhost();
         TheClickPlacesAtTheGhost();
         SelectingAnotherObjectAsksFirst();
+        TheCrossingNodeIsDuplicatedWithoutASelectedRow();
+        TheHeadingNamesTheSelectedCrossingNode();
         Console.WriteLine("PASS: duplicate");
     }
 

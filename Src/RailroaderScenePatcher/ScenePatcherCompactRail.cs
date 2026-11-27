@@ -66,14 +66,14 @@ namespace RailroaderScenePatcher {
         // line across the rail's whole width: a state line beside the label lost its family name to the ellipsis.
         void CompactHeading(UIPanelBuilder builder, CompactView view) {
             builder.HStack(row => {
-                if (selected == null) Heading(row, "No Selection", null, null).EqualFlexibleWidth(0);
+                if (selected == null) EmptyHeading(row).EqualFlexibleWidth(0);
                 else ObjectHeading(row).EqualFlexibleWidth(0);
                 CompactModeLabel(row, view);
             }).ChildrenKeepHeight().Height(RowHeight);
             var state = StateLine(out var states);
             // Without an inspected object the state line is an instruction, which wraps so it shows in full at the
             // rail's width.
-            if (selected == null) WrappedLine(builder, state);
+            if (selected == null) { var instruction = DuplicateState.EmptyInstruction(CrossingNodeLabel()); if (instruction != null) WrappedLine(builder, instruction); }
             else StateLineRow(builder, state, states);
         }
 

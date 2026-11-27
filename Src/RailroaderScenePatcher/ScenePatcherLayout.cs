@@ -594,7 +594,7 @@ namespace RailroaderScenePatcher {
             if (selected == null) {
                 // Keep the instruction across the full width while Guided is available without an inspected object.
                 headingRow = builder.HStack(row => {
-                    Heading(row, "No Selection", null, null).EqualFlexibleWidth(0);
+                    EmptyHeading(row).EqualFlexibleWidth(0);
                     DrawModeSwitch(row);
                 }).ChildrenKeepHeight().Height(RowHeight);
             } else headingRow = ObjectHeading(builder).Height(RowHeight);
@@ -603,7 +603,8 @@ namespace RailroaderScenePatcher {
             // The instruction while nothing is inspected wraps at the heading's size and takes the height its lines need, so it
             // is shown in full at any inspector width: one H3 line holds only part of it at the default window width.
             if (selected == null) {
-                Heading(builder, state, null, null, wrap: true);
+                var instruction = DuplicateState.EmptyInstruction(CrossingNodeLabel());
+                if (instruction != null) Heading(builder, instruction, null, null, wrap: true);
                 if (crossingNode?.Identity != null && !FileLocked && !guided.Enabled) DrawCrossingNode(builder);
             }
             else LockControls(builder.HStack(row => {

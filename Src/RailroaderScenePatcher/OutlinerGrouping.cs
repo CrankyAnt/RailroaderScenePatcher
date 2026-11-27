@@ -125,7 +125,7 @@ namespace RailroaderScenePatcher {
                     // The map objects occupy the first slots and keep their own names.
                     var number = group.Count(e => !ModObjects.Within(e.Identity.Path));
                     foreach (var entry in group.Where(e => ModObjects.IsPath(e.Identity.Path))
-                        .OrderBy(e => e.Identity.Scene, StringComparer.Ordinal).ThenBy(e => e.Identity.Path, StringComparer.Ordinal)) {
+                        .OrderBy(e => e.Identity.Scene, StringComparer.Ordinal).ThenBy(e => e.Identity.Path, ModObjects.PlacementOrder)) {
                         // A duplicated spawn point with a teleport name shows it, as a map spawn point shows its own name.
                         var teleport = SpawnPoints.TeleportName(entry);
                         if (teleport != null) { names[entry] = teleport; continue; }
