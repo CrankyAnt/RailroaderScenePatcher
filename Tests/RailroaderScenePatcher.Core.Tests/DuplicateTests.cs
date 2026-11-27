@@ -60,8 +60,9 @@ static class DuplicateTests {
         Assert(DuplicateState.Reason(marker, new[] { SceneFamilies.TrackMarker }) == null, "A Generic track marker can be duplicated: " + DuplicateState.Reason(marker, null));
         var post = Map.Observations(out _).First(r => r.Family == SceneFamilies.Milepost && r.Identity.Structure == MilepostScene.Structure);
         Assert(DuplicateState.Reason(post, new[] { SceneFamilies.Milepost }) == null, "A milepost can be duplicated: " + DuplicateState.Reason(post, new[] { SceneFamilies.Milepost }));
-        var pad = Map.Observations(out _).First(r => r.Family == SceneFamilies.CrossingPad);
-        Assert(DuplicateState.Reason(pad, null) != null, "A crossing pad is not duplicated here");
+        // A crossing pad the patcher can edit is duplicated: its copy gets a marker ID of its own and no binding.
+        var pad = Map.Observations(out _).First(r => r.Family == SceneFamilies.CrossingPad && r.Identity.Structure == CrossingPadScene.Structure);
+        Assert(DuplicateState.Reason(pad, null) == null, "A crossing pad can be duplicated: " + DuplicateState.Reason(pad, null));
         var shared = Map.Observations(out _).FirstOrDefault(r => r.Family == SceneFamilies.TrackMarker && r.Identity.Structure == null && r.GroupPath == null);
         Assert(shared == null || DuplicateState.Reason(shared, null) == CommandBand.EditReason(shared.Operations), "A marker the patcher cannot edit is not duplicated: " + (shared == null ? "" : DuplicateState.Reason(shared, null)));
         Assert(DuplicateState.Reason(station, new[] { SceneFamilies.SceneObject, SceneFamilies.TrackMarker }) == DuplicateState.HoldsOtherFamily, "A group that holds a track marker is not copied");

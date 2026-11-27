@@ -336,6 +336,7 @@ class Program {
         StationMapIconTests.Run();
         ModObjectTests.Run();
         ModObjectMarkerTests.Run();
+        ModObjectCrossingTests.Run();
         ModObjectSourceTests.Run();
         DuplicateTests.Run();
         CoalLoaderTests.Run();

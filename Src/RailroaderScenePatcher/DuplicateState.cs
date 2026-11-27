@@ -35,6 +35,9 @@ namespace RailroaderScenePatcher {
         internal const string Placed = "Mod object placed. Save when you're done.";
         // What Remove modification says for a mod object: the object itself goes, not only a change of it.
         internal const string RemoveTip = "Remove this mod object from the map. Your edits of its parts are removed with it.";
+        // The crossing node of the outliner: what Duplicate and Remove say for a crossing without signals.
+        // The mod's own crossing is removed there with Remove modification, as any mod object is.
+        internal const string CrossingField = "Crossing", NotThisMods = "This mod does not change this object.", Removed = "Mod object removed. Save when you're done.";
         // Why Duplicate is inactive for an object, or null: the short reasons of its tooltip.
         internal const string StarterMarker = "No start setup reads a duplicated marker.",
             InspectionOnly = "Inspection-only objects have no edits.",
@@ -43,16 +46,27 @@ namespace RailroaderScenePatcher {
         // becomes an object of its own, a station map icon, a location sign, which registers its own ground mask at its
         // place, and the Ela bridge. A copy of a bridge stands fully built and no construction controller switches it.
         // A spawn point's copy takes a priority below every map spawn point and a teleport name of its own.
-        // An object with a marker ID, a track binding or detection needs more than a copy.
         static readonly string[] Copied = { SceneFamilies.SceneObject, SceneFamilies.ChildObject, SceneFamilies.StationMapIcon, SceneFamilies.LocationSign, SceneFamilies.Bridge, SceneFamilies.SpawnPoint };
         // The families of scene markers a mod object is made of: the placing click gives it a marker ID of its own and
         // binds it to the track the game finds at its position.
-        static readonly string[] Marked = { SceneFamilies.TrackMarker, SceneFamilies.Milepost };
+        // A crossing pad gets a marker ID of its own too and starts without a track binding.
+        static readonly string[] Marked = { SceneFamilies.TrackMarker, SceneFamilies.Milepost, SceneFamilies.CrossingPad };
+        // What a duplicated crossing is made from: its controller with what stands below it. Its copy holds its own
+        // controller, masts, lights, gates, bell and pads. Its detection spans, its whistle signs and what a mod added
+        // to it stay with the original: the copy's detection starts empty.
+        static readonly string[] CrossingHolds = Copied.Concat(SceneFamilies.Crossing).Concat(new[] { SceneFamilies.TrackMarker }).ToArray();
         // familiesBelow: the families of the listed objects at or below the object.
         internal static string Reason(SceneObservation selected, IEnumerable<string> familiesBelow) {
             if (selected == null) return null;
             if (selected.Family == SceneFamilies.StarterPlacement) return StarterMarker;
             if (selected.InspectionOnly != null) return InspectionOnly;
+            // A crossing without signals is duplicated from its crossing object, which the outliner's crossing node stands for.
+            var crossingObject = selected.Family == CrossingObjectScene.Family;
+            if (selected.Family == SceneFamilies.CrossingController || crossingObject) {
+                // A crossing the patcher cannot edit could not get its detection either.
+                if (!crossingObject && !CommandBand.EditableStructure(selected.Identity.Structure)) return CommandBand.EditReason(selected.Operations);
+                return (familiesBelow ?? Enumerable.Empty<string>()).Any(family => family != null && !CrossingHolds.Contains(family, StringComparer.Ordinal)) ? HoldsOtherFamily : null;
+            }
             if (!Copied.Contains(selected.Family, StringComparer.Ordinal) && !Marked.Contains(selected.Family, StringComparer.Ordinal)) return OtherFamily;
             // A marker the patcher cannot edit takes no marker ID of its own, so it is not duplicated either.
             if (Marked.Contains(selected.Family, StringComparer.Ordinal) && !CommandBand.EditableStructure(selected.Identity.Structure)) return CommandBand.EditReason(selected.Operations);

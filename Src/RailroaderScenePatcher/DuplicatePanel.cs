@@ -50,19 +50,54 @@ namespace RailroaderScenePatcher {
         }
         // Why Duplicate is inactive for the inspected object, or null. The object's own reason comes first.
         string DuplicateReason() {
-            if (selected == null) return "Inspect an object first.";
+            var subject = selected ?? CrossingNodeSource();
+            if (subject == null) return "Inspect an object first.";
             string rule;
-            try { rule = DuplicateState.Reason(selected, FamiliesBelow(selected)); }
+            try { rule = DuplicateState.Reason(subject, FamiliesBelow(subject)); }
             catch (Exception e) { rule = "The object couldn't be read: " + e.GetBaseException().Message.TrimEnd('.') + "."; }
             if (rule != null) return rule;
             if (attachment?.Session.Blocked != null) return attachment.Session.Blocked + " The recovery choices are in the session details.";
             return StarterBlock() ?? (Requests.Pending ? "Wait for the scene check to finish." : null);
         }
+        // The crossing object of the crossing node the outliner has selected, as the source of Duplicate, or null. A
+        // crossing without signals has no row of its own: its node stands for the object its crossbucks and pads stand in.
+        SceneObservation CrossingNodeSource() {
+            var node = selected == null ? crossingNode : null;
+            if (node?.Identity == null || !(node.Member?.Handle is GameObject member) || member == null || member.transform.parent == null) return null;
+            var crossing = member.transform.parent.gameObject;
+            var at = NativeInventory.MapPosition(crossing.transform); var turn = crossing.transform.rotation;
+            return new SceneObservation(crossing, node.Identity, CrossingObjectScene.Family, crossing.activeInHierarchy, new double[] { at.x, at.y, at.z }, new double[] { turn.x, turn.y, turn.z, turn.w },
+                Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), null, displayName: node.Label);
+        }
+        // The selected crossing node in the inspector: the crossing's name, Duplicate, and Remove modification for a
+        // crossing this mod made.
+        void DrawCrossingNode(UIPanelBuilder builder) {
+            var node = crossingNode; var identity = node?.Identity;
+            if (identity == null) return;
+            Field(builder, DuplicateState.CrossingField, node.Label);
+            var made = false;
+            try { made = attachment != null && attachment.Session.IsModObject(identity); } catch { }
+            var remove = !made ? DuplicateState.NotThisMods : attachment.Session.Blocked != null ? attachment.Session.Blocked + " The recovery choices are in the session details." : Requests.Pending ? "Wait for the scene check to finish." : null;
+            builder.HStack(row => {
+                row.ConfigureLayout(4f);
+                ActButton(row, DuplicateAct());
+                ActButton(row, Slot(CommandBand.RemoveModification, DuplicateState.RemoveTip, remove, () => RemoveCrossing(identity)));
+            });
+        }
+        void RemoveCrossing(TargetIdentity identity) {
+            string refused = null;
+            try { var outcome = attachment.Session.Remove(identity, null); if (outcome == null || !outcome.Applied) refused = outcome?.Error ?? "The crossing could not be removed."; }
+            catch (Exception e) { refused = e.GetBaseException().Message; }
+            if (refused != null) feedback.Report(DuplicatePlace, "The crossing couldn't be removed: " + refused.TrimEnd('.') + ".");
+            else { crossingNodeKey = null; crossingNode = null; feedback.Report(DuplicatePlace, DuplicateState.Removed); ModObjectsChanged(); }
+            presentation?.RequestRefresh();
+        }
         Act DuplicateAct() => Slot(DuplicateState.Label, DuplicateState.Tip, DuplicateReason(), BeginDuplicate);
         void BeginDuplicate() {
-            if (selected == null || Duplicating || DuplicateReason() != null) return;
+            var subject = selected ?? CrossingNodeSource();
+            if (subject == null || Duplicating || DuplicateReason() != null) return;
             CancelGizmo(); ClearSnap(); CloseCoverageForm(); CloseEquipmentForm(); EndWorldEditAction();
-            duplicate.Begin(selected);
+            duplicate.Begin(subject);
             presentation?.RequestRefresh();
         }
         // Cancel: the inspected object is still the source, so the window shows it again.
@@ -181,6 +216,8 @@ namespace RailroaderScenePatcher {
             var placed = placedModObject; placedModObject = null;
             if (placed == null || inventory == null) return;
             var entry = inventory.Entries.FirstOrDefault(e => TargetIdentity.SameObject(e.Identity, placed) && (placed.Structure == null || e.Identity.Structure == placed.Structure));
+            // A crossing without signals has no row: the outliner selects the node of the new crossing.
+            if (entry == null && placed.Structure == CrossingObjectScene.Structure) crossingNodeKey = OutlinerGrouping.CrossingNodeKey(placed.Scene, placed.Path, null);
             if (entry == null) return;
             ClearSnap();
             selected = entry;

@@ -1230,6 +1230,11 @@ namespace RailroaderScenePatcher.Core {
                     value[ModObjects.SourceMember] = existing[ModObjects.SourceMember].DeepClone();
                     if (existing[ModObjects.TeleportNameMember] != null) value[ModObjects.TeleportNameMember] = existing[ModObjects.TeleportNameMember].DeepClone();
                 }
+                // And the marker IDs of the scene markers below it.
+                if (value != null && existing?[ModObjects.PartMarkerIdsMember] != null && value[ModObjects.SourceMember] != null && value[ModObjects.PartMarkerIdsMember] == null) {
+                    if (value.Parent != null) value = (JObject)value.DeepClone();
+                    value[ModObjects.PartMarkerIdsMember] = existing[ModObjects.PartMarkerIdsMember].DeepClone();
+                }
                 var normal = Normalised(existing, value, engine.Underlying(resolved));
                 outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !PreservingJson.SameModification(normal, value));
                 value = WithModObjectDependency(WithIdDependencies(normal, resolved, existing), target);

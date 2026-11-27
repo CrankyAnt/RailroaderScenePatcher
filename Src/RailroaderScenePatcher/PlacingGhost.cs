@@ -45,9 +45,11 @@ namespace RailroaderScenePatcher {
             foreach (var group in from.GetComponentsInChildren<LODGroup>(true))
                 foreach (var level in group.GetLODs().Skip(1))
                     foreach (var renderer in level.renderers ?? new Renderer[0]) if (renderer != null) farther.Add(renderer);
+            // What the placed object will not hold, such as the whistle signs of a crossing, is no part of the ghost.
+            var left = ModObjectWorld.NotHeld(from).Where(go => go != null).Select(go => go.transform).ToArray();
             var count = 0;
             foreach (var renderer in from.GetComponentsInChildren<MeshRenderer>(true)) {
-                if (renderer == null || farther.Contains(renderer)) continue;
+                if (renderer == null || farther.Contains(renderer) || left.Any(gone => renderer.transform.IsChildOf(gone))) continue;
                 var filter = renderer.GetComponent<MeshFilter>();
                 var mesh = filter == null ? null : filter.sharedMesh;
                 if (mesh == null) continue;

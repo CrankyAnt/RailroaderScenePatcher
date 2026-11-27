@@ -602,7 +602,10 @@ namespace RailroaderScenePatcher {
             var state = StateLine(out var states);
             // The instruction while nothing is inspected wraps at the heading's size and takes the height its lines need, so it
             // is shown in full at any inspector width: one H3 line holds only part of it at the default window width.
-            if (selected == null) Heading(builder, state, null, null, wrap: true);
+            if (selected == null) {
+                Heading(builder, state, null, null, wrap: true);
+                if (crossingNode?.Identity != null && !FileLocked && !guided.Enabled) DrawCrossingNode(builder);
+            }
             else LockControls(builder.HStack(row => {
                 StateLineRow(row, state, states).EqualFlexibleWidth(0);
                 DrawModeSwitch(row);

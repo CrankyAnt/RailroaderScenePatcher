@@ -66,7 +66,7 @@ namespace RailroaderScenePatcher.Core {
     // geometry and culling from the mod's location. A pad without a track location has no geometry, so a
     // relationship must name a location; disabling the pad is the way to hide it. Placement and activity stay
     // separate settings; the generated geometry follows the track, not the pad object.
-    public sealed class CrossingPadScene : IScene, IRelationshipScene, IVersionedScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IDependentOutputScene {
+    public sealed class CrossingPadScene : IScene, IRelationshipScene, IVersionedScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IDependentOutputScene, IMarkerIdScene {
         public const string Structure = "crossing-pad-v1", RequiredVersion = "0.5.0";
         readonly MarkerRelationship relationship;
         readonly ICrossingPadWorld world;
@@ -77,9 +77,15 @@ namespace RailroaderScenePatcher.Core {
         readonly MaskFollowing masks;
         public CrossingPadScene(ICrossingPadWorld world, Capability capability, GroundMasks masks = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world));
-            relationship = new MarkerRelationship(world, Structure, new GeneratedGeometry(world));
+            // A pad of the map takes no replacement ID; a pad that is a mod object, or stands in one, holds a marker ID
+            // of its own, which Set replacement marker ID changes.
+            relationship = new MarkerRelationship(world, Structure, new GeneratedGeometry(world), modObjects: true);
             Capability = capability; this.masks = new MaskFollowing(masks);
         }
+        public IReadOnlyList<string> MarkerIdUsers(object target, string id) => relationship.IdUsers(target, id);
+        public bool RewritesRegistration(object target, ObjectState state) => relationship.RewritesRegistration(target, state);
+        public string MarkerIdRefusal(object target, string id) => relationship.MarkerIdRefusal(target, id);
+        public string NewMarkerIdRefusal(object source, string id) => relationship.NewMarkerIdRefusal(source, id);
         public DependentOutput Output(object target) => masks.Output(target);
         public void RetryOutput(object target) => masks.RetryOutput(target);
         public IEnumerable<string> MapIds => relationship.MapIds;

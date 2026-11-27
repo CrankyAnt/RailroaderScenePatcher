@@ -117,6 +117,8 @@ namespace RailroaderScenePatcher {
             }
         }
 
+        // The key of the node of the crossing whose crossing object stands at the path.
+        internal static string CrossingNodeKey(string scene, string path, string padMarkerId) => "crossing\n" + scene + "\n" + path + "\n" + padMarkerId;
         // An unprotected crossing: the crossing object that holds crossbucks or pads becomes a node named with its game
         // name, holding its crossbucks, pads and crossing track markers. Crossings that share one crossing path are told
         // apart by pad marker ID: each crossbuck names its pad's marker ID, and each pad and track marker carries its own.
@@ -151,8 +153,8 @@ namespace RailroaderScenePatcher {
             }
             var joined = new HashSet<Unit>();
             foreach (var crossing in crossings.Values.Where(c => c.Members.Count >= 2)) {
-                var node = new OutlineNode { Key = "crossing\n" + crossing.Crossing.Scene + "\n" + crossing.Crossing.Path + "\n" + crossing.PadMarkerId, Label = Last(crossing.Crossing.Path) };
-                var unit = new Unit { Node = node, Members = crossing.Members, CrossingPath = crossing.Crossing.Path };
+                var node = new OutlineNode { Key = CrossingNodeKey(crossing.Crossing.Scene, crossing.Crossing.Path, crossing.PadMarkerId), Label = Last(ModObjects.Plain(crossing.Crossing.Path)) };
+                var unit = new Unit { Node = node, Members = crossing.Members, CrossingPath = crossing.Crossing.Path, CrossingScene = crossing.Crossing.Scene, CrossingPadMarkerId = crossing.PadMarkerId };
                 foreach (var m in crossing.Members) { Join(unit, m); joined.Add(m); }
                 SortCrossingChildren(node);
                 unit.Category = SceneObjectCategories.GradeCrossing;

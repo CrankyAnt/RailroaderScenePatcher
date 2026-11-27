@@ -17,7 +17,9 @@ namespace RailroaderScenePatcher {
     // exist only in the load that the scene patch file builds them in. A circuit set is a plain object the controller's list
     // refers to; a set the patcher adds for a detection addition is remembered by its own identity, so a later adapter over a
     // retained world still tells it from the native sets.
-    internal sealed class CrossingCoverageWorld : ICrossingCoverageWorld {
+    internal sealed class CrossingCoverageWorld : ICrossingCoverageWorld, IModObjectCrossings {
+        // A duplicated crossing: a mod object this patcher built, which starts without a circuit.
+        public bool IsModObject(object target) => ModObjectWorld.IsModObject(target as GameObject);
         const string GraphType = "Track.Graph", SpanType = "Track.TrackSpan", SegmentType = "Track.TrackSegment", LocationType = "Track.SerializableLocation";
         internal const string RootName = InventoryPresentationState.CoverageRoot;
         readonly Type controller, span, graph, segment, end, location, circuitSet;
@@ -72,7 +74,7 @@ namespace RailroaderScenePatcher {
             if (controllers.Length != 1) return controllers.Length == 0 ? "The object holds no crossing controller" : "The object holds several crossing controllers";
             if (go.GetComponents<Component>().Any(c => c == null)) return "Missing script on the crossing object";
             if (!(type.GetField("circuitSets", Native.Flags)?.GetValue(controllers[0]) is IList sets)) return "The crossing controller holds no circuit list";
-            if (sets.Count == 0) return "The crossing has no circuits";
+            if (sets.Count == 0 && !ModObjectWorld.IsModObject(go)) return CrossingCoverageScene.NoCircuits;
             foreach (var set in sets) {
                 if (set == null) return "The crossing holds an empty circuit";
                 foreach (var role in CircuitCoverage.Roles) {

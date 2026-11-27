@@ -356,6 +356,12 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to change crossing detection coverage: " + e.GetBaseException().Message);
                 }
+                // A crossing without signals is duplicated and removed as one object, through its crossing object.
+                try { capabilities.Add(new CrossingObjectScene(new CrossingObjectWorld(), Capability.Unchecked)); }
+                catch (Exception e) {
+                    capabilities.AddUnavailable(CrossingObjectScene.Structure, e.GetBaseException().Message);
+                    PatcherLog.Debug("The patcher couldn't prepare to duplicate a crossing without signals: " + e.GetBaseException().Message);
+                }
                 // Existing masts and bells take their transforms, cullers and own culling from the group world, with their
                 // crossing controller as the group; one set of fixed placements gives each crossing one culling plan.
                 try {

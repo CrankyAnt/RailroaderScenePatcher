@@ -310,6 +310,8 @@ namespace RailroaderScenePatcher.Core {
             internal TargetIdentity Source;
             // For a mod object, the model and build of its source as the placing click recorded it; null when unknown.
             internal string SourceBuild;
+            // For a mod object, the marker IDs of the scene markers below it, in hierarchy order; empty when it holds none.
+            internal string[] PartMarkerIds = new string[0];
             // For a duplicated spawn point, the object name it has in the game: its teleport name; null for its mark name.
             internal string TeleportName;
         }
@@ -629,10 +631,19 @@ namespace RailroaderScenePatcher.Core {
             // The mod object stands beside the object it is built from, under the name its target gives it: beside its
             // original, or beside the identical instance in that instance's parent; a part's copy beside the group of
             // that part. No parent is created.
+            // Each scene marker below the mod object, a pad of a duplicated crossing, takes a marker ID of its own too.
+            var partScene = scene as IModObjectPartScene;
+            var partSources = partScene?.PartMarkers(source ?? instead.Handle) ?? Array.Empty<object>();
+            if (partSources.Count != parsed.PartMarkerIds.Length) throw new InvalidPatchDefinitionException(ModObjects.PartMarkerIdCount(partSources.Count, parsed.PartMarkerIds.Length));
+            for (var i = 0; i < partSources.Count; i++) {
+                var refused = scene is IMarkerIdScene partIds ? partIds.NewMarkerIdRefusal(partSources[i], parsed.PartMarkerIds[i]) : ReplacementMarkerIds.NotSupported;
+                if (refused != null) throw new InvalidPatchDefinitionException(refused);
+            }
             var from = source != null ? parsed.Source.Path : instead.Path;
             var parent = ModObjects.StandsIn(parsed.Identity.Path, parsed.Source.Path, from);
             var root = (parent == null ? "" : parent + "/") + ModObjects.NameOf(parsed.Identity.Path);
-            var built = builder.Build(parsed.Identity.At(root), source ?? instead.Handle, placement, markerId) ?? throw new InvalidOperationException(ModObjects.Unavailable);
+            var built = (partSources.Count == 0 ? builder.Build(parsed.Identity.At(root), source ?? instead.Handle, placement, markerId)
+                : partScene.Build(parsed.Identity.At(root), source ?? instead.Handle, placement, markerId, parsed.PartMarkerIds)) ?? throw new InvalidOperationException(ModObjects.Unavailable);
             try { Prepare(parsed, built, source ?? instead.Handle); }
             catch { try { builder.Remove(built); } catch { } throw; }
             if (source == null) PatcherLog.Warning(ModObjects.FallbackWarning(scenePatchFileKey, parsed.Id, parsed.Source.Path, instead.Path));
@@ -807,7 +818,9 @@ namespace RailroaderScenePatcher.Core {
             var equipment = (relationships?["crossingEquipment"] as JObject)?.Properties().Select(p => p.Name).Where(name => !String.IsNullOrWhiteSpace(name)).Select(name => "equipment " + name) ?? Enumerable.Empty<string>();
             // A replacement ID names one marker, so it follows the same rule as "marker ID <id>".
             var markerId = item[ReplacementMarkerIds.Member]?.Type == JTokenType.String && !String.IsNullOrWhiteSpace((string)item[ReplacementMarkerIds.Member]) ? new[] { MarkerIdKey + (string)item[ReplacementMarkerIds.Member] } : new string[0];
-            return detection.Concat(equipment).Concat(markerId);
+            // So does each marker ID of a scene marker below a mod object.
+            var parts = (item[ModObjects.PartMarkerIdsMember] as JArray)?.Where(x => x.Type == JTokenType.String && !String.IsNullOrWhiteSpace((string)x)).Select(x => MarkerIdKey + (string)x).Distinct(StringComparer.Ordinal) ?? Enumerable.Empty<string>();
+            return detection.Concat(equipment).Concat(markerId).Concat(parts);
         }
         internal static HashSet<string> SharedAdditionIds(IEnumerable<JObject> items) {
             var seen = new HashSet<string>(StringComparer.Ordinal); var shared = new HashSet<string>(StringComparer.Ordinal);
@@ -935,7 +948,7 @@ namespace RailroaderScenePatcher.Core {
             if (dependencies == null || dependencies.Any(x => x.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)x))) throw new InvalidOperationException("Invalid dependencies");
             return dependencies.Select(x => (string)x).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         }
-        internal static readonly string[] Known = { "target", ModObjects.SourceMember, ModObjects.TeleportNameMember, ReplacementMarkerIds.Member, "placement", "active", "relationships", "starterPlacement", "dependsOn" };
+        internal static readonly string[] Known = { "target", ModObjects.SourceMember, ModObjects.TeleportNameMember, ReplacementMarkerIds.Member, ModObjects.PartMarkerIdsMember, "placement", "active", "relationships", "starterPlacement", "dependsOn" };
         // The modifications of a scene patch file by key, in ordinal key order.
         internal static SortedDictionary<string, JObject> Entries(JObject modifications) {
             var entries = new SortedDictionary<string, JObject>(StringComparer.Ordinal);
@@ -998,8 +1011,16 @@ namespace RailroaderScenePatcher.Core {
             }
             var starter = item["starterPlacement"] == null ? null : ParseStarter(item["starterPlacement"]);
             var markerId = item[ReplacementMarkerIds.Member] == null ? null : ParseMarkerId(item[ReplacementMarkerIds.Member]);
+            var partMarkerIds = new string[0];
+            if (item[ModObjects.PartMarkerIdsMember] != null) {
+                if (source == null) throw new InvalidPatchDefinitionException(ModObjects.PartMarkerIdsOnlyModObject);
+                var list = item[ModObjects.PartMarkerIdsMember] as JArray;
+                if (list == null || list.Any(x => x.Type != JTokenType.String)) throw new InvalidPatchDefinitionException(ModObjects.PartMarkerIdsShape);
+                partMarkerIds = list.Select(ParseMarkerId).ToArray();
+                if (partMarkerIds.Concat(new[] { markerId }).Where(x => x != null).Distinct(StringComparer.Ordinal).Count() != partMarkerIds.Length + (markerId == null ? 0 : 1)) throw new InvalidPatchDefinitionException(ModObjects.PartMarkerIdsShape);
+            }
             if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && equipment == null && starter == null && segments == null && markerId == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments).WithMarkerId(markerId), Dependencies = dependencies, Source = source, SourceBuild = build, TeleportName = teleportName };
+            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments).WithMarkerId(markerId), Dependencies = dependencies, Source = source, SourceBuild = build, TeleportName = teleportName, PartMarkerIds = partMarkerIds };
         }
         // A replacement ID: a non-empty string that does not begin with an id prefix the game reserves. Its
         // uniqueness depends on the world and is checked when the modification applies.

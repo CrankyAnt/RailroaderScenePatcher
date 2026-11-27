@@ -521,6 +521,8 @@ namespace RailroaderScenePatcher {
                 // controller has one note.
                 var own = ReferenceEquals(controller, c);
                 if (own && segmentIds == null) problems.Add(CircuitSpanProblems.Unknown(graphError));
+                // A duplicated crossing starts without a circuit, and no train triggers it until detection is added.
+                if (own && ModObjectWorld.IsModObject(go) && !sets.Cast<object>().Any()) problems.Add(CircuitSpanProblems.NoDetection);
                 foreach (var set in sets) {
                     string circuit = null;
                     if (own) try {

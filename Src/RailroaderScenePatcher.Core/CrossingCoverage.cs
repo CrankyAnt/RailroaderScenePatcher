@@ -53,9 +53,13 @@ namespace RailroaderScenePatcher.Core {
                 : RecoveryStart + "detection addition " + addition + " and select other tracks for this addition or delete it.";
         }
         const string RecoveryStart = "On the controller's Connections tab, click Edit ";
+        // The problem of a crossing that no train triggers: no circuit of it detects. A duplicated crossing starts so,
+        // until detection is added on its controller's Connections tab.
+        public const string NoDetection = "This crossing has no detection, so no train triggers it. On the controller's Connections tab, click Add detection.";
+        public static string Undetected(CrossingCoverage coverage) => coverage != null && coverage.Circuits.All(c => c.Value.Kind == CircuitKind.Detached) ? NoDetection : null;
         // Whether a problem is a crossing detection problem: it carries the circuit's recovery (Recovery), so its repair
         // route is Edit circuit or Edit detection addition, never another guided task.
-        public static bool IsDetectionProblem(string problem) => problem != null && problem.IndexOf(" " + RecoveryStart, StringComparison.Ordinal) >= 0;
+        public static bool IsDetectionProblem(string problem) => problem != null && (problem == NoDetection || problem.IndexOf(" " + RecoveryStart, StringComparison.Ordinal) >= 0);
         // What Unresolved reports, without its recovery.
         internal static string UnresolvedFault(string circuit, string role, string span, string lower, string upper, ISet<string> segments) {
             var name = SpanName(circuit, role, span);
@@ -330,6 +334,10 @@ namespace RailroaderScenePatcher.Core {
             }
             return null;
         }
+        public const string NoCircuits = "The crossing has no circuits";
+        bool IsModObject(object target) => world is IModObjectCrossings made && made.IsModObject(target);
+        // A duplicated crossing's modification holds the placement it was built at; the capability still moves no crossing.
+        bool BuiltAt(object target, Placement placement) => IsModObject(target) && placement.Following == null && Placements.Same(placement, new Placement(world.Position(target), world.Rotation(target)));
         Baseline BaselineOf(object target) {
             if (baselines.TryGetValue(target, out var known)) return known;
             var problem = world.PatternProblem(target);
@@ -354,7 +362,8 @@ namespace RailroaderScenePatcher.Core {
                 if (baseline.Circuits.Any(c => c.Key == key || ReferenceEquals(c.Set, set))) throw new InvalidOperationException("Two circuits of this crossing share island span " + key + "; they cannot be told apart");
                 baseline.Circuits.Add(new Circuit { Key = key, Set = set, Original = spans });
             }
-            if (baseline.Circuits.Count == 0) throw new InvalidOperationException("The crossing has no circuits");
+            // A duplicated crossing starts without a circuit: its detection is what its mod adds.
+            if (baseline.Circuits.Count == 0 && !IsModObject(target)) throw new InvalidOperationException(NoCircuits);
             // Additions an earlier application left in this world are adopted, so a repeated application reconciles them.
             equipment?.Adopt(target, baseline.Equipment);
             baselines.Add(target, baseline);
@@ -410,7 +419,7 @@ namespace RailroaderScenePatcher.Core {
         }
         public void CheckRelationships(object target, ObjectState state) {
             if (state == null) return;
-            if (state.Placement != null || state.Active != null) throw new InvalidOperationException("A crossing-coverage target accepts only relationships.crossingCoverage and relationships.crossingEquipment; placement and activity of the crossing are not supported");
+            if ((state.Placement != null && !BuiltAt(target, state.Placement)) || state.Active != null) throw new InvalidOperationException("A crossing-coverage target accepts only relationships.crossingCoverage and relationships.crossingEquipment; placement and activity of the crossing are not supported");
             if (state.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state.Equipment != null) {
                 if (equipment == null) throw new InvalidOperationException("Crossing equipment editing is unavailable");
@@ -443,7 +452,8 @@ namespace RailroaderScenePatcher.Core {
                 }
             }
             var effective = Effective(target, baseline, coverage);
-            if (effective.Circuits.All(c => c.Value.Kind == CircuitKind.Detached)) throw new InvalidOperationException("Detaching every circuit would leave the crossing without detection. " + WindowGuidance.KeepOneCircuit);
+            // A duplicated crossing has no circuit of the map: without an addition it detects nothing, as it started.
+            if (effective.Circuits.Count != 0 && effective.Circuits.All(c => c.Value.Kind == CircuitKind.Detached)) throw new InvalidOperationException("Detaching every circuit would leave the crossing without detection. " + WindowGuidance.KeepOneCircuit);
         }
         // The coverage an application converges on: a complete coverage as it stands, any other laid over the observed one.
         CrossingCoverage Effective(object target, Baseline baseline, CrossingCoverage coverage) => coverage.Complete ? coverage : CrossingCoverage.Overlay(Observed(target, baseline), coverage);

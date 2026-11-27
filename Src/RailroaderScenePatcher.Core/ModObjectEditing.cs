@@ -49,10 +49,20 @@ namespace RailroaderScenePatcher.Core {
                 inspected?.Validate(scene, inspectedObject, origin);
                 var from = DuplicateSource(inspectedObject);
                 var key = NewId(new TargetIdentity(from.Scene, ModObjects.Plain(from.Path), from.Component), ModObjects.KeyPrefix);
+                // A crossing pad's copy stands beside the crossing that holds the pad, as a part's copy beside its group.
+                if (group == null && ModObjects.StandsBesideHolder(from.Structure)) group = ModObjects.ParentOf(ModObjects.Plain(from.Path));
                 var beside = ModObjects.Beside(ModObjects.Within(inspectedObject.Path) && group == null ? inspectedObject.Path : from.Path, group);
                 var identity = new TargetIdentity(from.Scene, ModObjects.Path(beside, modId, key), from.Component, ModObjects.StructureOf(from.Structure));
                 var value = new JObject { ["target"] = identity.ToJson(), [ModObjects.SourceMember] = SourceJson(inspectedObject, from, origin) };
-                if (ModObjects.IsSceneMarker(identity.Structure)) value[ReplacementMarkerIds.Member] = NewMarkerId(engine.ResolveUnique(from), next);
+                var drawn = new HashSet<string>(StringComparer.Ordinal);
+                if (ModObjects.IsSceneMarker(identity.Structure)) value[ReplacementMarkerIds.Member] = NewMarkerId(engine.ResolveUnique(from), next, drawn);
+                // Each pad of a duplicated crossing gets a marker ID of its own, in the order the scene lists the pads.
+                // Without its original the mod object is built from an identical instance, which holds the same pads as
+                // the inspected object does.
+                object holder;
+                try { holder = engine.ResolveUnique(from); } catch (InvalidOperationException) { holder = origin; }
+                var parts = (scene as IModObjectPartScene)?.PartMarkers(holder) ?? Array.Empty<object>();
+                if (parts.Count != 0) value[ModObjects.PartMarkerIdsMember] = new JArray(parts.Select(part => (object)NewMarkerId(part, next, drawn)).ToArray());
                 value["placement"] = FixedJson(at);
                 if (ModObjects.BindsAtPlacement(identity.Structure)) {
                     var track = (scene as ITrackPointLookup)?.TrackAt(at.Position);
@@ -73,13 +83,18 @@ namespace RailroaderScenePatcher.Core {
         static readonly Random MarkerIdRandom = new Random();
         // A marker ID for a mod object made from the source: one that the source, every other scene marker, registration
         // and map object, and the replacement IDs of the scene patch file leave free.
-        string NewMarkerId(object source, Func<int, int> next) {
+        string NewMarkerId(object source, Func<int, int> next, HashSet<string> drawn) {
             if (!(scene is IMarkerIdScene markers)) throw new InvalidOperationException(ReplacementMarkerIds.NotSupported);
             var file = new HashSet<string>(StringComparer.Ordinal);
             foreach (var item in scenePatchFile?.Items ?? Enumerable.Empty<JObject>())
                 if (item[ReplacementMarkerIds.Member]?.Type == JTokenType.String) file.Add((string)item[ReplacementMarkerIds.Member]);
-            var id = ReplacementMarkerIds.Generate(next ?? MarkerIdRandom.Next, candidate => file.Contains(candidate) ? ReplacementMarkerIds.Shared(candidate) : markers.NewMarkerIdRefusal(source, candidate), out var reason);
-            return id ?? throw new InvalidOperationException(reason);
+            foreach (var item in scenePatchFile?.Items ?? Enumerable.Empty<JObject>())
+                foreach (var part in (item[ModObjects.PartMarkerIdsMember] as JArray)?.Where(t => t.Type == JTokenType.String) ?? Enumerable.Empty<JToken>()) file.Add((string)part);
+            // An ID drawn earlier for the same mod object is taken too.
+            var id = ReplacementMarkerIds.Generate(next ?? MarkerIdRandom.Next, candidate => file.Contains(candidate) || drawn.Contains(candidate) ? ReplacementMarkerIds.Shared(candidate) : markers.NewMarkerIdRefusal(source, candidate), out var reason);
+            if (id == null) throw new InvalidOperationException(reason);
+            drawn.Add(id);
+            return id;
         }
         // The source of a new mod object, with the model and build by which a later load finds an identical instance when
         // the original is missing. A mod object of this scene patch file passes on its own source as written, build

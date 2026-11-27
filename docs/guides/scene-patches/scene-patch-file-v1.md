@@ -54,6 +54,7 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 | `source` | object | Optional. Makes the modification a mod object: the scene object that the mod object is built from, written like a `target`. Requires `placement` and patcher 0.5.0 or later; see [Mod objects](#mod-objects). |
 | `teleportName` | string | Optional. The teleport name of a duplicated spawn point: its object name in the game. Allowed only in the modification of a mod object made from a spawn point. Requires patcher 0.5.0 or later; see [Mod objects](#mod-objects). |
 | `markerId` | string | Optional. The replacement ID of a generic track marker, or the marker ID of a mod object that is a scene marker. Requires patcher 0.5.0 or later; see Replacement ID below and [Mod objects](#mod-objects). |
+| `partMarkerIds` | array | Optional, in a mod object only. The marker IDs of the crossing pads of a duplicated crossing; see [Mod objects](#mod-objects). |
 | `placement` | object | Optional. A fixed placement contains `mode`, `position`, and `rotation`; a track-following placement contains `mode`, `track`, `offset`, and `rotation`. See Placement below. |
 | `active` | boolean | Optional. `false` disables the object, `true` enables it. Generic activity requires patcher 0.2.0 or later; track-marker activity requires 0.5.0 or later. |
 | `relationships` | object | Optional. Explicit relationship settings; see Relationships below. Requires patcher 0.5.0 or later. |
@@ -116,6 +117,13 @@ A mod object is a new object that a mod makes from a scene object of the map. It
 - `markerId` is required for a mod object that is a scene marker, such as a Generic track marker or a milepost. It is the mod object's own marker ID: the mod object holds it from the moment it's built, so it never takes its source's registration. It follows the rules of a replacement ID, and it must differ from the source's marker ID. A later `markerId` gives the mod object another ID; there is no form that returns it to its source's ID.
 
 - `teleportName` is optional and allowed only for a mod object made from a spawn point (`spawn-point-v1`). It is a non-empty string without `/`. It becomes the mod object's object name in the game, so the console's `/tp` command and the quick search find the mod object by that name, as they find the map's own spawn points by theirs. The `target` path stays the mod object's identity: the patcher keeps finding the mod object, and every object below it, by its mark. Without `teleportName`, the mod object's object name is the last segment of its `target` path.
+- `partMarkerIds` is required for a mod object whose source is a crossing that holds crossing pads. It is an array of strings: one marker ID for each crossing pad below the source, in hierarchy order. Each pad of the mod object holds its ID from the moment it's built. Each ID follows the rules of a replacement ID and must differ from the others, from `markerId`, and from the marker ID of every scene marker. No other modification holds `partMarkerIds`. The member raises no dependency minimum of its own: it stands only in a mod object, which already requires patcher 0.5.0.
+
+A mod object whose source is a crossing with signals, a `crossing-coverage-v1` target, is a crossing of its own. It holds a copy of the source's controller, masts, bell, and crossing pads. It holds none of the source's detection spans, whistle signs, or added lights, gates, and bells, and its controller evaluates no circuit: no train triggers it until its modification adds detection with `relationships.crossingCoverage.additions`. Its `circuits` object stays empty, because it has no circuit of the map. Each of its pads starts without a track binding and is listed with the problem `Marker has an empty segment binding` until a modification of that pad sets `relationships.trackMarker`. Its `placement` is where it was built; the crossing capability moves no controller, so another placement fails the modification. The game keeps the state of a crossing's lights, gates, and bell under a global ID in the save and between the players of a multiplayer game; the mod object holds an ID of its own, its source's ID followed by its mark, so the two crossings never share that state.
+
+A mod object whose source is the crossing object of a crossing without signals is that crossing as one object. A crossing object is the object that holds the crossbucks and crossing pads of a crossing without a controller. Its `source` and `target` have the component `UnityEngine.Transform` and the structure `crossing-object-v1`; the structure is required, because the component alone also names every group. Where several crossings share the path, as the three below `World/Roads Bryson/Old River Rd` do, the `source` adds `padMarkerId`, the marker ID of that crossing's pad. The mod object holds a copy of the crossbucks and pads and none of the whistle signs, and `partMarkerIds` gives each pad its marker ID. A modification of a crossbuck or pad below it targets that object's path below the mod object's path. The crossing object takes no other modification: `active`, `relationships`, and a `placement` other than the one it was built at fail with `A crossing without signals is not edited as one object. Edit its crossbucks and crossing pads.`
+
+A mod object whose source is a crossing pad, a `crossing-pad-v1` target, holds its `markerId` and no track binding. Its path is the path of the parent of the crossing that holds the source, then the pad's name and the mark: it stands beside that crossing, not in it.
 
 A mod object made from a spawn point takes a priority one below the lowest priority of the map's loaded spawn points, enabled or not, so it never becomes the start of a new game, and in `/tp` a map spawn point of the same name comes first. It keeps its source's radius. It is built at the world load, never before a new game starts.
 
@@ -142,6 +150,9 @@ A mod object fails with its reason, and the other modifications still apply, in 
 | `Invalid teleport name: a teleport name must be a non-empty string.` | Write the name as a non-empty string, or remove `teleportName`. |
 | `A teleport name can't contain a slash (/), because a slash splits the hierarchy path.` | Choose a name without `/`. |
 | `Replacement ID <ID> is already used by the scene marker <path>. ...` | Choose a `markerId` that differs from the source's and that no scene marker, registration, or map object uses. |
+| `Invalid mod object: partMarkerIds must hold a marker ID for each crossing pad of its source. The source holds <number>, and partMarkerIds holds <number>.` | Write one marker ID for each crossing pad of the source, or duplicate the crossing again in the native map editor. |
+| `Invalid mod object: partMarkerIds must be a list of marker IDs that differ from each other and from markerId.` | Write `partMarkerIds` as an array of different strings. |
+| `Invalid modification: only a mod object holds partMarkerIds.` | Remove `partMarkerIds` from the modification. |
 
 A mod object's path names no place of the map: the outliner lists a mod object under the place where it stands. No game switch, such as progression, names a mod object, so none switches it. A mod object stands built and active from its placement: the copy of a bridge shows the bridge complete, whatever the construction and progression state of its source.
 
@@ -748,7 +759,7 @@ When Save writes the scene patch file, it uses this order:
 - Scene patch file root: `formatVersion`, `sourceMap`, `modifications`, then unknown members.
 - `sourceMap`: `mapId`, then unknown members.
 - The keys of `modifications`, `circuits`, `additions`, and `crossingEquipment` are in ordinal order.
-- A modification: `target`, `source`, `markerId`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
+- A modification: `target`, `source`, `teleportName`, `markerId`, `partMarkerIds`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
 - `target` and `source`: `scene`, `path`, `component`, `structure`, `padMarkerId`, `markerId`, `mapPosition`; in `source`, then `build`.
 - `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`, `constructionSegments`.
 - `constructionSegments`: `segments`, `detach`. The values of `segments` are in ordinal order when it is an array of strings.
@@ -775,7 +786,8 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | --- | --- |
 | Fixed placement only | `0.1.0` |
 | Any modification with `active` | `0.2.0` |
-| Any modification with `source`, a mod object | `0.5.0` |
+| Any modification with `source`, a mod object, with or without `partMarkerIds` | `0.5.0` |
+| Any modification whose target `structure` is `crossing-object-v1` | `0.5.0` |
 | A location sign target other than the legacy Sylva location sign | `0.5.0` |
 | Any modification whose target `structure` is `bridge-colliders-v1` | `0.5.0` |
 | Any modification with `relationships`, a `Track.TrackMarker` target component, or target `structure` `track-marker-v1` | `0.5.0` |

@@ -13,11 +13,16 @@ namespace RailroaderScenePatcher {
     // or beside the identical instance that stands in for a missing original. The inventory and the capability of its
     // family then find it at that path like any object of the map. The scene asset is never
     // changed: the copy lives until its scene unloads or its modification leaves, and each load builds it again.
-    internal sealed class ModObjectWorld : IModObjectScene, IModObjectSources, IModObjectNames {
+    internal sealed class ModObjectWorld : IModObjectScene, IModObjectSources, IModObjectNames, IModObjectPartScene {
         // The mod objects that stand now. Unity reports a destroyed object as null, so an unloaded world leaves none.
         static readonly HashSet<GameObject> standing = new HashSet<GameObject>();
         // Whether this patcher built the object as a mod object.
         internal static bool IsModObject(GameObject go) => go != null && standing.Contains(go);
+        // Whether the object is a mod object or stands in one, as a pad of a duplicated crossing does.
+        internal static bool Within(GameObject go) {
+            for (var t = go == null ? null : go.transform; t != null; t = t.parent) if (standing.Contains(t.gameObject)) return true;
+            return false;
+        }
         // The mod objects with an object name of their own, with the name their target path gives them.
         static readonly Dictionary<GameObject, string> pathNames = new Dictionary<GameObject, string>();
         // The name of the object in a hierarchy path: for a mod object with an object name of its own, the name its target
@@ -48,7 +53,19 @@ namespace RailroaderScenePatcher {
         }
         static float Checked(double value) => Math.Abs(value) <= Single.MaxValue && !Double.IsNaN(value) ? (float)value : throw new InvalidOperationException("A coordinate exceeds the game's numeric precision.");
 
-        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) {
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId) => Build(identity, source, placement, markerId, null);
+        // The crossing pads below a crossing, in hierarchy order: the scene markers a copy of the crossing holds. A pad
+        // in something a mod added to the crossing is not among them, as the copy does not hold it. The crossing is a
+        // crossing controller's object or the crossing object of a crossing without signals; no other source that can
+        // be duplicated holds a pad below it.
+        static List<Component> Pads(GameObject crossing) {
+            var marker = Native.Type(TrackMarkerWorld.MarkerType);
+            if (marker == null) return new List<Component>();
+            return crossing.GetComponentsInChildren(marker, true).Where(m => m != null && m.gameObject != crossing && IsPad(m) && OwnedEquipment.Of(m.gameObject) == null).ToList();
+        }
+        static bool IsPad(Component marker) => TrackMarkerWorld.Get(marker.gameObject, TrackMarkerWorld.PadBuilder) != null;
+        public IReadOnlyList<object> PartMarkers(object source) => source is GameObject go && go != null ? Pads(go).Select(m => (object)m.gameObject).ToArray() : Array.Empty<object>();
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId, IReadOnlyList<string> partMarkerIds) {
             var from = source as GameObject;
             if (from == null) throw new InvalidOperationException("The source of this mod object is not a scene object.");
             if (placement?.Position == null || placement.Rotation == null || placement.Position.Length != 3 || placement.Rotation.Length != 4) throw new InvalidOperationException(ModObjects.NeedsPlacement);
@@ -75,12 +92,19 @@ namespace RailroaderScenePatcher {
                 // No switch of the game names a mod object, so nothing switches it: it starts enabled, whatever
                 // progression or an explicit disable made of its source.
                 if (!made.activeSelf) made.SetActive(true);
+                // The bell player the source's controller made while it ran is found by its place in the hierarchy,
+                // before the preparation changes the copy.
+                var bell = SourceBell(from, made);
                 Prepare(from, made);
+                StandAlone(made, bell, partMarkerIds ?? Array.Empty<string>());
+                OwnGlobalIds(made, identity.Path);
                 // A scene marker takes its own marker ID before it starts: under its source's ID its start would replace
                 // the source's registration in the track graph, which holds one entry per ID and segment.
                 if (markerId != null) {
                     var marker = made.GetComponent(Native.Type(TrackMarkerWorld.MarkerType)) ?? throw new InvalidOperationException("The source of this mod object holds no track marker for its marker ID.");
-                    (marker.GetType().GetField("id", Native.Flags) ?? throw new MissingFieldException(TrackMarkerWorld.MarkerType, "id")).SetValue(marker, markerId);
+                    SetMarkerId(marker, markerId);
+                    // A crossing pad's copy starts without a track location: its modder binds it to the track at its place.
+                    if (IsPad(marker)) Unbind(marker);
                 }
                 // Entering its parent starts its components, at its placement.
                 made.transform.SetParent(parent, true);
@@ -135,7 +159,7 @@ namespace RailroaderScenePatcher {
             }
             text.Append('\n');
             var count = 1;
-            if (!prop) for (var i = 0; i < t.childCount; i++) count += Describe(t.GetChild(i), depth + 1, text);
+            if (!prop) for (var i = 0; i < t.childCount; i++) if (!MadeWhileRunning(t.GetChild(i))) count += Describe(t.GetChild(i), depth + 1, text);
             return count;
         }
         // The name of a mesh or material asset. A mesh the game makes while it runs, such as the mesh of a text, has none
@@ -148,12 +172,23 @@ namespace RailroaderScenePatcher {
             while (name.EndsWith(Instance, StringComparison.Ordinal)) name = name.Substring(0, name.Length - Instance.Length);
             return name;
         }
+        // What the running game or a mod put below an object is no part of its model and build, so the signature of an
+        // object is the same whatever the game has done with it: a mesh the game generated, such as the mesh of a
+        // crossing pad, which the game marks as not saved; the bell player a crossing controller made beneath itself;
+        // and a light, gate or bell a mod added to a crossing.
+        static bool MadeWhileRunning(Transform child) {
+            var go = child.gameObject;
+            if ((go.hideFlags & HideFlags.DontSave) != 0 || go.GetComponent<OwnedEquipment>() != null) return true;
+            var type = Native.Type(ControllerType); var parent = child.parent;
+            var controller = type == null || parent == null ? null : parent.GetComponent(type);
+            return controller != null && (type.GetField("_bellPlayer", Native.Flags)?.GetValue(controller) as Component)?.gameObject == go;
+        }
         // The number of objects Describe reads below and at the object, without building the description.
         static int Size(Transform t, Dictionary<Transform, int> sizes) {
             var count = 1;
             var prop = false;
             foreach (var component in t.GetComponents<Component>()) if (component != null && component.GetType().FullName == PropInstanceType) { prop = true; break; }
-            for (var i = 0; i < t.childCount; i++) { var below = Size(t.GetChild(i), sizes); if (!prop) count += below; }
+            for (var i = 0; i < t.childCount; i++) { var below = Size(t.GetChild(i), sizes); if (!prop && !MadeWhileRunning(t.GetChild(i))) count += below; }
             sizes[t] = count;
             return count;
         }
@@ -182,6 +217,115 @@ namespace RailroaderScenePatcher {
             return found.OrderBy(p => p.Value, StringComparer.Ordinal).ThenBy(p => p.Key.GetSiblingIndex()).Select(p => new SourceInstance(p.Value, p.Key.gameObject)).ToArray();
         }
 
+        const string ControllerType = CrossingCoverageScene.ComponentType, SpanType = "Track.TrackSpan";
+        static void SetMarkerId(Component marker, string id) =>
+            (marker.GetType().GetField("id", Native.Flags) ?? throw new MissingFieldException(TrackMarkerWorld.MarkerType, "id")).SetValue(marker, id);
+        // Takes the track location of a crossing pad's copy, through the marker's own setter as a detach does, and the
+        // mesh the source's builder generated along the source's track. The pad's builder generates again once the
+        // pad is bound.
+        static void Unbind(Component marker) {
+            (marker.GetType().GetProperty("Location", Native.Flags) ?? throw new MissingMemberException(TrackMarkerWorld.MarkerType, "Location")).SetValue(marker, null, null);
+            var builder = TrackMarkerWorld.Get(marker.gameObject, TrackMarkerWorld.PadBuilder);
+            if (builder == null || !(TrackMarkerWorld.Field(builder, "meshContainer") is Transform container) || container == null) return;
+            for (var child = container.childCount - 1; child >= 0; child--) UnityEngine.Object.DestroyImmediate(container.GetChild(child).gameObject);
+        }
+        // The copy's object at the place in the hierarchy where the source has the item, or null.
+        static Transform TwinOf(Transform root, Transform item, Transform copy) {
+            var steps = new List<int>();
+            for (var t = item; t != root; t = t.parent) { if (t == null) return null; steps.Add(t.GetSiblingIndex()); }
+            var at = copy;
+            for (var i = steps.Count - 1; i >= 0; i--) { if (steps[i] >= at.childCount) return null; at = at.GetChild(steps[i]); }
+            return at;
+        }
+        // The copy of the bell player that the source's crossing controller made beneath itself when it started
+        // (GradeCrossingController.CreateBellPlayer), or null. The copy's controller makes its own when it starts.
+        static GameObject SourceBell(GameObject from, GameObject made) {
+            var type = Native.Type(ControllerType);
+            var controller = type == null ? null : from.GetComponent(type);
+            if (controller == null) return null;
+            var player = type.GetField("_bellPlayer", Native.Flags)?.GetValue(controller) as Component;
+            if (player == null || !player.transform.IsChildOf(from.transform) || player.transform == from.transform) return null;
+            var twin = TwinOf(from.transform, player.transform, made.transform);
+            return twin == null || twin.name != player.name ? null : twin.gameObject;
+        }
+        // The objects at and below a crossing, or a crossing pad, that a mod object made from it does not hold: the
+        // whistle signs, which are track markers other than pads and no members of the crossing, the lights, gates and
+        // bells a mod added, and the surface each pad's builder generated along its track, which a pad shows again once
+        // it is bound. Empty for any other object. The placing ghost leaves them out too, so it shows what is placed.
+        internal static List<GameObject> NotHeld(GameObject root) {
+            var left = new List<GameObject>();
+            var markerType = Native.Type(TrackMarkerWorld.MarkerType);
+            if (root == null || markerType == null) return left;
+            var controllerType = Native.Type(ControllerType);
+            var markers = root.GetComponentsInChildren(markerType, true).Where(m => m != null).ToArray();
+            var pads = markers.Where(IsPad).ToArray();
+            if ((controllerType == null || root.GetComponent(controllerType) == null) && pads.Length == 0) return left;
+            foreach (var marker in markers) if (marker.gameObject != root && !IsPad(marker)) left.Add(marker.gameObject);
+            foreach (var owned in root.GetComponentsInChildren<OwnedEquipment>(true)) left.Add(owned.gameObject);
+            foreach (var pad in pads) {
+                var builder = TrackMarkerWorld.Get(pad.gameObject, TrackMarkerWorld.PadBuilder);
+                if (builder != null && TrackMarkerWorld.Field(builder, "meshContainer") is Transform container && container != null)
+                    for (var child = 0; child < container.childCount; child++) left.Add(container.GetChild(child).gameObject);
+            }
+            return left;
+        }
+        // Makes the copy of a crossing independent of its source (Railroader 0.6.3). A crossing controller evaluates the
+        // track spans of its circuit sets on every pass (GradeCrossingController.LoopCoroutine). A span registers under
+        // its ID when it is enabled and removes that ID when it is disabled (TrackSpan.OnEnable, OnDisable), and a track
+        // marker does the same with its marker ID (TrackMarker.OnEnable, OnDisable), so a copy that started with its
+        // source's spans or marker IDs would take the source's registrations and remove them when it leaves. The copy
+        // therefore holds no circuit and no span: its detection starts empty and is what its mod adds. The whistle signs
+        // of the source, which are no members of the crossing, the lights, gates and bells a mod added to the source,
+        // and the bell player the source's controller made stay with the source. Each pad of the copy takes the
+        // marker ID given for it and no track location. Nothing here runs for a source that is no crossing.
+        static void StandAlone(GameObject made, GameObject sourceBell, IReadOnlyList<string> partMarkerIds) {
+            var controllerType = Native.Type(ControllerType);
+            var controller = controllerType == null ? null : made.GetComponent(controllerType);
+            // A crossing without signals has no controller: its crossing object holds its pads.
+            if (controller == null && Pads(made).Count == 0) {
+                if (partMarkerIds.Count != 0) throw new InvalidOperationException(ModObjects.PartMarkerIdCount(0, partMarkerIds.Count));
+                return;
+            }
+            if (controller != null) {
+                var sets = controllerType.GetField("circuitSets", Native.Flags) ?? throw new MissingFieldException(ControllerType, "circuitSets");
+                sets.SetValue(controller, Activator.CreateInstance(sets.FieldType));
+            }
+            var leaving = new List<GameObject>();
+            var spanType = Native.Type(SpanType) ?? throw new InvalidOperationException("The track span type is unavailable.");
+            foreach (var span in made.GetComponentsInChildren(spanType, true)) {
+                // A span stands on an object of its own; one that shares its object leaves alone.
+                var go = span.gameObject;
+                if (go == made || go.transform.childCount != 0 || go.GetComponents<Component>().Length != 2) UnityEngine.Object.DestroyImmediate(span);
+                else leaving.Add(go);
+            }
+            leaving.AddRange(NotHeld(made));
+            if (sourceBell != null) leaving.Add(sourceBell);
+            foreach (var go in leaving) if (go != null) UnityEngine.Object.DestroyImmediate(go);
+            // A game-object culler switches the objects on its list; what left the copy leaves the list.
+            var cullerType = Native.Type(CullerTypes.GameObjectCuller);
+            if (cullerType != null) foreach (var culler in made.GetComponentsInChildren(cullerType, true)) {
+                var field = Field(culler, "gameObjects");
+                if (!(field?.GetValue(culler) is System.Collections.IList list)) continue;
+                var kept = list.Cast<object>().Where(item => item as UnityEngine.Object != null).ToArray();
+                if (kept.Length == list.Count) continue;
+                if (list is Array) { var array = Array.CreateInstance(field.FieldType.GetElementType(), kept.Length); kept.CopyTo(array, 0); field.SetValue(culler, array); }
+                else { list.Clear(); foreach (var item in kept) list.Add(item); }
+            }
+            var pads = Pads(made);
+            if (pads.Count != partMarkerIds.Count) throw new InvalidOperationException(ModObjects.PartMarkerIdCount(pads.Count, partMarkerIds.Count));
+            for (var i = 0; i < pads.Count; i++) { SetMarkerId(pads[i], partMarkerIds[i]); Unbind(pads[i]); }
+        }
+        // A key-value object with a global ID registers under that ID while it is enabled, and the game keeps its
+        // values under the ID in the save and between the peers of a multiplayer game (GlobalKeyValueObject.OnEnable,
+        // StateManager.RegisterPropertyObject). A crossing controller publishes its lights, gates and bell there. Each
+        // such object of the copy takes an ID of its own before it starts, so the copy never shares that state with
+        // its source and never removes the source's registration.
+        static void OwnGlobalIds(GameObject made, string path) {
+            var type = Native.Type(CommandBand.GlobalKeyValueObject);
+            if (type == null) return;
+            var id = type.GetField("globalObjectId", Native.Flags) ?? throw new MissingFieldException(CommandBand.GlobalKeyValueObject, "globalObjectId");
+            foreach (var global in made.GetComponentsInChildren(type, true)) id.SetValue(global, ModObjects.OwnGlobalId(id.GetValue(global) as string, path));
+        }
         const string PropInstanceType = "Helpers.PropInstance", NightLightType = "Effects.NightLightController", OriginTargetType = "Helpers.WorldTransformerTarget";
         static FieldInfo Field(Component component, string name) => component.GetType().GetField(name, Native.Flags);
         // Brings the copy, still inactive below the holder, to the state a scene object has before the game starts it.

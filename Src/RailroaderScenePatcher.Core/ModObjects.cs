@@ -27,6 +27,22 @@ namespace RailroaderScenePatcher.Core {
         // Mod objects are not listed.
         IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build);
     }
+    // A scene whose mod objects hold scene markers below them: the pads of a duplicated crossing. Each takes a marker
+    // ID of its own before it starts, as a mod object that is a scene marker does, so no pad of the source loses its
+    // registration.
+    public interface IModObjectPartScene {
+        // The scene markers below the source that a mod object made from it holds, in hierarchy order; never the
+        // source itself. Empty for a source without such markers.
+        IReadOnlyList<object> PartMarkers(object source);
+        // As IModObjectScene.Build. partMarkerIds gives each scene marker below the mod object its marker ID, in the
+        // order of PartMarkers; each starts without a track location.
+        object Build(TargetIdentity identity, object source, Placement placement, string markerId, IReadOnlyList<string> partMarkerIds);
+    }
+    // A crossing world that tells the mod objects among its controllers apart: a duplicated crossing starts without a
+    // circuit and stands where its modification places it.
+    public interface IModObjectCrossings {
+        bool IsModObject(object controller);
+    }
     // A scene that gives a mod object an object name of its own in the game: a duplicated spawn point's teleport name,
     // by which the game's teleport command and quick search find it. The identity of the mod object stays its target
     // path, which ends with its mark: the scene keeps resolving the object, and the objects below it, by that path.
@@ -71,11 +87,28 @@ namespace RailroaderScenePatcher.Core {
         // Whether a mod object of the structure takes a teleport name.
         public static bool TakesTeleportName(string structure) => structure == SpawnPoints.Structure;
         public const string KeepsMarkerId = "A mod object keeps a marker ID of its own.";
+        // The marker IDs of the scene markers below a mod object, the pads of a duplicated crossing, in hierarchy order.
+        public const string PartMarkerIdsMember = "partMarkerIds";
+        public const string PartMarkerIdsShape = "Invalid mod object: partMarkerIds must be a list of marker IDs that differ from each other and from markerId.";
+        public const string PartMarkerIdsOnlyModObject = "Invalid modification: only a mod object holds partMarkerIds.";
+        public static string PartMarkerIdCount(int pads, int ids) =>
+            "Invalid mod object: partMarkerIds must hold a marker ID for each crossing pad of its source. The source holds " + pads + ", and partMarkerIds holds " + ids + ".";
+        // The global ID of a key-value object in a mod object, from the ID its source holds: the game keeps the values
+        // of such an object, such as the lights and gates of a crossing, under that ID in the save and between the
+        // peers of a multiplayer game, so a copy under its source's ID would share them. The mod object's mark makes
+        // the ID its own, the same at every load and on every peer. An empty ID stays empty: the game registers none.
+        public static string OwnGlobalId(string sourceId, string path) {
+            var mark = MarkOf(path);
+            return String.IsNullOrEmpty(sourceId) || mark == null ? sourceId : sourceId + " " + mark;
+        }
         // The fields a copy never takes from its source, with the value the copy holds instead: the origin flag of a
         // milepost. Helpers.MilePost.Origin caches, per prefix, the first loaded post with the flag that
         // FindObjectsByType returns, in no fixed order, so a copy with the flag could become its prefix's origin.
         public static readonly IReadOnlyList<KeyValuePair<string, string>> NotCopied = new[] { new KeyValuePair<string, string>("Helpers.MilePost", "origin") };
         // Whether a mod object of the structure is a scene marker: it holds a marker ID of its own.
+        // Whether a mod object of the structure stands beside the object that holds its source: a crossing pad's copy
+        // stands beside the crossing, not in it.
+        public static bool StandsBesideHolder(string structure) => structure == CrossingPadScene.Structure;
         public static bool IsSceneMarker(string structure) => structure == TrackMarkerScene.Structure || structure == MilepostScene.Structure || structure == CrossingPadScene.Structure;
         // Whether a mod object of the structure binds at placement to the track the game finds at its position.
         public static bool BindsAtPlacement(string structure) => structure == TrackMarkerScene.Structure || structure == MilepostScene.Structure;

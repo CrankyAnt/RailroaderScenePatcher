@@ -55,10 +55,12 @@ namespace RailroaderScenePatcher {
             internal OutlineNode Node;
             internal SceneObservation Row;
             internal List<Unit> Members = new List<Unit>();
-            internal string Category, Kind, Place, CrossingPath;
+            internal string Category, Kind, Place, CrossingPath, CrossingScene, CrossingPadMarkerId;
         }
         // A node without an inventory row that stands for a complex: where Focus goes, in map coordinates.
-        internal sealed class GroupNode { internal string Label; internal double[] Point; }
+        // Identity names the crossing object of a crossing without signals, with the pad marker ID that tells crossings
+        // at one path apart; Member is one of the crossing's own rows, which stands directly in that object.
+        internal sealed class GroupNode { internal string Label; internal double[] Point; internal TargetIdentity Identity; internal SceneObservation Member; }
         internal sealed class Result {
             internal IReadOnlyList<OutlineNode> Tops;
             internal int Listed, Unplaced;
@@ -334,7 +336,8 @@ namespace RailroaderScenePatcher {
             var tops = b.PlaceView ? OutlineTree.ByPlace(shown, kindCategories, narrowed ? null : places.All.Select(p => p.Name)) : OutlineTree.ByCategory(shown, kindCategories);
             foreach (var u in b.Units) {
                 Remember(b, u.Node, u);
-                if (u.Row == null && u.CrossingPath != null) b.Result.GroupNodes[u.Node.Key] = new GroupNode { Label = u.Node.Label, Point = Centre(u) };
+                if (u.Row == null && u.CrossingPath != null) b.Result.GroupNodes[u.Node.Key] = new GroupNode { Label = u.Node.Label, Point = Centre(u),
+                    Identity = u.CrossingScene == null ? null : CrossingObjectScene.Identity(u.CrossingScene, u.CrossingPath, u.CrossingPadMarkerId), Member = u.Members.Select(m => m.Row).FirstOrDefault(r => r != null) };
             }
             b.Result.Tops = lastTops = tops;
             b.Result.Listed = tops.Sum(t => t.Count);
@@ -404,15 +407,26 @@ namespace RailroaderScenePatcher {
         // The place of each unit; a crossing without a controller stands where its crossing object is, at the mean of
         // its members. A crossing is one with signals when a crossing controller holds it, and one without otherwise.
         static void PlaceUnits(BuildContext b) {
+            var crossingPlaces = new Dictionary<Unit, ScenePlace>();
             foreach (var u in b.Units) {
                 if (u.Row != null) u.Place = PlaceOf(u.Row, b.TrackPoint)?.Name;
                 else {
                     var members = u.Members.Where(m => Measure(m.Row, b.TrackPoint) != null).ToArray();
                     double[] Mean(Func<SceneObservation, double[]> at) => members.Length == 0 ? null : new[] { members.Average(m => at(m.Row)[0]), members.Average(m => at(m.Row)[1]) };
-                    u.Place = places.Of(u.CrossingPath, Mean(r => Measure(r, b.TrackPoint)), Mean(r => Placed(r, b.TrackPoint)))?.Name;
+                    var place = places.Of(u.CrossingPath, Mean(r => Measure(r, b.TrackPoint)), Mean(r => Placed(r, b.TrackPoint)));
+                    u.Place = place?.Name;
+                    if (u.CrossingPath != null) crossingPlaces[u] = place;
                 }
                 if (u.Category == SceneObjectCategories.GradeCrossing) u.Kind = u.Row?.Family == ControllerFamily ? SceneClassification.ProtectedCrossings : SceneClassification.UnprotectedCrossings;
                 if (b.Diagnostics && u.Row?.InspectionOnly != null) b.Result.InspectionOnlyRows.Add(u.Node.Label + " (" + u.Row.Identity.Path + ") [" + u.Row.Family + "] under " + u.Category + ": " + u.Row.InspectionOnly);
+            }
+            // A duplicated crossing without signals has no row, so its node takes the name a mod object's row takes
+            // (NameModObjects): its source's name at the place where it stands, with a sequence number among the
+            // crossings without signals of that place. The map's crossings occupy the first numbers and keep their names.
+            foreach (var group in crossingPlaces.Keys.GroupBy(u => u.Place ?? "")) {
+                var number = group.Count(u => !ModObjects.Within(u.CrossingPath));
+                foreach (var u in group.Where(u => ModObjects.IsPath(u.CrossingPath)).OrderBy(u => u.CrossingScene, StringComparer.Ordinal).ThenBy(u => u.CrossingPath, StringComparer.Ordinal))
+                    u.Node.Label = InventoryPresentationState.Numbered(places.NameAt(Last(ModObjects.Plain(u.CrossingPath)), crossingPlaces[u]), ++number);
             }
         }
         static string Describe(Unit u) => u.Node.Label + " [" + (u.Row?.Family ?? "no row") + "] " + (u.Row?.Identity.Path ?? u.Node.Key.Replace("\n", " "));

@@ -13,11 +13,15 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, ITrackPointLookup, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IModObjectScene, IModObjectSources, IModObjectNames, ISpawnPointPriorities, IDisposable {
+    public sealed class SceneCapabilities : IModObjectPartScene, ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, ITrackPointLookup, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IModObjectScene, IModObjectSources, IModObjectNames, ISpawnPointPriorities, IDisposable {
         // Supplied by the host: what builds and removes mod objects. Without it no mod object is built.
         public IModObjectScene ModObjectWorld { get; set; }
         public object Build(TargetIdentity identity, object source, Placement placement, string markerId) =>
             (ModObjectWorld ?? throw new InvalidOperationException(ModObjects.Unavailable)).Build(identity, source, placement, markerId);
+        // The scene markers below a source and the build that gives each its own marker ID, from what builds mod objects.
+        public IReadOnlyList<object> PartMarkers(object source) => (ModObjectWorld as IModObjectPartScene)?.PartMarkers(source) ?? Array.Empty<object>();
+        public object Build(TargetIdentity identity, object source, Placement placement, string markerId, IReadOnlyList<string> partMarkerIds) =>
+            (ModObjectWorld as IModObjectPartScene ?? throw new InvalidOperationException(ModObjects.Unavailable)).Build(identity, source, placement, markerId, partMarkerIds);
         // The model and build of objects, from what builds mod objects; without it no mod object has a fallback source.
         public string BuildOf(object source) => (ModObjectWorld as IModObjectSources)?.BuildOf(source);
         public IReadOnlyList<SourceInstance> Identical(TargetIdentity source, string build) =>
