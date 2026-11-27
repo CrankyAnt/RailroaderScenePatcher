@@ -78,7 +78,7 @@ namespace RailroaderScenePatcher.Core {
                 if (!world.TileLoaded(write.Position)) { item.Outstanding.Remove(write); item.Completed.Add(write.Label + " (tile unloaded; it builds from the current mask)"); continue; }
                 write.Built = false;
                 try { world.InvalidateTile(write.Position); }
-                catch (Exception e) { item.Error = "Couldn't request terrain output again: " + e.Message; return; }
+                catch (Exception e) { item.Error = "Couldn't request terrain output again: " + PatcherLog.Reason(e); return; }
             }
         }
         // The targets whose output stopped without completing, with their reports.

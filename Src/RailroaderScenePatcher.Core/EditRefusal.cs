@@ -11,7 +11,7 @@ namespace RailroaderScenePatcher.Core {
         public static T Check<T>(Func<T> check) {
             try { return check(); }
             catch (EditRefusal) { throw; }
-            catch (Exception e) when (!(e is OutOfMemoryException)) { throw new EditRefusal(e.GetBaseException().Message, e); }
+            catch (Exception e) when (!(e is OutOfMemoryException)) { throw new EditRefusal(PatcherLog.Reason(e), e); }
         }
         public static void Check(Action check) => Check<object>(() => { check(); return null; });
     }

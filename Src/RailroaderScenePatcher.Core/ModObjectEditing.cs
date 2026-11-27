@@ -182,8 +182,8 @@ namespace RailroaderScenePatcher.Core {
                     Commit(target, engine.ResolveUnique(target), null, entry.Key, null, entry.Value);
                 } catch (Exception e) {
                     scenePatchFile.Replace(entry.Key, entry.Value);
-                    Refuse(entry.Key, entry.Value, e.Message);
-                    try { HistoryNotice?.Invoke("Modification " + entry.Key + " is back in the scene patch file but is not applied: " + e.Message + "."); } catch { }
+                    Refuse(entry.Key, entry.Value, PatcherLog.Reason(e));
+                    try { HistoryNotice?.Invoke("Modification " + entry.Key + " is back in the scene patch file but is not applied: " + PatcherLog.Reason(e) + "."); } catch { }
                 }
             }
         }
@@ -204,7 +204,7 @@ namespace RailroaderScenePatcher.Core {
                 // Nothing changed: the same step stays in the history, and Save keeps what the scene patch file shows.
                 inverse = entries;
                 uncertain = true;
-                IncompleteOperation = name + " couldn't be reversed or reapplied: " + e.Message + ". The scene patch file keeps the state shown. " + WindowGuidance.SaveStillAvailable;
+                IncompleteOperation = name + " couldn't be reversed or reapplied: " + PatcherLog.Reason(e) + ". The scene patch file keeps the state shown. " + WindowGuidance.SaveStillAvailable;
             }
             RegisterPatchAction(() => ReplayModObject(name, key, identity, inverse, generation, keyGeneration), name);
         }

@@ -13,9 +13,9 @@ static class HelpWindowTests {
         TheWheelMovesAsTheGamesScrollViewsDo();
         TheWheelReachesTheEndOfTheContent();
         AHelpNeverCoversTheMapEditorsTitleBar();
-        AHelpFollowsItsQuestionMarkThroughAScaleChange();
+        EveryHelpOpensWithTheSameWidthAndPosition();
         ObjectHelpExplainsSupportedEditsAndReasonGroups();
-        Console.WriteLine("PASS: help windows scroll at the game's wheel step, keep off the Map Editor's title bar and follow a UI scale change");
+        Console.WriteLine("PASS: help windows scroll at the game's wheel step, keep off the Map Editor's title bar and open with one width and position");
     }
 
     static void ObjectHelpExplainsSupportedEditsAndReasonGroups([CallerFilePath] string path = "") {
@@ -72,11 +72,20 @@ static class HelpWindowTests {
         Check(Near(below.Y, 300) && Near(below.Height, 600), "A help that starts below the title bar is not moved");
     }
 
-    static void AHelpFollowsItsQuestionMarkThroughAScaleChange() {
-        // The "?" stands 40 pixels below the panel's top at scale 1.0; the panel keeps its top at 100.
-        var offset = PanelPlacement.AnchorOffset(140, 100, 1);
-        Check(Near(offset, 40), "The anchor is kept in canvas units below the panel's top");
-        Check(Near(PanelPlacement.AnchorTop(offset, 100, 1.25f), 150), "At 1.25 the anchor moves with the scaled panel content");
-        Check(Near(PanelPlacement.AnchorTop(PanelPlacement.AnchorOffset(150, 100, 1.25f), 100, 1), 140), "Back at 1.0 the anchor returns");
+    // The Placement and Changes helps opened narrow and low beside their "?", the outliner's and the Connections help wide at
+    // the top. Every help now opens with one width and at one place beside the panel, whichever "?" opens it; only its
+    // height follows its content, within the screen, and a help too long for the screen scrolls.
+    static void EveryHelpOpensWithTheSameWidthAndPosition() {
+        var placement = PanelPlacement.HelpSize(width => 340f * 600 / width, 1440, 60, 120);
+        var outliner = PanelPlacement.HelpSize(width => 340f * 3000 / width, 1440, 60, 120);
+        Check(Near(placement.Width, outliner.Width) && Near(placement.Width, 610), "A short and a long help take the same width: " + placement.Width + " and " + outliner.Width);
+        Check(Near(placement.Height, 340f * 600 / 610) && Near(outliner.Height, 1440 - 60 - 2 * PanelPlacement.HelpMargin), "Each help is as high as its content, within the screen: " + placement.Height + " and " + outliner.Height);
+        var low = PanelPlacement.HelpPlace(0, 734, 634, placement.Height + 60, 2560, 1440, 8, null);
+        var tall = PanelPlacement.HelpPlace(0, 734, 634, outliner.Height + 60, 2560, 1440, 8, null);
+        Check(Near(low.X, tall.X) && Near(low.Y, tall.Y) && Near(low.X, 742) && Near(low.Y, 8), "A short and a tall help open at the same place right of the panel, at the top: " + low.X + "," + low.Y + " and " + tall.X + "," + tall.Y);
+        var bar = new PanelPlacement.Area { X = 700, Y = 0, Width = 600, Height = 36 };
+        var below = PanelPlacement.HelpPlace(0, 734, 634, placement.Height + 60, 2560, 1440, 8, bar);
+        var belowTall = PanelPlacement.HelpPlace(0, 734, 634, outliner.Height + 60, 2560, 1440, 8, bar);
+        Check(Near(below.Y, belowTall.Y) && Near(below.Y, 44), "Below the Map Editor's title bar every help starts at the same height: " + below.Y + " and " + belowTall.Y);
     }
 }

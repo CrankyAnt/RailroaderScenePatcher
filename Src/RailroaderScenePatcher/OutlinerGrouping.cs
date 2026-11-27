@@ -59,8 +59,9 @@ namespace RailroaderScenePatcher {
         }
         // A node without an inventory row that stands for a complex: where Focus goes, in map coordinates.
         // Identity names the crossing object of a crossing without signals, with the pad marker ID that tells crossings
-        // at one path apart; Member is one of the crossing's own rows, which stands directly in that object.
-        internal sealed class GroupNode { internal string Label; internal double[] Point; internal TargetIdentity Identity; internal SceneObservation Member; }
+        // at one path apart; Member is one of the crossing's own rows, which stands directly in that object, and Members
+        // are all its rows, which its object frame encloses.
+        internal sealed class GroupNode { internal string Label; internal double[] Point; internal TargetIdentity Identity; internal SceneObservation Member; internal IReadOnlyList<SceneObservation> Members = Array.Empty<SceneObservation>(); }
         internal sealed class Result {
             internal IReadOnlyList<OutlineNode> Tops;
             internal int Listed, Unplaced;
@@ -337,7 +338,7 @@ namespace RailroaderScenePatcher {
             foreach (var u in b.Units) {
                 Remember(b, u.Node, u);
                 if (u.Row == null && u.CrossingPath != null) b.Result.GroupNodes[u.Node.Key] = new GroupNode { Label = u.Node.Label, Point = Centre(u),
-                    Identity = u.CrossingScene == null ? null : CrossingObjectScene.Identity(u.CrossingScene, u.CrossingPath, u.CrossingPadMarkerId), Member = u.Members.Select(m => m.Row).FirstOrDefault(r => r != null) };
+                    Identity = u.CrossingScene == null ? null : CrossingObjectScene.Identity(u.CrossingScene, u.CrossingPath, u.CrossingPadMarkerId), Member = u.Members.Select(m => m.Row).FirstOrDefault(r => r != null), Members = u.Members.Select(m => m.Row).Where(r => r != null).ToArray() };
             }
             b.Result.Tops = lastTops = tops;
             b.Result.Listed = tops.Sum(t => t.Count);

@@ -160,7 +160,11 @@ namespace RailroaderScenePatcher {
         // scene patch editing explains why a bell does not qualify. The patcher's own additions are not offered.
         public IReadOnlyList<SourceCandidate> Candidates(object target) {
             var result = new List<SourceCandidate>();
-            foreach (var owner in Resources.FindObjectsOfTypeAll(controller).OfType<Component>().Where(c => c != null && Loaded(c.gameObject)).Select(c => c.gameObject).Distinct()) {
+            var owners = Resources.FindObjectsOfTypeAll(controller).OfType<Component>().Where(c => c != null && Loaded(c.gameObject)).Select(c => c.gameObject).Distinct().ToArray();
+            // A duplicated crossing's devices stand at its numbered place, as the outliner names the copy.
+            var places = CrossingEquipment.Places(owners.Select(o => new KeyValuePair<string, IReadOnlyList<string>>(BoardScene.PathOf(o.transform), Ancestors(o.transform))).ToArray());
+            for (var o = 0; o < owners.Length; o++) {
+                var owner = owners[o];
                 var listed = owner.GetComponents(culler).SelectMany(c => (cullerObjects.GetValue(c) as IList)?.Cast<object>() ?? Enumerable.Empty<object>()).OfType<GameObject>().ToList();
                 for (var i = 0; i < owner.transform.childCount; i++) {
                     var child = owner.transform.GetChild(i).gameObject;
@@ -171,7 +175,7 @@ namespace RailroaderScenePatcher {
                     Placement(child.transform, out var position, out var rotation);
                     Placement(owner.transform, out var crossingPosition, out var crossingRotation);
                     result.Add(new SourceCandidate(new EquipmentSource(child.scene.name, BoardScene.PathOf(child.transform)), model, SourceProblem(child, target, EquipmentAddition.LightGatePattern),
-                        position, rotation, child.name, CrossingEquipment.Place(owner.name, Ancestors(owner.transform)), crossingPosition, crossingRotation));
+                        position, rotation, child.name, places[o], crossingPosition, crossingRotation));
                 }
             }
             // The bell definitions the game uses at grade crossings, eligible or with their reason, for the inspected controller;

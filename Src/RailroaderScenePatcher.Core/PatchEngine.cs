@@ -344,10 +344,10 @@ namespace RailroaderScenePatcher.Core {
                 var identity = identities[target];
                 bool present;
                 try { present = (Matches(identity) ?? Array.Empty<object>()).Any(m => ReferenceEquals(m, target)) || (scene as IRetainedScene)?.Unsettled(target) == true; }
-                catch (Exception e) { failures.Add(Describe(identity) + ": the retained object could not be checked, so its state is kept: " + e.Message); retained++; continue; }
+                catch (Exception e) { failures.Add(Describe(identity) + ": the retained object could not be checked, so its state is kept: " + PatcherLog.Reason(e)); retained++; continue; }
                 if (present) { retained++; continue; }
                 try { (scene as IRetainedScene)?.Release(target); }
-                catch (Exception e) { failures.Add(Describe(identity) + ": owned state of the reconstructed object remains: " + e.Message); continue; }
+                catch (Exception e) { failures.Add(Describe(identity) + ": owned state of the reconstructed object remains: " + PatcherLog.Reason(e)); continue; }
                 identities.Remove(target); resolutionOrder.Remove(target);
                 underlying.Remove(target); unsafeTargets.Remove(target); awaitingOutput.Remove(target); remainingState.Remove(target);
                 foreach (var built in builtObjects.Values) foreach (var id in built.Where(pair => ReferenceEquals(pair.Value, target)).Select(pair => pair.Key).ToArray()) built.Remove(id);
@@ -407,8 +407,8 @@ namespace RailroaderScenePatcher.Core {
                 // A mod object exists only through its modification: one that an earlier application of this scene
                 // patch file built and the file no longer holds is removed. An early route applies only a part.
                 if (early == null) foreach (var gone in BuiltFor(scenePatchFileKey).Where(pair => !entries.TryGetValue(pair.Key, out var entry) || entry[ModObjects.SourceMember] == null).ToArray())
-                    try { RemoveModObject(scenePatchFileKey, gone.Key, gone.Value); } catch (Exception e) { PatcherLog.Debug("A mod object that left its scene patch file could not be removed: " + e.Message); }
-            } catch (Exception e) { result.Error = "Scene check failed: " + e.Message; }
+                    try { RemoveModObject(scenePatchFileKey, gone.Key, gone.Value); } catch (Exception e) { PatcherLog.Debug("A mod object that left its scene patch file could not be removed: " + PatcherLog.Reason(e)); }
+            } catch (Exception e) { result.Error = "Scene check failed: " + PatcherLog.Reason(e); }
             finally { Unplan(); }
             return result;
         }
@@ -447,7 +447,7 @@ namespace RailroaderScenePatcher.Core {
                     scene.Preflight(matches[0]);
                     CheckRelationships(matches[0], parsed.State);
                     return true;
-                } catch (Exception e) { unavailable = "Early repair prerequisites unavailable: " + e.Message; return false; }
+                } catch (Exception e) { unavailable = "Early repair prerequisites unavailable: " + PatcherLog.Reason(e); return false; }
             } catch (InvalidOperationException) { return false; }
         }
         // A spawn point modification runs early when it sets only a fixed placement or activity, has no dependencies, and its
@@ -472,7 +472,7 @@ namespace RailroaderScenePatcher.Core {
                     if (IsUnsafe(matches[0])) throw new InvalidOperationException("Cleanup for this object couldn't be verified.");
                     scene.Preflight(matches[0]);
                     return true;
-                } catch (Exception e) { unavailable = "A prerequisite for placing spawn points before the new game starts is unavailable: " + e.Message; return false; }
+                } catch (Exception e) { unavailable = "A prerequisite for placing spawn points before the new game starts is unavailable: " + PatcherLog.Reason(e); return false; }
             } catch (InvalidOperationException) { return false; }
         }
         Outcome Execute(string id, SortedDictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, bool retryFailures) {
@@ -506,7 +506,7 @@ namespace RailroaderScenePatcher.Core {
                 try { outcome.Target = ParseTarget(item["target"] as JObject); } catch (InvalidOperationException) { }
                 string[] dependencies;
                 try { dependencies = Dependencies(item); }
-                catch (InvalidOperationException e) { throw new InvalidPatchDefinitionException(e.Message); }
+                catch (InvalidOperationException e) { throw new InvalidPatchDefinitionException(PatcherLog.Reason(e)); }
                 foreach (var dep in dependencies) {
                     if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency " + dep + " is missing from the scene patch file");
                     var dependency = Execute(dep, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets, retryFailures);
@@ -573,21 +573,21 @@ namespace RailroaderScenePatcher.Core {
                     } catch (Exception r) { restoreError = r; }
                     Observe("restore-result", scenePatchFileKey, id, identity.Path, restored ? "verified" : "unverified");
                     if (!restored) {
-                        var left = RemainingState.Describe(before, () => scene.Read(resolved), out var settingsMatch, restoreError?.Message);
+                        var left = RemainingState.Describe(before, () => scene.Read(resolved), out var settingsMatch, PatcherLog.Reason(restoreError));
                         SetUnsafe(resolved, true, left);
                         var cleanup = e is EmptyEquipmentObjectException && restoreError is EmptyEquipmentObjectException && settingsMatch
                             ? EquipmentCleanupContext.WorldLoad : EquipmentCleanupContext.None;
-                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The change failed. Cleanup could not be verified. Reason: " + e.Message, left, equipmentCleanup: cleanup);
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The change failed. Cleanup could not be verified. Reason: " + PatcherLog.Reason(e), left, equipmentCleanup: cleanup);
                     }
-                    if (AwaitOutput(resolved)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The change failed and the object is back as it was. The game is still regenerating its dependent output. Further changes must wait until that output is verified. Reason: " + e.Message);
-                    throw new AttemptFailure(FailureKind.Restored, "The change failed. The object is back as it was. Reason: " + e.Message);
+                    if (AwaitOutput(resolved)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The change failed and the object is back as it was. The game is still regenerating its dependent output. Further changes must wait until that output is verified. Reason: " + PatcherLog.Reason(e));
+                    throw new AttemptFailure(FailureKind.Restored, "The change failed. The object is back as it was. Reason: " + PatcherLog.Reason(e));
                 }
                 outcome.Applied = true;
             } catch (Exception e) {
 #if SCENE_PATCHER_FAULTS
                 FaultInjection.EndAttempt();
 #endif
-                outcome.Error = e.Message; if (e is InvalidPatchDefinitionException) outcome.Cause = FailureCause.InvalidDefinition;
+                outcome.Error = PatcherLog.Reason(e); if (e is InvalidPatchDefinitionException) outcome.Cause = FailureCause.InvalidDefinition;
                 // An incomplete cleanup keeps its object for Recheck; any other failure leaves no mod object behind.
                 if (builtNow != null && !unsafeTargets.Contains(builtNow)) { try { RemoveModObject(scenePatchFileKey, id, builtNow); outcome.ResolvedTarget = null; } catch { } }
                 if (outcome.Failure == FailureKind.None) {
@@ -595,7 +595,7 @@ namespace RailroaderScenePatcher.Core {
                     outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
                     if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; outcome.EquipmentCleanup = attempt.EquipmentCleanup; }
                 }
-                failed[key] = outcome; Observe("failed", scenePatchFileKey, id, error: e.Message);
+                failed[key] = outcome; Observe("failed", scenePatchFileKey, id, error: PatcherLog.Reason(e));
             }
             finally { visiting.Remove(id); }
             outcomes[id] = outcome;
@@ -922,7 +922,7 @@ namespace RailroaderScenePatcher.Core {
                 if (addition != null) return SharedAddition(addition);
                 ResolveUnique(parsed.Identity);
                 return null;
-            } catch (InvalidOperationException e) { return e.Message; }
+            } catch (InvalidOperationException e) { return PatcherLog.Reason(e); }
         }
         internal static TargetIdentity ParseTarget(JObject target) {
             if (target == null || !Only(target, "scene", "path", "component", "structure", TargetIdentity.PadMarkerMember, TargetIdentity.MarkerIdMember, TargetIdentity.MapPositionMember) || !RequiredString(target,"scene") || !RequiredString(target,"path") || !RequiredString(target,"component") || (target["structure"] != null && target["structure"].Type != JTokenType.String)

@@ -505,19 +505,10 @@ static class CommandBandTests {
         Check(low.Y == 280 && low.X == 742, "A help that would leave the screen moves up, not over the panel: " + low.Y);
         var both = PanelPlacement.Beside(0, 734, 100, 364, 1101, 2560, 1440, 8);
         Check(both.X >= 734 && both.Y == 100, "The outliner's help at 2560 x 1440 stands right of the whole panel, not over the outliner");
-        // The help window is as high as its content. A help that does not fit the screen at its usual width takes the
-        // first wider one at which it fits; one that fits at no width takes the widest at the screen's height.
-        float Wrapped(float width) => 340f * 900 / width;
-        var shortHelp = PanelPlacement.HelpSize(width => 300, 1080, 60, 120);
-        Check(shortHelp.Width == 340 && shortHelp.Height == 300, "A short help keeps the usual width and its content's height: " + shortHelp.Width + " x " + shortHelp.Height);
-        var fits = PanelPlacement.HelpSize(Wrapped, 1080, 60, 120);
-        Check(fits.Width == 340 && fits.Height == 900, "A help that fits the screen keeps the usual width: " + fits.Width + " x " + fits.Height);
-        var longHelp = PanelPlacement.HelpSize(width => 340f * 1500 / width, 1080, 60, 120);
-        Check(longHelp.Width == 520 && Math.Abs(longHelp.Height - 340f * 1500 / 520) < 0.01f && longHelp.Height + 60 <= 1080, "The outliner's help at UI scale 1.0 takes a wider window and fits the screen: " + longHelp.Width + " x " + longHelp.Height);
-        var middle = PanelPlacement.HelpSize(width => 340f * 1200 / width, 1080, 60, 120);
-        Check(middle.Width == 430, "A help takes the first width at which it fits: " + middle.Width);
+        // The help window is as high as its content at its one width; one too long for the screen takes the screen's
+        // height, and the rest scrolls (HelpWindowTests).
         var scaled = PanelPlacement.HelpSize(width => 340f * 1500 / width, 864, 60, 120);
-        Check(scaled.Width == 610 && scaled.Height == 864 - 60 - 2 * PanelPlacement.HelpMargin && scaled.Height < 340f * 1500 / 610, "At UI scale 1.25 the same help takes the widest window at the screen's height, and the rest scrolls: " + scaled.Width + " x " + scaled.Height);
+        Check(scaled.Width == 610 && scaled.Height == 864 - 60 - 2 * PanelPlacement.HelpMargin && scaled.Height < 340f * 1500 / 610, "At UI scale 1.25 a long help takes the screen's height, and the rest scrolls: " + scaled.Width + " x " + scaled.Height);
         Check(PanelPlacement.HelpSize(width => 10, 1080, 60, 120).Height == 120 && PanelPlacement.HelpSize(width => 5000, 100, 60, 120).Height == 120, "The help window is never lower than its least height");
         var placed = PanelPlacement.Beside(0, 734, 100, 634, scaled.Height + 60, 2560, 864, 8);
         Check(placed.Y + placed.Height <= 864 && placed.Y >= 0, "The widest help at the screen's height stands within the screen: " + placed.Y);
@@ -705,7 +696,7 @@ static class CommandBandTests {
         Check(CommandBand.Entered(" 528.41 ", 528.405334, out var typed) && typed == 528.41, "A changed field gives the entered number");
         Check(CommandBand.Entered("0", 1.13392689E-05, out var tiny) && tiny == 1.13392689E-05, "A field that shows 0 for a tiny value keeps the tiny value");
         Check(!CommandBand.Entered("abc", 1, out _) && !CommandBand.Entered("", 1, out _), "Text that is no number is refused");
-        foreach (var row in new[] { new[] { "distance", "7.51166105", "7.512" }, new[] { "from", "1.5E-05", "0" }, new[] { "to", "12", "12" }, new[] { "id", "1E5", "1E5" }, new[] { "segment", "377", "377" }, new[] { "distance", "none", "none" } })
+        foreach (var row in new[] { new[] { "distance", "7.51166105", "7.512" }, new[] { "from", "1.5E-05", "0" }, new[] { "to", "12", "12" }, new[] { "id", "1E5", "1E5" }, new[] { "segment", "377", "377" }, new[] { "distance", "none", "none" }, new[] { "segment length", "130.94512", "130.945" } })
             Check(CommandBand.Shown(row[0], row[1]) == row[2], "A binding value " + row[0] + "=" + row[1] + " shows as " + row[2]);
         foreach (var row in new[] { new[] { "approachA", "Approach A" }, new[] { "island", "Island" }, new[] { "approachB", "Approach B" }, new[] { "other", "other" } })
             Check(CommandBand.RoleCaption(row[0]) == row[1], "The role " + row[0] + " reads " + row[1]);

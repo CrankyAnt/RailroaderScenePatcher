@@ -103,7 +103,7 @@ namespace RailroaderScenePatcher {
         }
         void ChooseImportVersion(int conflict, bool useFile) {
             try { attachment.Session.ChooseImportVersion(conflict, useFile); }
-            catch (Exception e) { feedback.Refuse(ImportPlace, "Conflict choice", e.Message); }
+            catch (Exception e) { feedback.Refuse(ImportPlace, "Conflict choice", PatcherLog.Reason(e)); }
             presentation?.RequestRefresh();
         }
         void ApplyImport() {

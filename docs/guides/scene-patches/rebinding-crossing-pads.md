@@ -26,11 +26,11 @@ The inventory shows such an object in the `Crossing pad marker` family with the 
 ## Set or replace the binding in the native map editor
 
 1. Open **Scene Patcher** and select the pad's row in the outliner, under **Grade crossing**. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
-2. On the **Connections** tab, check the stored segment, end, and distance under **Current binding** in **Crossing pad binding**. Each **Named location** entry shows a location registered under this marker ID and tells you if it belongs to another object.
-3. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in meters in **Distance**. To select the segment in the world, click **Segment** in **Replacement targets**, click the track, then click **Confirm** in the footer. The confirmed segment fills the **Segment** field.
+2. On the **Connections** tab, check the stored segment, end, and distance under **Current binding** in **Crossing pad binding**. For a bound pad, **Marker segment length** shows how long the segment is. Each **Named location** entry shows a location registered under this marker ID and tells you if it belongs to another object.
+3. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in meters in **Distance**. The distance is measured from the **End** you entered, along the whole segment. To select the segment in the world, click **Segment** in **Replacement targets**, click the track, then click **Confirm** in the footer. The confirmed segment fills the **Segment** field.
 4. Click **Set** at the bottom of the tab.
 
-The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment, or an end other than `a` or `b` refuses the edit; the pad keeps its binding, registration, and geometry.
+The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment, or an end other than `a` or `b` refuses the edit, and a refused distance names the segment's length; the pad keeps its binding, registration, and geometry.
 
 After the check, the patcher changes the marker's named location to the new location, as for a Generic marker, and then runs the game's pad generation. Generation replaces the pad mesh with one built along the track at the new location and moves the pad's culling sphere to the new mesh bounds. The game's culling then decides on the next frame whether the new mesh is shown. The pad object itself does not move.
 

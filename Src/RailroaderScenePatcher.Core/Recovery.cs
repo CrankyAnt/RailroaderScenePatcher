@@ -90,7 +90,7 @@ namespace RailroaderScenePatcher.Core {
             settingsMatch = false;
             ObjectState now;
             try { now = readNow(); }
-            catch (Exception e) { return new[] { "The object's current state could not be read. Every setting is uncertain. Reason: " + e.Message }; }
+            catch (Exception e) { return new[] { "The object's current state could not be read. Every setting is uncertain. Reason: " + PatcherLog.Reason(e) }; }
             if (before == null) return new[] { "The state before the attempt could not be read. No comparison is possible, so every setting is uncertain" };
             var lines = new List<string>();
             string Numbers(IReadOnlyList<double> values) => values == null ? "unknown" : String.Join(", ", values.Select(ShownNumber.Text));

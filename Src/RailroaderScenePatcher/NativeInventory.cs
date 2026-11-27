@@ -460,7 +460,7 @@ namespace RailroaderScenePatcher {
                 var follower = Get(go, Relative);
                 var follows = follower != null && Field(follower, "targetActiveFollowsTrackGroup") is bool flag && flag;
                 var before = problems.Count;
-                MarkerLocation(Field(marker, "_location"), need, enabled, follows, bindings, problems, segmentIds, graphError);
+                MarkerLocation(Field(marker, "_location"), need, enabled, follows, bindings, problems, segmentIds, graphError, family == "Crossing pad marker");
                 if (reading.Need == BindingNeed.ReadAnyway) anyway.AddRange(problems.Skip(before));
                 // Every setup and car placement that reads a starter placement marker, with its cars and wreck setting.
                 bindings.AddRange(reading.Readers);
@@ -807,15 +807,27 @@ namespace RailroaderScenePatcher {
         // The names of the objects that enclose a transform, from its parent upwards.
         static IReadOnlyList<string> Ancestors(Transform t) { var names = new List<string>(); for (var p = t.parent; p != null; p = p.parent) names.Add(p.name); return names; }
         // A marker's binding, judged by what the game needs from its kind. A span's two locations keep Location below.
-        static void MarkerLocation(object location, BindingNeed need, bool enabled, bool followsGroup, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {
+        // A crossing pad's line also holds the length of its bound segment, which its distance counts along.
+        static void MarkerLocation(object location, BindingNeed need, bool enabled, bool followsGroup, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError, bool pad) {
             var segment = Text(Field(location, "segmentId"));
-            bindings.Add("Marker segment=" + segment + "; end=" + Text(Field(location, "end")) + "; distance=" + Text(Field(location, "distance")));
             var resolves = String.IsNullOrWhiteSpace(segment) ? false : segmentIds == null ? (bool?)null : segmentIds.Contains(segment);
+            var length = pad && resolves == true ? SegmentLength(segment) : null;
+            bindings.Add("Marker segment=" + segment + "; end=" + Text(Field(location, "end")) + "; distance=" + Text(Field(location, "distance"))
+                + (length == null ? "" : "; " + CommandBand.SegmentLengthKey + "=" + length));
             var problem = BindingRules.Problem(need, enabled, "Marker", segment, resolves) ?? BindingRules.Unknown(need, enabled, "Marker", segment, resolves, graphError);
             if (problem != null) problems.Add(problem);
             var note = BindingRules.Note(need, enabled, segment, resolves, followsGroup);
             if (note != null) bindings.Add("Marker binding note: " + note);
             // Existence is not proof that the binding names the intended track.
+        }
+        // The length of the loaded track segment with the ID, as text, or null when the graph doesn't give it.
+        static string SegmentLength(string id) {
+            try {
+                var lookup = Field(Native.Read(Native.Type("Track.Graph"), "Shared"), "_segmentsLookup") as IDictionary;
+                var segment = lookup != null && lookup.Contains(id) ? lookup[id] : null;
+                var length = segment?.GetType().GetMethod("GetLength", BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null)?.Invoke(segment, null);
+                return length == null ? null : Text(length);
+            } catch (Exception e) { PatcherLog.Debug("The length of track segment " + id + " is unavailable: " + PatcherLog.Reason(e)); return null; }
         }
         // A span end as the scene stores it: segment, end and distance, without resolving it on the graph.
         static TrackLocation StoredLocation(object location) =>

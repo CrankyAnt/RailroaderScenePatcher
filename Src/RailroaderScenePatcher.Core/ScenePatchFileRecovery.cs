@@ -87,7 +87,7 @@ namespace RailroaderScenePatcher.Core {
                 ResetApplied(loaded.Modifications);
                 LastReread = engine.Apply(text, scenePatchFileKey);
                 outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; }
+            } catch (Exception e) { outcome.Error = PatcherLog.Reason(e); }
             return outcome;
         }
         // Replaces the protected scene patch file with an empty scene patch file of the current format once Save runs. The original's
@@ -107,7 +107,7 @@ namespace RailroaderScenePatcher.Core {
                 ScenePatchFileDiagnostics = Array.Empty<ScenePatchFileDiagnostic>();
                 Blocked = null;
                 outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; }
+            } catch (Exception e) { outcome.Error = PatcherLog.Reason(e); }
             return outcome;
         }
         // A scene patch file whose bytes are not UTF-8 text exists although it cannot be read as text.

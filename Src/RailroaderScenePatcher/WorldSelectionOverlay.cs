@@ -221,6 +221,21 @@ namespace RailroaderScenePatcher {
                 if (on != null) foreach (var family in on) yield return family;
             }
         }
+        static bool Under(Renderer renderer, IReadOnlyList<GameObject> parts) {
+            foreach (var part in parts) if (part != null && renderer.transform.IsChildOf(part.transform)) return true;
+            return false;
+        }
+        // The renderers below the parts, with whether each outlines the object.
+        static Renderer[] PartsOnly(Renderer[] renderers, ref bool[] outlines, IReadOnlyList<GameObject> parts) {
+            var kept = new List<Renderer>(); var keptOutlines = new List<bool>();
+            for (var i = 0; i < renderers.Length; i++) {
+                var renderer = renderers[i];
+                if (renderer == null || !Under(renderer, parts)) continue;
+                kept.Add(renderer); keptOutlines.Add(i < outlines.Length && outlines[i]);
+            }
+            outlines = keptOutlines.ToArray();
+            return kept.ToArray();
+        }
         Renderer[] ListRenderers(GameObject go) {
             var own = go.GetComponentsInChildren<Renderer>(true);
             // A crossing controller is framed whole, around its setup, without its whistle signs and detection spans.
@@ -811,6 +826,7 @@ namespace RailroaderScenePatcher {
             var anchor = ScreenPoint(camera, candidate.Position, origin);
             if (candidate.Observation != null && candidate.Choice.Handle is GameObject go && go != null) {
                 var renderers = Renderers(go, out var outlines);
+                if (candidate.Parts != null) renderers = PartsOnly(renderers, ref outlines, candidate.Parts);
                 // A crossing pad lies on its track: the track's ballast and the road it crosses are not ground it
                 // stands in, so the pad is framed whole and not cut off where its ends meet the road.
                 var ground = PadFamilies.Contains(candidate.Observation.Family) ? null : (Func<double, double, double?>)GroundAt;
@@ -878,7 +894,9 @@ namespace RailroaderScenePatcher {
                         if (budget.Exhausted) { waits = true; break; }
                         kind = budget.Read(() => Kind(renderer, go, ref lods));
                     }
-                    boxes.Add(new ObjectMarkingBox(name, Point(bounds.center), Point(bounds.extents), oriented, kind, ground));
+                    // A part that lies on its track, such as the pad of a crossing node, is framed whole, as a pad is.
+                    var cut = ground != null && candidate.UncutParts != null && Under(renderer, candidate.UncutParts) ? null : ground;
+                    boxes.Add(new ObjectMarkingBox(name, Point(bounds.center), Point(bounds.extents), oriented, kind, cut));
                 }
                 // A storage pile or log pond has no renderer of its own: the box it lays its logs out in stands in, from
                 // its layout settings, so it is framed like any other box whether or not the camera has culled it.

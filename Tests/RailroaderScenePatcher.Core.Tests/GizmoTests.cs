@@ -215,6 +215,11 @@ static class GizmoTests {
         Assert(Caught(() => EditRefusal.Check(() => throw new InvalidOperationException("stale"))).Message == "stale"
             && Caught(() => EditRefusal.Check(() => throw new NullReferenceException("missing"))).Message == "missing", "A check step refuses whatever its exception type");
         Assert(Caught(() => EditRefusal.Check(() => throw new EditRefusal("own"))).Message == "own", "A refusal inside a check keeps its text");
+        // A check step that calls the game through reflection refuses with the game's reason and logs its stack in debug mode.
+        string reflected = null;
+        var reflectedLog = RecordingLog.Capture(true, () => reflected = Caught(() => EditRefusal.Check(() => throw new System.Reflection.TargetInvocationException(new ArgumentException("No track at the location")))).Message);
+        Assert(reflected == "No track at the location" && reflectedLog.At(LogLevel.Debug).Count(l => l.StartsWith(PatcherLog.GameCallDetail, StringComparison.Ordinal) && l.Contains("ArgumentException")) == 1,
+            "A reflected check refuses with the game's reason and logs it once: " + reflected + " | " + String.Join(" | ", reflectedLog.At(LogLevel.Debug)));
         var other = false;
         try { new Action(() => throw new InvalidOperationException("outside"))(); } catch (EditRefusal) { } catch (InvalidOperationException) { other = true; }
         Assert(other, "An exception outside a check step is no refusal, even an InvalidOperationException");

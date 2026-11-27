@@ -857,11 +857,13 @@ namespace RailroaderScenePatcher {
             if (entered == Number(own)) { value = own; return true; }
             return Double.TryParse(entered, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value);
         }
+        // The key of a crossing pad's Marker binding line that holds the length of its bound segment, beside its distance.
+        internal const string SegmentLengthKey = "segment length";
         // A number inside a binding line, such as a distance, as the panel shows it; other text stays as it is.
         // The end of a track location reads in lower case everywhere, as the scene patch file writes it: "a" or "b".
         internal static string Shown(string key, string value) =>
             key == "end" ? (value ?? "").ToLowerInvariant() :
-            (key == "distance" || key == "from" || key == "to") && Double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number) ? Number(number) : value;
+            (key == "distance" || key == "from" || key == "to" || key == SegmentLengthKey) && Double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number) ? Number(number) : value;
         // A click on a shown square marker reaches that marker before the label of another candidate that lies over
         // it; a click on no marker goes to the label under the pointer.
         internal static bool MarkerBeforeLabel(bool onShownMarker) => onShownMarker;
@@ -1173,22 +1175,20 @@ namespace RailroaderScenePatcher {
         // same width. Its height is what remains below that edge, at most the window's default height or what remains
         // below the Map Editor window, whichever is more, and never less than the minimum height.
         // mapEditorWidth is 0 when the Map Editor window is not shown; the window then keeps its default size at the left.
-        // The content size of a help window, in canvas units. It is as high as its content and as narrow as the first
-        // width at which the content fits the screen: a long help, such as the outliner's, takes a wider window
-        // instead of running past what the screen can show. Content that fits at no width takes the widest window at
-        // the screen's height, and its scroll view shows the rest. contentHeight gives the content's height at a width;
-        // screenHeight is the screen's height and frame what the window adds around its content, both in canvas units.
-        internal static readonly float[] HelpWidths = { 340, 430, 520, 610 };
+        // The content size of a help window, in canvas units. Every help has the same width, whichever "?" opens it, and
+        // is as high as its content within the screen; the scroll view shows what a longer help holds below that.
+        // contentHeight gives the content's height at a width; screenHeight is the screen's height and frame what the
+        // window adds around its content, both in canvas units.
+        internal const float HelpWidth = 610;
         internal const float HelpMargin = 8;
         internal static Area HelpSize(Func<float, float> contentHeight, float screenHeight, float frame, float minimumHeight) {
             var most = Math.Max(minimumHeight, screenHeight - frame - 2 * HelpMargin);
-            float width = HelpWidths[0], height = most;
-            foreach (var candidate in HelpWidths) {
-                width = candidate; height = contentHeight(candidate);
-                if (height <= most) break;
-            }
-            return new Area { Width = width, Height = Math.Max(minimumHeight, Math.Min(height, most)) };
+            return new Area { Width = HelpWidth, Height = Math.Max(minimumHeight, Math.Min(contentHeight(HelpWidth), most)) };
         }
+        // Where every help window opens, whichever "?" opens it: beside the panel (Beside), its top a gap below the
+        // screen's top, or below the Map Editor's title bar where it would cover it. Only its height differs.
+        internal static Area HelpPlace(float panelLeft, float panelRight, float width, float height, float screenWidth, float screenHeight, float gap, Area? titleBar) =>
+            Beside(panelLeft, panelRight, gap, width, height, screenWidth, screenHeight, gap, titleBar);
         // Where a help window stands: beside the panel, never over it, so the region it explains stays in view. To the
         // right of the panel where the screen has room, else to its left; its top at the "?" that opened it, within
         // the screen. Only when neither side has room does it take the side with more of it, at the screen's edge.
@@ -1213,10 +1213,6 @@ namespace RailroaderScenePatcher {
             area.Height = Math.Max(0, Math.Min(area.Height, screenHeight - area.Y));
             return area;
         }
-        // A help's anchor, the top of the "?" that opened it, as canvas units below the panel's top, so that a UI scale
-        // change, which keeps the panel's top-left corner and scales its content, moves the anchor with the "?".
-        internal static float AnchorOffset(float anchorTop, float panelTop, float scale) => (anchorTop - panelTop) / (scale > 0 ? scale : 1);
-        internal static float AnchorTop(float offset, float panelTop, float scale) => panelTop + offset * scale;
         // Where a placed window goes once it no longer lies within the screen, such as after its corner was dragged past
         // the screen's bottom edge: moved back inside with its own size, as the native window keeps itself within its
         // parent (Window.ClampToParentBounds), and never larger than the screen. A window within the screen, up to half a

@@ -590,6 +590,13 @@ static class ModObjectCrossingTests {
         try { OutlinerGrouping.LogPending = true; built = OutlinerGrouping.Build(listed, listed, "", false, null); } finally { OutlinerGrouping.LogPending = logPending; }
         var shared = built.GroupNodes.Values.Where(n => n.Identity?.Path == OldRiverPath).Select(n => n.Identity.PadMarkerId).OrderBy(id => id).ToArray();
         Assert(shared.SequenceEqual(new[] { "Mold1", "Mold2", "Mold3" }), "The three crossings below Old River Rd are named by their pad marker IDs: " + String.Join(",", shared));
+        // The frame of a selected crossing node encloses its own crossbucks and pad: at a shared path, not those of the
+        // crossings beside it.
+        foreach (var node in built.GroupNodes.Values.Where(n => n.Identity?.Path == OldRiverPath)) {
+            var id = node.Identity.PadMarkerId;
+            Assert(node.Members.Count >= 2 && node.Members.All(m => m.Identity.PadMarkerId == id || InventoryPresentationState.MarkerIdOf(m) == id)
+                && node.Members.Any(m => m.Family == SceneFamilies.CrossingPad), "The node of crossing " + id + " lists only its own members: " + String.Join(", ", node.Members.Select(m => m.Identity.Path + "/" + m.Identity.PadMarkerId)));
+        }
         // Each pad, with the marker ID line the inventory writes, stands in the node of its own crossing.
         var unprotected = built.Crossings.Where(line => line.StartsWith("unprotected ", StringComparison.Ordinal) && line.Contains(OldRiverPath)).ToArray();
         Assert(!built.Crossings.Any(line => line.StartsWith("unmatched", StringComparison.Ordinal)) && unprotected.Length == 3

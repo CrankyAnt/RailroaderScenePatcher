@@ -168,12 +168,28 @@ namespace RailroaderScenePatcher.Core {
                 changes.Add("Would remove " + Name(gone) + (displayName == null ? "; its copy is released from the controller and its culling." : "."));
             return changes.Concat(kept).ToList();
         }
+        // The places of the loaded crossing controllers, each by its path and the names of its ancestors from the parent
+        // upwards, in their order. A mod object, such as a duplicated crossing, takes the number the outliner gives it
+        // (OutlinerGrouping): the map's controllers of the same name come first, then the mod objects in placement order
+        // (ModObjects.PlacementOrder), so "Bryson Everett (2)" tells the copy's devices from the original's.
+        public static IReadOnlyList<string> Places(IReadOnlyList<KeyValuePair<string, IReadOnlyList<string>>> controllers) {
+            var places = controllers.Select(c => Place(ModObjects.NameOf(c.Key), c.Value)).ToArray();
+            foreach (var same in Enumerable.Range(0, controllers.Count).GroupBy(i => ModObjects.Plain(controllers[i].Key), StringComparer.Ordinal)) {
+                var number = same.Count(i => !ModObjects.IsPath(controllers[i].Key));
+                foreach (var i in same.Where(i => ModObjects.IsPath(controllers[i].Key)).OrderBy(i => controllers[i].Key, ModObjects.PlacementOrder))
+                    places[i] += " (" + (++number).ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
+            }
+            return places;
+        }
         // The place a crossing stands at, for a label: the part after "Grade Crossing - " of its own name, or else the
         // nearest enclosing object that names a place, without a leading "Roads ". ancestors run from the parent upwards.
+        // A mod object, such as a duplicated crossing, gives its place without its mod object mark, as the outliner names it.
         public static string Place(string crossing, IReadOnlyList<string> ancestors) {
             const string Lead = "Grade Crossing - ";
+            crossing = ModObjects.Plain(crossing);
             if (crossing != null && crossing.StartsWith(Lead, StringComparison.Ordinal) && crossing.Length > Lead.Length) return crossing.Substring(Lead.Length);
-            foreach (var name in ancestors ?? Array.Empty<string>()) {
+            foreach (var named in ancestors ?? Array.Empty<string>()) {
+                var name = ModObjects.Plain(named);
                 if (String.IsNullOrWhiteSpace(name) || name == "World" || name == "Large Scenery" || name == "Roads") continue;
                 return name.StartsWith("Roads ", StringComparison.Ordinal) ? name.Substring("Roads ".Length) : name;
             }
@@ -528,7 +544,7 @@ namespace RailroaderScenePatcher.Core {
         internal string ReleaseAll(List<object> owned) {
             string problem = null;
             foreach (var addition in owned.ToList()) {
-                try { Retire(owned, addition); } catch (Exception e) { problem = problem ?? e.Message; }
+                try { Retire(owned, addition); } catch (Exception e) { problem = problem ?? PatcherLog.Reason(e); }
                 if (owned.Contains(addition) && !world.Present(addition)) owned.Remove(addition);
             }
             return problem;

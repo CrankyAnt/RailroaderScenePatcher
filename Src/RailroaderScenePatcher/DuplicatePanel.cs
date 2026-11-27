@@ -68,6 +68,24 @@ namespace RailroaderScenePatcher {
             return new SceneObservation(crossing, node.Identity, CrossingObjectScene.Family, crossing.activeInHierarchy, new double[] { at.x, at.y, at.z }, new double[] { turn.x, turn.y, turn.z, turn.w },
                 Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), null, displayName: node.Label);
         }
+        // The selected crossing node as the world marks it while no row is inspected: its crossing object, framed around
+        // the node's own crossbucks and pads in gold, as an inspected object is (#38's complex frame), with its marker at
+        // the middle of those members, not at the crossing object that crossings at one path share. Its pads are framed
+        // whole. Built once per selected node and asked for on every repaint; null without a node.
+        SpatialCandidate crossingNodeFrame;
+        OutlinerGrouping.GroupNode crossingNodeFramed;
+        SpatialCandidate CrossingNodeFrame() {
+            var node = selected == null ? crossingNode : null;
+            if (node == null) return null;
+            if (ReferenceEquals(node, crossingNodeFramed) && crossingNodeFrame?.Choice.Handle is GameObject held && held != null) return crossingNodeFrame;
+            crossingNodeFramed = node; crossingNodeFrame = null;
+            var crossing = CrossingNodeSource();
+            if (crossing == null || node.Point == null || node.Point.Length != 3) return null;
+            GameObject[] Handles(Func<SceneObservation, bool> which) => node.Members.Where(which).Select(m => m.Handle as GameObject).Where(go => go != null).ToArray();
+            var observed = SpatialSelectionScene.Observe(crossing);
+            return crossingNodeFrame = new SpatialCandidate(observed.Choice, new[] { new Vector3((float)node.Point[0], (float)node.Point[1], (float)node.Point[2]) }, observed.Details, crossing,
+                parts: Handles(m => true), uncutParts: Handles(m => m.Family == SceneFamilies.CrossingPad));
+        }
         // The label of the selected crossing node while no row is inspected, which the inspector heading shows, or null.
         string CrossingNodeLabel() => selected == null && crossingNode?.Identity != null ? crossingNode.Label : null;
         // The inspector heading while no row is inspected: the selected crossing node's label with its crossing object's
@@ -94,7 +112,7 @@ namespace RailroaderScenePatcher {
         void RemoveCrossing(TargetIdentity identity) {
             string refused = null;
             try { var outcome = attachment.Session.Remove(identity, null); if (outcome == null || !outcome.Applied) refused = outcome?.Error ?? "The crossing could not be removed."; }
-            catch (Exception e) { refused = e.GetBaseException().Message; }
+            catch (Exception e) { refused = PatcherLog.Reason(e); }
             if (refused != null) feedback.Report(DuplicatePlace, "Couldn't remove the crossing. " + refused.TrimEnd('.') + ".");
             else { crossingNodeKey = null; crossingNode = null; feedback.Report(DuplicatePlace, DuplicateState.Removed); ModObjectsChanged(); }
             presentation?.RequestRefresh();
@@ -196,7 +214,7 @@ namespace RailroaderScenePatcher {
             var message = duplicate.Message;
             TargetIdentity placed = null;
             try { placed = duplicate.Tick(placingPointer, (from, placement) => attachment.Session.PlaceModObject(from.Identity, placement, null, from.GroupPath, markerIdRandom.Next)); }
-            catch (Exception e) { duplicate.End(); feedback.Report(DuplicatePlace, "The object couldn't be placed: " + e.GetBaseException().Message.TrimEnd('.') + "."); }
+            catch (Exception e) { duplicate.End(); feedback.Report(DuplicatePlace, "The object couldn't be placed: " + PatcherLog.Reason(e).TrimEnd('.') + "."); }
             if (placed != null) {
                 placedModObject = placed;
                 feedback.Report(DuplicatePlace, DuplicateState.Placed);

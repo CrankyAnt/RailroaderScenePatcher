@@ -154,7 +154,7 @@ namespace RailroaderScenePatcher {
         void Begin() {
             dragFault.Begin();
             try { gesture = new PlacementGesture(engine, attachment.Session, identity, inspected); live = gesture.Initial; }
-            catch (Exception e) { Fail(e.Message); }
+            catch (Exception e) { Fail(PatcherLog.Reason(e)); }
         }
         void Preview(TransformGizmoDelta delta) {
             if (!Active) return;

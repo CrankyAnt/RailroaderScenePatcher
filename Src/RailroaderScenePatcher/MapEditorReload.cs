@@ -113,7 +113,7 @@ namespace RailroaderScenePatcher {
                     + ". Outstanding: terrain data, " + current.Outstanding() + ". No reload was started; edits remain in memory.");
             }
             try { Native.Call(current.MapEditor, "Save"); }
-            catch (TargetInvocationException e) { throw new InvalidOperationException(e.InnerException?.Message ?? e.Message); }
+            catch (TargetInvocationException e) { throw new InvalidOperationException(PatcherLog.Reason(e)); }
             finally { current.RefreshChrome(); }
         }
         static void CaptureLocation(MapEditorAttachment current, string mapIdentifier) {

@@ -81,7 +81,7 @@ namespace RailroaderScenePatcher.Core {
             } catch (Exception e) {
                 VersionState = FileVersionState.Repair; Import = null;
                 var diagnosis = e is DecoderFallbackException encodingError ? InvalidUtf8Diagnostic(encodingError)
-                    : ScenePatchFileDiagnostic.Create(null, "", e.Message, "A readable scene patch file");
+                    : ScenePatchFileDiagnostic.Create(null, "", PatcherLog.Reason(e), "A readable scene patch file");
                 ScenePatchFileDiagnostics = new[] { diagnosis };
                 VersionMessage = "File needs repair: " + ScenePatchFile.Sentence(diagnosis.Message) + ".";
                 if (backupPreview == null && storage is IVersionBackupStorage backup) backupPreview = backup.ReserveVersionBackup();
@@ -111,7 +111,7 @@ namespace RailroaderScenePatcher.Core {
                         Exception cleanupError = null;
                         if (path != null) { try { backup.RemoveVersionBackupIfUnchanged(path); } catch (Exception e) { cleanupError = e; } }
                         backupPreview = backup.ReserveVersionBackup();
-                        if (cleanupError != null) throw new InvalidOperationException(error.Message + " The backup might remain at " + path + ". " + WindowGuidance.DeleteBackup, error);
+                        if (cleanupError != null) throw new InvalidOperationException(PatcherLog.Reason(error) + " The backup might remain at " + path + ". " + WindowGuidance.DeleteBackup, error);
                         throw;
                     }
                     replacementBackup = path; versionBackup = true; backedVersionFingerprint = shown; LastBackup = path; lastVersionBackup = true;
@@ -123,7 +123,7 @@ namespace RailroaderScenePatcher.Core {
                     VersionMessage = null;
                 }
                 VersionState = FileVersionState.None; Import = null; outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; }
+            } catch (Exception e) { outcome.Error = PatcherLog.Reason(e); }
             return outcome;
         }
         public Outcome UseFileVersion() {
@@ -198,7 +198,7 @@ namespace RailroaderScenePatcher.Core {
                     try { restored = scene.Restore(snapshot.Item1, snapshot.Item2); } catch { }
                     if (!restored) { engine.SetUnsafe(snapshot.Item1, true); unverified = true; }
                 }
-                outcome.Error = e.Message + (unverified ? ". Could not verify cleanup. Affected targets remain guarded" : "");
+                outcome.Error = PatcherLog.Reason(e) + (unverified ? ". Could not verify cleanup. Affected targets remain guarded" : "");
             }
             return outcome;
         }

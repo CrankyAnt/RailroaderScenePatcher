@@ -194,7 +194,7 @@ namespace RailroaderScenePatcher {
                 bell.Cancel = new CancellationTokenSource();
                 Task task;
                 try { task = (Task)load.MakeGenericMethod(clip).Invoke(null, new[] { Library(), locatorFromReference.Invoke(new[] { asset, source.Identifier }), bell.Cancel.Token }); }
-                catch (TargetInvocationException e) { throw new InvalidOperationException("Its audio cannot be loaded: " + e.GetBaseException().Message); }
+                catch (TargetInvocationException e) { throw new InvalidOperationException("Its audio cannot be loaded: " + PatcherLog.Reason(e), e); }
                 task.ContinueWith(t => Loaded(bell, t), CancellationToken.None, TaskContinuationOptions.None, scheduler);
                 return go;
             } catch {
@@ -223,7 +223,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) {
                 bell.AudioReference = null;
                 try { result.Dispose(); } catch { }
-                Failed(bell, e.GetBaseException().Message);
+                Failed(bell, PatcherLog.Reason(e));
             }
         }
         // A failure after the apply leaves the bell built and silent: its state names the reason, and one warning per bell

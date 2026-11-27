@@ -356,8 +356,7 @@ namespace RailroaderScenePatcher {
         RectTransform windowHelpButton;
         RectTransform HelpButton(UIPanelBuilder row, string region, string scope) {
             var open = presentation.HelpRegion == region;
-            IConfigurableElement button = null;
-            button = Button(row, "?", () => presentation.ToggleHelp(region, button.RectTransform));
+            var button = Button(row, "?", () => presentation.ToggleHelp(region));
             if (FitButton(button, "?") == 0) button.Width(28);
             button.Tooltip(scope + " help", open ? "Close the " + scope.ToLowerInvariant() + " help." : "Explain the " + scope.ToLowerInvariant() + ".");
             return button.RectTransform;
@@ -1281,7 +1280,7 @@ namespace RailroaderScenePatcher {
             // fields, disabled with its own reason.
             if (HoldsBinding) {
                 Section(builder, pad ? "Crossing pad binding" : "Track binding");
-                ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, (pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move." : "The track location this marker is registered at. A binding edit does not move the object.") + " End is a or b.", column => column == 2);
+                ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move. End is a or b. Distance is measured in meters from the End you entered, along the whole segment." : "The track location this marker is registered at. A binding edit does not move the object. End is a or b.", column => column == 2);
                 FieldLabel(builder, "Current binding");
                 if (current.Length == 0) Line(builder, "None", null, null);
                 foreach (var line in current) BindingFields(builder, line);
@@ -2054,7 +2053,7 @@ namespace RailroaderScenePatcher {
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "See what the object is connected to and which connections you can change.",
                 Terms = new[] {
                     new[] { "Track binding", "The track location where the game registers a marker. Changing the binding leaves the object in place." },
-                    new[] { "Replacement targets", "Select a target in the world, check its ID, then click Confirm. That leaves the current connection as it is." },
+                    new[] { "Replacement targets", "Select a target in the world, check its ID, then click Confirm. Confirm changes nothing. The connection changes only when you click Set or Apply." },
                     new[] { "Set, Detach, Clear binding", "Click Set to register the marker at the location you entered. Click Detach to remove it from the track. Click Clear binding to restore its underlying binding." },
                     new[] { "Crossing coverage", "Each circuit has an approach A, an island, and an approach B. Select which tracks the circuit covers, or detach it. A nearby track is covered only if it's part of a circuit. Click Preview to see the result for every circuit before you click Apply." },
                     new[] { "Detection addition", "To give an extra track its own circuit, enter an ID, click Add detection, and select the tracks for its three spans. Use Delete to remove the addition." },
@@ -2069,7 +2068,7 @@ namespace RailroaderScenePatcher {
                 Terms = new[] {
                     new[] { "Remove modification", "Removes this mod's modification and restores the object's underlying state. It doesn't restore an earlier patched position." },
                     new[] { "Recheck", "After a failed edit, click Recheck to compare the object with the scene patch file. Once they agree, you can edit the object again." },
-                    new[] { "Terrain output", "The game regenerates terrain output after you move a board or a ground mask. Save doesn't write that output. Click Retry to ask the game to rebuild it again." } },
+                    new[] { "Terrain output", "The game regenerates terrain output after you move a board or a ground mask. Save doesn't write that output. Click Retry to ask the game to rebuild it." } },
                 Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Location signs", "moving-location-signs.md" }, new[] { "File recovery", "recover-scene-patch-files.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
         };
         void DrawHelp(UIPanelBuilder builder, string region) {

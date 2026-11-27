@@ -25,6 +25,7 @@ static class FailureRecoveryTests {
         RemainingStateIsHonestWhenItCannotCompare();
         GuidanceNamesCorrectionAndOperationGuide();
         PanelResultsDistinguishOutcomesAndKeepTheGuide();
+        GameCallFailuresGiveTheGameReason();
         PendingRestoredOutputIsNoIncompleteCleanup();
         RetryAfterIncompleteCleanupIsBlockedNotStale();
         FailureColourFollowsTheFailureKind();
@@ -222,6 +223,22 @@ static class FailureRecoveryTests {
         Assert(feedback.Recovery.Guide == "editing-placement-in-the-map-editor.md#set-a-numeric-placement" && feedback.Recovery.GuideTitle == "Fixed placement", "The result keeps the operation's guide for the footer");
         Assert(!Run(inspection => w.Session.Edit(P, At(81), null, inspection)) && feedback.Result.StartsWith("Placement is blocked by incomplete cleanup. ", StringComparison.Ordinal), "A blocked retry says why: " + feedback.Result);
         Assert(Run(inspection => w.Session.Recheck(P, inspection)) && feedback.Recovery == null, "A completed action replaces the guidance with its result");
+    }
+    // A failure inside a reflected game call reaches the modder with the game's own reason, not the reflection wrapper's,
+    // and the debug log keeps the game's exception with its stack.
+    static void GameCallFailuresGiveTheGameReason() {
+        var w = new EditWorld();
+        var feedback = new RailroaderScenePatcher.EditFeedback();
+        Exception game;
+        try { throw new ArgumentOutOfRangeException("distance", "Location is past the end of the track"); } catch (Exception e) { game = e; }
+        w.Scene.NextApplyFailure = new System.Reflection.TargetInvocationException(game);
+        var log = RecordingLog.Capture(true, () => { w.Inventory.Refresh(); feedback.Run("Placement", "Placement", null, w.Inventory, w.Inventory.Entries.Single(e => e.Identity.Path == "p"), inspection => w.Session.Edit(P, At(70), null, inspection)); });
+        Assert(feedback.Result.StartsWith("Placement failed and was undone. Location is past the end of the track", StringComparison.Ordinal) && !feedback.Result.Contains("target of an invocation"), "The result names the game's reason: " + feedback.Result);
+        var detail = log.At(LogLevel.Debug).SingleOrDefault(l => l.Contains("ArgumentOutOfRangeException"));
+        Assert(detail != null && detail.Contains("Location is past the end of the track") && detail.Contains(nameof(GameCallFailuresGiveTheGameReason)) && !detail.Contains("TargetInvocationException"), "The debug log records the game's exception with its stack: " + String.Join(" | ", log.At(LogLevel.Debug)));
+        w.Scene.NextApplyFailure = new System.Reflection.TargetInvocationException(game);
+        var player = RecordingLog.Capture(false, () => w.Session.Edit(P, At(71), null));
+        Assert(!player.Lines.Any(l => l.Value.Contains("ArgumentOutOfRangeException")), "Player mode leaves the exception detail out: " + String.Join(" | ", player.PlayerLines));
     }
     // A scene whose mutations leave dependent output, such as terrain, outstanding until the test settles it.
     sealed class OutputScene : Scene, IDependentOutputScene {

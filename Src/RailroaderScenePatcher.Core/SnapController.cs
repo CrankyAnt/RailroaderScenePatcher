@@ -69,7 +69,7 @@ namespace RailroaderScenePatcher.Core {
                 if (request == null || !ReferenceEquals(request.Owner, this)) throw new InvalidOperationException("No snap is prepared for this scene patch editing session. " + WindowGuidance.PrepareSnap);
                 Validate(request);
                 return session.Edit(request.Target, request.Desired, null, request.Inspected, () => Validate(request));
-            } catch (Exception e) { return new Outcome { Error = e.Message }; }
+            } catch (Exception e) { return new Outcome { Error = PatcherLog.Reason(e) }; }
         }
         void Validate(SnapRequest request) {
             CheckMaps(request.Maps);

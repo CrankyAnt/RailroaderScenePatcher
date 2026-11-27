@@ -48,7 +48,7 @@ namespace RailroaderScenePatcher {
             cache.SetValue(c, null);
             if (!(c is Behaviour behaviour) || !behaviour.isActiveAndEnabled || values.Any(id => Matches(id) != 1)) return;
             try { update.Invoke(c, null); }
-            catch (TargetInvocationException e) { throw new InvalidOperationException("The construction controller couldn't show the construction based on its segments: " + e.GetBaseException().Message); }
+            catch (TargetInvocationException e) { throw new InvalidOperationException("The construction controller couldn't show the construction based on its segments: " + PatcherLog.Reason(e), e); }
         }
     }
     // A construction controller on an object of its own: Ela Bridge Scenery, the one the inventory lists in the Bridge

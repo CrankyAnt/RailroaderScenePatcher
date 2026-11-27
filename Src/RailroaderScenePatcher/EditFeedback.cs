@@ -159,11 +159,11 @@ namespace RailroaderScenePatcher {
             // An object an earlier failure guards is refused for that failure before the pin compares the scene: an
             // incomplete cleanup leaves the object changed, so the comparison would call the inspection stale instead.
             Outcome guarded = null;
-            try { guarded = guard?.Invoke(); } catch (Exception e) { Refuse(place, action, e.GetBaseException().Message); return false; }
+            try { guarded = guard?.Invoke(); } catch (Exception e) { Refuse(place, action, PatcherLog.Reason(e)); return false; }
             if (guarded != null && !guarded.Applied) { ReportFailure(place, action, selected, guarded); return false; }
             Outcome outcome;
             try { outcome = change(pin != null ? pin(selected) : inventory.PinForEdit(selected)); }
-            catch (Exception e) { Refuse(place, action, e.GetBaseException().Message); return false; }
+            catch (Exception e) { Refuse(place, action, PatcherLog.Reason(e)); return false; }
             if (outcome == null) { Refuse(place, action, "the edit returned no outcome"); return false; }
             if (!outcome.Applied) { ReportFailure(place, action, selected, outcome); return false; }
             // completed is the result of an edit that applied without doing what its name says, such as the placement

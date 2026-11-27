@@ -375,7 +375,7 @@ namespace RailroaderScenePatcher.Core {
             if (!baselines.TryGetValue(target, out var baseline)) return;
             string problem = null;
             foreach (var span in baseline.Owned.ToList()) {
-                try { Retire(baseline, span); } catch (Exception e) { problem = problem ?? e.Message; }
+                try { Retire(baseline, span); } catch (Exception e) { problem = problem ?? PatcherLog.Reason(e); }
             }
             if (equipment != null) problem = equipment.ReleaseAll(baseline.Equipment) ?? problem;
             if (baseline.Owned.Count > 0) throw new InvalidOperationException("owned span " + String.Join(", ", baseline.Owned.Select(world.SpanId)) + " remains registered" + (problem == null ? "" : ": " + problem));
@@ -615,7 +615,7 @@ namespace RailroaderScenePatcher.Core {
         }
         string Verify(object target, Baseline baseline, CrossingCoverage coverage) {
             CrossingCoverage observed;
-            try { observed = Observed(target, baseline); } catch (InvalidOperationException e) { return e.Message; }
+            try { observed = Observed(target, baseline); } catch (InvalidOperationException e) { return PatcherLog.Reason(e); }
             foreach (var circuit in coverage.Circuits)
                 if (!CircuitCoverage.Same(observed[circuit.Key], circuit.Value)) return DetectionAddition.Name(circuit.Key) + " is " + (observed[circuit.Key]?.ToString() ?? "absent") + ", expected " + circuit.Value;
             var left = observed.Circuits.FirstOrDefault(c => coverage[c.Key] == null);
@@ -638,7 +638,7 @@ namespace RailroaderScenePatcher.Core {
                 var member = members.Any(m => ReferenceEquals(m, circuit.Set));
                 // An addition outside the controller is one a failed application left behind; its spans count as residue below.
                 if (circuit.Original == null && !member) continue;
-                try { Classify(circuit, members, baseline); } catch (InvalidOperationException e) { return e.Message; }
+                try { Classify(circuit, members, baseline); } catch (InvalidOperationException e) { return PatcherLog.Reason(e); }
                 if (member) inUse.AddRange((world.Spans(circuit.Set) ?? Array.Empty<object>()).Where(s => baseline.Owned.Any(o => ReferenceEquals(o, s))));
                 var lost = circuit.Original?.FirstOrDefault(s => !world.Registered(s));
                 if (lost != null) return "detection span " + world.SpanId(lost) + " from the map is no longer registered";

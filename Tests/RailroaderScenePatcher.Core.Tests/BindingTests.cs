@@ -416,7 +416,7 @@ static class BindingTests {
     static void RefusedDistanceReadsToThreeDecimals() {
         var (_, _, _, scene) = Setup();
         var outcome = new PatchEngine(scene).Apply(Doc(Binding("far", At("Nnew", "a", 500.123456)))).Outcomes["far"];
-        Assert(!outcome.Applied && outcome.Error.Contains("Relationship distance 500.123 lies outside segment Nnew"), "The refused distance reads to three decimals: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("Distance 500.123 m lies outside segment Nnew, which is 120 m long") && !outcome.Error.Contains("Relationship distance"), "The refused distance reads to three decimals and names the segment length: " + outcome.Error);
     }
     static void UnresolvedTargetsChangeNothing() {
         var cases = new[] {

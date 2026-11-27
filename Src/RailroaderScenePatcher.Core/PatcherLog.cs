@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace RailroaderScenePatcher.Core {
@@ -34,6 +36,23 @@ namespace RailroaderScenePatcher.Core {
             Write(LogLevel.Warning, WithReason(text, failure));
             if (failure != null) Debug(() => ExceptionDetail + failure);
         }
+        // The reason an exception gives in a message. A reflected call into the game wraps the game's own exception in a
+        // TargetInvocationException, whose message names only the wrapper; the reason is then the game's message, and the
+        // debug log records the game's exception with its stack, once per exception.
+        public static string Reason(Exception failure) {
+            if (failure == null) return null;
+            var inner = failure;
+            while (inner is TargetInvocationException && inner.InnerException != null) inner = inner.InnerException;
+            if (ReferenceEquals(inner, failure)) return failure.Message;
+            var game = failure.GetBaseException();
+            lock (gate) {
+                if (!reasoned.TryGetValue(failure, out _)) { reasoned.Add(failure, game); Debug(() => GameCallDetail + game); }
+            }
+            return inner.Message;
+        }
+        static readonly ConditionalWeakTable<Exception, Exception> reasoned = new ConditionalWeakTable<Exception, Exception>();
+        // The start of the debug line that carries the exception a reflected game call threw.
+        public const string GameCallDetail = "Game call exception: ";
         // The start of the debug line that carries a warning's or error's full exception.
         public const string ExceptionDetail = "Exception detail for the line above: ";
         // Joins a sentence and the exception message once: "... Report this to the patcher maintainer: <message>", never

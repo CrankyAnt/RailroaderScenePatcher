@@ -19,8 +19,15 @@ namespace RailroaderScenePatcher {
         internal Vector3[] Path { get; }
         internal string Details { get; }
         internal Vector3 Position => Points[Points.Length / 2];
+        // The objects below the candidate's object whose renderers make up its frame, such as the crossbucks and pad of
+        // one crossing without signals where several crossings share their crossing object; null for all of them.
+        internal IReadOnlyList<GameObject> Parts { get; }
+        // The parts that lie on their track, such as a crossing pad, whose boxes are framed whole and not cut off where
+        // they meet the ground; null for none.
+        internal IReadOnlyList<GameObject> UncutParts { get; }
 
-        internal SpatialCandidate(SelectionCandidate choice, Vector3[] points, string details, SceneObservation observation = null, Vector3[] controlPoints = null, Vector3[] path = null) {
+        internal SpatialCandidate(SelectionCandidate choice, Vector3[] points, string details, SceneObservation observation = null, Vector3[] controlPoints = null, Vector3[] path = null, IReadOnlyList<GameObject> parts = null, IReadOnlyList<GameObject> uncutParts = null) {
+            Parts = parts; UncutParts = uncutParts;
             Choice = choice;
             Points = points;
             Details = details;
@@ -348,11 +355,12 @@ namespace RailroaderScenePatcher {
 
         // trackPoint is the inspected starter placement marker's track point in map coordinates, or null; cut is the track
         // its car cut stands on from that point back, in map coordinates, or null.
-        internal void Draw(SceneObservation inspected, IReadOnlyList<Rect> covered, Texture2D backing, double[] trackPoint = null, IReadOnlyList<double[]> cut = null) {
-            if (Event.current.type != EventType.Repaint || (Pending == null && inspected == null)) return;
+        // node is the crossing node the outliner has selected while no object is inspected, framed as the inspected object is.
+        internal void Draw(SceneObservation inspected, IReadOnlyList<Rect> covered, Texture2D backing, double[] trackPoint = null, IReadOnlyList<double[]> cut = null, SpatialCandidate node = null) {
+            if (Event.current.type != EventType.Repaint || (Pending == null && inspected == null && node == null)) return;
             var camera = Camera.main;
             if (camera == null) return;
-            var original = source ?? (inspected == null ? null : SpatialSelectionScene.Observe(inspected));
+            var original = source ?? (inspected == null ? node : SpatialSelectionScene.Observe(inspected));
             // The confirmed relation belongs to the object it was chosen for, and is not the inspected object itself.
             var confirmed = Confirmed;
             var relation = confirmed?.Source != null && ConfirmedFor(inspected) && confirmedMark != null &&

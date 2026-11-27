@@ -105,7 +105,7 @@ namespace RailroaderScenePatcher.Core {
                 if (refusal != null) throw new InvalidOperationException(refusal);
                 Import = Classify(loaded, text, shown);
                 outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; }
+            } catch (Exception e) { outcome.Error = PatcherLog.Reason(e); }
             return outcome;
         }
         // Discards the overview and its conflict choices. The version choice stays pending.
@@ -318,7 +318,7 @@ namespace RailroaderScenePatcher.Core {
                         catch (InvalidOperationException e) {
                             // An entry the patcher does not execute is kept without execution, and an entry whose target is
                             // unavailable is an isolated application failure, as at load.
-                            if (pair.Item2 && executable && changed.Contains(key)) notApplied.Add(key + ": " + ScenePatchFile.Sentence(e.Message));
+                            if (pair.Item2 && executable && changed.Contains(key)) notApplied.Add(key + ": " + ScenePatchFile.Sentence(PatcherLog.Reason(e)));
                             if (pair.Item2) unapplied.Add(key);
                             continue;
                         }
@@ -340,7 +340,7 @@ namespace RailroaderScenePatcher.Core {
                         object owner;
                         try { owner = engine.ResolveUnique(PatchEngine.ParseTarget(item["target"] as JObject)); } catch (InvalidOperationException) { continue; }
                         try { engine.CheckRelationships(owner, state); }
-                        catch (InvalidOperationException e) { throw new InvalidOperationException("Modification " + key + " cannot be applied: " + ScenePatchFile.Sentence(e.Message)); }
+                        catch (InvalidOperationException e) { throw new InvalidOperationException("Modification " + key + " cannot be applied: " + ScenePatchFile.Sentence(PatcherLog.Reason(e))); }
                     }
                 } finally { engine.Unplan(); }
                 scenePatchFile = merged;
@@ -373,7 +373,7 @@ namespace RailroaderScenePatcher.Core {
                     try { restored = scene.Restore(snapshot.Item1, snapshot.Item2); } catch { }
                     if (!restored) { engine.SetUnsafe(snapshot.Item1, true); unverified = true; }
                 }
-                outcome.Error = "Scene patch editing is back as it was before Import. " + ScenePatchFile.Sentence(e.Message) + "."
+                outcome.Error = "Scene patch editing is back as it was before Import. " + ScenePatchFile.Sentence(PatcherLog.Reason(e)) + "."
                     + (unverified ? " Cleanup could not be verified; the affected objects stay guarded until Recheck or a Map Editor reload." : "");
             }
             if (outcome.Applied) { try { OutstandingMayHaveChanged?.Invoke(); } catch { } }

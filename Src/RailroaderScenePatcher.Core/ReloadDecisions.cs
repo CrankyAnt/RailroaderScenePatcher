@@ -60,7 +60,7 @@ namespace RailroaderScenePatcher.Core {
                 } else if (choice != ReloadChoice.Discard) return "Reload cancelled. The decision was not recognized.";
                 reload();
                 return null;
-            } catch (Exception e) { return "Reload cancelled. " + e.Message; }
+            } catch (Exception e) { return "Reload cancelled. " + PatcherLog.Reason(e); }
         }
     }
 }

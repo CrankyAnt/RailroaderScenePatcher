@@ -1088,7 +1088,7 @@ namespace RailroaderScenePatcher {
                 // A selected station map icon shows the map's icon at its place, below its marking.
                 if (StationMapIconRules.ShowsMapIcon(selected) && selected.Handle is GameObject icon && icon != null)
                     WorldMapIcon.Draw(icon, icon.transform.position, covered);
-                selection.Draw(selected, covered, worldLabelBacking, InspectedTrackPoint(), InspectedCut());
+                selection.Draw(selected, covered, worldLabelBacking, InspectedTrackPoint(), InspectedCut(), CrossingNodeFrame());
             }
             catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
         }

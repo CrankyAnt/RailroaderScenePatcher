@@ -545,6 +545,20 @@ static class EquipmentTests {
         Assert(CrossingEquipment.Place("Grade Crossing Setup 2 Tracks", new[] { "Roads Andrews", "World" }) == "Andrews", "A setup crossing in Roads Andrews stands at Andrews");
         Assert(CrossingEquipment.Place("Grade Crossing Setup", new[] { "US19 Gov Island", "Roads Bryson", "World" }) == "US19 Gov Island", "The nearest enclosing place names a setup crossing");
         Assert(CrossingEquipment.Place("Lonely Crossing", new[] { "World" }) == "Lonely Crossing", "Without an enclosing place the crossing keeps its own name");
+        // A duplicated crossing is a mod object: its place leaves the mod object mark out, as the outliner names it.
+        Assert(CrossingEquipment.Place("Grade Crossing - Bryson Everett [mod object crankyant:fixture mod-object-grade-crossing---bryson-everett-2]", new[] { "Bryson", "Large Scenery", "World" }) == "Bryson Everett",
+            "A duplicated crossing gives its place without its mod object mark");
+        Assert(CrossingEquipment.Place("Grade Crossing Setup [mod object crankyant:fixture mod-object-grade-crossing-setup]", new[] { "Roads Andrews", "World" }) == "Andrews", "A duplicated setup crossing takes its place from its enclosing objects");
+        Assert(CrossingEquipment.Place("Grade Crossing Setup", new[] { "Bryson [mod object crankyant:fixture mod-object-bryson]", "World" }) == "Bryson", "An enclosing mod object names its place without its mark");
+        // A duplicated crossing's devices are told apart by the number the outliner gives the copy: the map's crossings of the
+        // same name come first, then the copies in placement order, whatever order the scene lists them in.
+        const string Everett = "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett";
+        string Copy(string key) => ModObjects.Path(Everett, "crankyant/fixture", key);
+        var bryson = new[] { "Bryson", "Large Scenery", "World" };
+        var controllers = new[] { Copy("mod-object-grade-crossing---bryson-everett-3"), Everett, Copy("mod-object-grade-crossing---bryson-everett-2"), "World/Roads Andrews/Grade Crossing Setup" }
+            .Select(path => new KeyValuePair<string, IReadOnlyList<string>>(path, path.StartsWith("World/Roads", StringComparison.Ordinal) ? new[] { "Roads Andrews", "World" } : bryson)).ToArray();
+        var places = CrossingEquipment.Places(controllers);
+        Assert(places.SequenceEqual(new[] { "Bryson Everett (3)", "Bryson Everett", "Bryson Everett (2)", "Andrews" }), "Each crossing's devices stand at its numbered place: " + String.Join(", ", places));
         // The source stands 10 m along X from its crossing. The destination crossing is turned 90 degrees about Y.
         var quarter = new[] { 0, Math.Sin(Math.PI / 4), 0, Math.Cos(Math.PI / 4) };
         var proposed = EquipmentPlacement.Propose(candidate.Position, candidate.Rotation, candidate.CrossingPosition, candidate.CrossingRotation, new double[] { 4000, 529, 5000 }, quarter);

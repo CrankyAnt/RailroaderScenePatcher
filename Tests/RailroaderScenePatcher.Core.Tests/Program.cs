@@ -26,6 +26,8 @@ class Scene : IScene, IInspectionScene, IMapPatchContext {
     public void Preflight(object target) { }
     public bool FailRead { get; set; }
     public int FailNextApplies;
+    // The next write throws this exception after it changed the object, as a reflected game call throws.
+    public Exception NextApplyFailure;
     public object Capture(object target) { BeforeCapture?.Invoke(); var box = (Box)target; return new object[] { (double[])box.Position.Clone(), (double[])box.Rotation.Clone(), box.Active }; }
     public Action BeforeRead;
     public ObjectState Read(object target) { var hook = BeforeRead; BeforeRead = null; hook?.Invoke(); if (FailRead) throw new Exception("injected read"); var box = (Box)target; return new ObjectState(new Placement(new[] { box.Position[0] + Origin, box.Position[1], box.Position[2] }, (double[])box.Rotation.Clone()), box.Active); }
@@ -37,6 +39,7 @@ class Scene : IScene, IInspectionScene, IMapPatchContext {
         if (state.Placement != null) { box.Position = new[] { state.Placement.Position[0] - Origin, state.Placement.Position[1], state.Placement.Position[2] }; box.Rotation = (double[])state.Placement.Rotation.Clone(); }
         if (state.Active != null) box.Active = state.Active.Value;
         if (FailNextApplies > 0) { FailNextApplies--; throw new Exception("injected once"); }
+        if (NextApplyFailure != null) { var failure = NextApplyFailure; NextApplyFailure = null; throw failure; }
         if (FailApply || ReferenceEquals(target, FailingTarget)) throw new Exception("injected");
     }
     public bool Restore(object target, object snapshot) { if (FailRestore) return false; var box = (Box)target; var placement = (object[])snapshot; box.Position = (double[])placement[0]; box.Rotation = (double[])placement[1]; box.Active = (bool)placement[2]; return true; }

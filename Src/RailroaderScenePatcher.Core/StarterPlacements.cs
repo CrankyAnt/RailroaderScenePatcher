@@ -166,7 +166,7 @@ namespace RailroaderScenePatcher.Core {
                     at = track.Move(at, -Math.Min(BodyStep, length - done));
                     points.Add(track.Position(at));
                 }
-            } catch (StarterTrackException e) { error = e.Message; }
+            } catch (StarterTrackException e) { error = PatcherLog.Reason(e); }
             return points;
         }
         public static IReadOnlyList<double[]> Body(IStarterTrack track, TrackLocation front, double length) => Body(track, front, length, out _);
@@ -201,7 +201,7 @@ namespace RailroaderScenePatcher.Core {
                     foreach (var other in placed)
                         if (Blocks(other.Value, point)) { blocker = other.Key; return "Blocked by the cut of " + StarterPlacements.Place(other.Key.Placement) + "."; }
                 }
-            } catch (StarterTrackException e) { return e.Message; }
+            } catch (StarterTrackException e) { return PatcherLog.Reason(e); }
             return null;
         }
         // Why the setup's cuts fail the rule where the marker's cut takes part, or null: the marker's own cut fails, or

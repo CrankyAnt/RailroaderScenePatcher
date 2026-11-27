@@ -108,9 +108,9 @@ namespace RailroaderScenePatcher.Core {
                     ReportResult(scenePatchFile.Result, mod.Source);
                     if (scenePatchFile.Result.NotApplicable != null && !mod.EditTarget) Report(mod.Source, "document", null, scenePatchFile.Result.NotApplicable, FailureCause.NotApplicable, true);
                 }
-                catch (Exception e) { scenePatchFile.PresentationError = "Failure report delivery failed: " + e.Message; }
+                catch (Exception e) { scenePatchFile.PresentationError = "Failure report delivery failed: " + PatcherLog.Reason(e); }
                 try { ObserveOverlap(mod, scenePatchFile.Result, notices); }
-                catch (Exception e) { scenePatchFile.PresentationError = (scenePatchFile.PresentationError == null ? "" : scenePatchFile.PresentationError + "; ") + "Overlap notice delivery failed: " + e.Message; }
+                catch (Exception e) { scenePatchFile.PresentationError = (scenePatchFile.PresentationError == null ? "" : scenePatchFile.PresentationError + "; ") + "Overlap notice delivery failed: " + PatcherLog.Reason(e); }
             }
             return scenePatchFiles;
         }

@@ -600,7 +600,7 @@ namespace RailroaderScenePatcher.Core {
             if (lengths.Count == 0) return "Relationship target segment " + location.Segment + " is missing";
             if (lengths.Count > 1) return "Relationship target segment " + location.Segment + " is ambiguous";
             if (Double.IsNaN(location.Distance) || location.Distance < 0 || location.Distance > lengths[0] + TrackLocation.DistanceTolerance)
-                return "Relationship distance " + ShownNumber.Text(location.Distance) + " lies outside segment " + location.Segment;
+                return "Distance " + ShownNumber.Text(location.Distance) + " m lies outside segment " + location.Segment + ", which is " + ShownNumber.Text(lengths[0]) + " m long";
             return null;
         }
         bool Resolvable(TrackLocation location) => location != null && Unresolved(location) == null;

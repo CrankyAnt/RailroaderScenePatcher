@@ -64,7 +64,7 @@ namespace RailroaderScenePatcher.Core {
                 writingPreview = false; desired = checkedPlacement; result.Applied = true;
             } catch (Exception e) {
                 var restored = Cancel();
-                result.Error = e.Message + (restored.Error == null ? "" : "; " + restored.Error);
+                result.Error = PatcherLog.Reason(e) + (restored.Error == null ? "" : "; " + restored.Error);
             }
             return result;
         }
@@ -100,7 +100,7 @@ namespace RailroaderScenePatcher.Core {
                 return result;
             } catch (Exception e) {
                 var restored = Cancel();
-                return new Outcome { Error = e.Message + (restored.Error == null ? "" : "; " + restored.Error), ResolvedTarget = target };
+                return new Outcome { Error = PatcherLog.Reason(e) + (restored.Error == null ? "" : "; " + restored.Error), ResolvedTarget = target };
             }
         }
         public Outcome Cancel() {
@@ -109,7 +109,7 @@ namespace RailroaderScenePatcher.Core {
             try { Restore(); engine.AwaitOutput(target); return new Outcome { Applied = true, ResolvedTarget = target }; }
             catch (Exception e) {
                 engine.SetUnsafe(target, true);
-                CleanupFailure = "Gizmo cleanup is unverified: " + e.Message.TrimEnd('.') + ". " + WindowGuidance.RecheckBeforeEditing;
+                CleanupFailure = "Gizmo cleanup is unverified: " + PatcherLog.Reason(e).TrimEnd('.') + ". " + WindowGuidance.RecheckBeforeEditing;
                 return new Outcome { Error = CleanupFailure, ResolvedTarget = target };
             }
         }

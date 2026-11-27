@@ -46,9 +46,8 @@ namespace RailroaderScenePatcher {
     public sealed class HelpWindow : BuilderWindowBase {
         internal Action<UIPanelBuilder> Build;
         internal const string WindowIdentifier = "crankyant/scene-patcher/help";
-        // Width is the content's at its narrowest (PanelPlacement.HelpWidths): the window's frame adds 24, so the
-        // window measures 364 then.
-        internal const int Width = 340, DefaultHeight = 300, MinimumHeight = 120;
+        // Width is the content's (PanelPlacement.HelpWidth): the window's frame adds 24, so the window measures 634.
+        internal const int Width = (int)PanelPlacement.HelpWidth, DefaultHeight = 300, MinimumHeight = 120;
         public override string Identifier => WindowIdentifier;
         public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(Width, DefaultHeight), new Vector2Int(260, MinimumHeight), Window.Position.UpperLeft);
         protected override string Title { get; set; } = "Scene Patcher help";
@@ -231,7 +230,7 @@ namespace RailroaderScenePatcher {
                 close = native.GetComponentsInChildren<Button>(true).FirstOrDefault(b => content == null || !b.transform.IsChildOf(content));
                 if (close == null) { TitleHelpProblem = "the window has no close button to stand beside"; return; }
                 titleClose = (RectTransform)close.transform;
-                titleHelp = BareTitleButton(manager, close.transform.parent, "CrankyAnt Scene Patcher window help", () => ToggleHelp(WindowHelpRegion, titleHelp), out var label);
+                titleHelp = BareTitleButton(manager, close.transform.parent, "CrankyAnt Scene Patcher window help", () => ToggleHelp(WindowHelpRegion), out var label);
                 if (label != null) {
                     label.richText = false; label.text = "?"; label.color = TitleGlyph;
                     label.fontStyle = FontStyles.Normal; label.enableAutoSizing = false;
@@ -353,10 +352,8 @@ namespace RailroaderScenePatcher {
         internal string HelpRegion { get; private set; }
         internal string HelpProblem { get; private set; }
         HelpWindow help;
-        // The top of the "?" that opened the help, in canvas units below the panel's top (PanelPlacement.AnchorOffset).
-        float helpAnchor;
         int helpSizing;
-        internal void ToggleHelp(string region, RectTransform beside) {
+        internal void ToggleHelp(string region) {
             if (disposed || region == null) return;
             try {
                 if (HelpRegion == region && help != null && help.NativeWindow.IsShown) { help.NativeWindow.CloseWindow(); HelpRegion = null; dirty = true; return; }
@@ -366,7 +363,6 @@ namespace RailroaderScenePatcher {
                     help.NativeWindow.OnShownDidChange += HelpShown;
                 }
                 HelpRegion = region;
-                helpAnchor = beside == null ? 0 : PanelPlacement.AnchorOffset(Bounds(beside).yMin, PanelBounds.yMin, scale);
                 if (help.NativeWindow.IsShown) help.Refresh(); else help.Show();
                 // The content is laid out over the next frames; the window takes its size and place after that.
                 helpSizing = 2;
@@ -397,10 +393,9 @@ namespace RailroaderScenePatcher {
             try { if (help.NativeWindow.IsShown) help.NativeWindow.CloseWindow(); } catch { }
             HelpRegion = null; dirty = true;
         }
-        // The help window is as high as its content, within the screen, and stands beside the panel at the height of
-        // the "?" that opened it, moved up where it would pass the screen's bottom: right of the panel where the
-        // screen has room, else left of it. A help too long for the screen at its usual width takes a wider window
-        // (PanelPlacement.HelpSize); what still does not fit is reached by scrolling.
+        // Every help window has the same width and opens at the same place beside the panel, whichever "?" opened it
+        // (PanelPlacement.HelpSize, HelpPlace): right of the panel where the screen has room, else left of it. It is as
+        // high as its content, within the screen; what does not fit is reached by scrolling.
         void SizeHelp() {
             if (help == null || !help.NativeWindow.IsShown) return;
             try {
@@ -424,7 +419,7 @@ namespace RailroaderScenePatcher {
                 var size = Bounds((RectTransform)native.transform).size;
                 // Beside the panel, never over it: the region the help explains stays in view.
                 var panel = PanelBounds;
-                var area = PanelPlacement.Beside(panel.xMin, panel.xMax, PanelPlacement.AnchorTop(helpAnchor, panel.yMin, scale), size.x, size.y, Screen.width, Screen.height, 8 * scale, MapEditorTitleBar());
+                var area = PanelPlacement.HelpPlace(panel.xMin, panel.xMax, size.x, size.y, Screen.width, Screen.height, PanelPlacement.HelpMargin * scale, MapEditorTitleBar());
                 // Below the Map Editor's title bar the help can be lower than its content: its content takes that height
                 // and scrolls.
                 if (area.Height < size.y - 0.5f) {

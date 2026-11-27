@@ -562,11 +562,11 @@ namespace RailroaderScenePatcher.Core {
                         if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("Applied state did not verify");
                     } catch (Exception e) {
                         var restored = false; string restoreError = null;
-                        try { FollowUpdate(resolved, prior); restored = Same(scene.Read(resolved), prior); } catch (Exception r) { restoreError = r.Message; }
-                        if (restored) throw new AttemptFailure(FailureKind.Restored, "Following the track failed. The object is back as it was. Reason: " + e.Message);
+                        try { FollowUpdate(resolved, prior); restored = Same(scene.Read(resolved), prior); } catch (Exception r) { restoreError = PatcherLog.Reason(r); }
+                        if (restored) throw new AttemptFailure(FailureKind.Restored, "Following the track failed. The object is back as it was. Reason: " + PatcherLog.Reason(e));
                         var left = Core.RemainingState.Describe(prior, () => scene.Read(resolved), restoreError);
                         engine.SetUnsafe(resolved, true, left);
-                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "Following the track failed. Cleanup could not be verified. Reason: " + e.Message, left);
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "Following the track failed. Cleanup could not be verified. Reason: " + PatcherLog.Reason(e), left);
                     }
                     outcome.Applied = true;
                 } catch (Exception e) { Fail(outcome, e); }
@@ -619,12 +619,12 @@ namespace RailroaderScenePatcher.Core {
                 outcome.Applied = true;
             } catch (Exception e) {
                 var restored = false; string restoreError = null;
-                try { FollowUpdate(target, prior); restored = Same(scene.Read(target), prior); } catch (Exception r) { restoreError = r.Message; }
-                if (restored) Fail(outcome, new AttemptFailure(FailureKind.Restored, "Following the track failed. The object is back as it was. Reason: " + e.Message));
+                try { FollowUpdate(target, prior); restored = Same(scene.Read(target), prior); } catch (Exception r) { restoreError = PatcherLog.Reason(r); }
+                if (restored) Fail(outcome, new AttemptFailure(FailureKind.Restored, "Following the track failed. The object is back as it was. Reason: " + PatcherLog.Reason(e)));
                 else {
                     var left = Core.RemainingState.Describe(prior, () => scene.Read(target), restoreError);
                     engine.SetUnsafe(target, true, left);
-                    Fail(outcome, new AttemptFailure(FailureKind.IncompleteCleanup, "Following the track failed. Cleanup could not be verified. Reason: " + e.Message, left));
+                    Fail(outcome, new AttemptFailure(FailureKind.IncompleteCleanup, "Following the track failed. Cleanup could not be verified. Reason: " + PatcherLog.Reason(e), left));
                 }
             }
             return outcome;
@@ -889,7 +889,7 @@ namespace RailroaderScenePatcher.Core {
                 var desired = engine.Desired(candidate, resolved, scenePatchFileKey).Coverage;
                 CheckEffectiveCoverage(resolved, desired);
                 return new CoveragePreview(CrossingCoverage.Describe(current, desired), null, unchanged);
-            } catch (Exception e) { return new CoveragePreview(Array.Empty<string>(), e.Message); }
+            } catch (Exception e) { return new CoveragePreview(Array.Empty<string>(), PatcherLog.Reason(e)); }
         }
         // The effective coverage an edit converges on must itself be valid: removing an entry can leave a crossing without
         // detection although every remaining entry is valid on its own. Checked before mutation, so a refusal changes nothing.
@@ -951,7 +951,7 @@ namespace RailroaderScenePatcher.Core {
                 }
             }
             try { engine.CheckRelationships(resolved, engine.Evaluate(PatchEngine.Parse(rest, scenePatchFileKey, key).State.LeavingActivity())); return null; }
-            catch (InvalidOperationException e) { return e.Message; }
+            catch (InvalidOperationException e) { return PatcherLog.Reason(e); }
         }
         // Removes one of this mod's equipment additions: its copy is released from the controller and its culling.
         // Removing an addition from a modification that is not applied, while another addition keeps it refused, changes
@@ -997,7 +997,7 @@ namespace RailroaderScenePatcher.Core {
             // offering a Recheck that refuses the same way.
             string Refusal(EquipmentAddition addition) {
                 try { engine.CheckRelationships(resolved, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { addition }, false))); return null; }
-                catch (InvalidOperationException e) { return e.Message; }
+                catch (InvalidOperationException e) { return PatcherLog.Reason(e); }
             }
             var refusals = modEquipment.Additions.ToDictionary(a => a.Key, Refusal, StringComparer.Ordinal);
             var refused = modEquipment.Additions.Where(a => refusals[a.Key] != null).Select(a => a.Id).ToList();
@@ -1025,7 +1025,7 @@ namespace RailroaderScenePatcher.Core {
             var dependency = engine.IneffectiveReason(scenePatchFile.Modifications, key, scenePatchFileKey);
             if (dependency != null) return dependency;
             try { engine.CheckRelationships(resolved, engine.Evaluate(PatchEngine.Parse(item, scenePatchFileKey, key).State.LeavingActivity())); return null; }
-            catch (InvalidOperationException e) { return e.Message; }
+            catch (InvalidOperationException e) { return PatcherLog.Reason(e); }
         }
         public string NewEquipmentId(string stem) {
             stem = new string((stem ?? "").Select(c => Char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-' ? c : '-').ToArray()).Trim('-');
@@ -1060,7 +1060,7 @@ namespace RailroaderScenePatcher.Core {
                     catch (InvalidOperationException e) when (existing != null && NotAppliedOf(key) != null) {
                         // A removal or correction in a modification that is not applied, which another addition keeps
                         // refused: only the scene patch file changes, and the scene keeps what it holds.
-                        var stays = " Nothing is built because the modification is still refused. Reason: " + ScenePatchFile.Sentence(e.Message) + ".";
+                        var stays = " Nothing is built because the modification is still refused. Reason: " + ScenePatchFile.Sentence(PatcherLog.Reason(e)) + ".";
                         var introduced = addition == null ? null : IntroducedRefusal(resolved, value, key, addition.Id);
                         if (introduced != null) throw new InvalidOperationException(introduced);
                         if (addition != null) return new EquipmentPreview(new[] { "Would save " + CrossingEquipment.Named(addition, displayName) + " in the scene patch file." + stays }, null);
@@ -1073,7 +1073,7 @@ namespace RailroaderScenePatcher.Core {
                 var current = scene.Read(resolved).Equipment;
                 var desired = engine.Desired(candidate, resolved, scenePatchFileKey).Equipment;
                 return new EquipmentPreview(CrossingEquipment.Describe(current, desired, displayName), null);
-            } catch (Exception e) { return new EquipmentPreview(Array.Empty<string>(), e.Message); }
+            } catch (Exception e) { return new EquipmentPreview(Array.Empty<string>(), PatcherLog.Reason(e)); }
         }
         // The modification with one entry of its crossing equipment set or, for a null addition, removed. An entry is keyed by
         // the equipment ID and holds no id member.
@@ -1337,7 +1337,7 @@ namespace RailroaderScenePatcher.Core {
 #if SCENE_PATCHER_FAULTS
             FaultInjection.EndAttempt();
 #endif
-            outcome.Error = e.Message;
+            outcome.Error = PatcherLog.Reason(e);
             var attempt = e as AttemptFailure;
             outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
             if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; outcome.EquipmentCleanup = attempt.EquipmentCleanup; }
@@ -1456,7 +1456,7 @@ namespace RailroaderScenePatcher.Core {
                 scenePatchFile.Replace(slot, value);
                 Refuse(slot, value, contentRefusal);
                 try { Replayed?.Invoke(target); } catch { }
-                try { HistoryNotice?.Invoke("Modification " + slot + " is back in the scene patch file but is not applied: " + e.Message + "."); } catch { }
+                try { HistoryNotice?.Invoke("Modification " + slot + " is back in the scene patch file but is not applied: " + PatcherLog.Reason(e) + "."); } catch { }
             } catch (Exception e) when (value != null && contentRefusal != null && valueWasRefused) {
                 // The restored modification was refused when the step replaced it, and is refused for its content again,
                 // while the scene holds the entry the step made effective, such as the additions that the final removal of
@@ -1466,7 +1466,7 @@ namespace RailroaderScenePatcher.Core {
                 var withdrawal = WithdrawForRefused(target, slot, current, value, contentRefusal);
                 if (withdrawal == null) {
                     try { Replayed?.Invoke(target); } catch { }
-                    try { HistoryNotice?.Invoke("Modification " + slot + " is back in the scene patch file but is not applied: " + e.Message + "."); } catch { }
+                    try { HistoryNotice?.Invoke("Modification " + slot + " is back in the scene patch file but is not applied: " + PatcherLog.Reason(e) + "."); } catch { }
                 } else {
                     value = current;
                     uncertain = true;
@@ -1475,7 +1475,7 @@ namespace RailroaderScenePatcher.Core {
             } catch (Exception e) {
                 value = current;
                 uncertain = true;
-                IncompleteOperation = name + " couldn't be reversed or reapplied: " + e.Message + ". The scene patch file keeps the state shown. " + WindowGuidance.SaveStillAvailable;
+                IncompleteOperation = name + " couldn't be reversed or reapplied: " + PatcherLog.Reason(e) + ". The scene patch file keeps the state shown. " + WindowGuidance.SaveStillAvailable;
             }
             RegisterPatchAction(() => Replay(name, slot, target, current, generation, keyGeneration, equipmentStep && currentRefused, equipmentStep), name);
         }
@@ -1490,7 +1490,7 @@ namespace RailroaderScenePatcher.Core {
             try {
                 var resolved = engine.ResolveUnique(target);
                 Commit(target, resolved, null, slot, current, null);
-            } catch (Exception e) { return e.Message; }
+            } catch (Exception e) { return PatcherLog.Reason(e); }
             scenePatchFile.Replace(slot, value);
             Refuse(slot, value, reason);
             return null;
@@ -1576,7 +1576,7 @@ namespace RailroaderScenePatcher.Core {
                 if (mutating) try { NameModObject(target, current); } catch { }
                 // What the scene patch file holds was refused before any mutation: its desired state, relationships or
                 // effective coverage. A guard that the object changed during the checks is no such refusal.
-                if (!mutating && !contentChecked) contentRefusal = e.Message;
+                if (!mutating && !contentChecked) contentRefusal = PatcherLog.Reason(e);
                 // A rejection before the mutation started changed nothing in the scene and needs no restoration.
                 if (!mutating) throw;
                 var restored = false; Exception restoreError = null;
@@ -1587,14 +1587,14 @@ namespace RailroaderScenePatcher.Core {
                     scene.Apply(target, prior); restored = Same(scene.Read(target), prior);
                 } catch (Exception r) { restoreError = r; }
                 if (!restored) {
-                    var left = Core.RemainingState.Describe(prior, () => scene.Read(target), out var settingsMatch, restoreError?.Message);
+                    var left = Core.RemainingState.Describe(prior, () => scene.Read(target), out var settingsMatch, PatcherLog.Reason(restoreError));
                     engine.SetUnsafe(target, true, left);
                     var cleanup = e is EmptyEquipmentObjectException && restoreError is EmptyEquipmentObjectException && settingsMatch
                         ? EquipmentCleanupContext.EditUndone : EquipmentCleanupContext.None;
-                    throw new AttemptFailure(FailureKind.IncompleteCleanup, "The edit failed. Cleanup could not be verified. Reason: " + e.Message, left, equipmentCleanup: cleanup);
+                    throw new AttemptFailure(FailureKind.IncompleteCleanup, "The edit failed. Cleanup could not be verified. Reason: " + PatcherLog.Reason(e), left, equipmentCleanup: cleanup);
                 }
-                if (engine.AwaitOutput(target)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The edit failed and the object is back as it was. The game is still regenerating its dependent output. Editing can resume once that output is verified. Reason: " + e.Message);
-                throw new AttemptFailure(FailureKind.Restored, "The edit failed. The object is back as it was. Reason: " + e.Message);
+                if (engine.AwaitOutput(target)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The edit failed and the object is back as it was. The game is still regenerating its dependent output. Editing can resume once that output is verified. Reason: " + PatcherLog.Reason(e));
+                throw new AttemptFailure(FailureKind.Restored, "The edit failed. The object is back as it was. Reason: " + PatcherLog.Reason(e));
             }
             Reapplied(key);
         }
@@ -1628,9 +1628,9 @@ namespace RailroaderScenePatcher.Core {
                         if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("Applied state did not verify");
                     } catch (Exception e) {
                         // The scene patch file is the reference here: what still differs from it remains.
-                        var left = Core.RemainingState.Describe(desired, () => scene.Read(resolved), out var settingsMatch, e.Message);
+                        var left = Core.RemainingState.Describe(desired, () => scene.Read(resolved), out var settingsMatch, PatcherLog.Reason(e));
                         engine.SetUnsafe(resolved, true, left);
-                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The object still does not match the scene patch file. Reason: " + e.Message, left,
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The object still does not match the scene patch file. Reason: " + PatcherLog.Reason(e), left,
                             equipmentCleanup: e is EmptyEquipmentObjectException && settingsMatch ? EquipmentCleanupContext.Recheck : EquipmentCleanupContext.None);
                     }
                 }
@@ -1696,7 +1696,7 @@ namespace RailroaderScenePatcher.Core {
             if (alignNativeCleanPending && error == null && nativeIdentity != null) savedNativeIdentity = nativeIdentity.Current;
             alignNativeCleanPending = false;
             if (error == null) return;
-            unrecovered = "Undo or Redo stopped on an error: " + error.Message + ". Undo history couldn't be recovered; further edits might not be recorded. " + WindowGuidance.SaveAfterHistoryError;
+            unrecovered = "Undo or Redo stopped on an error: " + PatcherLog.Reason(error) + ". Undo history couldn't be recovered; further edits might not be recorded. " + WindowGuidance.SaveAfterHistoryError;
             IncompleteOperation = unrecovered;
         }
         // Raised after a history change outside native Undo and Redo was accounted, such as a patch-only edit, so the native
@@ -1763,7 +1763,7 @@ namespace RailroaderScenePatcher.Core {
             if (SaveRefusal != null) return SaveRefusal;
             if (replacementBackup != null) {
                 try { CheckReplacement(); }
-                catch (Exception e) { var reason = e.Message; return reason.Length == 0 ? reason : Char.ToUpperInvariant(reason[0]) + reason.Substring(1); }
+                catch (Exception e) { var reason = PatcherLog.Reason(e); return reason.Length == 0 ? reason : Char.ToUpperInvariant(reason[0]) + reason.Substring(1); }
             }
             return DependencyRefusal();
         }
@@ -1772,7 +1772,7 @@ namespace RailroaderScenePatcher.Core {
         string DependencyRefusal() {
             if (scenePatchFile.Modifications.Count == 0) return null;
             try { DependencyMetadata.Raise(storage.ReadModInfo(), patcherId, MinimumPatcherVersion); return null; }
-            catch (Exception e) { return "The patcher dependency was not written: " + e.Message; }
+            catch (Exception e) { return "The patcher dependency was not written: " + PatcherLog.Reason(e); }
         }
         // The Save route. BeginSave runs before the native map write and throws when a patcher write fails;
         // CompleteNativeSave follows the native write; FailSave follows any exception of the attempt.
@@ -1804,8 +1804,8 @@ namespace RailroaderScenePatcher.Core {
             LastSave = new SaveReport(written, Outstanding(false), null);
         }
         public string FailSave(Exception error) {
-            LastSave = new SaveReport(written, Outstanding(true), error.Message);
-            return error.Message.TrimEnd('.') + ". Scene Patcher: completed writes: " + (written.Count == 0 ? "none" : String.Join(", ", written.Select(DisplayItem)))
+            LastSave = new SaveReport(written, Outstanding(true), PatcherLog.Reason(error));
+            return PatcherLog.Reason(error).TrimEnd('.') + ". Scene Patcher: completed writes: " + (written.Count == 0 ? "none" : String.Join(", ", written.Select(DisplayItem)))
                 + "; outstanding: " + String.Join(", ", LastSave.Outstanding.Select(DisplayItem)) + ". Edits remain in memory. " + WindowGuidance.CorrectAndSave;
         }
     }
