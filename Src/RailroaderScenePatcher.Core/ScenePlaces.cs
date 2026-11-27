@@ -182,7 +182,9 @@ namespace RailroaderScenePatcher.Core {
         // without one, the most specific name decides.
         public ScenePlace Of(string path, double[] at, double[] placedAt = null) {
             if (IsMoved(at, placedAt) && Nearest(at) is ScenePlace now) return now;
-            var named = NamedInPath(path);
+            // A mod object stands beside its source in the hierarchy, so its path names the source's place, not its
+            // own: it and the objects below it name no place.
+            var named = ModObjects.Within(path) ? new List<ScenePlace>() : NamedInPath(path);
             if (named.Count != 0 && (!Finite(at) || named[0].Points.Count == 0)) return named[0];
             var near = named.FirstOrDefault(p => Distance(p, at) <= Close) ?? named.Where(p => Distance(p, at) <= NameReach).OrderBy(p => Distance(p, at)).FirstOrDefault();
             return near ?? Nearest(at) ?? named.FirstOrDefault();
@@ -192,7 +194,8 @@ namespace RailroaderScenePatcher.Core {
         // place below World/Large Scenery (a folder named as a structure, such as Almond Bridge or Alarka Signs, is
         // none), a Roads folder, a station map icon, a map label and a Loc: board.
         public static IEnumerable<PlaceSource> SourcesOf(string path, double[] at) {
-            if (path == null) yield break;
+            // A mod object names no place: a duplicated station map icon or location sign is no source.
+            if (path == null || ModObjects.Within(path)) yield break;
             var name = path.Substring(path.LastIndexOf('/') + 1);
             if (name.StartsWith(SceneClassification.LocPrefix, StringComparison.Ordinal)) { yield return new PlaceSource(PlaceSourceKind.LocBoard, name.Substring(SceneClassification.LocPrefix.Length).Trim(), at); yield break; }
             if (path.StartsWith(StationIcons, StringComparison.Ordinal)) {

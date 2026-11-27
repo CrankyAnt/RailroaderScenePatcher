@@ -13,7 +13,16 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IDisposable {
+    public sealed class SceneCapabilities : ITargetKeyScene, IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IModObjectScene, IDisposable {
+        // Supplied by the host: what builds and removes mod objects. Without it no mod object is built.
+        public IModObjectScene ModObjectWorld { get; set; }
+        public object Build(TargetIdentity identity, object source, Placement placement) =>
+            (ModObjectWorld ?? throw new InvalidOperationException(ModObjects.Unavailable)).Build(identity, source, placement);
+        // The capability that resolved the object lets go of it first, so it keeps nothing for an object that is gone.
+        public void Remove(object modObject) {
+            Release(modObject);
+            ModObjectWorld?.Remove(modObject);
+        }
         // Supplied by the host: the map patches in the map context, which only the native map editor's context holds.
         public Func<IEnumerable<string>> MapPatches { get; set; }
         public IEnumerable<string> MapPatchIds => MapPatches?.Invoke() ?? Enumerable.Empty<string>();

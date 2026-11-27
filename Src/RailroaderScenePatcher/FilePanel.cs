@@ -133,10 +133,10 @@ namespace RailroaderScenePatcher {
         // Makes every control below the rectangle unavailable with the file panel's reason, also controls the native
         // builders add later, such as the rows of an outline that is scrolled or rebuilt.
         void LockControls(RectTransform rect, params RectTransform[] except) {
-            var reason = FileLockReason;
+            var reason = WindowLockReason;
             if (reason == null || rect == null) return;
             var locked = rect.GetComponent<UnavailableControls>() ?? rect.gameObject.AddComponent<UnavailableControls>();
-            locked.Reason = () => FileLockReason; locked.Except = except.Where(e => e != null).ToArray();
+            locked.Reason = () => WindowLockReason; locked.Except = except.Where(e => e != null).ToArray();
             locked.Apply();
         }
     }

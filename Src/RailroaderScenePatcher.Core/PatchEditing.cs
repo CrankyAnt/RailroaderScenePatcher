@@ -276,6 +276,8 @@ namespace RailroaderScenePatcher.Core {
                 if (scenePatchFile == null) return minimum;
                 foreach (var item in scenePatchFile.Items) {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
+                    // A mod object needs the patcher that builds it.
+                    if (item[ModObjects.SourceMember] != null) minimum = Max(minimum, ModObjects.RequiredVersion);
                     // A crossbuck that its crossing's pad marker ID names needs the crossbuck identity.
                     if ((item["target"] as JObject)?[TargetIdentity.PadMarkerMember] != null) minimum = Max(minimum, SceneObjects.RequiredVersion);
                     // A target that a marker ID or map position names among objects that share its path needs the key.
@@ -1155,6 +1157,9 @@ namespace RailroaderScenePatcher.Core {
         // Removes this mod's saved or unsaved modification of the object; the object returns to its effective underlying state.
         public Outcome Remove(TargetIdentity target) { return Remove(target, null); }
         public Outcome Remove(TargetIdentity target, InspectedTarget inspected) {
+            // A mod object leaves the scene with its modification and with the modifications of the objects below it.
+            var modObject = ModObjectKey(target);
+            if (modObject != null) return RemoveModObject(target, modObject, inspected);
             return Change("Remove scene modification", target, inspected, existing => {
                 if (existing == null) throw new InvalidOperationException("This object has no modification in the active scene patch file");
                 PatchEngine.Parse(existing);
@@ -1187,9 +1192,14 @@ namespace RailroaderScenePatcher.Core {
                 // this mod leaves the modification: the edit is a revert of that setting. An edit that leaves the
                 // scene patch file as it is changes nothing and adds no step to the native history, as a native field ignores
                 // a value equal to the one it shows.
+                // An edit of a mod object keeps the source it is built from.
+                if (value != null && existing?[ModObjects.SourceMember] != null && value[ModObjects.SourceMember] == null) {
+                    if (value.Parent != null) value = (JObject)value.DeepClone();
+                    value[ModObjects.SourceMember] = existing[ModObjects.SourceMember].DeepClone();
+                }
                 var normal = Normalised(existing, value, engine.Underlying(resolved));
                 outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !PreservingJson.SameModification(normal, value));
-                value = WithIdDependencies(normal, resolved, existing);
+                value = WithModObjectDependency(WithIdDependencies(normal, resolved, existing), target);
                 // A modification that stays in the scene patch file but does not take effect would be reported as applied
                 // without changing the object, so the edit is refused with the reason. Removing it remains possible.
                 if (value != null && ineffective != null)
@@ -1314,7 +1324,8 @@ namespace RailroaderScenePatcher.Core {
             bool Changed(JToken was, JToken now) => now != null && !PreservingJson.SameValue(was, now);
             if (Changed(existing?["active"], value["active"]) && state.Active.HasValue && under.Active == state.Active) result.Remove("active");
             if (Changed(existing?[ReplacementMarkerIds.Member], value[ReplacementMarkerIds.Member]) && state.MarkerId != null && under.MarkerId == state.MarkerId) result.Remove(ReplacementMarkerIds.Member);
-            if (Changed(existing?["placement"], value["placement"]) && state.Placement != null && state.Placement.Following == null && SamePlacement(state.Placement, under.Placement)) result.Remove("placement");
+            // A mod object always keeps its placement: it has no place without this mod.
+            if (value[ModObjects.SourceMember] == null && Changed(existing?["placement"], value["placement"]) && state.Placement != null && state.Placement.Following == null && SamePlacement(state.Placement, under.Placement)) result.Remove("placement");
             var relationships = result["relationships"] as JObject;
             if (relationships != null && Changed(existing?["relationships"]?["trackMarker"], relationships["trackMarker"]) && state.Marker != null && under.Marker != null && MarkerBinding.Same(state.Marker, under.Marker)) {
                 relationships.Remove("trackMarker");

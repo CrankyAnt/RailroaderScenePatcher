@@ -235,7 +235,8 @@ namespace RailroaderScenePatcher {
             new[] { new[] { RemoveModification }, new[] { "Recheck" }, new[] { "Guide" } },
             new[] { new[] { "Confirm" }, new[] { "Cancel" }, new[] { "Focus" }, new[] { "Details" } },
             new[] { new[] { "Cancel" } },
-            new[] { new[] { "Disable", "Enable" }, new[] { ClearActivity } },
+            new[] { new[] { "Disable", "Enable" }, new[] { ClearActivity }, new[] { DuplicateState.Label } },
+            new[] { new[] { DuplicateState.PlaceLabel }, new[] { DuplicateState.CancelLabel } },
             new[] { new[] { "Apply" }, new[] { "Read" } },
             new[] { new[] { "Track" }, new[] { "Node" }, new[] { "Apply" }, new[] { DiscardPrepared } },
             new[] { new[] { "Track" }, new[] { "Node" }, new[] { "Start" }, new[] { "Stop" } },
@@ -263,7 +264,9 @@ namespace RailroaderScenePatcher {
             // the glyph advances of the measured labels.
             { "Keep editor version", 152f }, { "Copy to clipboard", 131f }, { "Copy", 41f }, { "Import", 52f },
             // Estimated from the glyph advances of Clear location and Clear circuit.
-            { ClearSegments, 119f } };
+            { ClearSegments, 119f },
+            // Estimated from the glyph advances of Discard, Copy ID and Picked.
+            { DuplicateState.Label, 78f }, { DuplicateState.PlaceLabel, 43f } };
         // One colour table for every world marking. Gold frames the inspected object. A candidate of a pick mode is
         // blue: more saturated while the pointer is over it, plain blue once it was clicked and until Confirm. A current
         // relation of the inspected object, native or set by a patch, is green, and more saturated under the pointer.

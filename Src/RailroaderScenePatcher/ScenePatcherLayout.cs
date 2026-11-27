@@ -224,6 +224,8 @@ namespace RailroaderScenePatcher {
                 var outlinerRect = row.VStack(DrawOutliner);
                 // While the file panel is open, the outliner waits for it; Refresh alone stays available.
                 if (FileLocked) { DisableDuringRepair(outlinerRect); LockControls(outlinerRect, refreshButton); }
+                // While the blank object window of Duplicate is open, the outliner waits for Place or Cancel.
+                else if (Duplicating) LockControls(outlinerRect);
                 var outliner = outlinerRect.gameObject.AddComponent<LayoutElement>();
                 outliner.minWidth = width; outliner.preferredWidth = width; outliner.flexibleWidth = 0; outliner.flexibleHeight = 10000;
                 presentation.Divider(row, outliner, OutlinerMinimumWidth, OutlinerMaximum, () => outlinerWidth, width => { outlinerWidth = width; StoreOutlinerWidth(width); });
@@ -577,6 +579,8 @@ namespace RailroaderScenePatcher {
             builder.ConfigureLayout(4f);
             severalModifications = SeveralModifications(selected?.Identity);
             LockControls(DrawRightBand(builder), windowHelpButton);
+            // The blank object window of Duplicate takes the inspector's place until the object is placed or Cancel ends it.
+            if (Duplicating && !FileLocked) { DrawDuplicate(builder); DrawFooter(builder); return; }
             // While the file panel waits for a decision and nothing is inspected, its own heading is the first heading:
             // the empty inspector's heading and instruction would only stand above it.
             if (FileLocked && selected == null) { DrawFilePanel(builder); DrawFooter(builder); return; }
@@ -1390,7 +1394,7 @@ namespace RailroaderScenePatcher {
             // The row is the window's last: it stands at the lower edge, on the native padding below the last row. Its
             // buttons start at the left, so the native resize grip in the lower right corner covers only the row's
             // empty end.
-            ActionRow(builder, guided.Enabled && !FileLocked && selection?.Pending == null ? GuidedActs() : FooterActs(), FileLockReason);
+            ActionRow(builder, guided.Enabled && !FileLocked && !Duplicating && selection?.Pending == null ? GuidedActs() : FooterActs(), WindowLockReason);
         }
         // The footer's rule and message area of messageHeight; returns the area's layout element.
         LayoutElement DrawMessages(UIPanelBuilder builder, float messageHeight) {
@@ -1581,7 +1585,9 @@ namespace RailroaderScenePatcher {
         Act RemoveModificationAct() {
             var identity = selected?.Identity;
             var unchanged = ModificationBlock() ?? (IsChanged(selected) ? null : "This mod does not change this object.") ?? severalModifications;
-            return Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Each circuit returns to the coverage it would have without this modification. This mod's detection additions and added lights, gates, and bells are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
+            var modObject = false;
+            try { modObject = identity != null && attachment != null && attachment.Session.IsModObject(identity); } catch { }
+            return Slot(CommandBand.RemoveModification, modObject ? DuplicateState.RemoveTip : selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Each circuit returns to the coverage it would have without this modification. This mod's detection additions and added lights, gates, and bells are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
                 var removed = current.Remove(identity, inspection);
                 // Removal deletes the crossing's additions and returns its circuits: a form that was open for one closes.
                 if (removed?.Applied == true) { CloseCoverageForm(); CloseEquipmentForm(); }
@@ -1747,7 +1753,9 @@ namespace RailroaderScenePatcher {
                         Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", activity ?? block, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.
                         Slot(CommandBand.ClearActivity, "Clear this mod's value for the activity; the object returns to its underlying activity.", block ?? ControllerActivity ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
-                            () => Edit(ActivityPlace, "Clearing the activity's mod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
+                            () => Edit(ActivityPlace, "Clearing the activity's mod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2),
+                        // Duplicate makes a new object: it is no edit of this one, so Supported edits does not list it.
+                        DuplicateAct() };
                 }
             }
         }
@@ -1977,8 +1985,9 @@ namespace RailroaderScenePatcher {
                     new[] { "Track group", "Some markers switch with their track group. Disable holds the marker inactive. Click Clear activity to let the group control it again." },
                     new[] { "Dependencies", "Shows what else uses this object or changes with it, such as track locations, terrain masks, and visibility. The patcher checks direct links. The short form lists each object of this hierarchy by its relative path with its components; click the triangle after the heading for the full lines." },
                     new[] { "Runtime state", "Shows whether the game switches parts of the object on or off while it runs. Changes to these values don't make the inventory stale. Click the triangle after the heading to switch between the short form and the full lines, as for Dependencies." },
-                    new[] { "Copy ID", "Copies the object's ID, placement, and the map ID needed by the scene patch file." } },
-                Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" } } },
+                    new[] { "Copy ID", "Copies the object's ID, placement, and the map ID needed by the scene patch file." },
+                    new[] { "Duplicate", "Makes a new object from this one, a mod object of this mod. Click Place, then left-click the ground where the object goes; Esc stops placing and Cancel ends Duplicate. Until that click nothing is added. Afterward, edit the mod object like any other object; Remove modification removes it. The game's own object stays as it is." } },
+                Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" }, new[] { "Duplicating objects", "duplicating-scene-objects.md" } } },
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",
                 Terms = new[] {
                     new[] { "Numeric", "Position in map coordinates, rotation in degrees." },

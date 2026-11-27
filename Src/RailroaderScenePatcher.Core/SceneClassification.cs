@@ -162,6 +162,8 @@ namespace RailroaderScenePatcher.Core {
         // holds, then the game's container it stands in. A kind taken from the name loses the place in it; a group
         // whose category has kinds and whose name gives none takes its type name.
         public static SceneClass OfGroup(string path, IEnumerable<string> own, IEnumerable<string> atOrBelow, IEnumerable<string> namesBelow, Func<string, string> stripPlaces = null) {
+            // A mod object has the kind of its source: the mark in its name is no part of what names the kind.
+            path = ModObjects.Plain(path);
             var name = Last(path);
             var found = ByComponents(own, atOrBelow) ?? ByName(name, stripPlaces) ?? ByContent(namesBelow, atOrBelow, stripPlaces) ?? ByContainer(path, name, stripPlaces);
             // A crossing has no kind of its own here: the outliner tells crossings with signals from those without.
@@ -177,6 +179,7 @@ namespace RailroaderScenePatcher.Core {
         // Any listed object. family is the technical family the inventory lists it in, which its edits follow; the
         // category does not follow the family where the object itself says more.
         public static SceneClass Of(string family, string path, IEnumerable<string> own, IEnumerable<string> atOrBelow, IEnumerable<string> namesBelow, Func<string, string> stripPlaces = null) {
+            path = ModObjects.Plain(path);
             var name = Last(path) ?? "";
             atOrBelow = atOrBelow ?? own;
             // A Loc: object is a location board when it has something to show, and an invisible marker otherwise.

@@ -30,6 +30,7 @@ A logical binding identifies the track or other resource the game uses. For exam
 | Place starting cars or set whether they start derailed | [Starter placement](placing-starter-markers.md) and [guided tasks](completing-guided-tasks.md) |
 | Move a location sign, a bridge, or a group with its colliders, culling, or terrain mask | [Location signs](moving-location-signs.md), [the Ela bridge](placing-bridges.md), and [Groups and parts](moving-scene-objects.md) |
 | Move a station's map icon or a player spawn point | [Station map icons](moving-station-map-icons.md) and [spawn points](moving-spawn-points.md) |
+| Give a new station an existing station building or map icon | [Duplicate a scene object](duplicating-scene-objects.md) |
 | Move an existing mast, bell, or crossbuck | [Existing crossing equipment](moving-crossing-equipment.md) and [crossbucks](moving-scene-objects.md#crossbucks-at-unprotected-crossings) |
 | Remove obsolete detection or cover another track at an existing crossing | [Correct coverage](correcting-crossing-coverage.md) or [add detection](adding-crossing-detection.md). Check the approach spans and island for every affected circuit before applying. |
 | Add working lights, gates, or a bell to an existing crossing | [Lights and gates](adding-crossing-equipment.md) use eligible devices loaded in the crossing's scene. [Bells](adding-crossing-bells.md) use a bell definition that the game uses at grade crossings. Check the guide's source requirements and confirm the controller relationship. |

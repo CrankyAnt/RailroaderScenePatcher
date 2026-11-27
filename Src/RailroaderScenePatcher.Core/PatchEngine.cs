@@ -304,6 +304,8 @@ namespace RailroaderScenePatcher.Core {
         internal IScene Scene { get { return scene; } }
         internal sealed class Modification {
             internal string Id; internal TargetIdentity Identity; internal ObjectState State; internal string[] Dependencies;
+            // For a mod object, the scene object it is built from; null for a modification of an existing target.
+            internal TargetIdentity Source;
         }
         // The start of an attempt trace line: the debug output of one engine stage, as JSON that the native observation
         // and the attempt summary read.
@@ -340,6 +342,7 @@ namespace RailroaderScenePatcher.Core {
                 catch (Exception e) { failures.Add(Describe(identity) + ": owned state of the reconstructed object remains: " + e.Message); continue; }
                 identities.Remove(target); resolutionOrder.Remove(target);
                 underlying.Remove(target); unsafeTargets.Remove(target); awaitingOutput.Remove(target); remainingState.Remove(target);
+                foreach (var built in builtObjects.Values) foreach (var id in built.Where(pair => ReferenceEquals(pair.Value, target)).Select(pair => pair.Key).ToArray()) built.Remove(id);
                 released++;
             }
             return new ReentryResult(retained, released, failures);
@@ -393,6 +396,10 @@ namespace RailroaderScenePatcher.Core {
                     }
                     Execute(id, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets, retryFailures);
                 }
+                // A mod object exists only through its modification: one that an earlier application of this scene
+                // patch file built and the file no longer holds is removed. An early route applies only a part.
+                if (early == null) foreach (var gone in BuiltFor(scenePatchFileKey).Where(pair => !entries.TryGetValue(pair.Key, out var entry) || entry[ModObjects.SourceMember] == null).ToArray())
+                    try { RemoveModObject(scenePatchFileKey, gone.Key, gone.Value); } catch (Exception e) { PatcherLog.Debug("A mod object that left its scene patch file could not be removed: " + e.Message); }
             } catch (Exception e) { result.Error = "Scene check failed: " + e.Message; }
             finally { Unplan(); }
             return result;
@@ -464,6 +471,8 @@ namespace RailroaderScenePatcher.Core {
             var outcome = new Outcome();
             if (!visiting.Add(id)) { outcome.Error = "The modification dependencies form a cycle"; outcome.Cause = FailureCause.InvalidDefinition; outcome.Failure = FailureKind.Refused; return outcome; }
             var key = scenePatchFileKey.Length + ":" + scenePatchFileKey + id;
+            // The mod object this attempt built: a failure after that removes it again, so nothing half-made stays.
+            object builtNow = null;
             try {
                 if (failed.ContainsKey(key)) {
                     var priorFailure = failed[key];
@@ -505,6 +514,11 @@ namespace RailroaderScenePatcher.Core {
                 Observe("resolve", scenePatchFileKey, id, identity.Path);
                 IReadOnlyList<object> matches;
                 try { matches = Matches(identity); } catch (InvalidOperationException) { outcome.Cause = FailureCause.InvalidDefinition; throw; }
+                // A mod object that does not stand yet is built from its source, at its placement, before it resolves.
+                if (parsed.Source != null && UnresolvedTarget(matches) == TargetMissing) {
+                    try { builtNow = Build(parsed, scenePatchFileKey); } catch (InvalidOperationException) { outcome.Cause = FailureCause.InvalidDefinition; throw; }
+                    matches = Matches(identity);
+                }
                 var unresolved = UnresolvedTarget(matches);
                 // Applying a scene patch file tells the modder what to correct; an edit adds its own recovery guidance.
                 if (unresolved != null) { outcome.Cause = FailureCause.InvalidDefinition; throw new InvalidOperationException(inspectedTargets == null ? unresolved + " " + (unresolved == TargetMissing ? TargetMissingAction : TargetAmbiguousAction) : unresolved); }
@@ -564,6 +578,8 @@ namespace RailroaderScenePatcher.Core {
                 FaultInjection.EndAttempt();
 #endif
                 outcome.Error = e.Message; if (e is InvalidPatchDefinitionException) outcome.Cause = FailureCause.InvalidDefinition;
+                // An incomplete cleanup keeps its object for Recheck; any other failure leaves no mod object behind.
+                if (builtNow != null && !unsafeTargets.Contains(builtNow)) { try { RemoveModObject(scenePatchFileKey, id, builtNow); outcome.ResolvedTarget = null; } catch { } }
                 if (outcome.Failure == FailureKind.None) {
                     var attempt = e as AttemptFailure;
                     outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
@@ -574,6 +590,35 @@ namespace RailroaderScenePatcher.Core {
             finally { visiting.Remove(id); }
             outcomes[id] = outcome;
             return outcome;
+        }
+        // The mod objects this engine built, by the key of their scene patch file and their modification ID.
+        readonly Dictionary<string, Dictionary<string, object>> builtObjects = new Dictionary<string, Dictionary<string, object>>(StringComparer.Ordinal);
+        Dictionary<string, object> BuiltFor(string scenePatchFileKey) {
+            if (!builtObjects.TryGetValue(scenePatchFileKey ?? "", out var built)) builtObjects[scenePatchFileKey ?? ""] = built = new Dictionary<string, object>(StringComparer.Ordinal);
+            return built;
+        }
+        // Builds the mod object of a modification from its source. The source resolves exactly, as a target does.
+        internal object Build(Modification parsed, string scenePatchFileKey) {
+            if (!(scene is IModObjectScene builder)) throw new InvalidOperationException(ModObjects.Unavailable);
+            var sources = Matches(parsed.Source);
+            var unresolved = UnresolvedTarget(sources);
+            if (unresolved != null) throw new InvalidOperationException(unresolved == TargetMissing ? ModObjects.SourceMissing : ModObjects.SourceAmbiguous);
+            var placement = Evaluate(parsed.State).Placement;
+            var built = builder.Build(parsed.Identity, sources[0], placement) ?? throw new InvalidOperationException(ModObjects.Unavailable);
+            BuiltFor(scenePatchFileKey)[parsed.Id] = built;
+            return built;
+        }
+        // Removes a mod object and everything this engine keeps for it and for the objects resolved below it.
+        internal void RemoveModObject(string scenePatchFileKey, string id, object modObject) {
+            var path = identities.TryGetValue(modObject, out var known) ? known.Path : null;
+            (scene as IModObjectScene)?.Remove(modObject);
+            BuiltFor(scenePatchFileKey).Remove(id);
+            foreach (var target in resolutionOrder.Where(t => ReferenceEquals(t, modObject) || (path != null && identities[t].Path.StartsWith(path + "/", StringComparison.Ordinal))).ToArray()) Forget(target);
+        }
+        void Forget(object target) {
+            try { (scene as IRetainedScene)?.Release(target); } catch { }
+            identities.Remove(target); resolutionOrder.Remove(target);
+            underlying.Remove(target); unsafeTargets.Remove(target); awaitingOutput.Remove(target); remainingState.Remove(target);
         }
         // The state this object had before any modification of this engine touched it. An object that stood in a frame
         // keeps its place in that frame: its placement follows the frame to where the frame stands now.
@@ -829,7 +874,7 @@ namespace RailroaderScenePatcher.Core {
             if (dependencies == null || dependencies.Any(x => x.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)x))) throw new InvalidOperationException("Invalid dependencies");
             return dependencies.Select(x => (string)x).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         }
-        internal static readonly string[] Known = { "target", ReplacementMarkerIds.Member, "placement", "active", "relationships", "starterPlacement", "dependsOn" };
+        internal static readonly string[] Known = { "target", ModObjects.SourceMember, ReplacementMarkerIds.Member, "placement", "active", "relationships", "starterPlacement", "dependsOn" };
         // The modifications of a scene patch file by key, in ordinal key order.
         internal static SortedDictionary<string, JObject> Entries(JObject modifications) {
             var entries = new SortedDictionary<string, JObject>(StringComparer.Ordinal);
@@ -850,6 +895,14 @@ namespace RailroaderScenePatcher.Core {
             if (unsupported != null) throw new InvalidOperationException(unsupported);
             var dependencies = Dependencies(item);
             var identity = ParseTarget(item["target"] as JObject);
+            // A mod object: the target names the object the mod makes, the source the scene object it is made from.
+            TargetIdentity source = null;
+            if (item[ModObjects.SourceMember] != null) {
+                source = ParseTarget(item[ModObjects.SourceMember] as JObject);
+                if (identity.Keyed || identity.PadMarkerId != null || identity.Scene != source.Scene || identity.Component != source.Component || identity.Structure != source.Structure || !ModObjects.IsPath(identity.Path))
+                    throw new InvalidPatchDefinitionException(ModObjects.TargetShape);
+                if (item["placement"] == null) throw new InvalidPatchDefinitionException(ModObjects.NeedsPlacement);
+            }
             Placement checkedPlacement = null;
             if (item["placement"] != null) {
                 var placement = item["placement"] as JObject;
@@ -871,7 +924,7 @@ namespace RailroaderScenePatcher.Core {
             var starter = item["starterPlacement"] == null ? null : ParseStarter(item["starterPlacement"]);
             var markerId = item[ReplacementMarkerIds.Member] == null ? null : ParseMarkerId(item[ReplacementMarkerIds.Member]);
             if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && equipment == null && starter == null && segments == null && markerId == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments).WithMarkerId(markerId), Dependencies = dependencies };
+            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments).WithMarkerId(markerId), Dependencies = dependencies, Source = source };
         }
         // A replacement ID: a non-empty string that does not begin with an id prefix the game reserves. Its
         // uniqueness depends on the world and is checked when the modification applies.

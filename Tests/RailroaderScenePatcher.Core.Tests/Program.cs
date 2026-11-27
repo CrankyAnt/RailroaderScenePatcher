@@ -334,6 +334,8 @@ class Program {
         IndustryObjectTests.Run();
         LakeSurfaceTests.Run();
         StationMapIconTests.Run();
+        ModObjectTests.Run();
+        DuplicateTests.Run();
         CoalLoaderTests.Run();
         GroundMaskTests.Run();
         SpawnPointTests.Run();

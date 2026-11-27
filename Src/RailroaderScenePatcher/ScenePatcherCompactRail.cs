@@ -317,7 +317,8 @@ namespace RailroaderScenePatcher {
 
         // Enable or Disable and Clear activity from the Object tab, and Select group or Select controller.
         Act[] CompactObjectActs() {
-            var acts = new List<Act>(TabActs(ObjectTab));
+            // Duplicate opens the blank object window, which the full window shows.
+            var acts = new List<Act>(TabActs(ObjectTab).Where(act => act.Label != DuplicateState.Label));
             if (InventoryPresentationState.PartOf(selected) != null) acts.Add(SelectGroupAct());
             if (InventoryPresentationState.HeldBy(selected) != null) acts.Add(SelectControllerAct());
             return acts.ToArray();

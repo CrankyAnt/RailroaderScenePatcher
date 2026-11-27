@@ -11,6 +11,7 @@
     <Compile Include="../../Src/RailroaderScenePatcher/EditFeedback.cs" Link="EditFeedback.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/FilePanelState.cs" Link="FilePanelState.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/GuidedTaskState.cs" Link="GuidedTaskState.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/DuplicateState.cs" Link="DuplicateState.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/EnteredEditValues.cs" Link="EnteredEditValues.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/CoverageFormFields.cs" Link="CoverageFormFields.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/CommandBand.cs" Link="CommandBand.cs" />

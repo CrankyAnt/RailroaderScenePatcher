@@ -28,6 +28,7 @@ static class StationMapIconTests {
         IconEditsInScenePatchEditing();
         RefusalInScenePatchEditingLeavesTheFile();
         MinimumHoldsWithoutTheCapability();
+        AStationMapIconCanBeDuplicated();
         Console.WriteLine("PASS: station map icons");
     }
 
@@ -151,15 +152,49 @@ static class StationMapIconTests {
             if (active && icon.ParentActive && !DropRegistration) Registered.Add(icon); else Registered.Remove(icon);
         }
     }
+    // What builds a mod object in the controlled icon world: a new icon in the same holder, which registers with the
+    // map as an icon does when it becomes active. No station names it and no switch of the game holds it.
+    sealed class IconBuilder : IModObjectScene {
+        readonly IconWorld world;
+        public IconBuilder(IconWorld world) { this.world = world; }
+        public object Build(TargetIdentity identity, object source, Placement placement) {
+            if (world.Objects.ContainsKey(identity.Path)) throw new InvalidOperationException(ModObjects.Taken);
+            var made = new FakeIcon { Position = new[] { placement.Position[0] - world.Origin, placement.Position[1], placement.Position[2] }, Rotation = (double[])placement.Rotation.Clone(), Parent = ((FakeIcon)source).Parent };
+            world.Objects[identity.Path] = new List<object> { made }; world.Registered.Add(made);
+            return made;
+        }
+        public void Remove(object modObject) { foreach (var pair in world.Objects.Where(p => p.Value.Contains(modObject)).ToArray()) world.Objects.Remove(pair.Key); world.Registered.Remove(modObject); }
+    }
+    // A station map icon is duplicated as a mod object: a load builds it at its placement and the map shows it; it is a
+    // station map icon for its edits, names no place and leaves the source icon as it is. Remove modification takes
+    // it off the map again.
+    static void AStationMapIconCanBeDuplicated() {
+        var f = new Icons(); f.Capabilities.ModObjectWorld = new IconBuilder(f.World);
+        string Named(string path) => "{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"" + StationMapIconRules.Component + "\",\"structure\":\"" + StationMapIconRules.Structure + "\"}";
+        var made = ModObjects.Path(Bryson, "author/pack", "mod-object-bryson");
+        var doc = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"mod-object-bryson\":{\"target\":" + Named(made) + ",\"source\":" + Named(Bryson) +
+            ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", CochranTarget.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
+        var result = f.Engine.Apply(doc, "author/pack");
+        Assert(result.Outcomes["mod-object-bryson"].Applied, "The duplicated icon applies: " + result.Outcomes["mod-object-bryson"].Error);
+        var icon = (FakeIcon)f.World.Objects[made].Single();
+        Assert(Near(f.At(icon), CochranTarget) && f.World.Registered.Contains(icon), "The duplicated icon stands at its placement and the map shows it");
+        Assert(Near(f.At(f.BrysonIcon), BrysonAuthored) && f.World.Registered.Contains(f.BrysonIcon), "The source icon stays as it is: " + f.Where());
+        Assert(StationMapIconRules.Listed(made) && !ScenePlaces.SourcesOf(made, new[] { CochranTarget[0], CochranTarget[2] }).Any(), "It is a station map icon that names no place and no station");
+        // It takes the edits of its family, and Remove modification takes it off the map.
+        var session = new PatchEditingSession(f.Engine, new NativeMapEditor(), new Store { Patch = doc }, "author/pack", "author/pack");
+        Assert(session.Edit(Id(made), null, false).Applied && !icon.Active && !f.World.Registered.Contains(icon), "A duplicated icon is disabled like any station map icon");
+        Assert(session.Remove(Id(made)).Applied && !f.World.Objects.ContainsKey(made) && f.World.Registered.Contains(f.BrysonIcon), "Remove modification removes the duplicated icon and leaves the source");
+    }
     sealed class Icons {
         public readonly IconWorld World = new IconWorld();
         public readonly FakeIcon BrysonIcon = new FakeIcon { Position = new[] { 900.0, 80, 400 } }, CochranIcon = new FakeIcon { Position = new[] { -300.0, 80, 1200 } };
         public readonly StationMapIconScene Scene;
+        public readonly SceneCapabilities Capabilities;
         public readonly PatchEngine Engine;
         public Icons() {
             World.Objects[Bryson] = new List<object> { BrysonIcon }; World.Objects[Cochran] = new List<object> { CochranIcon };
             World.Registered.Add(BrysonIcon); World.Registered.Add(CochranIcon);
-            var scene = new SceneCapabilities(() => World.MapIds, null);
+            var scene = Capabilities = new SceneCapabilities(() => World.MapIds, null);
             scene.Add(Scene = new StationMapIconScene(World));
             Engine = new PatchEngine(scene);
         }

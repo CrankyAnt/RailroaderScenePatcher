@@ -21,6 +21,7 @@ Current native target support covers:
 - Starter placements ([place a starter placement marker on the track](placing-starter-markers.md)).
 - Player spawn points ([move player spawn points](moving-spawn-points.md)).
 - Station map icons ([move or disable a station map icon](moving-station-map-icons.md)).
+- Mod objects ([duplicate a scene object](duplicating-scene-objects.md)).
 
 The Current native targets section describes what has been observed in Railroader and the limits of those observations. The runtime capability classification remains `Unchecked`.
 
@@ -50,6 +51,7 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 | Field | Type | Requirement |
 | --- | --- | --- |
 | `target` | object | Required. Must contain `scene`, `path`, and `component`. Optional `structure` is a string. Optional `padMarkerId` is a non-empty string that names a crossbuck whose path other crossbucks share; see [Group](#scene-object). Optional `markerId` or `mapPosition` names an object whose path and component another loaded object shares; see [Objects that share a hierarchy path](#objects-that-share-a-hierarchy-path). |
+| `source` | object | Optional. Makes the modification a mod object: the scene object that the mod object is built from, written like a `target`. Requires `placement` and patcher 0.5.0 or later; see [Mod objects](#mod-objects). |
 | `markerId` | string | Optional. The replacement ID of a generic track marker. Requires patcher 0.5.0 or later; see Replacement ID below. |
 | `placement` | object | Optional. A fixed placement contains `mode`, `position`, and `rotation`; a track-following placement contains `mode`, `track`, `offset`, and `rotation`. See Placement below. |
 | `active` | boolean | Optional. `false` disables the object, `true` enables it. Generic activity requires patcher 0.2.0 or later; track-marker activity requires 0.5.0 or later. |
@@ -91,6 +93,40 @@ A modification holds the desired state of one object. It must contain at least o
 The [scene object inventory](inspect-scene-objects.md) supplies observed identifiers and placement without changing this format. An inspection-only entry does not enable a new v1 operation. The engine rechecks the resolved object and map context immediately before changing anything. A missing, ambiguous, or replaced target fails rather than redirecting the operation. Editing integrations can bind a complete scene patch file edit to its inspected observations through an in-memory token; that token is not serialized or distributed.
 
 [World selection](select-world-targets.md) confirms scene-object identities for the existing `target` fields. Segment and node choices record their native IDs and loaded map context in the editing session. Version 1 stores fixed and track-following placement, activity, track-marker relationships, and crossing coverage. A pending choice or confirmed track or node identity stays in the editing session. Applying an edit and using the native map editor's Save writes the mod values.
+
+### Mod objects
+
+A mod object is a new object that a mod makes from a scene object of the map. Its modification holds a `source` beside its `target`:
+
+```json
+"mod-object-alarka-jct-station": {
+  "target": { "scene": "BushnellWhittier-MapManager", "path": "World/Large Scenery/Alarka Jct/Alarka Jct Station [mod object author:pack mod-object-alarka-jct-station]", "component": "UnityEngine.Transform", "structure": "scene-object-v1" },
+  "source": { "scene": "BushnellWhittier-MapManager", "path": "World/Large Scenery/Alarka Jct/Alarka Jct Station", "component": "UnityEngine.Transform", "structure": "scene-object-v1" },
+  "placement": { "mode": "fixed", "position": [4493.0, 12.0, 5415.0], "rotation": [0.0, 0.0, 0.0, 1.0] },
+  "dependsOn": []
+}
+```
+
+- The key of the modification is the mod object's ID. The mod assigns it, and it names one mod object in that mod's scene patch file.
+- `source` names the scene object that the mod object is built from. It accepts the members of a `target`, a key for a shared path included, and must match exactly one object in the loaded map. The patcher reads the source and never changes it.
+- `target` names the mod object itself. It holds the `scene`, `component`, and `structure` of the source and no key. Its `path` is the source's path followed by ` [mod object <mod ID> <modification ID>]`, with each `/` in the two IDs written as `:`. The native map editor writes this path; the mod object stands beside its source in the hierarchy under that name.
+- `placement` is required: a mod object has no place without it.
+
+Each load builds the mod object from its source, at its placement, and then applies the modification's other members to it, such as `active`. Applying the scene patch file again builds nothing more. A mod object that the scene patch file no longer holds is removed from a world that stays loaded.
+
+A mod object takes the edits of its source's family, in its own modification. A modification of an object below a mod object, such as a part of a duplicated group, targets that object's path below the mod object's path. Its `dependsOn` names the mod object's modification, so the mod object is built first.
+
+A mod object fails with its reason, and the other modifications still apply, in these cases:
+
+| Reason | What to correct |
+| --- | --- |
+| `The source of this mod object doesn't match any object in the loaded map.` | Correct `source`, or remove the mod object. |
+| `The source of this mod object matches more than one object in the loaded map.` | Add the `markerId` or `mapPosition` key of the source; see [Objects that share a hierarchy path](#objects-that-share-a-hierarchy-path). |
+| `Invalid mod object: a mod object needs a placement.` | Add `placement`. |
+| `Invalid mod object: the target must name the source's scene, component and structure, and a path that ends with [mod object <ID>].` | Write `target` as described above. |
+| `Another object already stands at the path of this mod object.` | Give the mod object a `target` path that no other object has. |
+
+A mod object's path names no place of the map: the outliner lists a mod object under the place where it stands. No game switch, such as progression, names a mod object, so none switches it.
 
 ## Replacement ID
 
@@ -695,8 +731,8 @@ When Save writes the scene patch file, it uses this order:
 - Scene patch file root: `formatVersion`, `sourceMap`, `modifications`, then unknown members.
 - `sourceMap`: `mapId`, then unknown members.
 - The keys of `modifications`, `circuits`, `additions`, and `crossingEquipment` are in ordinal order.
-- A modification: `target`, `markerId`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
-- `target`: `scene`, `path`, `component`, `structure`, `padMarkerId`, `markerId`, `mapPosition`.
+- A modification: `target`, `source`, `markerId`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
+- `target` and `source`: `scene`, `path`, `component`, `structure`, `padMarkerId`, `markerId`, `mapPosition`.
 - `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`, `constructionSegments`.
 - `constructionSegments`: `segments`, `detach`. The values of `segments` are in ordinal order when it is an array of strings.
 - `crossingCoverage`: `circuits`, `additions`.
@@ -722,6 +758,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | --- | --- |
 | Fixed placement only | `0.1.0` |
 | Any modification with `active` | `0.2.0` |
+| Any modification with `source`, a mod object | `0.5.0` |
 | A location sign target other than the legacy Sylva location sign | `0.5.0` |
 | Any modification whose target `structure` is `bridge-colliders-v1` | `0.5.0` |
 | Any modification with `relationships`, a `Track.TrackMarker` target component, or target `structure` `track-marker-v1` | `0.5.0` |

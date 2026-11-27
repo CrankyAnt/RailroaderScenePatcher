@@ -382,7 +382,7 @@ namespace RailroaderScenePatcher {
             context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
             native = new NativeInventory(g => scene == null ? "Location sign editing is unavailable" : scene.Refusal(g));
             OutlinerGrouping.Scene = new OutlinerScene();
-            capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds, Keys = TargetKeyCache.Of, Resolved = target => TargetKeyCache.Of(target) };
+            capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds, Keys = TargetKeyCache.Of, Resolved = target => TargetKeyCache.Of(target), ModObjectWorld = new ModObjectWorld() };
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             // A new game reads its start spawn point before the world load, so the spawn point capability is ready with the runtime.
@@ -529,6 +529,7 @@ namespace RailroaderScenePatcher {
                 };
                 attachment.Session.Replayed = identity => replayed.Add(identity);
                 attachment.Session.HistoryNotice = feedback.QueueHistoryNotice;
+                attachment.Session.ModObjectsChanged = ModObjectsChanged;
                 // The patcher's own Save writes the scene patch file: that text is what the definitions on disk now are, so it
                 // is no change from outside and the inventory lamp stays Current.
                 ModScenePatchFiles.Written = text => { try { definitions.Written(ModScenePatchFiles.EditedModId(), text); } catch { } };
@@ -583,6 +584,7 @@ namespace RailroaderScenePatcher {
         }
         void Detach() {
             reloadRequirement = null;
+            duplicate.End(); placedModObject = null;
             presentation?.SetFileLock(null);
             CancelGuided();
             pickedTrackLocation = null; pickedTrackSelection = null;
@@ -605,9 +607,11 @@ namespace RailroaderScenePatcher {
             if (worldEditActionOpen && (!open || worldEditActionTab != inspectorTab.Value || worldEditActionMode != placementMode || !ReferenceEquals(worldEditActionTarget, selected?.Handle)))
                 EndWorldEditAction();
             ReleaseUnchangedNumericEdit();
-            inputBlocker.WorldPicking = open && pendingEdit;
+            // While a mod object is being placed, the left click on the world is the placing click, not the game's.
+            var placing = PlacingModObject;
+            inputBlocker.WorldPicking = open && (pendingEdit || placing);
             inputBlocker.WorldInspecting = open && pendingInspectOnly;
-            inputBlocker.WorldEditing = open && (pendingEdit || worldEditActionOpen || gizmoShown);
+            inputBlocker.WorldEditing = open && (pendingEdit || worldEditActionOpen || gizmoShown || placing);
             inputBlocker.GizmoShown = open && gizmoShown;
         }
         void BeginWorldEditAction() {
@@ -720,6 +724,7 @@ namespace RailroaderScenePatcher {
             // request ends.
             var reason = FileLockReason;
             if (reason != null) {
+                EndDuplicate();
                 CancelGizmo(); ClearSnap();
                 selection?.Cancel();
                 CancelRequest(reason);
@@ -772,6 +777,7 @@ namespace RailroaderScenePatcher {
                 var updated = fullRefresh || inventory == null || edited == null ? null : inventory.ReobserveRelated(edited);
                 fullRefresh = false;
                 if (updated != null) { KeepSelection(edited, updated); ReobserveMarkerIdHolders(edited, updated); } else Inspect();
+                InspectPlacedModObject();
                 ReadPlacement(); presentation?.RequestRefresh();
             }
             // Undo and Redo of this patcher's own steps changed their objects: observe those again, so they do not read
@@ -811,9 +817,11 @@ namespace RailroaderScenePatcher {
             // can run before this handler in the same frame: an Escape in the frame a gizmo ended is consumed as well.
             // While a field of the panel has the keyboard the patcher takes no Escape at all: the handler is not even
             // registered, so the key reaches the field and the game as without the mod.
-            var escapable = !(presentation != null && presentation.FieldFocused) && (selection?.Pending != null || gizmo?.Active == true || Time.frameCount <= gizmoEnded + 1 || EscapeGizmo() || EscapeSnap());
+            var escapable = !(presentation != null && presentation.FieldFocused) && (selection?.Pending != null || gizmo?.Active == true || Time.frameCount <= gizmoEnded + 1 || EscapeGizmo() || EscapeSnap() || PlacingModObject);
             if (escapable != escapeHeld) try {
                 if (escapable) UI.GameInput.RegisterEscapeHandler(UI.GameInput.EscapeHandler.Transient, () => {
+                    // While a mod object is being placed, Escape stops placing and returns to the blank object window.
+                    if (duplicate.Release()) { presentation?.RequestRefresh(); return true; }
                     // One press does one thing. A list closes before a drag or choice is cancelled; over the panel
                     // a standing gizmo or prepared snap can also be cancelled. Escape never ends the inspection.
                     switch (CommandBand.Escape(presentation != null && presentation.FieldFocused, selection?.Pending?.ListOpen == true, selection?.Pending != null, gizmo?.Active == true, EscapeGizmo(), EscapeSnap())) {
@@ -852,6 +860,7 @@ namespace RailroaderScenePatcher {
             presentation?.SetEntryStatus(entryStatus.Caption, entryStatus.Reason);
             if (!open) CancelGizmo();
             SyncInputRegions();
+            TickDuplicate(open);
             if (open && selection?.Pending != null && inputBlocker?.WorldClick is Vector2 pointer) {
                 try { selection.Pick(pointer, presentation.WorldUiBounds()); selectionProblem = null; }
                 catch (Exception e) {
@@ -1062,6 +1071,7 @@ namespace RailroaderScenePatcher {
         static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);
         void OnDestroy() { Release(); }
         void OnGUI() {
+            try { DrawPlacingMark(); } catch (Exception e) { PatcherLog.Debug("The pointer mark for placing a mod object is unavailable: " + e.GetBaseException().Message); }
             if (presentation == null || !presentation.IsOpen || selection == null || Event.current.type != EventType.Repaint) return;
             try {
                 if (worldLabelBacking == null) {

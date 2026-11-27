@@ -182,8 +182,8 @@ namespace RailroaderScenePatcher.Core {
             static readonly Shape Target = new Shape { Known = new[] { "scene", "path", "component", "structure", TargetIdentity.PadMarkerMember, TargetIdentity.MarkerIdMember, TargetIdentity.MapPositionMember } };
             static readonly Shape Dependencies = new Shape { SortedStrings = true };
             static readonly Shape Starter = new Shape { Known = new[] { "setup", "track", "wreck" }, Member = name => name == "track" ? Location : Unknown };
-            static readonly Shape Modification = new Shape { Known = new[] { "target", "markerId", "relationships", "starterPlacement", "placement", "dependsOn", "active" },
-                Member = name => name == "target" ? Target : name == "relationships" ? Relationships : name == "starterPlacement" ? Starter : name == "placement" ? Placement : name == "dependsOn" ? Dependencies : Unknown };
+            static readonly Shape Modification = new Shape { Known = new[] { "target", ModObjects.SourceMember, "markerId", "relationships", "starterPlacement", "placement", "dependsOn", "active" },
+                Member = name => name == "target" || name == ModObjects.SourceMember ? Target : name == "relationships" ? Relationships : name == "starterPlacement" ? Starter : name == "placement" ? Placement : name == "dependsOn" ? Dependencies : Unknown };
             static readonly Shape Modifications = new Shape { Member = name => Modification };
             static readonly Shape SceneTargetMap = new Shape { Known = new[] { "mapId" } };
             internal static readonly Shape ScenePatchFile = new Shape { Known = new[] { "formatVersion", "sourceMap", "modifications" },
