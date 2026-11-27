@@ -28,7 +28,7 @@ static class SupportedEditsTests {
     }
 
     public static void Run() {
-        CrossingControllerOffersOnlyItsConnections();
+        CrossingControllerOffersTheWholeMoveAndItsConnections();
         EveryBaseMapObjectListsItsEdits();
         FictionalObjectsListTheirEdits();
         WhatTheWorldAddsChangesTheList();
@@ -306,7 +306,7 @@ static class SupportedEditsTests {
         ["milepost"] = "Available: Move, Rotate, Disable, Set track binding | " + RailNoFollow + " | " + NoReplacementId,
         ["mast"] = "Available: Move, Rotate, Disable | " + RailNoFollow,
         ["bell"] = "Available: Move, Disable | Unavailable: | • A bell's sound has no direction: Rotate | " + NoFollowEquipment,
-        ["crossing controller"] = "Available: Edit crossing coverage, Edit crossing equipment | Unavailable: | • Its placement and activity can't be edited: " + Placed,
+        ["crossing controller"] = "Available: Move, Rotate, Edit crossing coverage, Edit crossing equipment | Unavailable: | " + NoFollowEquipment + " | • Its activity can't be edited: Disable",
         ["construction controller"] = "Available: Set construction segments | Unavailable: | • Its placement has no effect in the game: Move, Rotate, Follow a track | • The game needs it to show bridge parts: Disable",
         ["starter"] = "Available: Set track location | Unavailable: | • Has no effect on where cars start: " + Placed
             + " | " + NoReplacementId + " | • No new-game car placement uses it: Set Start derailed",
@@ -408,20 +408,30 @@ static class SupportedEditsTests {
         Check(Listed(map, crossbuck, verdicts).Expected.StartsWith("Available: Move,", StringComparison.Ordinal), "a crossbuck lists Move");
     }
 
-    // A crossing controller's placement and activity are refused by its capability, so no Placement mode and no Enabled
-    // control is offered; its crossing coverage is.
-    static void CrossingControllerOffersOnlyItsConnections() {
-        var controller = Entry("Grade crossing controller", CrossingCoverageScene.Structure, "Set which tracks each circuit detects.", component: CrossingCoverageScene.ComponentType);
+    // A crossing controller's placement moves its grade-crossing setup as a whole, at a fixed placement: Numeric, Gizmo
+    // and Snap are offered, Follow is not, and no Enabled control is offered; its crossing coverage is.
+    static void CrossingControllerOffersTheWholeMoveAndItsConnections() {
+        var controller = Entry("Grade crossing controller", CrossingCoverageScene.Structure, CommandBand.CrossingControllerOperations, component: CrossingCoverageScene.ComponentType);
         var edits = SupportedEdits.Of(controller);
-        const string reason = "Its placement and activity can't be edited";
-        Check(Shown(controller) == "Available: Edit crossing coverage, Edit crossing equipment | Unavailable: | • " + reason + ": Move, Rotate, Follow a track, Disable",
+        const string reason = "Its activity can't be edited";
+        Check(Shown(controller) == "Available: Move, Rotate, Edit crossing coverage, Edit crossing equipment | Unavailable: | " + NoFollowEquipment + " | • " + reason + ": Disable",
             "a crossing controller: " + Shown(controller));
-        foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
-            Check(SupportedEdits.ModeReason(edits, mode) == reason, "placement mode " + mode + " of a crossing controller is refused with its reason: " + SupportedEdits.ModeReason(edits, mode));
-        Check(CommandBand.Tooltip("Disable this object.", SupportedEdits.ReasonOf(edits, SupportedEdits.Activity)) == reason + ".", "its Disable tooltip gives the same reason");
+        foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode })
+            Check(SupportedEdits.ModeReason(edits, mode) == null, "placement mode " + mode + " of a crossing controller is offered: " + SupportedEdits.ModeReason(edits, mode));
+        Check(SupportedEdits.ModeReason(edits, CommandBand.FollowMode) == "Uses fixed placement", "Follow of a crossing controller is refused with its reason: " + SupportedEdits.ModeReason(edits, CommandBand.FollowMode));
+        Check(CommandBand.Tooltip("Disable this object.", SupportedEdits.ReasonOf(edits, SupportedEdits.Activity)) == reason + ".", "its Disable tooltip gives its reason");
+        // On a game build without the whole move, Move, Rotate and Follow are unavailable with that reason: Gizmo, Snap
+        // and Follow are closed, and Numeric stays open to show the placement, its fields carrying the reason.
+        var unsupported = new SupportedEdits.Live { WholeMoveReason = EditReasons.GameBuild };
+        Check(Shown(controller, unsupported) == "Available: Edit crossing coverage, Edit crossing equipment | Unavailable: | • Not supported on this game build: Move, Rotate, Follow a track | • " + reason + ": Disable",
+            "a crossing controller without the whole move: " + Shown(controller, unsupported));
+        var blocked = SupportedEdits.Of(controller, unsupported);
+        foreach (var mode in new[] { CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
+            Check(SupportedEdits.ModeBlock(blocked, mode, true) == "Not supported on this game build", "placement mode " + mode + " is closed without the whole move: " + SupportedEdits.ModeBlock(blocked, mode, true));
+        Check(SupportedEdits.ModeBlock(blocked, CommandBand.NumericMode, true) == null && SupportedEdits.ModeReason(blocked, CommandBand.NumericMode) == "Not supported on this game build", "Numeric stays open and its fields carry the reason");
         // Its lights, gates and bells are an edit of their own, unavailable with the reason the session gives when they cannot be read.
         var unread = new SupportedEdits.Live { EquipmentReason = "the crossing's equipment could not be read" };
-        Check(Shown(controller, unread) == "Available: Edit crossing coverage | Unavailable: | • " + reason + ": Move, Rotate, Follow a track, Disable | • Its lights, gates and bells can't be read: Edit crossing equipment",
+        Check(Shown(controller, unread) == "Available: Move, Rotate, Edit crossing coverage | Unavailable: | " + NoFollowEquipment + " | • " + reason + ": Disable | • Its lights, gates and bells can't be read: Edit crossing equipment",
             "a crossing controller whose equipment cannot be read: " + Shown(controller, unread));
     }
 }

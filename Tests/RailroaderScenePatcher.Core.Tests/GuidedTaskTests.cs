@@ -10,7 +10,7 @@ static class GuidedTaskTests {
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     static SceneObservation Target(string path) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Marker"), "Generic track marker", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
     internal static void Run() {
-        CrossingControllerCannotMoveOrChangeActivity();
+        CrossingControllerMovesItsSetupAndKeepsItsActivity();
         StartingPinsTheTargetAndCopiesValues();
         SelectionCannotReplacePinnedDraft();
         FailureAndSuccessKeepTheirRecoveryPaths();
@@ -94,14 +94,14 @@ static class GuidedTaskTests {
         var unknown = Applied(known: false); editor.Undo();
         Check(unknown.AppliedText(session.StepOf) == complete, "Without a known step the Apply step keeps the plain result");
     }
-    static void CrossingControllerCannotMoveOrChangeActivity() {
+    // A crossing controller's placement moves its setup as a whole, so the placement tasks take it; its activity is refused.
+    static void CrossingControllerMovesItsSetupAndKeepsItsActivity() {
         foreach (var crossing in new[] {
             new TargetIdentity("scene", "crossing", "other", CrossingCoverageScene.Structure),
             new TargetIdentity("scene", "crossing", CrossingCoverageScene.ComponentType, null)
         }) {
-            foreach (var task in new[] { GuidedTaskKind.Placement, GuidedTaskKind.Snap, GuidedTaskKind.Activity })
-                Check(GuidedTaskState.TargetBlock(task, crossing) == "Its placement and activity can't be edited", "A crossing controller cannot offer " + task);
-            foreach (var task in new[] { GuidedTaskKind.Binding, GuidedTaskKind.DetachBinding, GuidedTaskKind.StarterPlacement })
+            Check(GuidedTaskState.TargetBlock(GuidedTaskKind.Activity, crossing) == "Its activity can't be edited", "A crossing controller cannot offer " + GuidedTaskKind.Activity);
+            foreach (var task in new[] { GuidedTaskKind.Placement, GuidedTaskKind.Snap, GuidedTaskKind.Binding, GuidedTaskKind.DetachBinding, GuidedTaskKind.StarterPlacement })
                 Check(GuidedTaskState.TargetBlock(task, crossing) == null, "Other task rules decide whether a crossing controller can offer " + task);
         }
         var marker = new TargetIdentity("scene", "marker", "Track.TrackMarker", TrackMarkerScene.Structure);

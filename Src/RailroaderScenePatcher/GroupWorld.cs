@@ -392,8 +392,8 @@ namespace RailroaderScenePatcher {
         }
         // A group that holds a scene ground mask is not edited while the mask cannot be read and rebuilt: a move would
         // leave the terrain shaping behind.
-        static string MaskProblem(GameObject root) =>
-            !GroundMaskWorld.Available && GroundMaskWorld.Holds(root) ? "The game's ground mask members are unavailable, so you can't move, enable, or disable this group or its parts." : null;
+        internal static string MaskProblem(GameObject root) =>
+            root != null && !GroundMaskWorld.Available && GroundMaskWorld.Holds(root) ? "The game's ground mask members are unavailable, so you can't move, enable, or disable this group or its parts." : null;
         // A child object that only carries a simple culler and a top scene object resolve too, so their modification fails with the reason
         // (SceneObjectRules.PartRefusal).
         public IReadOnlyList<object> FindParts(string scene, string path) =>

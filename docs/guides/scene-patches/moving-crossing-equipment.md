@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move or disable an existing crossing mast or bell
 
-Use the patcher to move, rotate, disable, or enable a mast of an existing crossing, or to move, disable, or enable its bell. The equipment continues to respond to its crossing controller. This guide also explains how culling works after you move a mast.
+Use the patcher to move, rotate, disable, or enable a mast of an existing crossing, or to move, disable, or enable its bell. The equipment continues to respond to its crossing controller. You can also move or rotate the whole grade-crossing setup through its crossing controller. This guide also explains how culling works after you move a mast.
 
 To add equipment, see [add lights and gates to an existing crossing](adding-crossing-equipment.md) and [add a bell to an existing crossing](adding-crossing-bells.md). For the native map editor workflow, including Save, Undo, and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md#existing-crossing-mast-and-bell).
 
@@ -30,6 +30,29 @@ The mast's light and gate move and rotate together. The crossing controller, the
 Existing crossing equipment uses fixed placement. It cannot use track-following placement, so **Follow** is unavailable.
 
 A bell's sound has no direction, so rotation has no effect. The **Rotation** values remain visible as text, and the gizmo's **Rotate** tool is disabled. Both explain why rotation isn't editable. **Snap** sets the bell's position and writes a rotation, but that rotation has no effect.
+
+## Move or rotate the whole grade-crossing setup
+
+To move a crossing's masts and bell together, move the setup through its crossing controller.
+
+1. Select the crossing controller in the outliner, or click **Select in world** and select it in the world.
+2. On the **Placement** tab, choose **Numeric**, **Gizmo**, or **Snap**, as for a mast. **Follow** is unavailable because a grade-crossing setup uses fixed placement.
+3. Check the result in the world.
+
+The masts, with their lights and gates, and the bell move and rotate together. They keep their placement relative to each other. These objects stay where they are:
+
+- The crossing pads and the whistle signs. Their track bindings set their places. To move a pad, see [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md).
+- The detection spans. The crossing still detects trains on the same tracks. To change them, see [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md).
+- A mast or bell that you moved on its own. Its fixed placement keeps it at its map coordinates. To make it move with the setup again, select it and click **Remove modification**.
+- Lights, gates, and bells that a mod added to the crossing. Each stays at the placement that its addition records. To move one, edit it on the controller's **Connections** tab.
+
+The road and the track are native map data, so they don't move either.
+
+A duplicated crossing moves and rotates the same way. Its pads stay where they are, so rebind them if the track at the new location differs.
+
+The crossing's culler moves with the setup. A mast that stays behind, outside the culler's sphere, gets its own culling sphere, as described in the next section.
+
+A crossing controller can't be disabled, so **Disable** stays unavailable on its **Object** tab.
 
 ### Culling of a moved mast
 
@@ -61,6 +84,8 @@ Clicking the native **Save** button writes the modification to the edited mod's 
 ## What the file records
 
 A modification of a mast or bell records a fixed placement, an Enabled value, or both. It records no controller, key, track, or circuit. The equipment's logical binding to its crossing stays unchanged and is not part of the modification.
+
+A whole move records a fixed placement in the crossing controller's modification, next to any crossing coverage and crossing equipment that the modification holds. See [the crossing target](scene-patch-file-v1.md#crossing).
 
 ```json
 "move-signal-1": {
@@ -117,5 +142,6 @@ These statements come from the patcher's automated tests and from the code of Ra
 
 - A crossing controller creates its bell each time the controller is enabled. If the game switches the controller off and on during a session, the new bell appears at the controller and stays enabled until the next world load reapplies the scene patch file.
 - The patcher does not move the crossing controller, the road, the crossing pads, or the detection spans with a mast.
+- A whole move leaves each crossing pad object where it is. When the world reloads, the patcher builds a duplicated crossing at its saved placement, so the pad objects of the duplicate stand around that placement again. A bound pad's surface stays on its track either way, because the game generates it along the track binding.
 - The patcher sizes a moved mast's culling sphere around the mast and the gate arm's position when it plans the move. The arm can extend beyond that sphere when it swings later.
 - No mast or bell in the Railroader 0.6.3 base-game map follows a track group. Equipment that does is outside the mast's supported source pattern.

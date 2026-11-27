@@ -36,6 +36,9 @@ namespace RailroaderScenePatcher {
             internal string DisableProblem { get; set; }
             // Why the crossing's lights, gates and bells cannot be read now, so that none can be added, edited or removed.
             internal string EquipmentReason { get; set; }
+            // Why a crossing controller cannot move its grade-crossing setup as a whole, such as a game build without the
+            // support for crossing masts that the whole move runs on.
+            internal string WholeMoveReason { get; set; }
             // Why a generic track marker takes no replacement ID now, as its Replacement marker ID section reads it.
             internal string MarkerIdReason { get; set; }
             // Why the setups that read a starter placement marker could not be read.
@@ -45,9 +48,9 @@ namespace RailroaderScenePatcher {
             // The bridge kind of the object's group, for a part whose top scene object names it.
             internal BridgeKind? Bridge { get; set; }
         }
-        // The reason that holds every placement and activity edit of a crossing controller: its capability takes only
-        // its crossing coverage and added equipment.
-        internal const string CrossingNoEdit = "Its placement and activity can't be edited";
+        // The reason that holds the activity edit of a crossing controller: its capability takes its placement, which
+        // moves the grade-crossing setup as a whole, its crossing coverage and its added equipment.
+        internal const string CrossingNoActivity = "Its activity can't be edited";
         static readonly HashSet<string> MarkerStructures = new HashSet<string>(StringComparer.Ordinal) { CrossingPadScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure };
         // Whether the object's track binding is edited through its track marker: a crossing pad, a generic track marker or a milepost.
         internal static bool EditsBinding(string structure) => structure != null && MarkerStructures.Contains(structure);
@@ -73,16 +76,16 @@ namespace RailroaderScenePatcher {
             var equipment = structure == ExistingEquipmentScene.MastStructure || structure == ExistingEquipmentScene.BellStructure;
             var bridge = live?.Bridge ?? entry.Bridge;
             // The object's own reason, which every placement and activity edit meets.
-            var own = live?.Present == false ? EditReasons.Scene : starter ? CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)) : !editable ? CommandBand.EditReason(entry.Operations) : coverage ? CrossingNoEdit : null;
-            var move = own ?? (structure == CrossingPadScene.Structure ? CommandBand.PadFollowsTrack : controller ? CommandBand.ControllerNoPlacement : null);
+            var own = live?.Present == false ? EditReasons.Scene : starter ? CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)) : !editable ? CommandBand.EditReason(entry.Operations) : null;
+            var move = own ?? (structure == CrossingPadScene.Structure ? CommandBand.PadFollowsTrack : controller ? CommandBand.ControllerNoPlacement : coverage ? live?.WholeMoveReason : null);
             var edits = new List<Edit> {
                 new Edit(Move, Move, move),
                 new Edit(Rotate, Rotate, move ?? CommandBand.RotationBlock(structure)),
-                new Edit(Follow, Follow, move ?? (structure == MilepostScene.Structure ? CommandBand.MilepostNoFollow : equipment ? CommandBand.EquipmentNoFollow
+                new Edit(Follow, Follow, move ?? (structure == MilepostScene.Structure ? CommandBand.MilepostNoFollow : equipment ? CommandBand.EquipmentNoFollow : coverage ? CommandBand.SetupNoFollow
                     : bridge == BridgeKind.Rail ? CommandBand.RailBridgeNoFollow : bridge == BridgeKind.Road ? CommandBand.RoadBridgeNoFollow : null)),
             };
             var enabled = live?.Enabled ?? entry.Enabled;
-            edits.Add(new Edit(Activity, enabled ? "Disable" : "Enable", own ?? (controller ? CommandBand.ControllerNoActivity : null) ?? live?.ActivitySwitched
+            edits.Add(new Edit(Activity, enabled ? "Disable" : "Enable", own ?? (controller ? CommandBand.ControllerNoActivity : coverage ? CrossingNoActivity : null) ?? live?.ActivitySwitched
                 ?? (enabled ? live?.DisableProblem : null) ?? CommandBand.ActivityReason(!enabled, FollowsGroup(entry))));
             if (starter) {
                 edits.Add(new Edit(TrackLocation, TrackLocation, null));
@@ -91,7 +94,8 @@ namespace RailroaderScenePatcher {
                 return InScene(edits, live);
             }
             if (HoldsSegments(entry, live)) { edits.Add(new Edit(Segments, Segments, null)); return InScene(edits, live); }
-            // A crossing controller's Connections tab edits its coverage and, as a separate edit, its added lights, gates and bells.
+            // A crossing controller's Placement tab moves its setup as a whole; its Connections tab edits its coverage and,
+            // as a separate edit, its added lights, gates and bells.
             if (coverage) { edits.Add(new Edit(Coverage, Coverage, null)); edits.Add(new Edit(Equipment, Equipment, live?.EquipmentReason == null ? null : EditReasons.EquipmentUnread)); }
             // An object that holds a track binding: its own reason when the patcher does not edit it, as for every other edit.
             if (HoldsBinding(entry.Family)) edits.Add(new Edit(Binding, Binding, editable && EditsBinding(structure) ? null : own ?? CommandBand.EditReason(entry.Operations)));

@@ -102,7 +102,7 @@ namespace RailroaderScenePatcher {
 
         // Every fixed reason in the ticket. No reason contains a runtime identifier or a family placeholder.
         internal static readonly string[] Known = {
-            SupportedEdits.CrossingNoEdit, CommandBand.PadFollowsTrack, CommandBand.ControllerNoPlacement, CommandBand.ControllerNoActivity,
+            SupportedEdits.CrossingNoActivity, CommandBand.PadFollowsTrack, CommandBand.ControllerNoPlacement, CommandBand.ControllerNoActivity,
             Fixed, CommandBand.BellNoRotation, Starter, CommandBand.GroupEnableReason, Camera,
             SharedActivity, ProgressionUnread, MapFeatureUnread,
             Replacement, CommandBand.SharedPathBlock, CurrentId, UniqueId, Crossing, Scene, State,

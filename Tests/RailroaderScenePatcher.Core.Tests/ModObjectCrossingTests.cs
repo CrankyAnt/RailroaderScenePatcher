@@ -359,7 +359,7 @@ static class ModObjectCrossingTests {
         Assert(!refused.Applied && refused.Error == ModObjects.PartMarkerIdsOnlyModObject && plain.Source.Circuits.Count == 2, "A modification of a map object holds no part marker IDs: " + refused.Error);
     }
 
-    // The crossing capability moves no crossing: the duplicate stands where its modification places it, and a
+    // Without a whole move the crossing capability moves no crossing: the duplicate stands where its modification places it, and a
     // modification of a map crossing still takes no placement.
     static void ACrossingModObjectKeepsItsPlace() {
         var world = new World();

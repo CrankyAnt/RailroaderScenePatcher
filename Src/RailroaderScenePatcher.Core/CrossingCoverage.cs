@@ -267,8 +267,11 @@ namespace RailroaderScenePatcher.Core {
     // selected tracks covered by spans the patcher owns, or is detached from the crossing. A detection addition is a further
     // circuit the patcher owns, with owned spans for explicitly selected extra tracks, evaluated after the native circuits. The map's own detection spans stay registered
     // and unchanged, so another consumer keeps them; the crossing simply stops evaluating them. Proximity never assigns
-    // coverage, and the crossing object itself is never moved or disabled by this capability.
-    public sealed class CrossingCoverageScene : IScene, IRelationshipScene, IVersionedScene, IRetainedScene, IDisposable, ICrossingEquipmentScene {
+    // coverage, and the crossing is never disabled by this capability. A placement moves the grade-crossing setup as a
+    // whole (WholeMove): its masts with their lights and gates and its bell move together, and its pads and detection
+    // spans stay where they are, so the coverage is the same before and after. Without a whole move the capability
+    // moves no crossing.
+    public sealed class CrossingCoverageScene : IScene, IRelationshipScene, IVersionedScene, IRetainedScene, IDisposable, ICrossingEquipmentScene, IDependentOutputScene {
         public const string Structure = "crossing-coverage-v1", RequiredVersion = VersionRequirement.Delivery, ComponentType = "Track.Crossings.GradeCrossingController";
         // The start of the ID of every span the patcher owns (NewId); CircuitSpanProblems.CircuitKey reads it back.
         internal const string OwnedPrefix = "CrankyAnt.ScenePatcher.";
@@ -276,8 +279,8 @@ namespace RailroaderScenePatcher.Core {
         // The native circuits of a controller as first observed in this load, and every span the patcher owns for it.
         // Added holds the circuits the patcher owns for detection additions; their Original is null.
         sealed class Baseline { internal List<Circuit> Circuits = new List<Circuit>(); internal List<Circuit> Added = new List<Circuit>(); internal List<object> Owned = new List<object>(); internal List<object> Equipment = new List<object>(); }
-        // The captured state a failed application restores: coverage and the complete equipment.
-        sealed class Snapshot { internal CrossingCoverage Coverage; internal CrossingEquipment Equipment; }
+        // The captured state a failed application restores: coverage, the complete equipment and the setup's layout.
+        sealed class Snapshot { internal CrossingCoverage Coverage; internal CrossingEquipment Equipment; internal object Setup; }
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) => ReferenceEquals(a, b);
             public int GetHashCode(object value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
@@ -285,11 +288,21 @@ namespace RailroaderScenePatcher.Core {
         readonly ICrossingCoverageWorld world;
         readonly Dictionary<object, Baseline> baselines = new Dictionary<object, Baseline>(new ByReference());
         readonly CrossingEquipmentPart equipment;
-        // Without an equipment world the crossing-equipment relationship is refused.
-        public CrossingCoverageScene(ICrossingCoverageWorld world, Capability capability, ICrossingEquipmentWorld equipment = null) {
-            this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability;
+        // The whole move of the setup, or null: the capability then moves no crossing.
+        readonly WholeMove setup;
+        // Without an equipment world the crossing-equipment relationship is refused; without a whole move, a placement.
+        public CrossingCoverageScene(ICrossingCoverageWorld world, Capability capability, ICrossingEquipmentWorld equipment = null, WholeMove setup = null) {
+            this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.setup = setup;
             if (equipment != null) this.equipment = new CrossingEquipmentPart(equipment);
         }
+        // The terrain output that follows a ground mask of the setup after a whole move, by the crossing controller.
+        public DependentOutput Output(object target) => setup?.Output(target) ?? DependentOutput.None;
+        public void RetryOutput(object target) => setup?.RetryOutput(target);
+        // Why a track-following placement of a crossing controller is refused before any change.
+        public const string NoFollowing = "A grade-crossing setup uses fixed placement. Track-following placement does not apply to it";
+        public const string NoActivity = "A crossing controller can't be enabled or disabled. Its modification takes a placement, relationships.crossingCoverage, and relationships.crossingEquipment";
+        // Whether a placement of a controller moves its setup as a whole; without it this capability moves no crossing.
+        public bool MovesSetup => setup != null;
         // Whether this crossing capability can add equipment.
         public bool EquipmentAvailable => equipment != null;
         // The loaded devices scene patch editing offers as equipment sources for the controller, eligible or with their rejection reason.
@@ -419,7 +432,13 @@ namespace RailroaderScenePatcher.Core {
         }
         public void CheckRelationships(object target, ObjectState state) {
             if (state == null) return;
-            if ((state.Placement != null && !BuiltAt(target, state.Placement)) || state.Active != null) throw new InvalidOperationException("A crossing-coverage target accepts only relationships.crossingCoverage and relationships.crossingEquipment; placement and activity of the crossing are not supported");
+            if (setup == null) {
+                if ((state.Placement != null && !BuiltAt(target, state.Placement)) || state.Active != null) throw new InvalidOperationException("A crossing-coverage target accepts only relationships.crossingCoverage and relationships.crossingEquipment; placement and activity of the crossing are not supported");
+            } else {
+                if (state.Active != null) throw new InvalidOperationException(NoActivity);
+                var refusal = state.Placement == null ? null : state.Placement.Following != null ? NoFollowing : setup.Refusal(target);
+                if (refusal != null) throw new InvalidOperationException(refusal);
+            }
             if (state.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state.Equipment != null) {
                 if (equipment == null) throw new InvalidOperationException("Crossing equipment editing is unavailable");
@@ -469,7 +488,7 @@ namespace RailroaderScenePatcher.Core {
             if (TrackLocation.Same(range.From, range.To)) return "the selected track has no length";
             return null;
         }
-        public object Capture(object target) { var baseline = BaselineOf(target); return new Snapshot { Coverage = Observed(target, baseline), Equipment = equipment?.Observed(target, baseline.Equipment) }; }
+        public object Capture(object target) { var baseline = BaselineOf(target); return new Snapshot { Coverage = Observed(target, baseline), Equipment = equipment?.Observed(target, baseline.Equipment), Setup = setup?.Capture(target) }; }
         public ObjectState Read(object target) {
             var baseline = BaselineOf(target);
             return new ObjectState(new Placement(world.Position(target), world.Rotation(target)), world.Active(target), null, Observed(target, baseline), equipment?.Observed(target, baseline.Equipment));
@@ -497,10 +516,11 @@ namespace RailroaderScenePatcher.Core {
         }
         public void Apply(object target, ObjectState state) {
             if (state.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
-            if (state.Placement != null && !Placements.Same(state.Placement, new Placement(world.Position(target), world.Rotation(target)))) throw new InvalidOperationException("Crossing coverage does not move the crossing");
+            if (setup == null && state.Placement != null && !Placements.Same(state.Placement, new Placement(world.Position(target), world.Rotation(target)))) throw new InvalidOperationException("Crossing coverage does not move the crossing");
             if (state.Active != null && state.Active.Value != world.Active(target)) throw new InvalidOperationException("Crossing coverage does not change the crossing's activity");
             if (state.Equipment != null && equipment == null) throw new InvalidOperationException("Crossing equipment editing is unavailable");
             var baseline = BaselineOf(target);
+            if (setup != null && state.Placement != null && !setup.At(target, state.Placement)) MoveSetup(target, baseline, state.Placement);
             if (state.Coverage != null) {
                 var desired = Effective(target, baseline, state.Coverage);
                 Validate(target, baseline, state.Coverage, true);
@@ -517,18 +537,31 @@ namespace RailroaderScenePatcher.Core {
                 if (difference != null) throw new InvalidOperationException("Applied crossing equipment did not verify: " + difference);
             }
         }
+        // The whole move of the setup. Equipment the patcher added stands below the controller at a fixed placement of
+        // its own, in map coordinates: it keeps that placement, as a part with a fixed placement does, whichever scene
+        // patch file moves the setup and in whatever order.
+        void MoveSetup(object target, Baseline baseline, Placement placement) {
+            var kept = equipment?.Observed(target, baseline.Equipment);
+            setup.Move(target, placement);
+            var back = kept == null ? null : EquipmentChange(target, baseline, kept);
+            if (back == null) return;
+            equipment.Write(target, baseline.Equipment, back);
+            var difference = equipment.Verify(target, baseline.Equipment, back);
+            if (difference != null) throw new InvalidOperationException("Added crossing equipment did not keep its placement: " + difference);
+        }
         public bool Restore(object target, object snapshot) {
             try {
                 var baseline = BaselineOf(target);
                 var captured = (Snapshot)snapshot;
-                var restored = true;
+                // The setup returns first: the equipment then stands in the controller as it was captured.
+                var restored = setup == null || captured.Setup == null || setup.Restore(target, captured.Setup);
                 EmptyEquipmentObjectException leftover = null;
                 // Equipment first: an addition rebuilt from its source does not depend on the coverage, and a failure of one
                 // part still lets the other restore.
                 // The captured equipment holds the built additions. An addition whose copy was already gone ends not built: a
                 // copy the failed attempt built for it is retired, and a wrapper the attempt left stays.
                 if (captured.Equipment != null && equipment != null && EquipmentChange(target, baseline, captured.Equipment) != null) {
-                    try { equipment.Write(target, baseline.Equipment, captured.Equipment); restored = equipment.Verify(target, baseline.Equipment, captured.Equipment) == null; }
+                    try { equipment.Write(target, baseline.Equipment, captured.Equipment); restored &= equipment.Verify(target, baseline.Equipment, captured.Equipment) == null; }
                     catch (EmptyEquipmentObjectException e) { leftover = e; restored = false; }
                     catch { restored = false; }
                 }

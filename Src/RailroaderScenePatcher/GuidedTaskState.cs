@@ -12,8 +12,8 @@ namespace RailroaderScenePatcher {
         internal static readonly IReadOnlyList<GuidedTaskKind> Tasks = Array.AsReadOnly((GuidedTaskKind[])Enum.GetValues(typeof(GuidedTaskKind)));
         internal static string TargetBlock(GuidedTaskKind kind, TargetIdentity identity) =>
             identity != null && (identity.Structure == CrossingCoverageScene.Structure || (identity.Structure == null && identity.Component == CrossingCoverageScene.ComponentType))
-                && (kind == GuidedTaskKind.Placement || kind == GuidedTaskKind.Snap || kind == GuidedTaskKind.Activity)
-                ? SupportedEdits.CrossingNoEdit
+                && kind == GuidedTaskKind.Activity
+                ? SupportedEdits.CrossingNoActivity
             // The Ela construction controller: its position has no effect and its activity runs the visibility control.
             : identity?.Structure == ConstructionSceneryScene.Structure && (kind == GuidedTaskKind.Placement || kind == GuidedTaskKind.Snap) ? CommandBand.ControllerNoPlacement
             : identity?.Structure == ConstructionSceneryScene.Structure && kind == GuidedTaskKind.Activity ? CommandBand.ControllerNoActivity

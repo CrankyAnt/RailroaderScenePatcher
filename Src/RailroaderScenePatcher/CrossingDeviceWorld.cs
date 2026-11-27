@@ -22,11 +22,16 @@ namespace RailroaderScenePatcher {
     // child named Crossing Bell and sets its play field itself. Audio.IntegerLoopingPlayer destroys the clips it
     // split when it is disabled and splits none when enabled, so a bell that is enabled again is configured again
     // with the controller's loaded clip.
-    internal sealed class CrossingDeviceWorld : IGroupWorld {
+    //
+    // The controller's object is also the root of the whole move of its grade-crossing setup (WholeMove): everything
+    // below it moves with its transform, and the crossing pads, the whistle signs and the detection spans are put
+    // back where they stood (Stays). A detection span reads its two track locations and never its transform
+    // (Track.TrackSpan), and a crossing pad is generated along its marker's track location, so neither follows a move.
+    internal sealed class CrossingDeviceWorld : IWholeMoveWorld {
         const string ControllerType = CrossingCoverageScene.ComponentType, LampType = ExistingEquipmentScene.MastComponent, GateType = ExistingEquipmentScene.GateComponent,
             BellType = ExistingEquipmentScene.BellComponent, OwnerType = "KeyValue.Runtime.KeyValueObject", SpanType = "Track.TrackSpan", RelativeType = "Track.TrackRelativePosition";
         static readonly Type controller = Native.Type(ControllerType), lamp = Native.Type(LampType), gate = Native.Type(GateType), bell = Native.Type(BellType), keyOwner = Native.Type(OwnerType),
-            span = Native.Type(SpanType), relative = Native.Type(RelativeType), switcher = Native.Type(GroupWorld.GameObjectCullerType);
+            span = Native.Type(SpanType), relative = Native.Type(RelativeType), switcher = Native.Type(GroupWorld.GameObjectCullerType), marker = Native.Type(TrackMarkerWorld.MarkerType);
         static readonly FieldInfo lampKey = lamp?.GetField("key", Native.Flags), lampTargets = lamp?.GetField("targetObjects", Native.Flags), gateKey = gate?.GetField("key", Native.Flags),
             bellPlayer = controller?.GetField("_bellPlayer", Native.Flags), circuitSets = controller?.GetField("circuitSets", Native.Flags), followsGroup = relative?.GetField("targetActiveFollowsTrackGroup", Native.Flags);
         static readonly string[] keys = Keys();
@@ -193,11 +198,35 @@ namespace RailroaderScenePatcher {
             return holders.TryGetValue(heldSpan, out var holder) ? holder : null;
         }
 
-        // The crossing controller is no target of this capability: only its equipment resolves.
+        // The crossing controller is no target of this capability: only its equipment resolves. The crossing capability
+        // resolves the controller and moves its setup through this world.
         public IReadOnlyList<object> Find(string scene, string path) => Array.Empty<object>();
-        public string Refusal(object group) => null;
+        // Why the setup cannot move now, or null: a ground mask below the controller that cannot be read and rebuilt.
+        public string Refusal(object group) => GroupWorld.MaskProblem(group as GameObject);
         public void SetActive(object group, bool active) => throw new InvalidOperationException("A crossing controller cannot be enabled or disabled");
-        public void SetPlacement(object group, Placement placement) => throw new InvalidOperationException("A crossing controller cannot be moved");
+        public void SetPlacement(object group, Placement placement) => groups.SetPlacement(Device(group, "crossing controller"), placement);
+        // The objects below the controller that keep their map placement when the setup moves as a whole: each track
+        // marker, a crossing pad or a whistle sign, whose place its track binding sets, and each detection span.
+        // Equipment the patcher added is no part of the observation; the crossing capability keeps its placement.
+        public IReadOnlyList<object> Stays(object group) {
+            var root = Device(group, "crossing controller");
+            var kept = new List<object>();
+            foreach (var type in new[] { marker, span }) {
+                if (type == null) continue;
+                foreach (var held in root.GetComponentsInChildren(type, true))
+                    if (held != null && held.gameObject != root && !kept.Contains(held.gameObject)) kept.Add(held.gameObject);
+            }
+            return kept;
+        }
+        // Each kept object keeps the scene position and rotation it has, read before the root moves and written back
+        // afterwards, so a pad that stays is not placed again from a map position computed through its moved root.
+        public void SetPlacementKeeping(object group, Placement placement, IReadOnlyList<object> kept) {
+            var root = Device(group, "crossing controller");
+            var standing = (kept ?? Array.Empty<object>()).OfType<GameObject>().Where(go => go != null).Select(go => (go.transform, go.transform.position, go.transform.rotation)).ToArray();
+            groups.SetPlacement(root, placement);
+            foreach (var (transform, position, rotation) in standing) transform.SetPositionAndRotation(position, rotation);
+            Physics.SyncTransforms();
+        }
         // The transforms at and below an animator move while the game runs, as a gate's arm does: they keep only
         // their identity and activity in the check that nothing but the equipment changed.
         static readonly Type animator = Native.Type("UnityEngine.Animator");

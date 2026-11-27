@@ -351,7 +351,17 @@ namespace RailroaderScenePatcher {
                 CrossingEquipmentWorld equipmentWorld = null;
                 try { equipmentWorld = new CrossingEquipmentWorld { Warn = Report }; }
                 catch (Exception e) { PatcherLog.Debug("The patcher couldn't prepare to add crossing equipment: " + e.GetBaseException().Message); }
-                try { capabilities.Add(crossingCoverageScene = new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked, equipmentWorld)); }
+                // Existing masts and bells take their transforms, cullers and own culling from the group world, with their
+                // crossing controller as the group; one set of fixed placements gives each crossing one culling plan. The
+                // whole move of a setup through its controller shares that world and those fixed placements.
+                var held = new PartHolds();
+                CrossingDeviceWorld mastWorld = null;
+                string devicesUnavailable = null;
+                try {
+                    if (groupWorld == null) throw new InvalidOperationException("the patcher couldn't prepare to control when moved parts are shown");
+                    mastWorld = new CrossingDeviceWorld(groupWorld, false);
+                } catch (Exception e) { devicesUnavailable = e.GetBaseException().Message; }
+                try { capabilities.Add(crossingCoverageScene = new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked, equipmentWorld, mastWorld == null ? null : new WholeMove(mastWorld, held, groundMasks))); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to change crossing detection coverage: " + e.GetBaseException().Message);
@@ -362,12 +372,9 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(CrossingObjectScene.Structure, e.GetBaseException().Message);
                     PatcherLog.Debug("The patcher couldn't prepare to duplicate a crossing without signals: " + e.GetBaseException().Message);
                 }
-                // Existing masts and bells take their transforms, cullers and own culling from the group world, with their
-                // crossing controller as the group; one set of fixed placements gives each crossing one culling plan.
                 try {
-                    if (groupWorld == null) throw new InvalidOperationException("the patcher couldn't prepare to control when moved parts are shown");
-                    var held = new PartHolds();
-                    capabilities.Add(ExistingEquipmentScene.Masts(new CrossingDeviceWorld(groupWorld, false), held));
+                    if (mastWorld == null) throw new InvalidOperationException(devicesUnavailable);
+                    capabilities.Add(ExistingEquipmentScene.Masts(mastWorld, held));
                     capabilities.Add(ExistingEquipmentScene.Bells(new CrossingDeviceWorld(groupWorld, true, equipmentWorld?.ReconfigureBell, equipmentWorld == null ? "the patcher couldn't prepare crossing equipment" : equipmentWorld.BellsUnavailable), held));
                 } catch (Exception e) {
                     capabilities.AddUnavailable(ExistingEquipmentScene.MastStructure, e.GetBaseException().Message);

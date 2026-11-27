@@ -933,6 +933,10 @@ namespace RailroaderScenePatcher {
         internal const string RailBridgeNoFollow = EditReasons.Fixed;
         // Why Follow is inactive for an existing crossing mast or bell: the capability covers fixed placement and activity.
         internal const string EquipmentNoFollow = EditReasons.Fixed;
+        // A grade-crossing setup moves as a whole through its crossing controller, at a fixed placement.
+        internal const string SetupNoFollow = EditReasons.Fixed;
+        // Supported edits of a crossing controller: the whole move of its setup, its coverage and its added equipment.
+        internal const string CrossingControllerOperations = "Move or rotate the whole grade-crossing setup. Its masts, lights, gates, and bell move together, and its crossing pads and detection spans stay in place. Set which tracks each circuit detects or detach the circuit. You can add detection for extra tracks, or add lights, gates, and bells.";
         // Why the rotation of an existing crossing bell cannot be set, or null for any other object: the bell is a
         // sound source at a point. Its position stays editable.
         internal const string BellNoRotation = "A bell's sound has no direction";

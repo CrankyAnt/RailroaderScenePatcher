@@ -720,7 +720,7 @@ namespace RailroaderScenePatcher {
                 : icon ? (iconRefusal == null ? StationMapIconRules.Operations : CommandBand.NotEditable(iconRefusal))
                 : scenery ? (sceneryRefusal == null ? CommandBand.ConstructionSceneryOperations : CommandBand.NotEditable(sceneryRefusal))
                 : spanHolder != null ? CommandBand.DetectionSpanOperations
-                : coverageEditable ? "Set which tracks each circuit detects or detach the circuit. You can add detection for extra tracks, or add lights, gates, and bells. The crossing and its original detection spans stay in place."
+                : coverageEditable ? CommandBand.CrossingControllerOperations
                 : CommandBand.NotEditable(coverageRefusal);
             // An added light, gate or bell is edited on its crossing's Connections tab, not as an object of its own.
             string displayName = null;

@@ -700,7 +700,7 @@ namespace RailroaderScenePatcher.Core {
             public new bool Equals(object a, object b) => ReferenceEquals(a, b);
             public int GetHashCode(object value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
         }
-        static (double[], double[]) InMap(Placement root, GroupPart part) {
+        internal static (double[], double[]) InMap(Placement root, GroupPart part) {
             var turn = Quaternion.Normalize(root.Rotation); var offset = Quaternion.Rotate(turn, part.RootPosition);
             return (new[] { root.Position[0] + offset[0], root.Position[1] + offset[1], root.Position[2] + offset[2] }, Quaternion.Multiply(turn, part.RootRotation));
         }

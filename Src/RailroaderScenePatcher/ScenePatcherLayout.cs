@@ -920,6 +920,8 @@ namespace RailroaderScenePatcher {
                 live.ActivitySwitched = selected.GroupPath != null || SceneObjectRules.InFamilies(selected.Family) ? GroupWorld.ActivityProblem(target) : IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
                 live.DisableProblem = GroupWorld.DisableProblem(target);
             }
+            // A crossing controller moves its setup only where the crossing capability holds the whole move.
+            if (CommandBand.EditsCoverage(selected.Identity) && crossingCoverageScene?.MovesSetup != true) live.WholeMoveReason = EditReasons.GameBuild;
             // A crossing whose lights, gates and bells the session cannot read offers no equipment edit, with that reason.
             if (CommandBand.EditsCoverage(selected.Identity) && attachment != null)
                 try { attachment.Session.Equipment(selected.Identity); } catch (Exception e) { live.EquipmentReason = e.GetBaseException().Message; }
@@ -1848,7 +1850,7 @@ namespace RailroaderScenePatcher {
         // A construction controller on an object of its own takes no placement and no Enabled setting: its position has
         // no effect, and the construction's visibility control runs on it.
         bool IsController => selected?.Identity.Structure == ConstructionSceneryScene.Structure;
-        string ControllerActivity => IsController ? CommandBand.ControllerNoActivity : CommandBand.EditsCoverage(selected?.Identity) ? SupportedEdits.CrossingNoEdit : null;
+        string ControllerActivity => IsController ? CommandBand.ControllerNoActivity : CommandBand.EditsCoverage(selected?.Identity) ? SupportedEdits.CrossingNoActivity : null;
         bool HasStarterTrack(TargetIdentity identity) {
             try { return attachment != null && identity != null && attachment.Session.HasStarterTrack(identity); } catch { return false; }
         }

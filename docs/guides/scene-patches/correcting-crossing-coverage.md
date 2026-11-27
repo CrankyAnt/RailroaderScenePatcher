@@ -26,7 +26,7 @@ The patcher never assigns coverage by proximity. The crossing detects a nearby t
 
 - The map's own detection spans for a corrected or detached circuit stay registered and unchanged. A track that used to trigger the crossing still exists and other consumers still see its spans. The crossing stops evaluating them, so a train on the old route no longer starts the warning.
 - Circuits you do not edit keep their coverage and keep working in both travel directions.
-- The crossing object, its equipment, and its activity do not move or change. A crossing-coverage modification accepts no `placement` or `active`.
+- A coverage edit doesn't move or change the crossing object, its equipment, or its activity. A crossing-coverage modification accepts no `active`. A `placement` in the same modification moves the grade-crossing setup as a whole and leaves its detection unchanged. See [move or rotate the whole grade-crossing setup](moving-crossing-equipment.md#move-or-rotate-the-whole-grade-crossing-setup).
 - At least one circuit or [detection addition](adding-crossing-detection.md) keeps detection. Detaching every circuit of a crossing without an addition is refused, also when earlier edits or modifications already detached the others. In the native map editor, **Detach** is unavailable for the last covered circuit and its tooltip says why; a scene patch file that would detach it fails that modification and leaves the coverage unchanged.
 
 ## Edit coverage in the native map editor

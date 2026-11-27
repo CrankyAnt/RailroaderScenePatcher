@@ -23,7 +23,7 @@ You must specify the tracks and area. The patcher doesn't choose them from nearb
 ## What stays the same
 
 - The crossing's native circuits keep their spans, their order, and their function. You can still [correct or detach them](correcting-crossing-coverage.md) in the same modification.
-- The crossing object, its equipment, and its activity do not move or change. The modification accepts no `placement` or `active`.
+- Adding detection doesn't move or change the crossing object, its equipment, or its activity. The modification accepts no `active`. A `placement` in the same modification moves the grade-crossing setup as a whole and leaves its detection unchanged. See [move or rotate the whole grade-crossing setup](moving-crossing-equipment.md#move-or-rotate-the-whole-grade-crossing-setup).
 - The crossing keeps at least one circuit or addition that detects trains. An addition counts, so you can detach every native circuit while an addition remains. Deleting the last one is refused.
 
 ## Add detection in the native map editor

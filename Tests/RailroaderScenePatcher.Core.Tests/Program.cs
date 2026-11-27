@@ -353,6 +353,7 @@ class Program {
         InteractiveBuildingTests.Run();
         PartCullingTests.Run();
         ExistingEquipmentTests.Run();
+        CrossingSetupTests.Run();
         SelectionTests.Run();
         ComplexTests.Run();
         BoardTests.Run();
