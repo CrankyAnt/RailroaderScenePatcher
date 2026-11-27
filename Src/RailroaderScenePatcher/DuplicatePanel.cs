@@ -4,7 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
+using TMPro;
 using UI.Builder;
+using UI.Common;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,6 +18,7 @@ namespace RailroaderScenePatcher {
         const string DuplicatePlace = "Duplicate";
         readonly DuplicateState duplicate = new DuplicateState();
         readonly PlacingPointer placingPointer = new PlacingPointer();
+        readonly PlacingGhost placingGhost = new PlacingGhost();
         bool Duplicating => duplicate.Open;
         bool PlacingModObject => duplicate.Step == DuplicateStep.Placing;
         // Why the window's other controls are unavailable now, or null: the file panel's reason, or the open Duplicate.
@@ -23,16 +26,17 @@ namespace RailroaderScenePatcher {
         // The mod object the last placing click made: it is inspected once the inventory lists it.
         TargetIdentity placedModObject;
 
-        // The pointer of the placing click: the world click the input blocker confirmed this frame, and the ground
-        // under it.
+        // The pointer while placing: where it is over the world, the world click the input blocker confirmed this
+        // frame, and the ground under a screen point. Both points are in GUI coordinates.
         sealed class PlacingPointer : IPlacingPointer {
-            internal Vector2? Click;
+            internal Vector2? At, Click;
+            public double[] Pointer => At is Vector2 point ? new double[] { point.x, point.y } : null;
             public double[] WorldClick => Click is Vector2 point ? new double[] { point.x, point.y } : null;
             public double[] MapPoint(double[] click) {
                 var camera = Camera.main;
                 var terrain = LayerMask.NameToLayer("Terrain");
                 if (camera == null || terrain < 0) return null;
-                // The click is in GUI coordinates, which run down from the top of the screen.
+                // The point is in GUI coordinates, which run down from the top of the screen.
                 var ray = camera.ScreenPointToRay(new Vector3((float)click[0], Screen.height - (float)click[1], 0));
                 if (!Physics.Raycast(ray, out var hit, 20000f, 1 << terrain)) return null;
                 var map = NativeInventory.MapPosition(hit.point, true);
@@ -66,6 +70,41 @@ namespace RailroaderScenePatcher {
             duplicate.Cancel();
             presentation?.RequestRefresh();
         }
+        // A selection in the outliner while the mod object is unplaced: the game's own question asks whether to cancel
+        // the duplicate. Keep duplicating, its Cancel and Escape keep the blank window; Cancel Duplicate ends it and
+        // then runs the selection. Returns false when no duplicate is open, so the caller selects at once.
+        bool AskBeforeOutlinerSelection(object target, string name, Action select) {
+            if (!duplicate.AskBeforeSelecting(target)) return false;
+            presentation?.RequestRefresh();
+            var source = duplicate.Source;
+            var answered = false;
+            void Choose(bool cancel, Action dismiss) {
+                if (answered) return;
+                answered = true;
+                dismiss();
+                // A duplicate that ended meanwhile, by closing the window or a reload, has nothing left to keep.
+                if (!ReferenceEquals(duplicate.Selecting, target)) return;
+                if (!cancel) { duplicate.KeepDuplicate(); presentation?.RequestRefresh(); return; }
+                duplicate.CancelForSelection();
+                presentation?.RequestRefresh();
+                select();
+            }
+            try {
+                ModalAlertController.Present((builder, dismiss) => {
+                    builder.ConfigureLayout(16f);
+                    builder.AddLabel(DuplicateState.SelectTitle, text => { text.fontSize = 22f; text.horizontalAlignment = HorizontalAlignmentOptions.Center; });
+                    builder.AddLabel(DuplicateState.SelectQuestion(source, name), text => { text.fontSize = 18f; text.horizontalAlignment = HorizontalAlignmentOptions.Center; });
+                    builder.AlertButtons(buttons => {
+                        buttons.AddButtonMedium(DuplicateState.KeepChoice, () => Choose(false, dismiss));
+                        buttons.AddButtonMedium(DuplicateState.CancelChoice, () => Choose(true, dismiss));
+                    });
+                }, escapeDismisses: true, width: 600, onCancel: dismiss => Choose(false, dismiss));
+            } catch (Exception e) {
+                duplicate.KeepDuplicate();
+                feedback.Report(DuplicatePlace, "The question to cancel Duplicate couldn't open: " + e.GetBaseException().Message.TrimEnd('.') + ". Click Cancel to end Duplicate.");
+            }
+            return true;
+        }
         // Closing the window, a map reload, the file panel or the end of editing: nothing of the mod object existed.
         void EndDuplicate() {
             if (!Duplicating) return;
@@ -93,19 +132,25 @@ namespace RailroaderScenePatcher {
             var viewport = view.GetComponent<ScrollRect>().viewport;
             if (viewport.GetComponent<RectMask2D>() == null && viewport.GetComponent<Mask>() == null)
                 viewport.gameObject.AddComponent<RectMask2D>();
+            // While placing, Release takes Place's slot: it takes the ghost off the pointer, as Esc does.
             ActionRow(builder, new[] {
-                Slot(DuplicateState.PlaceLabel, DuplicateState.PlaceTip, duplicate.PlaceReason, () => { duplicate.Place(); presentation?.RequestRefresh(); }),
+                PlacingModObject
+                    ? Slot(DuplicateState.ReleaseLabel, DuplicateState.ReleaseTip, null, () => { duplicate.Release(); presentation?.RequestRefresh(); })
+                    : Slot(DuplicateState.PlaceLabel, DuplicateState.PlaceTip, null, () => { duplicate.Place(); presentation?.RequestRefresh(); }),
                 Slot(DuplicateState.CancelLabel, DuplicateState.CancelTip, null, CancelDuplicate, "Cancel Duplicate") }, null);
         }
         // One frame of Duplicate: ends it when its window is gone, and while placing gives the frame's world click to
         // the state. A placed mod object changed the scene: the inventory reads it again and then inspects the object.
+        // The ghost follows the pointer in every frame while placing; over the window, or where no ground is, it hides.
         void TickDuplicate(bool open) {
-            if (!Duplicating) return;
+            if (!Duplicating) { placingGhost.Clear(); return; }
             var source = duplicate.Source?.Handle as GameObject;
-            if (!open || attachment == null || FileLocked || presentation.Compact || source == null) { EndDuplicate(); return; }
-            if (!PlacingModObject) return;
+            if (!open || attachment == null || FileLocked || presentation.Compact || source == null) { EndDuplicate(); placingGhost.Clear(); return; }
+            if (!PlacingModObject) { placingGhost.Hide(); return; }
+            var mouse = Input.mousePosition;
+            var pointer = new Vector2(mouse.x, Screen.height - mouse.y);
+            placingPointer.At = presentation.PanelBounds.Contains(pointer) ? (Vector2?)null : pointer;
             placingPointer.Click = inputBlocker?.WorldClick;
-            if (placingPointer.Click == null) return;
             var message = duplicate.Message;
             TargetIdentity placed = null;
             try { placed = duplicate.Tick(placingPointer, (from, placement) => attachment.Session.PlaceModObject(from, placement)); }
@@ -115,6 +160,12 @@ namespace RailroaderScenePatcher {
                 feedback.Report(DuplicatePlace, DuplicateState.Placed);
                 ModObjectsChanged();
             }
+            if (PlacingModObject && duplicate.Ghost != null) {
+                var turn = duplicate.Source.Rotation;
+                try { placingGhost.Show(source, duplicate.Ghost, new Quaternion((float)turn[0], (float)turn[1], (float)turn[2], (float)turn[3])); }
+                catch (Exception e) { placingGhost.Clear(); PatcherLog.Debug("The placing ghost is unavailable: " + e.GetBaseException().Message); }
+            }
+            else placingGhost.Hide();
             if (placed != null || !PlacingModObject || duplicate.Message != message) presentation?.RequestRefresh();
         }
         // A mod object was placed, removed or put back: the scene holds other objects than the snapshot, so the

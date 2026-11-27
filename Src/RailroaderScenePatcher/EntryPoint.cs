@@ -584,7 +584,7 @@ namespace RailroaderScenePatcher {
         }
         void Detach() {
             reloadRequirement = null;
-            duplicate.End(); placedModObject = null;
+            duplicate.End(); placingGhost.Clear(); placedModObject = null;
             presentation?.SetFileLock(null);
             CancelGuided();
             pickedTrackLocation = null; pickedTrackSelection = null;

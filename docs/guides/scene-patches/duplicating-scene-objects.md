@@ -28,15 +28,17 @@ Duplicate makes a new object from an object of the map and places it where you c
 
 1. Move the camera to where the object goes. The camera moves as always, and the native map editor stays available. The other controls of the Scene Patcher window, **Select in world** among them, wait until you place the object or click **Cancel**.
 
-1. Click **Place**. The pointer gets a mark with the instruction **Left-click to place**.
+1. Click **Place**. A ghost of the object, a copy that is shown only, stands on the ground under the pointer and follows it, with the instruction **Left-click to place**. Over the Scene Patcher window, or where no ground is, the ghost is hidden.
 
-1. Left-click the ground. The object is placed at that point, with the rotation of the object you duplicated.
+1. Left-click the ground. The object is placed where the ghost stands, with the rotation of the object you duplicated.
 
-   To stop placing without placing anything, press Esc. The blank object window stays open with **Place**.
+   To stop placing without placing anything, click **Release** or press Esc. The ghost leaves the pointer, and the blank object window shows **Place** and **Cancel** again.
 
 After the click, the window shows the new object with all four tabs. The outliner lists it under the place where it stands.
 
 To end without a new object, click **Cancel**. The window shows the object you started from. Closing the Scene Patcher window or reloading the map also ends Duplicate.
+
+If you select another object in the outliner before you place the object, Scene Patcher asks whether to cancel Duplicate. Click **Cancel Duplicate** to end it and inspect the object you selected, or **Keep duplicating** to stay in the blank object window.
 
 ## Edit or remove a mod object
 

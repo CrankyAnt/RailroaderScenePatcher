@@ -6,13 +6,16 @@ using System.Linq;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
-    // The pointer while a mod object is being placed: the left click on the world of this frame, and the map point
-    // under a click. A click on a window, and a right or middle click that moves the camera, is no click here.
+    // The pointer while a mod object is being placed: where it is over the world, the left click on the world of this
+    // frame, and the map point under a screen point. A click on a window, and a right or middle click that moves the
+    // camera, is no click here.
     internal interface IPlacingPointer {
+        // The pointer in screen coordinates while it is over the world, or null while it is over a window.
+        double[] Pointer { get; }
         // The left click on the world of this frame, in screen coordinates, or null.
         double[] WorldClick { get; }
-        // The map point of the ground under the click, or null where no ground is.
-        double[] MapPoint(double[] click);
+        // The map point of the ground under a screen point, or null where no ground is.
+        double[] MapPoint(double[] screen);
     }
     internal enum DuplicateStep { None, Blank, Placing }
     // Duplicate on the Object tab: the blank object window of a mod object that does not exist yet. Blank shows what is
@@ -20,12 +23,12 @@ namespace RailroaderScenePatcher {
     // of the mod object exists: no object, no outliner entry and no entry in the scene patch file.
     internal sealed class DuplicateState {
         internal const string Label = "Duplicate", Tip = "Make a new object from this one and place it in the world.";
-        internal const string PlaceLabel = "Place", PlaceTip = "Mark the pointer, then left-click the ground to place the object.";
+        internal const string PlaceLabel = "Place", PlaceTip = "Put a ghost of the object on the pointer, then left-click the ground to place it.";
+        internal const string ReleaseLabel = "Release", ReleaseTip = "Take the ghost off the pointer. Nothing is placed.";
         internal const string CancelLabel = "Cancel", CancelTip = "End Duplicate and return to the source object. Nothing is added.";
         internal const string BlankInstruction = "Move the camera to where the object goes, then click Place.";
-        internal const string PlacingInstruction = "Left-click the ground to place the object. Press Esc to stop placing.";
+        internal const string PlacingInstruction = "Left-click the ground to place the object. Click Release or press Esc to stop placing.";
         internal const string PointerInstruction = "Left-click to place";
-        internal const string PlacingActive = "Left-click the ground to place the object.";
         internal const string LockReason = "Place the object or click Cancel first.";
         internal const string NoGround = "No ground is under the pointer. Left-click the ground.";
         internal const string NotPlaced = "Not placed";
@@ -49,6 +52,10 @@ namespace RailroaderScenePatcher {
             if (selected.Family != SceneFamilies.SceneObject && selected.Family != SceneFamilies.StationMapIcon) return OtherFamily;
             return (familiesBelow ?? Enumerable.Empty<string>()).Any(family => family != null && !Copied.Contains(family, StringComparer.Ordinal)) ? HoldsOtherFamily : null;
         }
+        // The question that a selection in the outliner asks while the mod object is unplaced, with its title and choices.
+        internal const string SelectTitle = "Cancel Duplicate?", KeepChoice = "Keep duplicating", CancelChoice = "Cancel Duplicate";
+        internal static string SelectQuestion(SceneObservation source, string selectedName) =>
+            "Inspecting " + selectedName + " cancels the duplicate of " + source.DisplayName + ". Nothing is added.";
         // The title of the blank object window: it names the duplicated source.
         internal static string Title(SceneObservation source) => "Duplicating " + source.DisplayName;
 
@@ -56,11 +63,16 @@ namespace RailroaderScenePatcher {
         internal bool Open => Step != DuplicateStep.None;
         // The object being duplicated.
         internal SceneObservation Source { get; private set; }
+        // The map point where the ghost of the source stands while placing: the ground under the pointer. Null when
+        // nothing is being placed, the pointer is over a window, or no ground is under it.
+        internal double[] Ghost { get; private set; }
+        // The object the modder selected in the outliner while the question whether to cancel the duplicate is open, or null.
+        internal object Selecting { get; private set; }
         // Why the last placing click placed nothing, or null.
         internal string Message { get; private set; }
         internal string Instruction => Step == DuplicateStep.Placing ? PlacingInstruction : Step == DuplicateStep.Blank ? BlankInstruction : null;
-        // Why Place is inactive, or null.
-        internal string PlaceReason => Step == DuplicateStep.Placing ? PlacingActive : null;
+        // The controls of the blank object window: Place and Cancel, and while placing Release in Place's slot.
+        internal string[] Actions => Step == DuplicateStep.Placing ? new[] { ReleaseLabel, CancelLabel } : Step == DuplicateStep.Blank ? new[] { PlaceLabel, CancelLabel } : new string[0];
 
         // Duplicate: opens the blank object window for a new object made from the source.
         internal void Begin(SceneObservation source) {
@@ -68,11 +80,11 @@ namespace RailroaderScenePatcher {
             Source = source; Step = DuplicateStep.Blank; Message = null;
         }
         // Place: the pointer is marked and the next left click on the world places the object.
-        internal void Place() { if (Step == DuplicateStep.Blank) { Step = DuplicateStep.Placing; Message = null; } }
-        // Esc while placing: back to the blank window with Place.
+        internal void Place() { if (Step == DuplicateStep.Blank && Selecting == null) { Step = DuplicateStep.Placing; Message = null; } }
+        // Release or Esc while placing: the ghost leaves the pointer, back to the blank window with Place.
         internal bool Release() {
             if (Step != DuplicateStep.Placing) return false;
-            Step = DuplicateStep.Blank;
+            Step = DuplicateStep.Blank; Ghost = null;
             return true;
         }
         // Cancel: ends the duplicate and returns the source object, which the window inspects again.
@@ -81,20 +93,38 @@ namespace RailroaderScenePatcher {
             End();
             return source;
         }
+        // A selection in the outliner while the mod object is unplaced: true when the modder must first confirm that the
+        // duplicate is cancelled. The ghost leaves the pointer while the question is open.
+        internal bool AskBeforeSelecting(object selection) {
+            if (!Open || selection == null) return false;
+            Release();
+            Selecting = selection;
+            return true;
+        }
+        // The modder declined: the duplicate stays in the blank window.
+        internal void KeepDuplicate() { Selecting = null; }
+        // The modder confirmed: the duplicate ends and the object they selected is returned for inspection.
+        internal object CancelForSelection() {
+            var chosen = Selecting;
+            End();
+            return chosen;
+        }
         // Closing the window, a map reload or the end of editing: the unplaced mod object is gone.
-        internal void End() { Step = DuplicateStep.None; Source = null; Message = null; }
+        internal void End() { Step = DuplicateStep.None; Source = null; Message = null; Ghost = null; Selecting = null; }
         // One frame while placing. Only a left click on the world places: the object goes to the map point under it,
         // with the source's rotation. Returns the target of the placed mod object, or null while none was placed. A
         // click that places nothing, on no ground or refused by the edit, returns to the blank window with its reason.
         internal TargetIdentity Tick(IPlacingPointer pointer, Func<TargetIdentity, Placement, Outcome> place) {
             if (Step != DuplicateStep.Placing || pointer == null || place == null) return null;
+            var at = pointer.Pointer;
+            Ghost = at == null ? null : pointer.MapPoint(at);
             var click = pointer.WorldClick;
             if (click == null) return null;
             var point = pointer.MapPoint(click);
             if (point == null) { Message = NoGround; return null; }
             var outcome = place(Source.Identity, new Placement(point, Source.Rotation.ToArray()));
             if (outcome == null || !outcome.Applied) {
-                Step = DuplicateStep.Blank;
+                Step = DuplicateStep.Blank; Ghost = null;
                 Message = outcome?.Error ?? "The object could not be placed.";
                 return null;
             }

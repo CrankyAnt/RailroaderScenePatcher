@@ -132,11 +132,13 @@ namespace RailroaderScenePatcher {
         }
         // Makes every control below the rectangle unavailable with the file panel's reason, also controls the native
         // builders add later, such as the rows of an outline that is scrolled or rebuilt.
-        void LockControls(RectTransform rect, params RectTransform[] except) {
+        void LockControls(RectTransform rect, params RectTransform[] except) => LockControls(rect, false, except);
+        // keepRows leaves the outliner's rows and their disclosures available, as while a mod object is unplaced.
+        void LockControls(RectTransform rect, bool keepRows, params RectTransform[] except) {
             var reason = WindowLockReason;
             if (reason == null || rect == null) return;
             var locked = rect.GetComponent<UnavailableControls>() ?? rect.gameObject.AddComponent<UnavailableControls>();
-            locked.Reason = () => WindowLockReason; locked.Except = except.Where(e => e != null).ToArray();
+            locked.Reason = () => WindowLockReason; locked.Except = except.Where(e => e != null).ToArray(); locked.KeepRows = keepRows;
             locked.Apply();
         }
     }
@@ -146,6 +148,8 @@ namespace RailroaderScenePatcher {
     internal sealed class UnavailableControls : MonoBehaviour {
         internal Func<string> Reason = () => null;
         internal RectTransform[] Except = new RectTransform[0];
+        // Whether the outliner's rows and their disclosures stay available.
+        internal bool KeepRows;
         int nextFrame;
         void LateUpdate() {
             string reason = null;
@@ -168,6 +172,7 @@ namespace RailroaderScenePatcher {
         }
         static readonly int UiLayer = LayerMask.NameToLayer("UI");
         void LockRows() {
+            if (KeepRows) return;
             foreach (var clicks in GetComponentsInChildren<OutlineRowClickHandler>(true)) {
                 if (Except.Any(e => e != null && clicks.transform.IsChildOf(e))) continue;
                 var saved = clicks.GetComponent<UnavailableRow>();
@@ -195,6 +200,7 @@ namespace RailroaderScenePatcher {
             foreach (var selectable in GetComponentsInChildren<Selectable>(true)) {
                 if (Except.Any(e => e != null && selectable.transform.IsChildOf(e))) continue;
                 if (selectable is Scrollbar) continue;
+                if (KeepRows && selectable.GetComponentInParent<OutlineRowClickHandler>(true) != null) continue;
                 var saved = selectable.GetComponent<UnavailableTooltip>();
                 if (saved == null) {
                     var provider = selectable.GetComponent<UI.Tooltips.UITooltipProvider>();

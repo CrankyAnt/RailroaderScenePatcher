@@ -224,8 +224,9 @@ namespace RailroaderScenePatcher {
                 var outlinerRect = row.VStack(DrawOutliner);
                 // While the file panel is open, the outliner waits for it; Refresh alone stays available.
                 if (FileLocked) { DisableDuringRepair(outlinerRect); LockControls(outlinerRect, refreshButton); }
-                // While the blank object window of Duplicate is open, the outliner waits for Place or Cancel.
-                else if (Duplicating) LockControls(outlinerRect);
+                // While the blank object window of Duplicate is open, the outliner waits for Place or Cancel; a click on
+                // a row asks whether to cancel the duplicate (AskBeforeOutlinerSelection).
+                else if (Duplicating) LockControls(outlinerRect, true);
                 var outliner = outlinerRect.gameObject.AddComponent<LayoutElement>();
                 outliner.minWidth = width; outliner.preferredWidth = width; outliner.flexibleWidth = 0; outliner.flexibleHeight = 10000;
                 presentation.Divider(row, outliner, OutlinerMinimumWidth, OutlinerMaximum, () => outlinerWidth, width => { outlinerWidth = width; StoreOutlinerWidth(width); });
@@ -542,17 +543,12 @@ namespace RailroaderScenePatcher {
                 var outline = items.AddOutlineView(rows, state, new UIState<string>(selectedKey), key => {
                     if (!byKey.TryGetValue(key, out var observation)) {
                         // A click on a crossing node selects the crossing, so Focus goes to it.
-                        if (tree != null && crossingKeys.TryGetValue(key, out var nodeKey) && tree.GroupNodes.TryGetValue(nodeKey, out var node)) presentation.Action(() => SelectCrossingNode(nodeKey, node))();
+                        if (tree != null && crossingKeys.TryGetValue(key, out var nodeKey) && tree.GroupNodes.TryGetValue(nodeKey, out var node))
+                            presentation.Action(() => { if (!AskBeforeOutlinerSelection(node, node.Label, () => SelectCrossingNode(nodeKey, node))) SelectCrossingNode(nodeKey, node); })();
                         return;
                     }
-                    presentation.Action(() => {
-                        if (!GuidedSelect(observation)) return;
-                        crossingNodeKey = null; crossingNode = null;
-                        // A click on the row that is inspected already clears the inspection.
-                        if (CommandBand.ClearsInspection(selected, observation)) { ClearInspection(); return; }
-                        if (!inventoryPresentation.CanSelect(inventory, observation)) return;
-                        CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, observation); ReadPlacement();
-                    })();
+                    // While a mod object is unplaced, the modder first confirms that the duplicate is cancelled.
+                    presentation.Action(() => { if (!AskBeforeOutlinerSelection(observation, observation.DisplayName, () => SelectOutlinerRow(observation, true))) SelectOutlinerRow(observation, false); })();
                 });
                 // A row's tooltip waits as long as a button's, also while the pointer moves from row to row.
                 if (outline.GetComponent<OutlineTooltipDelay>() == null) outline.gameObject.AddComponent<OutlineTooltipDelay>();
@@ -562,6 +558,16 @@ namespace RailroaderScenePatcher {
                 // The compact rail trims this view to whole rows.
                 presentation.OutlinerView = outline.GetComponent<ScrollRect>();
             });
+        }
+        // A click on an object's row. After a cancelled duplicate the source is still inspected, and a click on its row
+        // keeps it inspected instead of clearing the inspection.
+        void SelectOutlinerRow(SceneObservation observation, bool afterDuplicate) {
+            if (!GuidedSelect(observation)) return;
+            crossingNodeKey = null; crossingNode = null;
+            // A click on the row that is inspected already clears the inspection.
+            if (CommandBand.ClearsInspection(selected, observation)) { if (!afterDuplicate) ClearInspection(); return; }
+            if (!inventoryPresentation.CanSelect(inventory, observation)) return;
+            CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, observation); ReadPlacement();
         }
         void FitOutliner(TMP_Text measure) {
             if (measure == null || inventory == null) return;
@@ -1986,7 +1992,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Dependencies", "Shows what else uses this object or changes with it, such as track locations, terrain masks, and visibility. The patcher checks direct links. The short form lists each object of this hierarchy by its relative path with its components; click the triangle after the heading for the full lines." },
                     new[] { "Runtime state", "Shows whether the game switches parts of the object on or off while it runs. Changes to these values don't make the inventory stale. Click the triangle after the heading to switch between the short form and the full lines, as for Dependencies." },
                     new[] { "Copy ID", "Copies the object's ID, placement, and the map ID needed by the scene patch file." },
-                    new[] { "Duplicate", "Makes a new object from this one, a mod object of this mod. Click Place, then left-click the ground where the object goes; Esc stops placing and Cancel ends Duplicate. Until that click nothing is added. Afterward, edit the mod object like any other object; Remove modification removes it. The game's own object stays as it is." } },
+                    new[] { "Duplicate", "Makes a new object from this one, a mod object of this mod. Click Place: a ghost of the object follows the pointer. Left-click the ground where the object goes; Release or Esc stops placing and Cancel ends Duplicate. Until that click nothing is added. Selecting another object in the outliner first asks whether to cancel Duplicate. Afterward, edit the mod object like any other object; Remove modification removes it. The game's own object stays as it is." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" }, new[] { "Duplicating objects", "duplicating-scene-objects.md" } } },
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",
                 Terms = new[] {

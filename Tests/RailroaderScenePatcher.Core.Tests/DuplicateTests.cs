@@ -21,6 +21,7 @@ static class DuplicateTests {
         public Frame Now = new Frame();
         public const double Horizon = 300;
         public double[] WorldClick => Now.Button == 0 && !Now.OverWindow ? new[] { Now.X, Now.Y } : null;
+        public double[] Pointer => Now.OverWindow ? null : new[] { Now.X, Now.Y };
         public double[] MapPoint(double[] click) => click[1] < Horizon ? null : new[] { 4000 + click[0], 12, 5000 + click[1] };
     }
     static readonly BaseMapFixture Map = new BaseMapFixture();
@@ -36,6 +37,10 @@ static class DuplicateTests {
         OnlyALeftClickOnTheWorldPlaces();
         EscReturnsAndCancelEnds();
         ARefusedClickReturnsToTheBlankWindow();
+        TheGhostFollowsThePointerWhilePlacing();
+        ReleaseAndEscRemoveTheGhost();
+        TheClickPlacesAtTheGhost();
+        SelectingAnotherObjectAsksFirst();
         Console.WriteLine("PASS: duplicate");
     }
 
@@ -97,7 +102,7 @@ static class DuplicateTests {
         window.State.Begin(window.Source);
         Assert(window.State.Step == DuplicateStep.Blank && ReferenceEquals(window.State.Source, window.Source), "Duplicate opens the blank object window for the source");
         Assert(DuplicateState.Title(window.State.Source) == "Duplicating Alarka Jct Station", "The title names the duplicated source: " + DuplicateState.Title(window.State.Source));
-        Assert(window.State.Instruction == DuplicateState.BlankInstruction && window.State.PlaceReason == null, "The blank window says what to do and offers Place");
+        Assert(window.State.Instruction == DuplicateState.BlankInstruction && window.State.Actions.SequenceEqual(new[] { DuplicateState.PlaceLabel, DuplicateState.CancelLabel }), "The blank window says what to do and offers Place");
         Assert(window.Modifications == 0 && window.World.World.Objects.Count == 1 && !window.Session.IsDirty(false), "The unplaced mod object has no object and no entry in the scene patch file");
         // A second Duplicate does not replace the open one.
         window.State.Begin(Row(ModObjectTests.Station + "/Mask"));
@@ -112,7 +117,7 @@ static class DuplicateTests {
         window.State.Begin(window.Source);
         Assert(window.Play(new Frame { Button = 0, X = 100, Y = 400 }) == null && window.Clicks == 0 && window.Modifications == 0, "A click before Place places nothing");
         window.State.Place();
-        Assert(window.State.Step == DuplicateStep.Placing && window.State.Instruction == DuplicateState.PlacingInstruction && window.State.PlaceReason == DuplicateState.PlacingActive, "Place shows the left-click instruction");
+        Assert(window.State.Step == DuplicateStep.Placing && window.State.Instruction == DuplicateState.PlacingInstruction && window.State.Actions[0] == DuplicateState.ReleaseLabel, "Place shows the left-click instruction and offers Release");
         foreach (var frame in new[] { new Frame(), new Frame { Button = 1, X = 100, Y = 400 }, new Frame { Button = 2, X = 100, Y = 400 }, new Frame { Button = 0, X = 100, Y = 400, OverWindow = true } })
             Assert(window.Play(frame) == null && window.Clicks == 0 && window.State.Step == DuplicateStep.Placing, "Only a left click on the world places: button " + frame.Button + (frame.OverWindow ? " over a window" : ""));
         Assert(window.Play(new Frame { Button = 0, X = 100, Y = 200 }) == null && window.Clicks == 0 && window.State.Step == DuplicateStep.Placing && window.State.Message == DuplicateState.NoGround, "A click where no ground is places nothing and says so");
@@ -133,7 +138,7 @@ static class DuplicateTests {
         window.State.Begin(window.Source);
         Assert(!window.State.Release(), "Esc in the blank window is not taken");
         window.State.Place();
-        Assert(window.State.Release() && window.State.Step == DuplicateStep.Blank && window.State.PlaceReason == null, "Esc while placing returns to the blank window");
+        Assert(window.State.Release() && window.State.Step == DuplicateStep.Blank && window.State.Actions[0] == DuplicateState.PlaceLabel, "Esc while placing returns to the blank window");
         Assert(window.Play(new Frame { Button = 0, X = 493, Y = 415 }) == null && window.Modifications == 0, "After Esc a click places nothing");
         window.State.Place();
         var source = window.State.Cancel();
@@ -151,5 +156,94 @@ static class DuplicateTests {
         window.State.Begin(window.Source); window.State.Place();
         Assert(window.Play(new Frame { Button = 0, X = 493, Y = 415 }) == null && window.Clicks == 1, "The refused click places nothing");
         Assert(window.State.Step == DuplicateStep.Blank && !String.IsNullOrEmpty(window.State.Message) && window.Modifications == 0 && window.World.ModObject == null, "The blank window shows the reason: " + window.State.Message);
+    }
+
+    static bool Near(double[] a, double[] b) => a != null && b != null && a.Length == b.Length && a.Zip(b, (x, y) => Math.Abs(x - y)).All(d => d < 0.001);
+
+    // While Place is active, the ghost of the source stands at the map point under the pointer and follows it. Over a
+    // window, or where no ground is, it is hidden. Before Place there is no ghost.
+    static void TheGhostFollowsThePointerWhilePlacing() {
+        var window = new Window();
+        window.State.Begin(window.Source);
+        window.Play(new Frame { X = 100, Y = 400 });
+        Assert(window.State.Ghost == null, "The blank window shows no ghost");
+        window.State.Place();
+        window.Play(new Frame { X = 100, Y = 400 });
+        Assert(Near(window.State.Ghost, new[] { 4100.0, 12, 5400 }), "The ghost stands under the pointer");
+        window.Play(new Frame { X = 250, Y = 380 });
+        Assert(Near(window.State.Ghost, new[] { 4250.0, 12, 5380 }), "The ghost follows the pointer");
+        window.Play(new Frame { X = 250, Y = 380, OverWindow = true });
+        Assert(window.State.Ghost == null, "Over a window the ghost is hidden");
+        window.Play(new Frame { X = 250, Y = 200 });
+        Assert(window.State.Ghost == null, "Where no ground is the ghost is hidden");
+        window.Play(new Frame { Button = 1, X = 300, Y = 450 });
+        Assert(Near(window.State.Ghost, new[] { 4300.0, 12, 5450 }) && window.State.Step == DuplicateStep.Placing, "A camera move keeps the ghost on the pointer");
+        Assert(window.Modifications == 0 && window.World.ModObject == null, "The ghost is no mod object");
+    }
+
+    // Release, the control that takes Place's slot while placing, and Esc both remove the ghost and return to the blank
+    // object window with Place and Cancel; neither creates a mod object.
+    static void ReleaseAndEscRemoveTheGhost() {
+        foreach (var esc in new[] { false, true }) {
+            var window = new Window();
+            window.State.Begin(window.Source);
+            Assert(window.State.Actions.SequenceEqual(new[] { DuplicateState.PlaceLabel, DuplicateState.CancelLabel }), "The blank window offers Place and Cancel");
+            window.State.Place();
+            Assert(window.State.Actions.SequenceEqual(new[] { DuplicateState.ReleaseLabel, DuplicateState.CancelLabel }), "While placing the window offers Release and Cancel");
+            window.Play(new Frame { X = 100, Y = 400 });
+            Assert(window.State.Ghost != null, "The ghost stands on the pointer");
+            Assert(window.State.Release(), (esc ? "Esc" : "Release") + " is taken while placing");
+            Assert(window.State.Ghost == null && window.State.Step == DuplicateStep.Blank && window.State.Instruction == DuplicateState.BlankInstruction, (esc ? "Esc" : "Release") + " removes the ghost and returns to the blank window");
+            Assert(window.State.Actions.SequenceEqual(new[] { DuplicateState.PlaceLabel, DuplicateState.CancelLabel }), "The blank window offers Place and Cancel again");
+            window.Play(new Frame { X = 150, Y = 420 });
+            Assert(window.State.Ghost == null && window.Play(new Frame { Button = 0, X = 150, Y = 420 }) == null, "After it no ghost follows and a click places nothing");
+            Assert(window.Modifications == 0 && window.World.ModObject == null && !window.Session.IsDirty(false), "No mod object was created");
+        }
+        Assert(DuplicateState.ReleaseLabel == "Release" && DuplicateState.ReleaseTip.EndsWith(".", StringComparison.Ordinal), "Release has its label and tooltip");
+    }
+
+    // The ghost moves with the pointer frame by frame; one left click places the mod object at the ghost's position,
+    // once, and the ghost goes with the placing.
+    static void TheClickPlacesAtTheGhost() {
+        var window = new Window();
+        window.State.Begin(window.Source); window.State.Place();
+        window.Play(new Frame { X = 100, Y = 400 });
+        window.Play(new Frame { X = 320, Y = 470 });
+        var ghost = window.State.Ghost;
+        var placed = window.Play(new Frame { Button = 0, X = 320, Y = 470 });
+        Assert(placed != null && window.Clicks == 1, "One left click places the mod object");
+        Assert(Near(window.World.At(window.World.ModObject), ghost), "It stands where the ghost stood");
+        Assert(window.State.Ghost == null && !window.State.Open, "The ghost goes with the placing");
+        window.Play(new Frame { Button = 0, X = 330, Y = 480 });
+        Assert(window.Clicks == 1 && window.Modifications == 1, "It is placed once");
+    }
+
+    // Selecting another object in the outliner while the mod object is unplaced asks before the duplicate is cancelled.
+    // Declining keeps the duplicate as it was, in the blank window; confirming ends it and the selected object is
+    // inspected. With no duplicate open, a selection asks nothing.
+    static void SelectingAnotherObjectAsksFirst() {
+        var other = Row(ModObjectTests.Station + "/Mask");
+        var idle = new DuplicateState();
+        Assert(!idle.AskBeforeSelecting(other) && idle.Selecting == null, "Without an open duplicate a selection asks nothing");
+        foreach (var placing in new[] { false, true }) {
+            var window = new Window();
+            window.State.Begin(window.Source);
+            if (placing) { window.State.Place(); window.Play(new Frame { X = 100, Y = 400 }); }
+            Assert(window.State.AskBeforeSelecting(other), "Selecting another object asks first" + (placing ? " while placing" : ""));
+            Assert(ReferenceEquals(window.State.Selecting, other) && window.State.Open && ReferenceEquals(window.State.Source, window.Source), "The duplicate stays open while the question is asked");
+            Assert(window.State.Ghost == null && window.State.Step == DuplicateStep.Blank, "The ghost leaves the pointer while the question is asked");
+            Assert(window.Play(new Frame { Button = 0, X = 100, Y = 400 }) == null && window.Clicks == 0, "A click while the question is asked places nothing");
+            window.State.KeepDuplicate();
+            Assert(window.State.Selecting == null && window.State.Open && window.State.Step == DuplicateStep.Blank && ReferenceEquals(window.State.Source, window.Source), "Declining keeps the duplicate");
+            Assert(window.Modifications == 0, "Declining adds nothing");
+            window.State.Place();
+            window.Play(new Frame { X = 120, Y = 410 });
+            Assert(window.State.Ghost != null, "After declining Place puts the ghost on the pointer again");
+            Assert(window.State.AskBeforeSelecting(other), "The next selection asks again");
+            var chosen = window.State.CancelForSelection();
+            Assert(ReferenceEquals(chosen, other) && !window.State.Open && window.State.Selecting == null && window.State.Ghost == null, "Confirming cancels the duplicate and gives the selected object");
+            Assert(window.Modifications == 0 && window.World.ModObject == null && !window.Session.IsDirty(false), "Confirming adds nothing");
+        }
+        Assert(DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot") == "Inspecting Bryson Depot cancels the duplicate of Alarka Jct Station. Nothing is added.", "The question names both objects: " + DuplicateState.SelectQuestion(Row(ModObjectTests.Station), "Bryson Depot"));
     }
 }
