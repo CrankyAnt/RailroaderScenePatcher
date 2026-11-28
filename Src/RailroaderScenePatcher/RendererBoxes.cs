@@ -209,8 +209,14 @@ namespace RailroaderScenePatcher {
                 if (batchPoints.TryGetValue(oldest, out var points)) { total -= points.Length; batchPoints.Remove(oldest); }
             }
         }
-        static WorldPoint[] ToWorld(IReadOnlyList<WorldPoint> corners, Matrix4x4 matrix) =>
-            corners.Select(p => { var q = matrix.MultiplyPoint3x4(new Vector3((float)p.X, (float)p.Y, (float)p.Z)); return new WorldPoint(q.x, q.y, q.z); }).ToArray();
+        static WorldPoint[] ToWorld(IReadOnlyList<WorldPoint> corners, Matrix4x4 matrix) {
+            var world = new WorldPoint[corners.Count];
+            for (var i = 0; i < world.Length; i++) {
+                var p = corners[i]; var q = matrix.MultiplyPoint3x4(new Vector3((float)p.X, (float)p.Y, (float)p.Z));
+                world[i] = new WorldPoint(q.x, q.y, q.z);
+            }
+            return world;
+        }
         // A renderer's box in its own space and the matrix to the world. The mesh gives it whether or not the renderer
         // shows now; a static batch has no own mesh any more. False when neither is known.
         static bool LocalBox(Renderer renderer, out Bounds local, out Matrix4x4 matrix) {

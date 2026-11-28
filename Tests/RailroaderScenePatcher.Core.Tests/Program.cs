@@ -291,6 +291,7 @@ class Program {
         WorldStrokeGeometryTests.Run();
         ObjectMarkingGeometryTests.Run();
         ObjectMarkingGeometryTests.RunBoxes();
+        MarkingCostTests.Run();
         FittedFrameTests.Run();
         HelperMarkerTests.Run();
         ShapeTests.Run();

@@ -62,18 +62,25 @@ namespace RailroaderScenePatcher.Core {
         public static IReadOnlyList<int> Resolve(double x, double y, IReadOnlyList<PickTarget> targets) {
             if (targets == null || targets.Count == 0) return Array.Empty<int>();
             double Distance(int i) { double dx = targets[i].X - x, dy = targets[i].Y - y; return dx * dx + dy * dy; }
-            var all = Enumerable.Range(0, targets.Count).ToArray();
-            var pool = all.Where(i => OnMarker(targets[i], x, y)).ToArray();
-            if (pool.Length == 0) pool = all.Where(i => targets[i].Area).ToArray();
-            if (pool.Length == 0) return Array.Empty<int>();
-            var winner = pool.OrderBy(Distance).ThenBy(i => i).First();
-            bool Same(int i) {
-                if (i == winner) return true;
-                if (!targets[i].Marked || !targets[winner].Marked) return false;
-                double dx = targets[i].X - targets[winner].X, dy = targets[i].Y - targets[winner].Y;
-                return dx * dx + dy * dy < SameSpot * SameSpot;
-            }
-            return all.Where(Same).OrderBy(i => i == winner ? 0 : 1).ThenBy(Distance).ThenBy(i => i).ToArray();
+            // Loops, not queries: the hover runs this every frame over every candidate.
+            var winner = -1;
+            for (var pass = 0; pass < 2 && winner < 0; pass++)
+                for (var i = 0; i < targets.Count; i++)
+                    if (pass == 0 ? OnMarker(targets[i], x, y) : targets[i].Area)
+                        if (winner < 0 || Distance(i).CompareTo(Distance(winner)) < 0) winner = i;
+            if (winner < 0) return Array.Empty<int>();
+            var spot = new List<int>();
+            if (targets[winner].Marked)
+                for (var i = 0; i < targets.Count; i++) {
+                    if (i == winner || !targets[i].Marked) continue;
+                    double dx = targets[i].X - targets[winner].X, dy = targets[i].Y - targets[winner].Y;
+                    if (dx * dx + dy * dy < SameSpot * SameSpot) spot.Add(i);
+                }
+            spot.Sort((a, b) => { var order = Distance(a).CompareTo(Distance(b)); return order != 0 ? order : a.CompareTo(b); });
+            var result = new int[spot.Count + 1];
+            result[0] = winner;
+            spot.CopyTo(result, 1);
+            return result;
         }
         // The click rule with complexes that show as one. A group's square marker and frame take part as
         // those of one object, in place of its objects other than those that show on their own. Where the rule picks

@@ -75,13 +75,18 @@ namespace RailroaderScenePatcher {
         // hundreds of arrays a frame, which the game pays for in collection pauses.
         // With each list, which of its renderers outline the object (ObjectMarkingGeometry.Outlines): a renderer the
         // game's culling hides now still counts, so the frame and its marker do not change with camera distance.
-        sealed class Listed { internal Renderer[] Renderers; internal bool[] Outlines; internal int Until; }
+        // With them, whether the game moves one of them while it runs (GroupWorld.MovesWhileRunning).
+        sealed class Listed { internal Renderer[] Renderers; internal bool[] Outlines; internal bool Moves; internal int Until; }
         readonly Dictionary<GameObject, Listed> listed = new Dictionary<GameObject, Listed>();
-        Renderer[] Renderers(GameObject go, out bool[] outlines) {
-            if (listed.TryGetValue(go, out var kept) && Time.frameCount < kept.Until) { outlines = kept.Outlines; return kept.Renderers; }
+        Renderer[] Renderers(GameObject go, out bool[] outlines, out bool moves) {
+            if (listed.TryGetValue(go, out var kept) && Time.frameCount < kept.Until) { outlines = kept.Outlines; moves = kept.Moves; return kept.Renderers; }
             var list = ListRenderers(go);
-            outlines = list.Select(OutlinesObject).ToArray();
-            listed[go] = new Listed { Renderers = list, Outlines = outlines, Until = Time.frameCount + 90 + (go.GetInstanceID() & 63) };
+            outlines = new bool[list.Length]; moves = false;
+            for (var i = 0; i < list.Length; i++) {
+                outlines[i] = OutlinesObject(list[i]);
+                if (!moves && list[i] != null && GroupWorld.MovesWhileRunning(list[i].transform)) moves = true;
+            }
+            listed[go] = new Listed { Renderers = list, Outlines = outlines, Moves = moves, Until = Time.frameCount + 90 + (go.GetInstanceID() & 63) };
             return list;
         }
         // The game's components that switch renderers off by camera distance and hold the renderers they switch: a
@@ -305,7 +310,9 @@ namespace RailroaderScenePatcher {
         }
         // The surface may have changed: an edit, a terrain output that completed, or a track change. The heights are
         // read again.
-        internal void ClearSurface() { grounds.Clear(); listed.Clear(); colliders.Clear(); controlled.Clear(); piles.Clear(); groupedFrom = null; }
+        internal void ClearSurface() { grounds.Clear(); listed.Clear(); colliders.Clear(); controlled.Clear(); piles.Clear(); groupedFrom = null; ForgetGeometry(); }
+        // What was measured of the objects, and the last pass, are made anew.
+        void ForgetGeometry() { geometry.Clear(); lodsOf.Clear(); reuse.Forget(); keptShapes = null; keptMeasured = null; keptGroups = null; }
         // What is kept per object and per renderer loses the entries of objects the game destroyed, now and then.
         int prunedAt;
         void Prune() {
@@ -317,6 +324,8 @@ namespace RailroaderScenePatcher {
             foreach (var gone in piles.Keys.Where(key => key == null).ToArray()) piles.Remove(gone);
             foreach (var gone in kinds.Keys.Where(key => key == null).ToArray()) kinds.Remove(gone);
             foreach (var gone in keptBoxes.Keys.Where(key => key == null).ToArray()) keptBoxes.Remove(gone);
+            foreach (var gone in lodsOf.Keys.Where(key => key == null).ToArray()) lodsOf.Remove(gone);
+            geometry.RemoveWhere(handle => !(handle is GameObject go) || go == null);
             rendererBoxes?.Prune();
         }
         // The world box of each static-batched renderer from when it last showed, in its object's own space: the box it
@@ -326,8 +335,12 @@ namespace RailroaderScenePatcher {
         // The box that follows each renderer's mesh, read within the pass's share (RendererBoxes).
         RendererBoxes rendererBoxes;
         RendererBoxes Boxes => rendererBoxes ?? (rendererBoxes = new RendererBoxes(budget));
-        internal static WorldPoint[] BoxCorners(Bounds b) =>
-            Enumerable.Range(0, 8).Select(i => Point(b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)))).ToArray();
+        internal static WorldPoint[] BoxCorners(Bounds b) {
+            Vector3 c = b.center, e = b.extents;
+            var corners = new WorldPoint[8];
+            for (var i = 0; i < 8; i++) corners[i] = Point(c + Vector3.Scale(e, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)));
+            return corners;
+        }
 
         internal void Release() {
             frameChecks.Clear(); writtenCameraLine = null;
@@ -341,6 +354,7 @@ namespace RailroaderScenePatcher {
             controlled.Clear();
             listed.Clear();
             colliders.Clear();
+            ForgetGeometry();
         }
 
         internal void ClearInteraction() {
@@ -358,6 +372,7 @@ namespace RailroaderScenePatcher {
             // Native windows can move between the last repaint and this click.
             covered = uiBounds;
             budget.Begin();
+            BeginPass(camera);
             if (covered.Any(r => r.Contains(pointer))) return Array.Empty<SelectionCandidate>();
             lastPick = pointer;
             var labelHits = labels.Where(s => s.Candidate != null && s.Label.Contains(pointer)).ToArray();
@@ -427,6 +442,10 @@ namespace RailroaderScenePatcher {
         object groupedFrom;
         int groupedCount;
         InventoryGroup[] inventoryGroups = new InventoryGroup[0];
+        // For each group, the part of its marking that no camera changes (ObjectMarkingGroupPiece), kept while it holds:
+        // a camera move then only measures the distance to its box and, between the group and the frame distance,
+        // projects that box.
+        ObjectMarkingGroupPiece[] groupPieces = new ObjectMarkingGroupPiece[0];
         // For each group, the index among the candidates of each of its objects, or -1 for one the choice does not
         // offer; kept per list of candidates.
         SpatialCandidate[] mappedFor;
@@ -440,7 +459,7 @@ namespace RailroaderScenePatcher {
             object from = listed ? (object)snapshot : candidates;
             var count = listed ? snapshot.Count : candidates.Length;
             if (ReferenceEquals(from, groupedFrom) && count == groupedCount) return inventoryGroups;
-            groupedFrom = from; groupedCount = count; mappedFor = null; inventoryGroups = new InventoryGroup[0];
+            groupedFrom = from; groupedCount = count; mappedFor = null; inventoryGroups = new InventoryGroup[0]; groupPieces = new ObjectMarkingGroupPiece[0];
             try {
                 var all = (listed ? snapshot.ToArray() : candidates.Where(c => c.Observation != null).Select(c => c.Observation).ToArray()).Where(o => !ChosenInOutliner(o)).ToArray();
                 // A root of the Scene object and Child object families anchors a scene object with child objects with the inventory objects
@@ -548,7 +567,11 @@ namespace RailroaderScenePatcher {
                 // with the orientation of the scene object that anchors it, the crossing controller's root, as its
                 // fallback, and is cut at the surface like the box of an object.
                 var root = groups[g].Root;
-                var marking = ObjectMarkingGeometry.GroupFrame(eye, anchors, frames, root != null ? Basis(root.transform) : (WorldBasis?)null, GroundAt, Projection(camera), ViewOf(camera), listed);
+                var orientation = root != null ? Basis(root.transform) : (WorldBasis?)null;
+                if (groupPieces.Length != groups.Length) groupPieces = new ObjectMarkingGroupPiece[groups.Length];
+                var piece = groupPieces[g];
+                if (piece == null || !piece.Holds(anchors, frames, orientation, listed)) groupPieces[g] = piece = ObjectMarkingGeometry.GroupPieceOf(anchors, frames, orientation, listed);
+                var marking = ObjectMarkingGeometry.GroupFrame(piece, eye, GroundAt, passProjection, passView);
                 // Objects that stand apart, such as the signs of a container along the track, form no group: each shows
                 // on its own.
                 if (marking.Spread) continue;
@@ -575,9 +598,15 @@ namespace RailroaderScenePatcher {
             return layout;
         }
         // Every candidate projected once, with what was measured of each.
-        Shape[] ProjectAll(SpatialCandidate[] candidates, Camera camera, Vector3 origin, out Measured[] measured) {
+        // moving, when given, receives the candidates with a part the game moves while it runs; waiting those still
+        // waiting for reads.
+        Shape[] ProjectAll(SpatialCandidate[] candidates, Camera camera, Vector3 origin, out Measured[] measured, List<int> moving = null, List<int> waiting = null) {
             var shapes = new Shape[candidates.Length]; measured = new Measured[candidates.Length];
-            for (var i = 0; i < candidates.Length; i++) shapes[i] = Project(candidates[i], camera, origin, ObjectMarkingGeometry.FrameDistance, out measured[i]);
+            for (var i = 0; i < candidates.Length; i++) {
+                shapes[i] = Project(candidates[i], camera, origin, ObjectMarkingGeometry.FrameDistance, out measured[i]);
+                if (lastMoves) moving?.Add(i);
+                if (lastWaits) waiting?.Add(i);
+            }
             return shapes;
         }
         // A candidate that shows on its own in a group within the group's frame distance has its own frame, although
@@ -591,6 +620,11 @@ namespace RailroaderScenePatcher {
                 if (distance > ObjectMarkingGeometry.FrameDistance) shapes[m] = Project(candidates[m], camera, origin, Double.PositiveInfinity, out _);
             }
         }
+        // The camera of the pass, a repaint or a click: its projection, its view and its position, made once per pass.
+        Func<WorldPoint, ClipPoint> passProjection;
+        ScreenRect passView;
+        WorldPoint passEye;
+        void BeginPass(Camera camera) { passProjection = Projection(camera); passView = ViewOf(camera); passEye = Point(camera.transform.position); }
         // The camera's projection of a world point to clip coordinates, and its view in top-left screen pixels.
         static Func<WorldPoint, ClipPoint> Projection(Camera camera) {
             var toClip = camera.projectionMatrix * camera.worldToCameraMatrix;
@@ -650,13 +684,45 @@ namespace RailroaderScenePatcher {
             shape.Text = ObjectLabel(relation, label);
             shapes.Add(shape);
         }
+        // A pass is used again while the camera stands still and nothing it was made from changed (MarkingReuse), for
+        // at most ReuseFrames frames: the pointer then changes only what it marks and the labels. A part the game moves
+        // while it runs is followed in every pass, and with it the groups it belongs to.
+        const int ReuseFrames = 30;
+        // A pass that left reads for a later frame is used again for IncompleteFrames frames, while the objects still
+        // waiting are measured further in each of them.
+        const int IncompleteFrames = 4;
+        readonly MarkingReuse reuse = new MarkingReuse(ReuseFrames, IncompleteFrames);
+        readonly ObservationPace pace = new ObservationPace();
+        // The camera's position, rotation, projection and view, the screen, the world origin and the inventory count.
+        readonly double[] viewKey = new double[33];
+        // The candidates, the choice's candidate, the inspected object and the inventory snapshot.
+        readonly object[] passInputs = new object[4];
+        Shape[] keptShapes; Measured[] keptMeasured; GroupLayout keptGroups;
+        SpatialCandidate keptSource;
+        readonly List<int> moving = new List<int>(), waiting = new List<int>();
+        void FillViewKey(Camera camera, Vector3 origin, int inventoryCount) {
+            var t = camera.transform; var p = t.position; var r = t.rotation; var m = camera.projectionMatrix; var view = camera.pixelRect;
+            var k = 0;
+            viewKey[k++] = p.x; viewKey[k++] = p.y; viewKey[k++] = p.z;
+            viewKey[k++] = r.x; viewKey[k++] = r.y; viewKey[k++] = r.z; viewKey[k++] = r.w;
+            for (var i = 0; i < 16; i++) viewKey[k++] = m[i];
+            viewKey[k++] = view.x; viewKey[k++] = view.y; viewKey[k++] = view.width; viewKey[k++] = view.height;
+            viewKey[k++] = Screen.width; viewKey[k++] = Screen.height;
+            viewKey[k++] = origin.x; viewKey[k++] = origin.y; viewKey[k++] = origin.z;
+            viewKey[k] = inventoryCount;
+        }
+        // What the pointer marked on a kept shape in the last repaint is marked anew.
+        static void Unmark(Shape shape) { shape.Text = null; shape.Label = default; shape.Listed = false; shape.Strong = false; shape.Detailed = false; }
         internal void Draw(SpatialCandidate[] candidates, PendingSelection pending, SpatialCandidate source, bool hasSource, SpatialCandidate confirmed, SpatialCandidate followed,
             IReadOnlyList<SpatialCandidate> bound, Camera camera, Vector3 origin, IReadOnlyList<Rect> uiBounds, Texture2D backing, SpatialCandidate trackPoint = null) {
             covered = uiBounds;
             inspectedMark = source;
             budget.Begin();
             Prune();
-            BeginObservation(pending, source, camera);
+            BeginPass(camera);
+            var snapshot = Inventory?.Invoke();
+            FillViewKey(camera, origin, snapshot?.Count ?? -1);
+            BeginObservation(pending, source, camera, candidates);
             try {
             if (textStyle == null) {
                 // Skin labels can carry one-line height/offset constraints. Measure and draw with
@@ -676,13 +742,51 @@ namespace RailroaderScenePatcher {
             var pointer = new Vector2(mouse.x, Screen.height - mouse.y);
             // The pointer marks what a click there would select, by the click's own rule: one candidate, or the
             // candidates of one spot. Over a window or a label it marks nothing by that rule; a label marks its own.
-            var projected = ProjectAll(candidates, camera, origin, out var measured);
             var overUi = covered.Any(r => r.Contains(pointer));
-            // A group marker's label is no candidate's: the pointer over it keeps the hover of its group.
+            // A group marker's label is no candidate's: the pointer over it keeps the hover of its group. What it says
+            // is read before the kept shapes are marked anew.
             var labelHit = overUi ? null : labels.FirstOrDefault(label => label.Candidate != null && label.Label.Contains(pointer));
+            var labelHitChoice = labelHit?.Candidate.Choice;
+            var labelHitListed = labelHit != null && labelHit.Listed;
             labels.Clear();
-            var groups = Groups(candidates, measured, camera, origin, pending?.Candidate, source);
-            OwnFrames(candidates, projected, measured, groups, camera, origin);
+            // The inspected object is observed anew in every repaint: the candidate kept from an earlier repaint stands
+            // for it while it is the same object, so a still camera reuses its pass.
+            if (source == null || keptSource == null || !source.Choice.Matches(keptSource.Choice)) keptSource = source;
+            passInputs[0] = candidates; passInputs[1] = pending?.Candidate; passInputs[2] = keptSource; passInputs[3] = snapshot;
+            Shape[] projected; Measured[] measured; GroupLayout groups;
+            if (!observing && keptShapes != null && reuse.Reuses(viewKey, passInputs, Time.frameCount)) {
+                projected = keptShapes; measured = keptMeasured; groups = keptGroups;
+                var own = false;
+                // A part the game moves while it runs is followed in every pass where it shows; the frame of a group
+                // it belongs to follows with the next pass.
+                foreach (var i in moving) {
+                    if (projected[i] == null) continue;
+                    projected[i] = Project(candidates[i], camera, origin, ObjectMarkingGeometry.FrameDistance, out measured[i]);
+                    own |= groups.OwnAtGroupDistance.Contains(i);
+                }
+                // An object still waiting for reads is measured further in every pass; once the last one is read,
+                // the next pass is made anew, with its group frames.
+                if (waiting.Count != 0) {
+                    for (var w = waiting.Count - 1; w >= 0; w--) {
+                        var i = waiting[w];
+                        projected[i] = Project(candidates[i], camera, origin, ObjectMarkingGeometry.FrameDistance, out measured[i]);
+                        own |= groups.OwnAtGroupDistance.Contains(i);
+                        if (!lastWaits) waiting.RemoveAt(w);
+                    }
+                    if (waiting.Count == 0) reuse.Forget();
+                }
+                if (own) OwnFrames(candidates, projected, measured, groups, camera, origin);
+            } else {
+                passIncomplete = false;
+                moving.Clear(); waiting.Clear();
+                projected = ProjectAll(candidates, camera, origin, out measured, moving, waiting);
+                groups = Groups(candidates, measured, camera, origin, pending?.Candidate, source);
+                OwnFrames(candidates, projected, measured, groups, camera, origin);
+                reuse.Keep(viewKey, passInputs, Time.frameCount, !passIncomplete && !budget.Exhausted);
+                keptShapes = projected; keptMeasured = measured; keptGroups = groups;
+            }
+            foreach (var kept in projected) if (kept != null) Unmark(kept);
+            foreach (var group in groups.Shown) if (group.Shape != null) Unmark(group.Shape);
             var pointed = pending == null || overUi || labelHit != null ? null : Resolve(candidates, projected, groups, camera, origin, pointer);
             var under = pointed?.HoveredObjects ?? Array.Empty<int>();
             var several = pending?.ListOpen == true;
@@ -693,7 +797,7 @@ namespace RailroaderScenePatcher {
                 bool chosen = pending != null && ReferenceEquals(candidate.Choice, pending.Candidate);
                 bool offered = inOffers && (several || chosen);
                 bool rowHovered = inOffers && (overUi && ReferenceEquals(candidate.Choice, pending.Highlight) ||
-                    ReferenceEquals(candidate.Choice, labelHit?.Candidate.Choice) && (chosen || (several && labelHit.Listed)));
+                    ReferenceEquals(candidate.Choice, labelHitChoice) && (chosen || (several && labelHitListed)));
                 // Hovering a row reveals that object's own frame, including when its group stands in for it.
                 if (groups.Hidden[index]) {
                     if (!offered || !several) continue;
@@ -736,7 +840,7 @@ namespace RailroaderScenePatcher {
             if (source != null && source.Points.Length > 0) {
                 var marked = shapes.FirstOrDefault(s => s.Text != null && s.Candidate != null && s.Candidate.Choice.Matches(source.Choice));
                 // The inspected object keeps its frame and marker at any camera distance and while culling hides it.
-                var shape = Project(source, camera, origin, Double.PositiveInfinity, out _);
+                var shape = Project(source, camera, origin, Double.PositiveInfinity, out _, fresh: true);
                 if (marked != null) {
                     if (hasSource) marked.Text = ObjectLabel(source, "Inspected: ");
                 } else if (shape != null) {
@@ -788,13 +892,16 @@ namespace RailroaderScenePatcher {
                 GUI.contentColor = Color.white;
                 DrawTracks(shapes, zones);
                 DrawOutlines(shapes, zones);
+                // A candidate that a row points at is drawn over the others on its spot.
+                // Neutral markers first, then hovered, clicked and related ones, then the one a row points at:
+                // on a spot that several share, the candidate shows in its colour, not under a neutral marker.
+                var ordered = new List<Shape>(shapes.Count);
+                for (var rank = 0; rank <= 2; rank++) foreach (var shape in shapes) if (CommandBand.DrawRank(shape.Detailed, shape.Strong) == rank) ordered.Add(shape);
                 foreach (var zone in zones) {
                     GUI.BeginGroup(zone);
                     try {
-                        // A candidate that a row points at is drawn over the others on its spot.
-                        // Neutral markers first, then hovered, clicked and related ones, then the one a row points at:
-                        // on a spot that several share, the candidate shows in its colour, not under a neutral marker.
-                        foreach (var shape in shapes.OrderBy(s => CommandBand.DrawRank(s.Detailed, s.Strong))) DrawShape(shape, zone.position);
+                        // Each marker is drawn in the zones it reaches into, not in every zone.
+                        foreach (var shape in ordered) if (shape.Marker.width > 0 && zone.Overlaps(MarkerReach(shape))) DrawShape(shape, zone.position);
                         foreach (var label in labels) {
                             if (!zone.Overlaps(label.Label)) continue;
                             var rect = Offset(label.Label, zone.position);
@@ -817,114 +924,169 @@ namespace RailroaderScenePatcher {
             } finally { observing = false; }
         }
 
+        // What one pass measured of an object that no camera changes: the piece of its boxes the frame outlines
+        // (ObjectMarkingGeometry.PieceOf), whether a box was still to be read (Waits) and how many mesh renderers
+        // are hidden without a known box (Unseen). It is kept on its renderers' beat while the object stands where it
+        // stood, and measured again after the scene may have changed (ClearSurface). An object with a part the game
+        // moves while it runs, such as a clock hand, is measured in every pass, and so is one still waiting for reads.
+        sealed class Geometry {
+            internal ObjectMarkingPiece Piece; internal bool Waits, Moves; internal int Unseen, Until;
+            internal Vector3 Position, Scale, Origin, Anchor; internal Quaternion Rotation;
+            internal bool Holds(GameObject go, Vector3 origin, Vector3 anchor) {
+                if (Time.frameCount >= Until || origin != Origin || anchor != Anchor) return false;
+                var t = go.transform;
+                return t.position == Position && t.rotation == Rotation && t.lossyScale == Scale;
+            }
+        }
+        // Kept by the object's identity (MarkingKey), not by candidate: every repaint observes the inspected object
+        // anew and every click makes new candidates, and each finds the entry of its object. Bounded by GeometryLimit.
+        const int GeometryLimit = 20000;
+        readonly KeptGeometry<Geometry> geometry = new KeptGeometry<Geometry>(GeometryLimit);
+        static MarkingKey KeyOf(SpatialCandidate candidate, GameObject go) => new MarkingKey(go, candidate.Parts, candidate.UncutParts, candidate.Observation.Family);
+        // Whether the object the last Project measured has a part the game moves while it runs.
+        bool lastMoves;
+        // Whether the object the last Project measured still waits for reads.
+        bool lastWaits;
+        // Whether a pass left reads for a later frame: it is not used again (MarkingReuse).
+        bool passIncomplete;
+        Geometry Measure(SpatialCandidate candidate, GameObject go, Vector3 origin, List<string> decisions, List<string> skipped, out Renderer[] renderers,
+            ref Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods) {
+            renderers = Renderers(go, out var outlines, out var moves);
+            if (candidate.Parts != null) renderers = PartsOnly(renderers, ref outlines, candidate.Parts);
+            // A crossing pad lies on its track: the track's ballast and the road it crosses are not ground it
+            // stands in, so the pad is framed whole and not cut off where its ends meet the road.
+            // The crossing object of a crossing without signals holds its pads: its frame is not cut at the ground either.
+            var ground = PadFamilies.Contains(candidate.Observation.Family) || ChosenInOutliner(candidate.Observation) ? null : (Func<double, double, double?>)GroundAt;
+            var boxes = new List<ObjectMarkingBox>();
+            // What is read once per renderer and per place is read within a share of the frame: a renderer whose
+            // kind is not known yet, once that share is used up, leaves its object without boxes until a
+            // later frame, so the first view after a load builds up over some frames instead of in one.
+            var waits = false;
+            // The mesh renderers that are on but hidden without a known box yet.
+            var unseen = 0;
+            for (int index = 0; index < renderers.Length; index++) {
+                var renderer = renderers[index];
+                var name = decisions != null || skipped != null ? "#" + index : "";
+                if (renderer == null) continue;
+                // A renderer switched off by the scene or a modder is passed over; one the game's culling hides
+                // now still outlines the object, from its mesh.
+                if (index >= outlines.Length || !outlines[index]) {
+                    skipped?.Add(name + ": Not used for the frame because it is switched off.");
+                    continue;
+                }
+                var shows = renderer.enabled && renderer.gameObject.activeInHierarchy;
+                // A static batch moves its meshes into one combined mesh, whose bounds are not the renderer's; only
+                // the world-aligned box stays per renderer, and only while it shows. That box is kept, in the
+                // object's own space, for while the game's culling hides the renderer
+                // (ObjectMarkingGeometry.RendererBox).
+                if (!Boxes.Own(renderer, out var ownCorners, out var ownSource)) { waits = true; break; }
+                decisions?.Add(name + ": The box for this drawing component was " + RendererBoxes.Describe(ownSource) + ".");
+                var worldBounds = shows ? renderer.bounds : default;
+                WorldPoint[] visible = shows ? BoxCorners(worldBounds) : null;
+                if (shows && ownCorners == null) {
+                    var toLocal = renderer.transform.worldToLocalMatrix; var local = new WorldPoint[visible.Length];
+                    for (var i = 0; i < visible.Length; i++) local[i] = Point(toLocal.MultiplyPoint3x4(Vector(visible[i])));
+                    keptBoxes[renderer] = local;
+                }
+                keptBoxes.TryGetValue(renderer, out var keptBox);
+                var toWorld = renderer.transform.localToWorldMatrix;
+                var box = ObjectMarkingGeometry.RendererBox(shows, visible, ownCorners, keptBox, p => Point(toWorld.MultiplyPoint3x4(Vector(p))));
+                // A hidden renderer without a box of its own and never seen since the world loaded adds nothing.
+                if (box == null) {
+                    skipped?.Add(name + ": Not used for the frame because it is hidden and its box is unknown.");
+                    // It still makes its object visible: a mesh renderer outlines the object once it shows, so the
+                    // object shows no helper marker (HelperMarkers.Shows). Its kind is read within the pass's share.
+                    if (!kinds.TryGetValue(renderer, out var hiddenKind)) {
+                        if (budget.Exhausted) { waits = true; break; }
+                        var known = lods;
+                        hiddenKind = budget.Read(() => Kind(renderer, go, ref known));
+                        lods = known;
+                    }
+                    if (hiddenKind == ObjectMarkingBoxKind.Mesh) unseen++;
+                    continue;
+                }
+                // A mesh renderer that shows outlines with its own oriented box; a hidden one with the box
+                // RendererBox gave.
+                var oriented = shows ? (renderer is MeshRenderer ? ownCorners : null) : box.ToArray();
+                Bounds bounds;
+                if (shows) bounds = worldBounds;
+                else {
+                    // A hidden renderer reports no world box: the one around its box stands in.
+                    bounds = new Bounds(new Vector3((float)oriented[0].X, (float)oriented[0].Y, (float)oriented[0].Z), Vector3.zero);
+                    foreach (var corner in oriented) bounds.Encapsulate(new Vector3((float)corner.X, (float)corner.Y, (float)corner.Z));
+                }
+                if (bounds.size.sqrMagnitude < .000001f) {
+                    skipped?.Add(name + ": Not used for the frame because its box is empty.");
+                    continue;
+                }
+                // A renderer that is switched off was passed over above and is never read. The kind of one that
+                // shows is read once, within the pass's share; an object with a kind still to read waits whole.
+                if (!kinds.TryGetValue(renderer, out var kind)) {
+                    if (budget.Exhausted) { waits = true; break; }
+                    var known = lods;
+                    kind = budget.Read(() => Kind(renderer, go, ref known));
+                    lods = known;
+                }
+                // A part that lies on its track, such as the pad of a crossing node, is framed whole, as a pad is.
+                var cut = ground != null && candidate.UncutParts != null && Under(renderer, candidate.UncutParts) ? null : ground;
+                boxes.Add(new ObjectMarkingBox("#" + index, Point(bounds.center), Point(bounds.extents), oriented, kind, cut));
+            }
+            // A storage pile or log pond has no renderer of its own: the box it lays its logs out in stands in, from
+            // its layout settings, so it is framed like any other box whether or not the camera has culled it.
+            if (!waits)
+                foreach (var pile in Piles(go)) {
+                    var oriented = PileBox(pile);
+                    if (oriented == null) continue;
+                    var bounds = new Bounds(Vector(oriented[0]), Vector3.zero);
+                    foreach (var corner in oriented) bounds.Encapsulate(Vector(corner));
+                    boxes.Add(new ObjectMarkingBox("pile " + pile.name, Point(bounds.center), Point(bounds.extents), oriented, ObjectMarkingBoxKind.Mesh, ground));
+                }
+            if (waits) boxes.Clear();
+            var t = go.transform;
+            return new Geometry {
+                Piece = ObjectMarkingGeometry.PieceOf(Point(candidate.Position + origin), boxes, Basis(t), ObjectMarkingGeometry.FramesWhole(candidate.Observation.Family)),
+                Waits = waits, Moves = moves, Unseen = unseen, Until = Time.frameCount + 90 + (go.GetInstanceID() & 63),
+                Position = t.position, Rotation = t.rotation, Scale = t.lossyScale, Origin = origin, Anchor = candidate.Position
+            };
+        }
         Shape Project(SpatialCandidate candidate, Camera camera, Vector3 origin) => Project(candidate, camera, origin, ObjectMarkingGeometry.FrameDistance, out _);
         // frameDistance is the distance beyond which the object has no frame (ObjectMarkingGeometry.Frame); measured
         // is what was measured of a scene object, also when the object is not in view and has no shape.
-        Shape Project(SpatialCandidate candidate, Camera camera, Vector3 origin, double frameDistance, out Measured measured) {
+        // fresh measures the object's boxes again, as for the inspected object, which the gizmo moves.
+        Shape Project(SpatialCandidate candidate, Camera camera, Vector3 origin, double frameDistance, out Measured measured, bool fresh = false) {
             measured = null;
+            lastMoves = false; lastWaits = false;
             if (candidate.Points.Length == 0) return null;
             // The surface heights are kept by world place: an origin move makes every place another one.
             if (origin != groundOrigin) { grounds.Clear(); groundOrigin = origin; }
             var shape = new Shape { Candidate = candidate };
             var anchor = ScreenPoint(camera, candidate.Position, origin);
             if (candidate.Observation != null && candidate.Choice.Handle is GameObject go && go != null) {
-                var renderers = Renderers(go, out var outlines);
-                if (candidate.Parts != null) renderers = PartsOnly(renderers, ref outlines, candidate.Parts);
-                // A crossing pad lies on its track: the track's ballast and the road it crosses are not ground it
-                // stands in, so the pad is framed whole and not cut off where its ends meet the road.
-                // The crossing object of a crossing without signals holds its pads: its frame is not cut at the ground either.
-                var ground = PadFamilies.Contains(candidate.Observation.Family) || ChosenInOutliner(candidate.Observation) ? null : (Func<double, double, double?>)GroundAt;
-                Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods = null;
-                var boxes = new List<ObjectMarkingBox>();
-                // What is read once per renderer and per place is read within a share of the frame: a renderer whose
-                // kind is not known yet, once that share is used up, leaves its object without boxes until a
-                // later frame, so the first view after a load builds up over some frames instead of in one.
-                var waits = false;
-                // The mesh renderers that are on but hidden without a known box yet.
-                var unseen = 0;
                 var decisions = observing ? new List<string>() : null;
                 var skipped = observing ? new List<string>() : null;
-                for (int index = 0; index < renderers.Length; index++) {
-                    var renderer = renderers[index];
-                    var name = "#" + index;
-                    if (renderer == null) continue;
-                    // A renderer switched off by the scene or a modder is passed over; one the game's culling hides
-                    // now still outlines the object, from its mesh.
-                    if (index >= outlines.Length || !outlines[index]) {
-                        skipped?.Add(name + ": Not used for the frame because it is switched off.");
-                        continue;
-                    }
-                    var shows = renderer.enabled && renderer.gameObject.activeInHierarchy;
-                    // A static batch moves its meshes into one combined mesh, whose bounds are not the renderer's; only
-                    // the world-aligned box stays per renderer, and only while it shows. That box is kept, in the
-                    // object's own space, for while the game's culling hides the renderer
-                    // (ObjectMarkingGeometry.RendererBox).
-                    if (!Boxes.Own(renderer, out var ownCorners, out var ownSource)) { waits = true; break; }
-                    decisions?.Add(name + ": The box for this drawing component was " + RendererBoxes.Describe(ownSource) + ".");
-                    WorldPoint[] visible = shows ? BoxCorners(renderer.bounds) : null;
-                    if (shows && ownCorners == null) { var toLocal = renderer.transform.worldToLocalMatrix; keptBoxes[renderer] = visible.Select(p => Point(toLocal.MultiplyPoint3x4(Vector(p)))).ToArray(); }
-                    keptBoxes.TryGetValue(renderer, out var kept);
-                    var toWorld = renderer.transform.localToWorldMatrix;
-                    var box = ObjectMarkingGeometry.RendererBox(shows, visible, ownCorners, kept, p => Point(toWorld.MultiplyPoint3x4(Vector(p))));
-                    // A hidden renderer without a box of its own and never seen since the world loaded adds nothing.
-                    if (box == null) {
-                        skipped?.Add(name + ": Not used for the frame because it is hidden and its box is unknown.");
-                        // It still makes its object visible: a mesh renderer outlines the object once it shows, so the
-                        // object shows no helper marker (HelperMarkers.Shows). Its kind is read within the pass's share.
-                        if (!kinds.TryGetValue(renderer, out var hiddenKind)) {
-                            if (budget.Exhausted) { waits = true; break; }
-                            hiddenKind = budget.Read(() => Kind(renderer, go, ref lods));
-                        }
-                        if (hiddenKind == ObjectMarkingBoxKind.Mesh) unseen++;
-                        continue;
-                    }
-                    // A mesh renderer that shows outlines with its own oriented box; a hidden one with the box
-                    // RendererBox gave.
-                    var oriented = shows ? (renderer is MeshRenderer ? ownCorners : null) : box.ToArray();
-                    Bounds bounds;
-                    if (shows) bounds = renderer.bounds;
-                    else {
-                        // A hidden renderer reports no world box: the one around its box stands in.
-                        bounds = new Bounds(new Vector3((float)oriented[0].X, (float)oriented[0].Y, (float)oriented[0].Z), Vector3.zero);
-                        foreach (var corner in oriented) bounds.Encapsulate(new Vector3((float)corner.X, (float)corner.Y, (float)corner.Z));
-                    }
-                    if (bounds.size.sqrMagnitude < .000001f) {
-                        skipped?.Add(name + ": Not used for the frame because its box is empty.");
-                        continue;
-                    }
-                    // A renderer that is switched off was passed over above and is never read. The kind of one that
-                    // shows is read once, within the pass's share; an object with a kind still to read waits whole.
-                    if (!kinds.TryGetValue(renderer, out var kind)) {
-                        if (budget.Exhausted) { waits = true; break; }
-                        kind = budget.Read(() => Kind(renderer, go, ref lods));
-                    }
-                    // A part that lies on its track, such as the pad of a crossing node, is framed whole, as a pad is.
-                    var cut = ground != null && candidate.UncutParts != null && Under(renderer, candidate.UncutParts) ? null : ground;
-                    boxes.Add(new ObjectMarkingBox(name, Point(bounds.center), Point(bounds.extents), oriented, kind, cut));
+                Renderer[] renderers = null;
+                Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods = null;
+                // What no camera changes is measured once and kept (Geometry); the frame is taken from it for this camera.
+                var key = KeyOf(candidate, go);
+                if (fresh || observing || !geometry.TryGet(key, out var kept) || !kept.Holds(go, origin, candidate.Position)) {
+                    kept = Measure(candidate, go, origin, decisions, skipped, out renderers, ref lods);
+                    // What is measured fresh, for the object the gizmo moves, is not kept.
+                    if (!fresh) { if (!kept.Waits && !kept.Moves) geometry.Keep(key, kept); else geometry.Remove(key); }
                 }
-                // A storage pile or log pond has no renderer of its own: the box it lays its logs out in stands in, from
-                // its layout settings, so it is framed like any other box whether or not the camera has culled it.
-                if (!waits)
-                    foreach (var pile in Piles(go)) {
-                        var oriented = PileBox(pile);
-                        if (oriented == null) continue;
-                        var bounds = new Bounds(Vector(oriented[0]), Vector3.zero);
-                        foreach (var corner in oriented) bounds.Encapsulate(Vector(corner));
-                        boxes.Add(new ObjectMarkingBox("pile " + pile.name, Point(bounds.center), Point(bounds.extents), oriented, ObjectMarkingBoxKind.Mesh, ground));
-                    }
-                if (waits) boxes.Clear();
+                if (kept.Waits) passIncomplete = true;
+                lastWaits = kept.Waits;
+                lastMoves = kept.Moves;
                 var view = camera.pixelRect;
                 // One frame per object, around the piece its marker belongs to. Picking uses the same rectangle.
                 // The frame around multiple boxes follows them, with the object's orientation as its fallback.
-                var result = ObjectMarkingGeometry.Frame(Point(candidate.Position + origin), Point(camera.transform.position), boxes, Projection(camera), ViewOf(camera), decisions, frameDistance, Basis(go.transform),
-                    ObjectMarkingGeometry.FramesWhole(candidate.Observation.Family));
+                var result = ObjectMarkingGeometry.Frame(kept.Piece, passEye, passProjection, passView, decisions, frameDistance);
                 measured = new Measured { Frame = result };
-                if (HelperMarkers.Shows(result, waits, unseen)) {
+                if (HelperMarkers.Shows(result, kept.Waits, kept.Unseen)) {
                     // An invisible object, without a renderer that outlines it, shows its helper marker: the square
                     // marker on its pivot, read from its transform now, so it follows every placement change, gizmo
                     // preview and Undo, and the frame of its colliders' bounds or the least frame about the marker.
                     var pivot = go.transform.position;
-                    var helper = HelperMarkers.Mark(Point(pivot), Point(camera.transform.position), Colliders(go), Projection(camera), ViewOf(camera), frameDistance, Basis(go.transform));
+                    var helper = HelperMarkers.Mark(Point(pivot), passEye, Colliders(go), passProjection, passView, frameDistance, Basis(go.transform));
                     anchor = ScreenPoint(camera, pivot, Vector3.zero);
                     if (helper.Frame.HasValue) {
                         var frame = ObjectMarkingGeometry.VisibleFrame(helper.Frame.Value);
@@ -960,7 +1122,7 @@ namespace RailroaderScenePatcher {
                     var half = (float)(ObjectMarkingGeometry.MarkerSize / 2 + ObjectMarkingGeometry.MarkerMargin);
                     shape.Objects.Add(new Rect(anchor.x - half, anchor.y - half, 2 * half, 2 * half));
                 }
-                if (observing && !(result.Distance > ObservationRange)) Observe(candidate, renderers, lods ?? Lods(go), decisions, skipped, result, view, Basis(go.transform));
+                if (observing && !(result.Distance > ObservationRange)) Observe(candidate, renderers, lods ?? LodsOf(go), decisions, skipped, result, view, Basis(go.transform));
             }
             if (candidate.ControlPoints != null) {
                 if (trackRadius == 0) {
@@ -1045,6 +1207,12 @@ namespace RailroaderScenePatcher {
             var at = ObjectMarkingGeometry.MarkerScreen(inFront, point.x, point.y, ScreenRect.FromEdges(rect.xMin, rect.yMin, rect.xMax, rect.yMax));
             return new Vector3((float)at.X, (float)at.Y, inFront ? point.z : camera.nearClipPlane);
         }
+        // The levels of detail of each object, read once and kept with what is measured of it (ForgetGeometry).
+        readonly Dictionary<GameObject, Dictionary<Renderer, KeyValuePair<LODGroup, int>>> lodsOf = new Dictionary<GameObject, Dictionary<Renderer, KeyValuePair<LODGroup, int>>>();
+        Dictionary<Renderer, KeyValuePair<LODGroup, int>> LodsOf(GameObject go) {
+            if (!lodsOf.TryGetValue(go, out var lods)) lodsOf[go] = lods = Lods(go);
+            return lods;
+        }
         // The level of detail each renderer of an object belongs to, by its LOD group.
         static Dictionary<Renderer, KeyValuePair<LODGroup, int>> Lods(GameObject go) {
             var lods = new Dictionary<Renderer, KeyValuePair<LODGroup, int>>();
@@ -1060,7 +1228,7 @@ namespace RailroaderScenePatcher {
         // object with their base types, its shadow mode and its level of detail.
         ObjectMarkingBoxKind Kind(Renderer renderer, GameObject go, ref Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods) {
             if (kinds.TryGetValue(renderer, out var known)) return known;
-            if (lods == null) lods = Lods(go);
+            if (lods == null) lods = LodsOf(go);
             var components = new List<string>();
             foreach (var behaviour in renderer.GetComponents<MonoBehaviour>())
                 for (var type = behaviour == null ? null : behaviour.GetType(); type != null && type != typeof(MonoBehaviour); type = type.BaseType)
@@ -1080,8 +1248,9 @@ namespace RailroaderScenePatcher {
         string cameraLine, writtenCameraLine;
         // Per object, the box signature of its last written block.
         readonly LogOnChange frameChecks = new LogOnChange();
-        void BeginObservation(PendingSelection pending, SpatialCandidate source, Camera camera) {
-            observing = PatcherLog.DebugEnabled && ((object)pending ?? source) != null;
+        // They run once per camera rest and set of candidates (ObservationPace), off the per-frame path.
+        void BeginObservation(PendingSelection pending, SpatialCandidate source, Camera camera, SpatialCandidate[] candidates) {
+            observing = PatcherLog.DebugEnabled && ((object)pending ?? source) != null && pace.Due(viewKey, candidates);
             if (!observing) return;
             cameraLine = "Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + Number(camera.pixelRect.width) + "x" +
                 Number(camera.pixelRect.height) + " pixels. Near view limit: " + Number(camera.nearClipPlane) + " m. Far view limit: " + Number(camera.farClipPlane) +
@@ -1263,24 +1432,23 @@ namespace RailroaderScenePatcher {
             }
         }
 
+        // The square a marker covers on screen: a pointed-at candidate's marker is larger.
+        static Rect MarkerReach(Shape shape) => shape.Strong ? new Rect(shape.Marker.x - 6, shape.Marker.y - 6, shape.Marker.width + 12, shape.Marker.height + 12) : shape.Marker;
+        const float MarkerEdge = 2f;
         static void DrawShape(Shape shape, Vector2 origin) {
             var marker = Offset(shape.Marker, origin);
             if (marker.width == 0) return;
             // A pointed-at candidate's marker is larger and filled with its colour, so it stands out on a spot it shares.
             if (shape.Strong) marker = new Rect(marker.x - 6, marker.y - 6, marker.width + 12, marker.height + 12);
-            GUI.color = shape.Strong ? shape.Color : new Color(.08f, .08f, .08f, 1f);
+            // The edge colour over the whole square, then the fill inside its edge: the pixels of a filled square with
+            // four edges over it, in two draws. Both colours are opaque.
+            GUI.color = shape.Strong ? Color.white : shape.Color;
             GUI.DrawTexture(marker, Texture2D.whiteTexture);
-            Frame(marker, shape.Strong ? Color.white : shape.Color, 2f);
+            GUI.color = shape.Strong ? shape.Color : new Color(.08f, .08f, .08f, 1f);
+            GUI.DrawTexture(new Rect(marker.x + MarkerEdge, marker.y + MarkerEdge, marker.width - 2 * MarkerEdge, marker.height - 2 * MarkerEdge), Texture2D.whiteTexture);
             GUI.color = shape.Strong ? new Color(.08f, .08f, .08f, 1f) : shape.Color;
             foreach (var bar in ObjectMarkingGeometry.MarkerSymbol(shape.Group))
                 GUI.DrawTexture(new Rect(marker.center.x + (float)bar.X, marker.center.y + (float)bar.Y, (float)bar.Width, (float)bar.Height), Texture2D.whiteTexture);
-        }
-        static void Frame(Rect rect, Color color, float weight) {
-            GUI.color = color;
-            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, weight), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(rect.x, rect.yMax - weight, rect.width, weight), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(rect.x, rect.y, weight, rect.height), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(rect.xMax - weight, rect.y, weight, rect.height), Texture2D.whiteTexture);
         }
     }
 }
