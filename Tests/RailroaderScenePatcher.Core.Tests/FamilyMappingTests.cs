@@ -140,8 +140,5 @@ static class FamilyMappingTests {
         Check(rows.Where(r => r.Family == SceneObjectRules.ChildFamily).All(r => r.GroupPath != null && CommandBand.ShownFamily(r) == CommandBand.PartFamily),
             "a child object still shows as Part, the window word for a child object");
         Check(rows.Where(r => r.Family == SceneObjectRules.Family).All(r => CommandBand.ShownFamily(r) == CommandBand.GroupFamily), "a top scene object shows as Group, the window word for a complex");
-        var holders = OutlinerGrouping.SignContainers(rows).Select(r => r.Identity.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
-        Check(holders.SequenceEqual(new[] { "World/Large Scenery/Bryson/Bryson Signs", "World/Large Scenery/Ela/Signs", "World/Large Scenery/Sylva/Sylva Signs" }),
-            "the three sign holders in the Scene object family stay unlisted in the outliner: " + String.Join(", ", holders));
     }
 }

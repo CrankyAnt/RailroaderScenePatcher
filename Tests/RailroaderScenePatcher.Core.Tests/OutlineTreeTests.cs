@@ -16,11 +16,19 @@ static class OutlineTreeTests {
     static IEnumerable<OutlineNode> All(IEnumerable<OutlineNode> nodes) => nodes.SelectMany(n => new[] { n }.Concat(All(n.Children)));
     static string Shape(IEnumerable<OutlineNode> nodes) => String.Join(" ", nodes.Select(n => n.Label + (n.Children.Count == 0 ? "" : "{" + Shape(n.Children) + "}")));
     static bool IsPlaceFolder(OutlineNode node) => node.Row == null && node.Key.Substring(node.Key.LastIndexOf('/') + 1).StartsWith(OutlineTree.PlaceKey, StringComparison.Ordinal);
+    sealed class FixtureInventory : IInspectionScene {
+        readonly IReadOnlyList<SceneObservation> entries;
+        internal FixtureInventory(IReadOnlyList<SceneObservation> entries) { this.entries = entries; }
+        public IEnumerable<string> MapIds => new[] { "base map" };
+        public IEnumerable<SceneObservation> Discover() => entries;
+    }
 
     public static void Run() {
         Order();
         var map = new BaseMapFixture();
         var entries = map.Observations(out var source);
+        var inventory = new SceneInventory(new FixtureInventory(entries));
+        inventory.Refresh();
         OutlinerGrouping.InvalidatePlaces();
         OutlinerGrouping.Scene = map.Scene(source);
         OutlinerGrouping.LogPending = true;
@@ -35,22 +43,41 @@ static class OutlineTreeTests {
                 foreach (var top in byCategory.Tops) Console.WriteLine("CATEGORY (" + top.Count + ") " + top.Label + ": " + String.Join(", ", top.Children.Select(c => "(" + c.Count + ") " + c.Label)));
                 foreach (var top in byPlace.Tops) Console.WriteLine("PLACEVIEW (" + top.Count + ") " + top.Label + ": " + String.Join(", ", top.Children.Select(c => "(" + c.Count + ") " + c.Label)));
             }
-            // What has no row, counted from the fixture alone: the three sign containers that hold only track markers,
-            // and the track spans no crossing controller holds.
-            var containers = new[] { "World/Large Scenery/Bryson/Bryson Signs", "World/Large Scenery/Ela/Signs", "World/Large Scenery/Sylva/Sylva Signs" };
+            var signGroups = new Dictionary<string, string[]> {
+                ["World/Large Scenery/Bryson/Bryson Signs"] = new[] { "Speed Sign (2)", "Yard Limit", "Yard Limit (1)" },
+                ["World/Large Scenery/Ela/Signs"] = new[] { "Station Sign", "Station Sign (1)" },
+                ["World/Large Scenery/Sylva/Sylva Signs"] = new[] { "Yard Limit Trackside" },
+            };
             // Every listed track span of the base map is a detection span of a crossing controller: the spans the game
             // builds from its operations data are not in the inventory, so the outliner hides no span here.
             var nativeSpans = entries.Count(e => e.Family == SceneFamilies.TrackSpan && e.HolderPath == null);
-            Check(nativeSpans == 0 && OutlinerGrouping.HiddenCount(entries) == containers.Length, "on the base map the sign containers are the only objects without a row (" + OutlinerGrouping.HiddenCount(entries) + ")");
-            Check(byCategory.Hidden.OrderBy(h => h, StringComparer.Ordinal).SequenceEqual(containers.Select(c => "sign holder " + c)), "the hidden list names the objects of the inventory without a row: " + String.Join(" | ", byCategory.Hidden));
-            Check(OutlinerGrouping.SignContainers(entries).Select(e => e.Identity.Path).OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(containers), "the sign containers are Bryson Signs, Ela Signs and Sylva Signs (got " + String.Join(", ", OutlinerGrouping.SignContainers(entries).Select(e => e.Identity.Path)) + ")");
             foreach (var view in new[] { new { Name = "By category", Tree = byCategory, Place = false }, new { Name = "By place", Tree = byPlace, Place = true } }) {
+                OutlinerGrouping.ByPlace = view.Place;
                 var tops = view.Tree.Tops;
+                foreach (var signs in signGroups) {
+                    var group = All(tops).SingleOrDefault(n => n.Row?.Identity.Path == signs.Key);
+                    Check(group != null && !group.Context, view.Name + ": the movable sign group has a selectable row at " + signs.Key);
+                    Check(group.Children.Select(n => n.Label).SequenceEqual(signs.Value) && group.Children.All(n => n.Row.Family == SceneFamilies.TrackMarker),
+                        view.Name + ": the group's signs are nested and keep their Generic track marker family at " + signs.Key);
+                    var matches = OutlinerGrouping.Rows(inventory, group.Label, OutlinerFilter.All, null, null);
+                    var search = OutlinerGrouping.Build(matches, inventory.Entries, group.Label, true, null);
+                    var found = All(search.Tops).SingleOrDefault(n => n.Row?.Identity.Path == signs.Key);
+                    Check(found != null && !found.Context && found.Children.Select(n => n.Label).SequenceEqual(signs.Value),
+                        view.Name + ": searching for the group shows its row with all its signs at " + signs.Key);
+                    foreach (var sign in found.Children) {
+                        var parent = InventoryPresentationState.GroupOf(inventory, sign.Row);
+                        Check(parent == found.Row && OutlinerGrouping.Tooltip(search, sign.Row, false, null).Contains("\nPart of: " + found.Label + "\n"),
+                            view.Name + ": the marker names its group and Select group resolves its row at " + sign.Row.Identity.Path);
+                    }
+                    Check(SupportedEdits.PlacementModes(found.Row).Contains(CommandBand.NumericMode) && SupportedEdits.PlacementModes(found.Row).Contains(CommandBand.GizmoMode),
+                        view.Name + ": the selected group offers numeric and gizmo placement at " + signs.Key);
+                }
+                Check(nativeSpans == 0 && OutlinerGrouping.HiddenCount(entries) == 0 && view.Tree.Hidden.Count == 0, view.Name + ": the base map has no hidden inventory rows");
                 Check(view.Tree.Violations.Count == 0, view.Name + ": " + view.Tree.Violations.Count + " violations: " + String.Join(" | ", view.Tree.Violations.Take(15)));
-                Check(view.Tree.Listed == entries.Count - containers.Length - nativeSpans && tops.Sum(t => t.Count) == view.Tree.Listed, view.Name + " lists every object but the sign containers and the native track spans once (" + view.Tree.Listed + " of " + entries.Count + ")");
+                Check(view.Tree.Listed == entries.Count && tops.Sum(t => t.Count) == view.Tree.Listed, view.Name + " lists every object once (" + view.Tree.Listed + " of " + entries.Count + ")");
                 Check(view.Tree.Unplaced == 0 && view.Tree.CatchAll.Count == 0 && !All(tops).Any(n => n.Label == OutlineTree.NoPlace || n.Label == SceneObjectCategories.Unclassified), view.Name + " has no catch-all node: " + String.Join(" | ", view.Tree.CatchAll.Take(5)));
                 var rows = All(tops).Where(n => n.Row != null).Select(n => n.Row).ToArray();
-                Check(rows.Length == rows.Distinct().Count() && !rows.Any(r => containers.Contains(r.Identity.Path)), view.Name + " shows each object once and no sign container");
+                Check(rows.Length == rows.Distinct().Count(), view.Name + " shows each object once");
                 // Every part stands beneath its group, and every detection span beneath its controller.
                 foreach (var node in All(tops).Where(n => n.Row != null))
                     foreach (var child in node.Children.Where(c => c.Row?.GroupPath != null)) Check(child.Row.GroupPath == node.Row.Identity.Path, child.Row.Identity.Path + " stands beneath its group");
@@ -84,8 +111,7 @@ static class OutlineTreeTests {
             Check(nodes.Length == crossbuckParents && nodes.All(n => n.Children.Count(m => m.Row.Category == SceneObjectCategories.GradeCrossing) >= 2 && n.Children.Any(m => m.Row.Family == SceneFamilies.CrossingPad) && byCategory.GroupNodes[n.Key].Point != null),
                 "each crossing object without a controller is one node with its crossbucks and pads and a point for Focus (" + nodes.Length + " of " + crossbuckParents + ")");
             Check(!All(tree).Any(n => n.Row != null && n.Row.Family == SceneFamilies.CrossingPad && !All(new[] { crossings }).Contains(n)) && All(tree.Where(t => t.Label == "Sign")).Count(n => n.Label.StartsWith("Whistle Sign", StringComparison.Ordinal)) == 60, "every pad stands at its crossing, and the 60 whistle signs are signs");
-            // Whittier Signs lists a part of its own, so it keeps its row; the signs of the containers are rows of their own.
-            Check(All(tree).Any(n => n.Row?.Identity.Path == "World/Large Scenery/Whittier/Whittier Signs") && All(tree).Any(n => n.Row?.Identity.Path == "World/Large Scenery/Ela/Signs/Station Sign"), "Whittier Signs keeps its row, and a sign of a container is a row of its own");
+            Check(All(tree).Any(n => n.Row?.Identity.Path == "World/Large Scenery/Whittier/Whittier Signs"), "Whittier Signs keeps its row");
             // The place view: every place the game names is a top-level node, also without objects; no other name of a place has a node.
             var placeTops = byPlace.Tops;
             Check(placeTops.Select(t => t.Label).SequenceEqual(places.OrderBy(p => p, OutlineTree.NaturalComparer.Instance)), "every place is a top-level node, in alphabetical order");

@@ -760,10 +760,11 @@ namespace RailroaderScenePatcher {
         void DrawObject(UIPanelBuilder builder) {
             DrawOrigin(builder);
             // A part names its group first, with the button that inspects the group directly after the name.
-            var partOf = InventoryPresentationState.PartOf(selected);
+            var groupPath = OutlinerGrouping.GroupPathOf(inventory?.Entries, selected);
+            var partOf = InventoryPresentationState.PartOf(selected, groupPath);
             if (partOf != null) {
                 builder.HStack(row => {
-                    Line(row, Literal(partOf), "Group", selected.GroupPath, RowHeight).EqualFlexibleWidth(0);
+                    Line(row, Literal(partOf), "Group", groupPath, RowHeight).EqualFlexibleWidth(0);
                     ActButton(row, SelectGroupAct());
                 }).ChildrenKeepHeight().Height(RowHeight);
             }

@@ -68,7 +68,7 @@ Click **Remove modification** to restore a part's unmodified placement relative 
 
 ## Groups with track markers
 
-A group can contain track markers. For example, `Bryson Signs` contains its speed sign and yard limit signs. Each marker keeps its own row in the **Generic track marker** family and isn't a part of the group.
+A group can contain track markers. In either outliner view, find `Bryson Signs`, `Sylva Signs`, or `Signs` at Ela. Expand the group to see its signs. Each sign keeps its **Generic track marker** family and its own edits. From a sign's **Object** tab, click **Select group** beside **Part of** to inspect the whole group.
 
 To move or rotate the group, select its row and follow [move a group in the native map editor](#move-a-group-in-the-native-map-editor). Its parts and its markers move together and keep their placement relative to each other. Each marker keeps the track binding it had: its segment, end, and distance don't change, so the game still reads the marker at the same track location. To bind a marker to the place where it now stands, select the marker and set its binding, as described in [repair track bindings](repairing-track-bindings.md).
 

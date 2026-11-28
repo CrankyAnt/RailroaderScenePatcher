@@ -219,16 +219,19 @@ namespace RailroaderScenePatcher {
         // The inventory entry of the group a part belongs to, or null: for a top scene object, for an object outside any
         // group, and while the inventory does not hold exactly one entry for the group.
         internal static SceneObservation GroupOf(SceneInventory inventory, SceneObservation part) {
-            if (inventory == null || part?.GroupPath == null) return null;
-            var found = inventory.Entries.Where(entry => entry.GroupPath == null && SceneObjectRules.InFamilies(entry.Family) && entry.Identity.Scene == part.Identity.Scene && entry.Identity.Path == part.GroupPath).Take(2).ToArray();
+            var path = OutlinerGrouping.GroupPathOf(inventory?.Entries, part);
+            if (inventory == null || path == null) return null;
+            var found = inventory.Entries.Where(entry => entry.GroupPath == null && SceneObjectRules.InFamilies(entry.Family) && entry.Identity.Scene == part.Identity.Scene && entry.Identity.Path == path).Take(2).ToArray();
             return found.Length == 1 ? found[0] : null;
         }
         // The mark after an outliner row's name for an object that no supported operation covers; null otherwise.
         internal const string InspectionOnlyMark = "inspection only";
         internal static string RowMark(SceneObservation entry) => entry?.InspectionOnly == null ? null : InspectionOnlyMark;
         // The Object tab's line that names a part's group, or null for any object that is no part.
-        internal static string PartOf(SceneObservation entry) =>
-            entry?.GroupPath == null ? null : "Part of: " + entry.GroupPath.Substring(entry.GroupPath.LastIndexOf('/') + 1);
+        internal static string PartOf(SceneObservation entry, string groupPath = null) {
+            groupPath = groupPath ?? entry?.GroupPath;
+            return groupPath == null ? null : "Part of: " + groupPath.Substring(groupPath.LastIndexOf('/') + 1);
+        }
 
         // The outliner width that fits most names: the 95th percentile of the name widths, or the longest of fewer than
         // twenty, plus the row decoration. The column takes at most 40 percent of the window and leaves the inspector its

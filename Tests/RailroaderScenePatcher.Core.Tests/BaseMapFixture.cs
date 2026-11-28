@@ -102,7 +102,8 @@ sealed class BaseMapFixture {
         foreach (var o in Objects.Where(o => o.Listed)) {
             SceneObjectVerdict root = null;
             if (o.TopSceneObject) roots.TryGetValue(o.Path, out root);
-            var row = new SceneObservation(new object(), new TargetIdentity("BushnellWhittier-MapManager", o.Path, "UnityEngine.Transform", o.Structure), o.Family, true, new[] { o.At[0], 0, o.At[1] }, new double[] { 0, 0, 0, 1 },
+            var structure = root?.Disposition == GroupDisposition.Group ? SceneObjects.Structure : o.Structure;
+            var row = new SceneObservation(new object(), new TargetIdentity("BushnellWhittier-MapManager", o.Path, "UnityEngine.Transform", structure), o.Family, true, new[] { o.At[0], 0, o.At[1] }, new double[] { 0, 0, 0, 1 },
                 new string[0], new string[0], new string[0], "Placement", inspectionOnly: root?.Disposition == GroupDisposition.InspectionOnly ? root.Reason : null,
                 groupPath: o.ChildObject ? Above(o.Path, roots.ContainsKey) : null, category: root?.Category, subcategory: root?.Subcategory,
                 holderPath: o.Family == SceneFamilies.TrackSpan ? Above(o.Path, controllers.Contains) : null, bridge: root?.Bridge ?? BridgeKind.None);

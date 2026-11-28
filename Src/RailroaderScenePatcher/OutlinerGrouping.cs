@@ -64,6 +64,7 @@ namespace RailroaderScenePatcher {
         internal sealed class GroupNode { internal string Label; internal double[] Point; internal TargetIdentity Identity; internal SceneObservation Member; internal IReadOnlyList<SceneObservation> Members = Array.Empty<SceneObservation>(); }
         internal sealed class Result {
             internal IReadOnlyList<OutlineNode> Tops;
+            internal IReadOnlyList<SceneObservation> Entries;
             internal int Listed, Unplaced;
             internal List<string> Hidden = new List<string>();
             internal List<string> CatchAll = new List<string>();
@@ -153,22 +154,36 @@ namespace RailroaderScenePatcher {
         static string Parent(string path) { var at = path.LastIndexOf('/'); return at < 0 ? null : path.Substring(0, at); }
         static string Round(double v) => Math.Round(v).ToString(CultureInfo.InvariantCulture);
 
-        // A container of signs: a Sign group that lists no part of its own and holds objects another family lists, as
-        // Bryson Signs, Ela Signs and Sylva Signs hold track markers. It gets no row; the signs it holds are rows of
-        // their own. Why such a group has no edit does not decide this: a Sign group without such objects keeps its row.
+        // A sign holder with no edit and no parts of its own gets no row. An editable sign group keeps its row,
+        // including when its only parts are markers listed in their own family.
         static IReadOnlyList<SceneObservation> containersFrom;
         static HashSet<SceneObservation> containers = new HashSet<SceneObservation>();
+        static HashSet<ScenePath> movableSignGroups = new HashSet<ScenePath>();
         internal static ISet<SceneObservation> SignContainers(IReadOnlyList<SceneObservation> entries) {
             if (entries == null) return new HashSet<SceneObservation>();
             if (ReferenceEquals(containersFrom, entries)) return containers;
             var found = new HashSet<SceneObservation>();
-            foreach (var group in entries.Where(e => SceneObjectRules.InFamilies(e.Family) && e.GroupPath == null && e.Category == SceneObjectCategories.Sign)) {
+            var movable = new HashSet<ScenePath>();
+            foreach (var group in entries.Where(e => e.Family == SceneObjectRules.Family && e.GroupPath == null && e.Category == SceneObjectCategories.Sign)) {
+                if (group.Identity.Structure == SceneObjects.Structure) {
+                    movable.Add(new ScenePath(group.Identity.Scene, group.Identity.Path));
+                    continue;
+                }
+                if (group.Identity.Structure != null) continue;
                 var below = group.Identity.Path + "/";
                 bool Inside(SceneObservation e) => e.Identity.Scene == group.Identity.Scene && e.Identity.Path.StartsWith(below, StringComparison.Ordinal);
                 if (!entries.Any(e => e.GroupPath == group.Identity.Path && e.Identity.Scene == group.Identity.Scene) && entries.Any(e => !SceneObjectRules.InFamilies(e.Family) && Inside(e))) found.Add(group);
             }
-            containersFrom = entries; containers = found;
+            containersFrom = entries; containers = found; movableSignGroups = movable;
             return found;
+        }
+        // Markers keep their own family and editing rules. For navigation they belong to the nearest movable sign group above them.
+        internal static string GroupPathOf(IReadOnlyList<SceneObservation> entries, SceneObservation row) {
+            if (entries == null || row?.Family != SceneFamilies.TrackMarker || row.GroupPath != null) return row?.GroupPath;
+            SignContainers(entries);
+            for (var path = Parent(row.Identity.Path); path != null; path = Parent(path))
+                if (movableSignGroups.Contains(new ScenePath(row.Identity.Scene, path))) return path;
+            return null;
         }
         // A track span of the scene that no crossing controller holds is a native track span and gets no row. The
         // base map has none: the spans the game builds from its operations data while it runs never enter the
@@ -341,6 +356,7 @@ namespace RailroaderScenePatcher {
                     Identity = u.CrossingScene == null ? null : CrossingObjectScene.Identity(u.CrossingScene, u.CrossingPath, u.CrossingPadMarkerId), Member = u.Members.Select(m => m.Row).FirstOrDefault(r => r != null), Members = u.Members.Select(m => m.Row).Where(r => r != null).ToArray() };
             }
             b.Result.Tops = lastTops = tops;
+            b.Result.Entries = entries;
             b.Result.Listed = tops.Sum(t => t.Count);
             b.Result.Unplaced = tops.Where(t => t.Label == OutlineTree.NoPlace || t.Label == SceneObjectCategories.Unclassified).Sum(t => t.Count);
             if (b.Diagnostics) {
@@ -384,10 +400,14 @@ namespace RailroaderScenePatcher {
         // Units: every object outside a group and outside a controller, with its parts or detection spans beneath it. A
         // part or span whose holder the search left out brings its holder, dimmed.
         static void BuildUnits(BuildContext b) {
-            foreach (var row in b.Rows.Where(r => !b.Hidden.Contains(r) && r.GroupPath == null && r.HolderPath == null))
-                b.Make(row, new ScenePath(row.Identity.Scene, row.Identity.Path), false).Node.Count = 1;
-            foreach (var row in b.Rows.Where(r => !b.Hidden.Contains(r) && (r.GroupPath != null || r.HolderPath != null))) {
-                var holderAt = new ScenePath(row.Identity.Scene, row.GroupPath ?? row.HolderPath);
+            var parts = new List<(SceneObservation Row, string Holder)>();
+            foreach (var row in b.Rows.Where(r => !b.Hidden.Contains(r))) {
+                var holder = GroupPathOf(b.Entries, row) ?? row.HolderPath;
+                if (holder == null) b.Make(row, new ScenePath(row.Identity.Scene, row.Identity.Path), false).Node.Count = 1;
+                else parts.Add((row, holder));
+            }
+            foreach (var (row, path) in parts) {
+                var holderAt = new ScenePath(row.Identity.Scene, path);
                 if (!b.ByPath.TryGetValue(holderAt, out var holder)) {
                     b.RootEntries.TryGetValue(holderAt, out var found);
                     holder = b.Make(found, holderAt, true);
@@ -442,7 +462,8 @@ namespace RailroaderScenePatcher {
             var lines = new List<string> { OwnName(item) };
             if (!equipment) lines.Add(item.Identity.Path);
             // A group says that it is a group of scene objects, and a part names its group: the same in both views.
-            if (item.GroupPath != null) lines.Add(InventoryPresentationState.PartOf(item));
+            var groupPath = GroupPathOf(result.Entries, item);
+            if (groupPath != null) lines.Add(InventoryPresentationState.PartOf(item, groupPath));
             else if (item.Family == SceneObjectRules.Family) {
                 // A group the outliner lists under Rail bridges stands at a rail bridge, as one the edits treat as a rail bridge does.
                 var railBridge = item.Bridge == BridgeKind.Rail || (shown?[1] ?? item.Subcategory) == SceneObjectCategories.RailBridges;
