@@ -330,9 +330,16 @@ namespace RailroaderScenePatcher.Core {
     }
     // The model assets and the configuration an equipment copy inherits. The world supplies values in hierarchy order.
     public sealed class EquipmentDeviceIdentity : IEquatable<EquipmentDeviceIdentity> {
+        static readonly object MissingMember = new object();
         readonly object[] values;
 
         public EquipmentDeviceIdentity(IEnumerable<object> values) { this.values = values.ToArray(); }
+
+        // A member absent from this game build occupies its place in the comparison, distinct from a member whose value is null.
+        public static object ReadMember(Func<object> read) {
+            try { return read(); }
+            catch (MissingMemberException) { return MissingMember; }
+        }
 
         public bool Equals(EquipmentDeviceIdentity other) => other != null && values.SequenceEqual(other.values);
         public override bool Equals(object other) => Equals(other as EquipmentDeviceIdentity);

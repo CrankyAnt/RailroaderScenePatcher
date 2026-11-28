@@ -47,7 +47,7 @@ namespace RailroaderScenePatcher {
                 var root = new GameObject("CrankyAnt Scene Patcher pad distance gizmo");
                 root.transform.SetParent(transform, false);
                 padGizmo = root.AddComponent<PadDistanceGizmo>();
-                padGizmo.Initialize(attachment, trackPoses, start, PadMoved, PadReleased, PadCancelled);
+                padGizmo.Initialize(attachment, trackPoses, selected.Identity, start, PadMoved, PadReleased, PadCancelled);
             } catch (Exception e) { padGizmo = null; GizmoUnavailable(e); }
         }
         // Takes the distance gizmo away; it is shown again once it is wanted.

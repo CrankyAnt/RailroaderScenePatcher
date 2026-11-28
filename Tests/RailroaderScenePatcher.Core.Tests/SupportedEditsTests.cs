@@ -53,7 +53,7 @@ static class SupportedEditsTests {
         });
         var plain = new BaseMapFixture();
         foreach (var (path, reason, shortReason) in new[] {
-            (station, SceneObjectRules.StationAgentReason, "Station click spots are native map data"),
+            (station, SceneObjectRules.StationAgentReason, "Contains a station click spot"),
             (depot, SceneObjectRules.ConstructionOutsideBridge, "It has a construction controller"),
         }) {
             var verdict = map.Verdicts.Single(v => v.Path == path);
@@ -138,7 +138,7 @@ static class SupportedEditsTests {
             [SceneObjectRules.CrossingPadReason] = "Edit its crossing pad separately",
             [SceneObjectRules.SpawnPointReason] = "Edit its spawn points one by one",
             [SceneObjectRules.MapIconReason] = "Edit its map icon separately",
-            [SceneObjectRules.StationAgentReason] = "Station click spots are native map data",
+            [SceneObjectRules.StationAgentReason] = "Contains a station click spot",
             [SceneObjectRules.ConstructionOutsideBridge] = "It has a construction controller",
             [SceneObjectRules.TopObjectRefusal] = "Edit the whole group instead",
             [SceneObjectRules.CullerOnlyRefusal] = "Edit its parts directly",

@@ -1762,8 +1762,12 @@ namespace RailroaderScenePatcher {
                             Slot("Apply", "Apply the previewed change.", block ?? (prepared == null ? "Click Preview first." : null), () => Edit(EquipmentPlace, EquipmentPlace, (edit, inspection) => {
                                 var done = prepared.Addition != null ? edit.AddEquipment(identity, prepared.Addition, inspection) : edit.RemoveEquipment(identity, prepared.RemoveId, inspection);
                                 if (done?.Applied == true && prepared.Addition == null) CloseEquipmentForm();
-                                // An applied addition is the one the open form now edits, so a later Undo or Redo refills the form from it.
-                                else if (done?.Applied == true) equipmentEdited = prepared.Addition.Id;
+                                // The open form now edits the addition just applied. Its submitted placement is the baseline
+                                // for the next draft, and Undo or Redo can refill the form from the addition.
+                                else if (done?.Applied == true) {
+                                    equipmentEdited = prepared.Addition.Id;
+                                    FillEquipment(prepared.Addition.Placement);
+                                }
                                 return done;
                             }, true)) };
                     }

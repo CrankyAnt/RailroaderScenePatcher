@@ -299,7 +299,7 @@ static class OutlinerGroupingTests {
             // An object without an edit stands under its category like any other; its tooltip gives the reason.
             var shedRow = Find(tree.Tops, "Sylva Shed");
             Check(ReferenceEquals(shedRow?.Row, shed) && shedRow.Row.InspectionOnly != null && OutlinerGrouping.Tooltip(tree, shed, false, null).Contains(CommandBand.InspectionOnlyLine(shed.InspectionOnly)), "an inspection-only group stands under its category, and its tooltip gives the reason");
-            Check(ReferenceEquals(Find(tree.Tops, "Depot Signs")?.Row, iconSigns) && !OutlinerGrouping.SignContainers(inventory.Entries).Contains(iconSigns) && OutlinerGrouping.SignContainers(inventory.Entries).Single().Identity.Path == Signs,
+            Check(ReferenceEquals(Find(tree.Tops, "Depot Signs")?.Row, iconSigns) && tree.Signs.Hidden.Single().Identity.Path == Signs,
                 "a sign group that is inspection only and holds no object of another family keeps its row; only the one that holds another family's signs has none");
             // The sign container and the native track span have no row; the count line counts what the tree can list.
             Check(Find(tree.Tops, "Bryson Signs") == null && Find(tree.Tops, "Span-a") == null && OutlinerGrouping.HiddenCount(inventory.Entries) == 2, "a sign container and a native track span have no row");

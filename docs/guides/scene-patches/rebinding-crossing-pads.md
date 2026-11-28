@@ -46,7 +46,7 @@ The pad stays in place while you drag. Release the mouse button to set the bindi
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment, or an end other than `a` or `b` refuses the edit, and a refused distance names the segment's length; the pad keeps its binding, registration, and geometry.
 
-When writing a scene patch file by hand, use `"end": "a"` for a pad. The game always measures from end `a`. If you write end `b`, the game builds the pad in the wrong place, usually near end `a`. For a location a short way from end `b`, the game fails to build the pad. If the game can't build the pad at a location, for example where the pad runs into a short neighbouring segment, the patcher undoes the edit and tells you to move the pad along the track.
+If the game can't build the pad at a location, for example where the pad runs into a short neighbouring segment, the patcher undoes the edit and tells you to move the pad along the track.
 
 After the check, the patcher changes the marker's named location to the new location, as for a Generic marker, and then runs the game's pad generation. Generation replaces the pad mesh with one built along the track at the new location and moves the pad's culling sphere to the new mesh bounds. The game's culling then decides on the next frame whether the new mesh is shown. The pad object itself does not move.
 
@@ -93,7 +93,9 @@ Copy the inspected identity with **Copy ID** in the command band and add a modif
 }
 ```
 
-On every world load the patcher applies the binding and generates the pad from it once; a repeated application leaves current geometry alone and keeps one registration.
+Use `"end": "a"` to measure from End A or `"end": "b"` to measure from End B. When the patcher applies a binding from End B, it subtracts the distance from the loaded segment's length and registers the pad at that distance from End A. The game builds the pad at the same track point, and the patcher leaves the file as written.
+
+On every world load the patcher applies the binding and generates the pad from it once. A repeated application leaves current geometry alone and keeps one registration.
 
 ## Limits
 

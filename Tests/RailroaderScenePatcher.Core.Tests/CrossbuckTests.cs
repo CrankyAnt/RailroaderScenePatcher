@@ -26,6 +26,7 @@ static class CrossbuckTests {
         IncompleteCleanupBlocksRetry();
         EditingHistoryRemovalAndSave();
         ObjectTabAndOutliner();
+        CopiedCrossbuckNamesItsCrossing();
         Console.WriteLine("PASS: crossbucks at unprotected crossings");
     }
 
@@ -309,5 +310,35 @@ static class CrossbuckTests {
         Check(InventoryPresentationState.Rows(inventory, "pad marker M0sh", OutlinerFilter.All, null).Single().Identity.PadMarkerId == "M0sh", "a search by pad marker ID finds the Old River Rd crossbuck");
         var copied = JObject.Parse(PatchEditingSession.CopyId(new[] { "map" }, listed.Objects[0]))["target"];
         Check((string)copied["path"] == OldRiver + "/Sign-Crossing0 (1)" && (string)copied["padMarkerId"] == "Mbkd", "Copy ID shows the pad marker ID beside the raw path: " + copied);
+    }
+    static void CopiedCrossbuckNamesItsCrossing() {
+        OutlinerGrouping.InvalidatePlaces();
+        const string original = "World/Large Scenery/Alarka Jct/Crossing Unprotected";
+        const string sign = "/Sign-Crossing0 (1)";
+        var copy = original + " " + ModObjects.Mark("author:pack", "mod-object-crossing");
+        var listed = new Listing();
+        var position = new double[] { 1, 2, 3 };
+        var rotation = new double[] { 0, 0, 0, 1 };
+        SceneObservation BuckAt(string path) => new SceneObservation(new object(), new TargetIdentity(Scene, path, "UnityEngine.Transform", SceneObjects.Structure),
+            SceneObjectRules.Family, true, position, rotation, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), CommandBand.CrossbuckOperations,
+            displayName: SceneObjectRules.CrossbuckName(path), category: SceneObjectCategories.GradeCrossing);
+        foreach (var crossing in new[] { original, original + " (1)", copy }) {
+            listed.Objects.Add(new SceneObservation(new object(), CrossingObjectScene.Identity(Scene, crossing), CrossingObjectScene.Family, true,
+                position, rotation, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "Move", category: SceneObjectCategories.GradeCrossing));
+            listed.Objects.Add(BuckAt(crossing + sign));
+            listed.Objects.Add(BuckAt(crossing + "/Sign-Crossing0 (2)"));
+        }
+        var inventory = new SceneInventory(listed);
+        inventory.Refresh();
+        var copiedBuck = inventory.Entries.Single(e => e.Identity.Path == copy + sign);
+        var name = OutlinerGrouping.InspectorName(copiedBuck, inventory, null);
+        Check(name == "Sign-Crossing0 (1) at Alarka Jct Crossing Unprotected (3)", "The heading uses the numbered crossing's display name: " + name);
+        var copiedRows = inventory.Entries.Where(e => e.Identity.Path.StartsWith(copy, StringComparison.Ordinal)).ToArray();
+        var filtered = OutlinerGrouping.Build(copiedRows, inventory.Entries, "", true, null);
+        IEnumerable<InventoryPresentationState.OutlineNode> Walk(IEnumerable<InventoryPresentationState.OutlineNode> nodes) =>
+            nodes.SelectMany(node => new[] { node }.Concat(Walk(node.Children)));
+        Check(Walk(filtered.Tops).Single(node => node.Row?.Identity.Path == copy).Label == "Alarka Jct Crossing Unprotected (3)",
+            "Filtering out the map crossings leaves the copied crossing's number unchanged");
+        OutlinerGrouping.InvalidatePlaces();
     }
 }

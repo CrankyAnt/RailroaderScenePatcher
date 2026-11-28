@@ -20,7 +20,7 @@ namespace RailroaderScenePatcher {
             ProgressionUnread = "Progression data can't be read", MapFeatureUnread = "Map feature data can't be read",
             SharedActivity = "Progression or a map feature controls it", TrackGroupActivity = "Its track group controls its activity",
             CrossingPad = "Edit its crossing pad separately", SpawnPoints = "Edit its spawn points one by one",
-            MapIcon = "Edit its map icon separately", StationClickSpots = "Station click spots are native map data",
+            MapIcon = "Edit its map icon separately", StationClickSpots = "Contains a station click spot",
             ConstructionController = "It has a construction controller", OnMilepost = "Edit it on its milepost",
             OnCrossingPad = "Edit it on its crossing pad", OnGroup = "Edit it on its group",
             WholeGroup = "Edit the whole group instead", Parts = "Edit its parts directly", Groups = "Edit its groups instead",

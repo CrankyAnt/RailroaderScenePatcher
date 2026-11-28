@@ -165,10 +165,12 @@ namespace RailroaderScenePatcher {
             void Add(params object[] fields) => values.AddRange(fields);
             void Properties(Component component, params string[] names) {
                 foreach (var name in names) {
-                    var value = Native.Read(component, name);
+                    var value = EquipmentDeviceIdentity.ReadMember(() => Native.Read(component, name));
                     values.Add(value is UnityEngine.Object asset ? AssetId(asset) : value);
                 }
             }
+            object ReadField(Type type, string name, object receiver) =>
+                EquipmentDeviceIdentity.ReadMember(() => Field(type, name).GetValue(receiver));
             int Target(GameObject target) => target == null ? -1 : indices[target.transform];
             Add(nodes.Length);
             foreach (var node in nodes) {
@@ -190,7 +192,7 @@ namespace RailroaderScenePatcher {
                         "loop", "volume", "pitch", "spatialBlend", "rolloffMode", "minDistance", "maxDistance");
                     if (type == lamp) {
                         Add(lampKey.GetValue(component), ((Behaviour)component).enabled,
-                            Field(lamp, "invert").GetValue(component), Field(lamp, "rampDuration").GetValue(component));
+                            ReadField(lamp, "invert", component), ReadField(lamp, "rampDuration", component));
                         var targets = (GameObject[])lampTargets.GetValue(component);
                         Add(targets.Length);
                         foreach (var target in targets) Add(Target(target));
@@ -200,11 +202,11 @@ namespace RailroaderScenePatcher {
                         foreach (var material in materials) {
                             Add(material != null);
                             if (material != null) Add(AssetId((Material)materialShared.GetValue(material)), materialProperty.GetValue(material),
-                                Field(materialType, "lampColorFalse").GetValue(material), Field(materialType, "lampColorTrue").GetValue(material));
+                                ReadField(materialType, "lampColorFalse", material), ReadField(materialType, "lampColorTrue", material));
                         }
                     }
                     if (type == gate) Add(gateKey.GetValue(component), ((Behaviour)component).enabled,
-                        AssetId((UnityEngine.Object)gateClip.GetValue(component)), Field(gate, "invert").GetValue(component), Field(gate, "speed").GetValue(component));
+                        AssetId((UnityEngine.Object)gateClip.GetValue(component)), ReadField(gate, "invert", component), ReadField(gate, "speed", component));
                 }
             }
             return new EquipmentDeviceIdentity(values);
@@ -230,10 +232,7 @@ namespace RailroaderScenePatcher {
                     Placement(child.transform, out var position, out var rotation);
                     Placement(owner.transform, out var crossingPosition, out var crossingRotation);
                     var problem = SourceProblem(child, target, EquipmentAddition.LightGatePattern);
-                    EquipmentDeviceIdentity identity = null;
-                    // A source still works when its setup cannot be compared. Keep it as its own choice in that case.
-                    if (problem == null) try { identity = DeviceIdentity(child); }
-                    catch (MissingMemberException) { }
+                    var identity = problem == null ? DeviceIdentity(child) : null;
                     result.Add(new SourceCandidate(new EquipmentSource(child.scene.name, BoardScene.PathOf(child.transform)), model, problem,
                         position, rotation, child.name, places[o], crossingPosition, crossingRotation, identity));
                 }

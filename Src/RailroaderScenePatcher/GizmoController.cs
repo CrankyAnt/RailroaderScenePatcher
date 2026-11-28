@@ -103,10 +103,7 @@ namespace RailroaderScenePatcher {
                 }
                 hooks = new Harmony(HookId);
                 // These hooks act only while a drag is in progress: Escape, Save, Undo and Redo then cancel the drag.
-                Patch(controller.GetType(), "HandleEscapeCancel", nameof(BeforeEscape));
-                Patch(attachment.MapEditor.GetType(), "Save", nameof(BeforeSaveOrHistory));
-                Patch(attachment.Manager.GetType(), "Undo", nameof(BeforeSaveOrHistory));
-                Patch(attachment.Manager.GetType(), "Redo", nameof(BeforeSaveOrHistory));
+                NativeGizmoInput.PatchDragCancellation(hooks, controller, attachment, typeof(GizmoController), nameof(BeforeEscape), nameof(BeforeSaveOrHistory));
                 WorldInputHooks.Acquire(); worldHooks = true;
                 nativeVisual = native;
                 nativeVisualWasEnabled = native.enabled;
@@ -128,25 +125,10 @@ namespace RailroaderScenePatcher {
         // input from the native map editor, it waits for it.
         bool CanDrag() {
             if (!Shown || holding || inputBlocked() || Time.unscaledTime - activated < 0.2f || attachment.Session.Blocked != null) return false;
-            try {
-                foreach (var name in new[] { "_spanEndpointTool", "_builtinPlacementTool", "_terrainPaintTool", "_terrainTileTool" }) {
-                    var tool = Native.Read(controller, name);
-                    if (tool != null && (bool)Native.Read(tool, "OwnsPointer")) return false;
-                }
-                var box = Native.Read(controller, "_boxSelectTool");
-                if (box != null && (bool)Native.Read(box, "IsDragging")) return false;
-                if ((bool)Native.Read(Native.Type("Game.MapEditor.DtoFieldEditSession"), "AnySessionActive")) return false;
-                foreach (var native in controller.GetComponents<TransformGizmo>()) if (native != null && native.IsDragging) return false;
-            } catch { return false; }
-            return true;
+            return NativeGizmoInput.CanStartDrag(controller);
         }
         // Switches between Move and Rotate while the gizmo stands; not during a drag.
         internal void SetMode(TransformGizmoMode mode) { if (Shown && !Active) visual.Mode = mode; }
-        void Patch(Type type, string name, string prefix, params Type[] parameters) {
-            var method = type.GetMethod(name, Native.Flags, null, parameters, null);
-            if (method == null) throw new MissingMethodException(type.FullName, name);
-            hooks.Patch(method, prefix: new HarmonyMethod(typeof(GizmoController).GetMethod(prefix, Native.Flags)) { priority = Priority.First });
-        }
         static bool BeforeEscape(ref bool __result) {
             if (current == null || !current.Active) return true;
             current.Cancel(); __result = true; return false;

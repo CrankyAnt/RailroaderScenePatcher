@@ -209,9 +209,8 @@ namespace RailroaderScenePatcher.Core {
         // Why a group with a map icon is left out. Station map icons, in the Station Icons holder, have their own family;
         // a map icon elsewhere is in no family and has no edit.
         public const string MapIconReason = "This group contains a map icon, which the patcher can't move with the group.";
-        // Why a group with a station click spot is left out: in Railroader 0.6.3 station click spots are native map data,
-        // which the native map editor edits. The group's Placement tab gives this reason instead of its controls.
-        public const string StationAgentReason = "This group can't be moved as a whole because it contains a station click spot, which is native map data. Edit station click spots in the Map Editor.";
+        // The native map editor edits station click spots. The group's Placement tab gives this reason instead of its controls.
+        public const string StationAgentReason = "This group can't be moved as a whole because it contains a station click spot. " + WindowGuidance.EditStationClickSpots;
         // Why a group with a crossing pad outside a crossing is left out: its track binding places the pad, so the pad
         // can't move with the group. A track marker without a pad moves with its group and keeps its binding.
         public const string CrossingPadReason = "This group can't be moved as a whole because it contains a crossing pad, which its track binding places. " + WindowGuidance.EditCrossingPadSeparately;

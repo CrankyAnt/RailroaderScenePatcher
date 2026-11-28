@@ -185,7 +185,7 @@ namespace RailroaderScenePatcher {
                 try {
                     overWorldLabel = WorldInspecting && !navigating && OverWorldLabel?.Invoke(point) == true;
                     var needsWorldShield = !navigating && (WorldPicking || (WorldEditing && !GizmoShown) || overWorldLabel);
-                    var inspectClick = WorldInspecting && primaryPressed;
+                    var inspectClick = WorldInspecting && !navigating && primaryPressed;
                     if (needsWorldShield || inspectClick) {
                         // The native UI gate first checks the EventSystem's cached hover state.
                         // Arm the shield before the click, and hide it while checking for native UI underneath.
@@ -197,7 +197,8 @@ namespace RailroaderScenePatcher {
                         if (!overUi && overWorld) {
                             worldHoverShield = needsWorldShield;
                             if (inspectClick || (WorldPicking && needsWorldShield && primaryPressed)) {
-                                worldCaptured = needsWorldShield;
+                                // The native editor's world picker also checks the UI gate before selecting.
+                                worldCaptured = true;
                                 candidate = point;
                                 candidateInspectOnly = inspectClick;
                             }

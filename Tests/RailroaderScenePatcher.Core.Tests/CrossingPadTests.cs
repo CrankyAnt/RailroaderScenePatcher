@@ -121,6 +121,7 @@ static class CrossingPadTests {
         UnresolvedInputsChangeNothing();
         DetachIsRefusedBeforeMutation();
         AnEndBBindingIsStoredFromEndA();
+        AFileBindingFromEndBBuildsThePadAtTheSameTrackPoint();
         PlacementAndActivityKeepTheBinding();
         PadsComposeWithGenericMarkers();
         PreflightRefusalChangesNothing();
@@ -258,6 +259,26 @@ static class CrossingPadTests {
         var missing = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Smissing", "b", 5)));
         Assert(!missing.Applied && missing.Error.Contains("missing"), "An end b location on a missing segment keeps its refusal: " + missing.Error);
     }
+    static void AFileBindingFromEndBBuildsThePadAtTheSameTrackPoint() {
+        var (world, pad, _, scene) = Setup();
+        var capabilities = new SceneCapabilities(() => new[] { "map" });
+        capabilities.Add(scene);
+        var engine = new PatchEngine(capabilities);
+        var patch = Doc(Binding("rebind", At("Sj7c", "b", 30)));
+
+        var outcome = engine.Apply(patch).Outcomes["rebind"];
+        Assert(outcome.Applied && Entry(world, pad) == "Sj7c|a|370" && Mesh(world, pad) == "Sj7c|a|370@1020",
+            "A file binding 30 m from end b on a 400 m segment registers and builds the pad 370 m from end a: " + outcome.Error + " " + Entry(world, pad));
+
+        var generations = world.Generations;
+        Assert(engine.Apply(patch).Outcomes["rebind"].Applied && world.Generations == generations,
+            "Applying the same file again leaves the current pad geometry alone");
+
+        var session = new PatchEditingSession(engine, new NativeMapEditor(), new Store { Patch = patch });
+        var recheck = session.Recheck(Pad);
+        Assert(recheck.Applied && Entry(world, pad) == "Sj7c|a|370" && world.Generations == generations,
+            "Recheck accepts the same track point from end a without rebuilding the pad: " + recheck.Error);
+    }
     static string Placed(string id, string extra = "") =>
         "\"" + id + "\":{" + Target() + ",\"placement\":{\"mode\":\"fixed\",\"position\":[1025,1,2],\"rotation\":[0,0,0,1]}" + extra + ",\"dependsOn\":[]}";
     static void PlacementAndActivityKeepTheBinding() {
@@ -279,10 +300,11 @@ static class CrossingPadTests {
         markerWorld.Objects["World/Large Scenery/Ela/Signs/Station Sign (1)"] = new List<object> { sign }; markerWorld.Load(sign); markerWorld.Relative(sign);
         var capabilities = new SceneCapabilities(() => new[] { "map" });
         capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); capabilities.Add(pads);
-        var signBinding = "\"sign\":{\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"World/Large Scenery/Ela/Signs/Station Sign (1)\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"relationships\":{\"trackMarker\":{\"segment\":\"Nnew\",\"end\":\"a\",\"distance\":2}},\"dependsOn\":[]}";
+        var signBinding = "\"sign\":{\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"World/Large Scenery/Ela/Signs/Station Sign (1)\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"relationships\":{\"trackMarker\":{\"segment\":\"Nnew\",\"end\":\"b\",\"distance\":2}},\"dependsOn\":[]}";
         var wrongStructure = Binding("as-marker", At("Sj7c", "a", 190), RearPath).Replace("crossing-pad-v1", "track-marker-v1");
         var result = new PatchEngine(capabilities).Apply(Doc(signBinding + "," + Binding("pad", At("Sj7c", "a", 186.9477)) + "," + wrongStructure));
         Assert(result.Outcomes["sign"].Applied && result.Outcomes["pad"].Applied && Mesh(world, pad) == Rebound && sign.Segment == "Nnew", "A pad and a Generic marker apply through their own capabilities");
+        Assert(Entry(markerWorld, sign) == "Nnew|b|2", "A Generic marker uses the end written in the file");
         Assert(!result.Outcomes["as-marker"].Applied && Mesh(world, rear) == "Sj7c|a|210@1045", "A pad target named with the Generic-marker structure does not resolve to the pad");
         var incompatible = new SceneCapabilities(() => new[] { "map" });
         incompatible.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); incompatible.AddUnavailable(CrossingPadScene.Structure, "pad builder missing");

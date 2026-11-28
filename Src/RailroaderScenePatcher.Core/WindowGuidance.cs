@@ -13,6 +13,7 @@ namespace RailroaderScenePatcher.Core {
     public static class WindowGuidance {
         // Scene objects.
         public const string EditCrossingPadSeparately = "Edit its crossing pad in the Crossing pad marker family.";
+        public const string EditStationClickSpots = "Edit station click spots in the Map Editor.";
         public const string EditSpawnPointsIndividually = "Edit its spawn points individually in the Spawn point family.";
         public const string RemovePadMarkerId = "Remove padMarkerId from this target.";
         public const string EditCulledParts = "Edit its parts directly.";

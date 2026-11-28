@@ -173,6 +173,7 @@ namespace RailroaderScenePatcher.Core {
         public bool? Active { get; }
         // The track-marker relationship: a location or explicit detachment. Null leaves it untouched, and an object without one reads null.
         public MarkerBinding Marker { get; }
+        internal ObjectState WithMarker(MarkerBinding marker) => new ObjectState(Placement, Active, marker, Coverage, Equipment, Starter) { LeavesActivity = LeavesActivity, Segments = Segments, MarkerId = MarkerId };
         // The crossing-coverage relationship. Null leaves it untouched, and an object without one reads null. This mod's coverage
         // lists only its explicit circuits; observed coverage lists every circuit of the crossing.
         public CrossingCoverage Coverage { get; }
@@ -554,7 +555,7 @@ namespace RailroaderScenePatcher.Core {
                 Observe("preflight", scenePatchFileKey, id, identity.Path);
                 scene.Preflight(resolved);
                 // One modification's own state: an omitted active leaves the activity another modification set.
-                var state = Evaluate(parsed.State.LeavingActivity());
+                var state = Evaluate(RecordedState(resolved, parsed.State).LeavingActivity());
                 CheckRelationships(resolved, state);
                 Observe("capture", scenePatchFileKey, id, identity.Path);
                 Underlying(resolved);
@@ -758,6 +759,7 @@ namespace RailroaderScenePatcher.Core {
         // Refuses a relationship the object does not support and a relationship target that does not resolve uniquely.
         // A relationship scene also checks the settings its relationships make unsupported.
         internal void CheckRelationships(object target, ObjectState state) {
+            state = RecordedState(target, state);
             if (state?.Segments != null && !(scene is IConstructionSegmentScene)) throw new InvalidPatchDefinitionException(ConstructionSegmentRule.NoRelationship);
             if (state?.MarkerId != null && !(scene is IMarkerIdScene)) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.NotSupported);
             if (scene is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
@@ -866,8 +868,21 @@ namespace RailroaderScenePatcher.Core {
                 var standing = scene.Read(target)?.Equipment ?? state.Equipment;
                 state = new ObjectState(state.Placement, state.Active, state.Marker, state.Coverage, standing.Without(owner ?? ""), state.Starter).WithSegments(state.Segments).WithMarkerId(state.MarkerId);
             }
-            foreach (var item in own) state = Overlay(state, item.State);
+            foreach (var item in own) state = Overlay(state, RecordedState(target, item.State));
             return Evaluate(state);
+        }
+        // A crossing pad's recorded binding is measured from end a. Leave observed and captured state alone so that
+        // clearing or restoring a modification can return the object's original binding.
+        internal ObjectState RecordedState(object target, ObjectState state) {
+            var marker = StoredBinding(target, state?.Marker);
+            return ReferenceEquals(marker, state?.Marker) ? state : state.WithMarker(marker);
+        }
+        internal MarkerBinding StoredBinding(object target, MarkerBinding binding) {
+            var location = binding?.Location;
+            if (location?.End != "b") return binding;
+            var stored = scene is CrossingPadScene pad ? pad.StoredLocation(location)
+                : scene is SceneCapabilities capabilities ? capabilities.StoredBinding(target, location) : location;
+            return ReferenceEquals(stored, location) ? binding : MarkerBinding.At(stored);
         }
         // One modification's state laid over a complete state: every value the modification sets replaces the one below.
         internal static ObjectState Overlay(ObjectState under, ObjectState mod) =>

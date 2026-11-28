@@ -416,8 +416,24 @@ namespace RailroaderScenePatcher.Core {
         void Conclude(int seen, int[] matches, SceneObservation[] near) {
             if (!maps.SequenceEqual(scene.MapIds)) { MarkStale("the map context changed"); return; }
             if (seen != Entries.Count) { MarkStale(seen + " observations instead of " + Entries.Count); return; }
-            for (var i = 0; i < matches.Length; i++) if (matches[i] != 1) { MarkStale(Name(Entries[i]) + (matches[i] == 0 ? (near != null && near[i] != null ? " changed (" + Entries[i].Difference(near[i]) + ")" : " changed or is missing") : " is observed " + matches[i] + " times")); return; }
+            for (var i = 0; i < matches.Length; i++) {
+                if (matches[i] == 1) continue;
+                var expected = Entries[i];
+                if (matches[i] > 1) { MarkStale(Name(expected) + " is observed " + matches[i] + " times"); return; }
+                var current = near?[i];
+                // A native graph edit can briefly expose a different binding for an unrelated pad during the scan.
+                // Check that pad once more without adopting either observation or discarding other mismatches.
+                if (current != null && expected.Family == SceneFamilies.CrossingPad && scene is ITargetedInspectionScene targeted
+                    && PadLocation(expected) != PadLocation(current)) {
+                    current = targeted.Observe(expected.Handle, expected.Identity);
+                    if (expected.Matches(current)) continue;
+                    if (current != null) { MarkStale(Name(expected) + " changed (" + current.Difference(expected) + ")"); return; }
+                }
+                MarkStale(Name(expected) + (current == null ? " changed or is missing" : " changed (" + expected.Difference(current) + ")"));
+                return;
+            }
         }
+        static string PadLocation(SceneObservation entry) => entry.Bindings.FirstOrDefault(line => line.StartsWith("Marker segment=", StringComparison.Ordinal));
         static string Name(SceneObservation entry) => entry.DisplayName;
         void MarkStale(string reason) { if (!IsStale) StaleReason = reason; IsStale = true; }
         // Continues the stepped comparison, or starts one: at least one unit of the scan, then further units while more()

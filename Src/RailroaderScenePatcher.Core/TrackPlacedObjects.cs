@@ -38,12 +38,15 @@ namespace RailroaderScenePatcher.Core {
         // Puts each kept object back where it stood.
         internal static void PutBack(IReadOnlyList<Kept> kept) {
             foreach (var one in kept ?? Array.Empty<Kept>())
-                if (!GroupChecks.Near(one.World.Position(one.Target), one.Position, GroupChecks.PositionTolerance) || !GroupChecks.SameRotation(one.World.Rotation(one.Target), one.Rotation))
+                if (PlacementChanged(one))
                     one.World.SetPlacement(one.Target, one.Position, one.Rotation);
         }
         // Why a kept object no longer stands where it stood, or null.
         internal static string Moved(IReadOnlyList<Kept> kept) =>
-            (kept ?? Array.Empty<Kept>()).Any(one => !GroupChecks.Near(one.World.Position(one.Target), one.Position, GroupChecks.PositionTolerance) || !GroupChecks.SameRotation(one.World.Rotation(one.Target), one.Rotation))
+            (kept ?? Array.Empty<Kept>()).Any(PlacementChanged)
                 ? "a track marker that follows its track left its track placement" : null;
+        static bool PlacementChanged(Kept one) =>
+            !GroupChecks.Near(one.World.Position(one.Target), one.Position, GroupChecks.PositionTolerance) ||
+            !GroupChecks.SameRotation(one.World.Rotation(one.Target), one.Rotation);
     }
 }

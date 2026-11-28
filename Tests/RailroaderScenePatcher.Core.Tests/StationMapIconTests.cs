@@ -68,7 +68,7 @@ static class StationMapIconTests {
         // That reason promises no edit: such a map icon is in no family.
         Assert(SceneObjectRules.MapIconReason.IndexOf("family", StringComparison.OrdinalIgnoreCase) < 0 && SceneObjectRules.MapIconReason.IndexOf("edited", StringComparison.OrdinalIgnoreCase) < 0,
             "The map icon reason promises no edit: " + SceneObjectRules.MapIconReason);
-        // A station click spot is native map data in Railroader 0.6.3: a settled rule without a ticket.
+        // The station click spot is a child of the station group. The native map editor edits it.
         var spot = SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Depot", new Node("Click").With("Model.StationAgent"), new Node("Shell").Solid())))))
             .Single(v => v.Path == "World/Large Scenery/Town/Depot");
         Assert(spot.Reason == SceneObjectRules.StationAgentReason && CommandBand.GroupInspectionOnly(spot, SceneObjectRules.Family) == "Not editable as a group: " + SceneObjectRules.StationAgentReason,

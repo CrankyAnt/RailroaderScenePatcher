@@ -14,6 +14,7 @@ using RailroaderScenePatcher.Core;
 class FakeDevice {
     public string Scene = "BushnellWhittier", Path, Model = "Crossing Signal Wishbone A";
     public int Mesh = 1;
+    public Func<object> ReadGateSpeed = () => 1f;
     public string[] GateComponents = { "UnityEngine.Animator", "RollingStock.Controls.KeyValueBoolAnimator" };
     public DeviceFacts Facts = new DeviceFacts {
         Lamps = { new LampFacts { Name = "Signal 1", Key = "lights", Targets = 1, Materials = 2, RendererUsesMaterial = true } },
@@ -91,10 +92,16 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
         return LightGatePattern.Problem(d.Facts, Keys);
     }
     public IReadOnlyList<SourceCandidate> Candidates(object controller) =>
-        Devices.Where(d => d.Owner == null).Select(d => new SourceCandidate(new EquipmentSource(d.Scene, d.Path), d.Model,
-            SourceProblem(d, controller, EquipmentAddition.LightGatePattern), device: new EquipmentDeviceIdentity(new object[] { d.Mesh, d.Facts.Lamps.Count, d.Facts.Gates.Count }
-                .Concat(HierarchyDependencies.AuthoredComponents(d.GateComponents, name => name))
-                .Concat(d.Facts.Lamps.Select(l => (object)l.Key)).Concat(d.Facts.Gates.Select(g => (object)g.Key)))))
+        Devices.Where(d => d.Owner == null).Select(d => {
+            var problem = SourceProblem(d, controller, EquipmentAddition.LightGatePattern);
+            var identity = problem == null
+                ? new EquipmentDeviceIdentity(new object[] { d.Mesh, d.Facts.Lamps.Count, d.Facts.Gates.Count }
+                    .Concat(HierarchyDependencies.AuthoredComponents(d.GateComponents, name => name))
+                    .Append(EquipmentDeviceIdentity.ReadMember(d.ReadGateSpeed))
+                    .Concat(d.Facts.Lamps.Select(l => (object)l.Key)).Concat(d.Facts.Gates.Select(g => (object)g.Key)))
+                : null;
+            return new SourceCandidate(new EquipmentSource(d.Scene, d.Path), d.Model, problem, device: identity);
+        })
             .Concat(BellPattern.Sources(CrossingBells, Bells, b => b.Identifier, b => b.Name, b => SourceProblem(b, controller, EquipmentAddition.BellPattern))).ToArray();
     public IReadOnlyList<object> Owned(object controller) => All.Where(a => ReferenceEquals(a.Controller, controller) && !a.Destroyed).Cast<object>().ToArray();
     public EquipmentAddition Describe(object addition) => ((Added)addition).Record;
@@ -183,6 +190,7 @@ static class EquipmentTests {
     }
     public static void Run() {
         EquipmentChoicesDistinguishSameNamedDevicesBySetup();
+        EquipmentChoicesCompareTheRemainingSetupWhenAMemberIsAbsent();
         EquipmentChoicesKeepTheFirstUsableSourceOfEachModel();
         AdditionConstructsThroughTheController();
         EligibilityFollowsThePatternAcrossModels();
@@ -415,6 +423,19 @@ static class EquipmentTests {
             Assert(choices.Select(c => c.Source.Path).SequenceEqual(expected),
                 "Different assets or lamp setups have separate choices, while equivalent devices keep the first path");
         }
+    }
+    static void EquipmentChoicesCompareTheRemainingSetupWhenAMemberIsAbsent() {
+        var (f, session, _, _) = Session();
+        f.World.Devices.Clear();
+        f.World.Device("World/Z/Signal 1");
+        f.World.Device("World/B/Signal 1", d => d.Facts.Lamps[0].Key = "gates");
+        f.World.Device("World/A/Signal 1");
+        foreach (var device in f.World.Devices)
+            device.ReadGateSpeed = () => throw new MissingFieldException("KeyValueBoolAnimator", "speed");
+
+        var paths = session.EquipmentSources(Crossing).Select(c => c.Source.Path).ToArray();
+        Assert(paths.SequenceEqual(new[] { "World/A/Signal 1", "World/B/Signal 1" }),
+            "An absent member does not prevent matching equivalent sources or distinguishing different lamp setups: " + String.Join(", ", paths));
     }
     static void EquipmentChoicesKeepTheFirstUsableSourceOfEachModel() {
         var (f, session, mapEditor, store) = Session();

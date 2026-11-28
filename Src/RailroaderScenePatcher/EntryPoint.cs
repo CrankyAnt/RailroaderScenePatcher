@@ -817,6 +817,8 @@ namespace RailroaderScenePatcher {
                     if (updated != null) { KeepSelection(edited, updated); ReobserveMarkerIdHolders(edited, updated); } else Inspect(preserveFeedback: edited != null);
                     InspectPlacedModObject();
                     ReadPlacement();
+                    if (edited?.Identity.Structure == CrossingCoverageScene.Structure && ReferenceEquals(edited.Handle, selected?.Handle)
+                        && (!edited.Position.SequenceEqual(selected.Position) || !edited.Rotation.SequenceEqual(selected.Rotation))) ReadOpenEquipment(keepDraft: true);
                     RestoreEditDrafts(drafts);
                 } finally {
                     Requests.Refreshed();
@@ -1667,28 +1669,37 @@ namespace RailroaderScenePatcher {
         // change of one axis rewrites only that axis.
         Placement equipmentOwn;
         double[] equipmentAngles;
-        void FillEquipment(Placement placement) {
+        void FillEquipment(Placement placement, bool keepDraft = false) {
+            var previous = equipmentOwn;
+            var previousAngles = equipmentAngles;
             equipmentOwn = placement;
             var angles = new Quaternion((float)placement.Rotation[0], (float)placement.Rotation[1], (float)placement.Rotation[2], (float)placement.Rotation[3]).eulerAngles;
             equipmentAngles = new double[] { angles.x, angles.y, angles.z };
-            for (var i = 0; i < 3; i++) { equipmentFields[i + 1] = CommandBand.Number(placement.Position[i]); equipmentFields[i + 4] = CommandBand.Number(equipmentAngles[i]); }
+            for (var i = 0; i < 3; i++) {
+                if (!keepDraft || previous == null || equipmentFields[i + 1] == CommandBand.Number(previous.Position[i]))
+                    equipmentFields[i + 1] = CommandBand.Number(placement.Position[i]);
+                if (!keepDraft || previousAngles == null || equipmentFields[i + 4] == CommandBand.Number(previousAngles[i]))
+                    equipmentFields[i + 4] = CommandBand.Number(equipmentAngles[i]);
+            }
         }
         // The ID of the addition the open form edits, or null for a new addition from Use.
         string equipmentEdited;
-        // After a native history step the open form for an addition shows that addition as the scene patch file now holds
-        // it, as the placement fields show the object's current placement. An addition the step removed leaves the form as
-        // it is; a new addition's form keeps the modder's values.
-        void ReadOpenEquipment() {
+        // After a setup move or native history step the open form for an addition reads its current map placement.
+        // During a move its edited fields stay as entered. A new or removed addition's values stay as entered too.
+        void ReadOpenEquipment(bool keepDraft = false) {
             if (equipmentSource == null || equipmentEdited == null || attachment == null || selected?.Identity.Structure != CrossingCoverageScene.Structure) return;
             try {
                 var entry = attachment.Session.EquipmentEntries(selected.Identity).FirstOrDefault(e => e.Addition.Id == equipmentEdited);
                 if (entry == null) return;
-                equipmentSource = entry.Addition.Source; preparedEquipment = null; equipmentOwn = null; equipmentFields[0] = entry.Addition.Id;
-                var copies = EquipmentCopies();
-                IReadOnlyList<SourceCandidate> candidates = null;
-                if (entry.Built == null) try { candidates = attachment.Session.EquipmentSourceDetails(selected.Identity); } catch { }
-                equipmentLabel = EquipmentEntryName(entry, copies, candidates);
-                if (entry.Addition.Placement?.Position != null && entry.Addition.Placement.Rotation != null) FillEquipment(entry.Addition.Placement);
+                preparedEquipment = null;
+                if (!keepDraft) {
+                    equipmentSource = entry.Addition.Source; equipmentOwn = null; equipmentFields[0] = entry.Addition.Id;
+                    var copies = EquipmentCopies();
+                    IReadOnlyList<SourceCandidate> candidates = null;
+                    if (entry.Built == null) try { candidates = attachment.Session.EquipmentSourceDetails(selected.Identity); } catch { }
+                    equipmentLabel = EquipmentEntryName(entry, copies, candidates);
+                }
+                if (entry.Addition.Placement?.Position != null && entry.Addition.Placement.Rotation != null) FillEquipment(entry.Addition.Placement, keepDraft);
             } catch (Exception) { }
         }
         // After Use file version the open equipment form shows its addition as the scene patch file now holds it. A form

@@ -23,6 +23,7 @@ namespace RailroaderScenePatcher {
         Behaviour controller;
         MapEditorAttachment attachment;
         NativeTrackPoses track;
+        TargetIdentity identity;
         Harmony hooks;
         bool stopping, worldHooks, nativeVisualWasEnabled, dragging;
         float activated;
@@ -47,8 +48,8 @@ namespace RailroaderScenePatcher {
         internal TrackLocation Location => live ?? start;
 
         // released gets the location the drag began at and the one it was released at, or null without a move.
-        internal void Initialize(MapEditorAttachment attachment, NativeTrackPoses track, TrackLocation start, Action<TrackLocation> moved, Action<TrackLocation, TrackLocation> released, Action cancelled) {
-            this.attachment = attachment; this.track = track; this.start = start; this.moved = moved; this.released = released; this.cancelled = cancelled;
+        internal void Initialize(MapEditorAttachment attachment, NativeTrackPoses track, TargetIdentity identity, TrackLocation start, Action<TrackLocation> moved, Action<TrackLocation, TrackLocation> released, Action cancelled) {
+            this.attachment = attachment; this.track = track; this.identity = identity; this.start = start; this.moved = moved; this.released = released; this.cancelled = cancelled;
             try {
                 if (current != null || GizmoController.IsShown) throw new EditRefusal("Another scene-patch gizmo is shown");
                 controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as Behaviour;
@@ -60,10 +61,7 @@ namespace RailroaderScenePatcher {
                 var pose = Pose(start);
                 hooks = new Harmony(HookId);
                 // These hooks act only while a drag is in progress: Escape, Save, Undo and Redo then cancel the drag.
-                Patch(controller.GetType(), "HandleEscapeCancel", nameof(BeforeEscape));
-                Patch(attachment.MapEditor.GetType(), "Save", nameof(BeforeSaveOrHistory));
-                Patch(attachment.Manager.GetType(), "Undo", nameof(BeforeSaveOrHistory));
-                Patch(attachment.Manager.GetType(), "Redo", nameof(BeforeSaveOrHistory));
+                NativeGizmoInput.PatchDragCancellation(hooks, controller, attachment, typeof(PadDistanceGizmo), nameof(BeforeEscape), nameof(BeforeSaveOrHistory));
                 WorldInputHooks.Acquire(); worldHooks = true;
                 nativeVisual = native;
                 nativeVisualWasEnabled = native.enabled;
@@ -92,22 +90,7 @@ namespace RailroaderScenePatcher {
         // A drag starts only when no native operation holds the pointer or an edit session, as for the placement gizmo.
         bool CanDrag() {
             if (!Shown || Time.unscaledTime - activated < 0.2f || attachment.Session.Blocked != null) return false;
-            try {
-                foreach (var name in new[] { "_spanEndpointTool", "_builtinPlacementTool", "_terrainPaintTool", "_terrainTileTool" }) {
-                    var tool = Native.Read(controller, name);
-                    if (tool != null && (bool)Native.Read(tool, "OwnsPointer")) return false;
-                }
-                var box = Native.Read(controller, "_boxSelectTool");
-                if (box != null && (bool)Native.Read(box, "IsDragging")) return false;
-                if ((bool)Native.Read(Native.Type("Game.MapEditor.DtoFieldEditSession"), "AnySessionActive")) return false;
-                foreach (var native in controller.GetComponents<TransformGizmo>()) if (native != null && native.IsDragging) return false;
-            } catch { return false; }
-            return true;
-        }
-        void Patch(Type type, string name, string prefix) {
-            var method = type.GetMethod(name, Native.Flags, null, Type.EmptyTypes, null);
-            if (method == null) throw new MissingMethodException(type.FullName, name);
-            hooks.Patch(method, prefix: new HarmonyMethod(typeof(PadDistanceGizmo).GetMethod(prefix, Native.Flags)) { priority = Priority.First });
+            return NativeGizmoInput.CanStartDrag(controller);
         }
         static bool BeforeEscape(ref bool __result) {
             if (current == null || !current.Active) return true;
@@ -145,7 +128,7 @@ namespace RailroaderScenePatcher {
             dragging = false;
             Stop();
             cancelled?.Invoke();
-            PatcherLog.Debug("The crossing pad's distance gizmo stopped: " + e.GetBaseException().Message);
+            PatcherLog.Debug(() => "The distance gizmo stopped for " + identity.Label + ": " + PatcherLog.Reason(e));
         }
         // Cancels a drag in progress; the binding stays as it was and the owner restores its fields.
         internal void Cancel() {

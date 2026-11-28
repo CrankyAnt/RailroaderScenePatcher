@@ -243,7 +243,7 @@ An entry in a scene patch file, identified by its modification ID, that holds th
 A supplying mod's declared dependency on the patcher, with the minimum patcher version that the mod requires.
 
 **Fixed placement**:
-Physical placement fixed in map coordinates, independent of any track. It is distinct from track-following placement.
+Physical placement independent of any track, fixed in map coordinates for a scene object. A child object's recorded fixed placement is its placement when its scene object is at its map placement, and the child moves with that scene object at the same relative placement.
 
 **Owned state**:
 State that a supplying mod's coherent operation constructs or registers, such as an owned span or an added object. Cleanup removes only owned state.

@@ -79,8 +79,8 @@ Every scene object below World that has a renderer, collider, light, storage pil
 
 | Top scene object left out of the family | Rule | Where it is edited |
 | --- | --- | --- |
-| Track marker | A `Track.TrackMarker` at or below the top scene object. The complex is not moved as a whole | Each marker in the Generic track marker family |
-| Station click spot | A `Model.StationAgent` at or below the root. In Railroader 0.6.3 station click spots are native map data | In the native map editor |
+| Track marker | A `Track.TrackMarker` at or below the top scene object. An eligible group moves as a whole. A track-following marker stays at its track point | Each marker in the Generic track marker family |
+| Station click spot | A `Model.StationAgent` at or below the root. A station click spot is a child object of the station group | In the native map editor |
 | Construction controller outside a rail bridge | A `Game.Mow.TrackConstructionScenery` at or below a top scene object that is no rail bridge construction | Nowhere: in Railroader 0.6.3 only rail bridge constructions hold one |
 | Spawn point | A `Character.SpawnPoint` at or below the top scene object. The complex is not moved as a whole | Each spawn point in the Spawn point family |
 | Map icon | A `UI.Map.MapIcon` at or below the top scene object. Such a map icon is in no family and has no edit; station map icons have their own Station Icons object and family | Nowhere |

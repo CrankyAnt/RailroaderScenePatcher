@@ -436,7 +436,7 @@ namespace RailroaderScenePatcher.Core {
                 // A modification the patcher refused changes nothing: the tab says so with the reason instead.
                 var failure = NotAppliedOf(ScenePatchFile.Key(own[0]));
                 if (failure != null) return new[] { FailureLabels.Of(failure.Kind) + ". " + ScenePatchFile.Sentence(failure.Reason) + "." };
-                return ChangeLines(PatchEngine.Parse(own[0]).State, engine.Underlying(resolved));
+                return ChangeLines(engine.RecordedState(resolved, PatchEngine.Parse(own[0]).State), engine.Underlying(resolved));
             } catch (InvalidOperationException) { return new string[0]; }
         }
         // The lines for one modification's state against the underlying state.
@@ -599,7 +599,8 @@ namespace RailroaderScenePatcher.Core {
                 var key = TargetKey(item);
                 if (items.Count(i => !ReferenceEquals(i, item) && TargetKey(i) == key) != 0) return false;
                 var underlying = engine.Underlying(held.Target);
-                var desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)).WithMarkerId(parsed.State.MarkerId ?? underlying.MarkerId));
+                var marker = engine.StoredBinding(held.Target, parsed.State.Marker) ?? underlying.Marker;
+                var desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)).WithMarkerId(parsed.State.MarkerId ?? underlying.MarkerId));
                 if (!Same(scene.Read(held.Target), desired)) return false;
                 return !(scene is IDerivedStateScene derived) || derived.DerivedProblem(held.Target, desired) == null;
             } catch (Exception) { return false; }
@@ -617,7 +618,8 @@ namespace RailroaderScenePatcher.Core {
                 var key = TargetKey(item);
                 if (items.Count(i => !ReferenceEquals(i, item) && TargetKey(i) == key) != 0) return null;
                 var underlying = engine.Underlying(target);
-                desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)).WithMarkerId(parsed.State.MarkerId ?? underlying.MarkerId));
+                var marker = engine.StoredBinding(target, parsed.State.Marker) ?? underlying.Marker;
+                desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)).WithMarkerId(parsed.State.MarkerId ?? underlying.MarkerId));
                 prior = scene.Read(target);
                 if (prior.Active != desired.Active || prior.MarkerId != desired.MarkerId || !MarkerBinding.Same(prior.Marker, desired.Marker) || !CrossingCoverage.Same(prior.Coverage, desired.Coverage) || !StarterSetting.Same(prior.Starter, desired.Starter)) return null;
                 placement.PreflightPlacement(target);
@@ -672,12 +674,9 @@ namespace RailroaderScenePatcher.Core {
         // The binding an edit writes: a crossing pad's location from end a (CrossingPadScene.StoredLocation), any other as
         // entered. A target that does not resolve keeps the entered binding, and the edit's own checks refuse it.
         MarkerBinding StoredBinding(TargetIdentity target, MarkerBinding binding) {
-            if (binding?.Location == null || target?.Structure != CrossingPadScene.Structure) return binding;
+            if (binding?.Location?.End != "b" || target?.Structure != CrossingPadScene.Structure) return binding;
             try {
-                var resolved = engine.ResolveUnique(target);
-                var stored = scene is CrossingPadScene pad ? pad.StoredLocation(binding.Location)
-                    : scene is SceneCapabilities capabilities ? capabilities.StoredBinding(resolved, binding.Location) : binding.Location;
-                return ReferenceEquals(stored, binding.Location) ? binding : MarkerBinding.At(stored);
+                return engine.StoredBinding(engine.ResolveUnique(target), binding);
             } catch (Exception) { return binding; }
         }
         // Sets or replaces this mod's replacement ID of a generic track marker. A null id clears the mod's value: the

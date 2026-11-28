@@ -97,6 +97,7 @@ static class InspectionTests {
         result = new PatchEngine(mutable).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
         Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == mutationCount, "Changed binding after inspection cannot authorize a placement edit");
         SteppedFreshness();
+        FreshnessConfirmsAChangedPadBinding();
         ComponentsLeavingDuringAPass();
         OwnedRuntimeObjectsDoNotMakeTheSnapshotStale();
         AnEquipmentEditAddsNoInventoryEntries();
@@ -267,6 +268,43 @@ static class InspectionTests {
         parts.Reads.Clear(); parts.FailingRead = sign;
         Check(parts.Discover().Count() == 2 && parts.Reads.SequenceEqual(new[] { "read Widget", "reads done", "classify Widget", "classify Sign", "classify Holder", "classify Board", "classified", "observe Sign", "observe Board" }),
             "A stopped owner walk reads no further owner and still observes the candidates: " + String.Join(", ", parts.Reads));
+    }
+
+    sealed class PadInspection : ITargetedInspectionScene {
+        public IEnumerable<string> MapIds => new[] { "map" };
+        public SceneObservation Scanned, Current;
+        public int Reads;
+        public IEnumerable<SceneObservation> Discover() { yield return Scanned; }
+        public SceneObservation Observe(object handle, TargetIdentity identity) { Reads++; return Current; }
+    }
+
+    static void FreshnessConfirmsAChangedPadBinding() {
+        var handle = new object();
+        var identity = new TargetIdentity("scene", "World/Crossing Pad", "Track.TrackCurveMeshBuilder", CrossingPadScene.Structure);
+        SceneObservation Pad(string location) => new SceneObservation(handle, identity, SceneFamilies.CrossingPad, true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { location }, Array.Empty<string>(), Array.Empty<string>(), "Bind");
+        var original = Pad("Marker segment=Sbye; end=A; distance=85.445; segment length=99.15");
+        var transient = Pad("Marker segment=Spx4; end=A; distance=29.1735; segment length=109.8501");
+        var changed = Pad("Marker segment=Sbye; end=A; distance=80; segment length=99.15");
+        foreach (var stepped in new[] { false, true }) {
+            var scene = new PadInspection { Scanned = original, Current = original };
+            var inventory = new SceneInventory(scene);
+            inventory.Refresh();
+            var inspected = inventory.Entries.Single();
+            void Compare() {
+                if (stepped) inventory.AdvanceFreshnessCheck(() => true);
+                else inventory.CheckFreshness();
+            }
+            scene.Scanned = transient;
+            Compare();
+            Check(!inventory.IsStale && scene.Reads == 1 && inventory.PinCompared(inspected) != null,
+                "A one-off pad binding read is checked once and leaves the inspected pad available for Set");
+
+            scene.Current = changed;
+            Compare();
+            Check(inventory.IsStale && scene.Reads == 2 && inventory.StaleReason.Contains("distance=80") && !inventory.StaleReason.Contains("Spx4"),
+                "A persistently changed pad still blocks Set and names the binding from the second read: " + inventory.StaleReason);
+        }
     }
 
     // The panel's inventory notice says that edits are refused only in the states in which a pin refuses them.
