@@ -2,7 +2,9 @@
 
 This changelog lists notable changes, newest first.
 
-## 0.5.0
+## Unreleased
+
+### 0.5.0
 
 - On a crossing pad's **Connections** tab, a gizmo on the track moves the pad along its segment. **End** and **Distance** follow the drag, and the gizmo counts from end `a`. When you release the mouse button, the patcher binds the pad there and regenerates it; Escape keeps the current binding. **Segment length** beside the **Track location (m)** caption shows how long the entered segment is. While a field of the pad's binding has the focus or the gizmo is dragged, the world marks the entered segment and labels its **End A** and **End B**. See [move the pad along its track with the gizmo](docs/guides/scene-patches/rebinding-crossing-pads.md#move-the-pad-along-its-track-with-the-gizmo).
 - A crossing pad's binding is always stored from end `a`, because the game builds a pad from end `a`; a pad bound from end `b` was built near end `a`, or failed a short way from end `b` with the game's own text `Distance 7 is greater than length 6.503645`. When you enter end `b` on the pad's **Connections** tab, the patcher stores the same place from end `a`, and a note below the row shows it. If the game's pad builder still fails at a place, the edit fails with a reason in the window's words.
@@ -97,11 +99,11 @@ This changelog lists notable changes, newest first.
 - A mod that has a scene patch file but doesn't list the patcher under `dependencies.required` in its `Info.json` now produces a warning in the Player log.
 - The structure ids of scene objects, child objects and location signs are now `scene-object-v1`, `child-object-v1` and `location-sign-v1`. The old ids are not read: a modification whose target carries an old id matches no object and fails with the Log row `This target doesn't match any object in the loaded map.`. The other modifications of that file still apply, and the file is not rewritten. The families are renamed as well: top scene objects are in the **Group** family, their child objects in the **Part** family, location signs in the **Location sign** family, starter placement markers in the **Starter placement marker** family, and grade crossing controllers in the **Grade crossing controller** family.
 
-## 0.4.0
+### 0.4.0
 
 - You can set, replace, or detach the track location of Generic track markers, such as yard-limit and station signs, in the native map editor and through `relationships.trackMarker` in `scene-patches.json` (`track-marker-v1`). The marker's track-graph registration follows the binding; the object does not move. Placement and activity of a marker object are separate settings. Mileposts, crossing pads, crossings, and markers whose activity follows a track group are inspection only.
 
-## 0.3.0
+### 0.3.0
 
 - You can move, rotate, disable, and restore the Ela bridge with its colliders and culling, in the native map editor and through `scene-patches.json` (`bridge-colliders-v1`). Separate track-owned trestles and construction scenery stay unchanged.
 - You can move, rotate, disable, and restore location signs with their culling and terrain mask, in the native map editor and through `scene-patches.json` (`location-sign-v1`). Scene patch editing tracks the terrain output the game regenerates, reports writes that do not complete, and can request them again.
