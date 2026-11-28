@@ -1,0 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
+<!-- SPDX-License-Identifier: MIT -->
+# Map patches are the native route for map data
+
+Railroader 0.6.3 map patches are the game's native route for map data, and the patcher keeps its scene-object route beside them, both edited in the native map editor. A map patch cannot reach Unity scene objects, because signals, progression, bridges and some scenery are not in map data, so the scene-object route stays for them. No family covers native map data. Writing native map data from the patcher was rejected because it would duplicate the native map editor, and extending a scene-object family into map data would duplicate the native map editor for that family. The cost is that a modder keeps two routes, a map patch and a scene patch file, with no coupling between them (see ADR 0005). If the game later moves scene objects into map data, the scene-object route keeps working for what stays in the scene, and a family that moves is reconsidered then. See [#38](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/38).

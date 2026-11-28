@@ -1,1 +1,30 @@
 version: 1
+parts:
+  dotnet-test:
+    projects:
+      - sdk-version: "10.0.x"
+        project: Tests/RailroaderScenePatcher.Core.Tests/RailroaderScenePatcher.Core.Tests.csproj
+        console-runner: true
+      - sdk-version: "10.0.x"
+        project: Tests/RailroaderScenePatcher.Core.FaultTests/RailroaderScenePatcher.Core.FaultTests.csproj
+        console-runner: true
+    paths:
+      - Src/RailroaderScenePatcher.Core/
+      - Tests/RailroaderScenePatcher.Core.Tests/
+      - Tests/RailroaderScenePatcher.Core.FaultTests/
+      - Src/RailroaderScenePatcher/
+      - Directory.Build.props
+  custom:
+    script: Tests/Run-PowerShellTests.sh
+    paths:
+      - Tests/Run-PowerShellTests.sh
+      - Tests/FixedPlacementJourney/
+      - Tools/NativeObservation/Info.json
+      - Tests/DocumentationChecks/
+      - docs/guides/
+      - GLOSSARY.md
+      - Src/**/*.cs
+    request: 171
+    waits-for: powershell-test
+dependabot:
+  nuget: [/Src/RailroaderScenePatcher.Core, /Src/RailroaderScenePatcher, /Tests/RailroaderScenePatcher.Core.Tests, /Tests/RailroaderScenePatcher.Core.FaultTests, /Tools/NativeObservation, /Tests/FaultInjection, /Tools/TerrainHeightReadout]

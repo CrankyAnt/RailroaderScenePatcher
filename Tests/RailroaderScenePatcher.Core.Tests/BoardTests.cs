@@ -1,0 +1,450 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Newtonsoft.Json.Linq;
+using RailroaderScenePatcher;
+using RailroaderScenePatcher.Core;
+
+// A controlled board world with the lifecycle the game's components have: enabling a board registers its
+// culling sphere and circle-mask modifiers at the current placement, disabling releases them, moving the transform
+// leaves both stale until the culling position is refreshed and the mask is rebuilt, and a mask change
+// invalidates loaded terrain tiles at its old and new bounds, which then build asynchronously.
+class FakeBoard {
+    public string Scene = "BushnellWhittier-MapManager", Path = LocationSigns.SylvaPath;
+    public double[] Position = { 25692.9766, 633.4856, 441.8128 }, Rotation = { 0.0, 0.0, 0.0, 1.0 };
+    public bool Active = true, ParentsActive = true, Culler = true, CullerEnabled = true, MaskEnabled = true, Flattens;
+    public int Masks = 1;
+    public string Unexpected;
+    public object Parent = new object();
+    public double[] Sphere;
+    public readonly List<string> Keys = new List<string>();
+}
+class FakeBoardWorld : IBoardWorld {
+    public const double Tile = 500;
+    public string[] Maps = { "map", "layer" };
+    public readonly List<FakeBoard> Boards = new List<FakeBoard>();
+    public readonly Dictionary<string, double[]> MaskStore = new Dictionary<string, double[]>();
+    public readonly HashSet<string> PendingTiles = new HashSet<string>(), UnloadedTiles = new HashSet<string>();
+    public readonly List<string> Invalidated = new List<string>();
+    public double Clock;
+    public bool FailRebuild;
+    public int FailRebuildCount, PlacementWrites, Rebuilds, Finds;
+    int nextKey;
+    public IEnumerable<string> MapIds => Maps;
+    public event Action<double[], double[]> TileBuilt;
+    public FakeBoard Add(FakeBoard board = null) { board = board ?? new FakeBoard(); Boards.Add(board); if (board.Active && board.ParentsActive) Register(board); return board; }
+    static string TileOf(double[] p) => Math.Floor(p[0] / Tile) + "," + Math.Floor(p[2] / Tile);
+    bool Registered(FakeBoard b) => b.Active && b.ParentsActive;
+    void Register(FakeBoard b) {
+        if (b.Culler && b.CullerEnabled) b.Sphere = (double[])b.Position.Clone();
+        if (b.MaskEnabled) for (var i = 0; i < b.Masks; i++) AddKey(b);
+    }
+    void AddKey(FakeBoard b) { var key = "k" + nextKey++; MaskStore[key] = (double[])b.Position.Clone(); b.Keys.Add(key); Invalidate(b.Position); }
+    void RemoveKeys(FakeBoard b) { foreach (var key in b.Keys) { if (MaskStore.TryGetValue(key, out var at)) Invalidate(at); MaskStore.Remove(key); } b.Keys.Clear(); }
+    void Invalidate(double[] at) { var tile = TileOf(at); if (!UnloadedTiles.Contains(tile)) PendingTiles.Add(tile); }
+    public IReadOnlyList<object> Find(string scene, string path) { Finds++; return Find(Boards, scene, path); }
+    static IReadOnlyList<object> Find(List<FakeBoard> Boards, string scene, string path) => Boards.Where(b => b.Scene == scene && b.Path == path && b.Culler).Cast<object>().ToList();
+    public BoardFacts Facts(object board) {
+        var b = (FakeBoard)board;
+        return new BoardFacts(b.Scene, b.Path, true, b.ParentsActive, b.Culler, b.CullerEnabled, b.Masks, b.MaskEnabled, b.Flattens, b.Unexpected, b.Parent);
+    }
+    public double[] Position(object board) => (double[])((FakeBoard)board).Position.Clone();
+    public double[] Rotation(object board) => (double[])((FakeBoard)board).Rotation.Clone();
+    public bool Active(object board) => ((FakeBoard)board).Active;
+    public void SetPlacement(object board, double[] position, double[] rotation) { var b = (FakeBoard)board; PlacementWrites++; b.Position = (double[])position.Clone(); b.Rotation = (double[])rotation.Clone(); }
+    public void SetActive(object board, bool active) {
+        var b = (FakeBoard)board;
+        if (b.Active == active) return;
+        b.Active = active;
+        if (!b.ParentsActive) return;
+        if (active) Register(b); else { b.Sphere = null; RemoveKeys(b); }
+    }
+    public void RefreshCulling(object board) {
+        var b = (FakeBoard)board;
+        if (!Registered(b) || b.Sphere == null) throw new NullReferenceException("culling token");
+        b.Sphere = (double[])b.Position.Clone();
+    }
+    public void RebuildMask(object board) {
+        var b = (FakeBoard)board;
+        if (FailRebuild || FailRebuildCount > 0) { FailRebuildCount--; throw new InvalidOperationException("mask injected"); }
+        Rebuilds++;
+        var count = b.Keys.Count; RemoveKeys(b);
+        for (var i = 0; i < count; i++) AddKey(b);
+    }
+    public BoardRegistration Registration(object board) {
+        var b = (FakeBoard)board;
+        return new BoardRegistration(b.Sphere == null ? null : (double[])b.Sphere.Clone(), b.Keys.Where(MaskStore.ContainsKey).Select(k => (double[])MaskStore[k].Clone()), b.Keys.Count(k => !MaskStore.ContainsKey(k)));
+    }
+    public bool TileLoaded(double[] position) => !UnloadedTiles.Contains(TileOf(position));
+    public void InvalidateTile(double[] position) { Invalidated.Add(TileOf(position)); Invalidate(position); }
+    public bool TerrainIdle => PendingTiles.Count == 0;
+    public double Now => Clock;
+    public string Label(object board) => ((FakeBoard)board).Path;
+    // The game builds each invalidated loaded tile and raises its bounds.
+    public void BuildTiles(string only = null) {
+        foreach (var tile in PendingTiles.Where(t => only == null || t == only).ToArray()) {
+            var parts = tile.Split(',').Select(Double.Parse).ToArray();
+            PendingTiles.Remove(tile);
+            TileBuilt?.Invoke(new[] { parts[0] * Tile, 0, parts[1] * Tile }, new[] { (parts[0] + 1) * Tile, 0, (parts[1] + 1) * Tile });
+        }
+    }
+    public int Registrations => MaskStore.Count;
+}
+
+static class BoardTests {
+    static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
+    const string Scene = "BushnellWhittier-MapManager";
+    static readonly double[] Moved = { 25772.99, 633.4856, 393.795837 };
+    // In the neighbouring terrain tile, so old and new positions need separate tile builds.
+    static readonly double[] Far = { 26310.0, 640.0, 393.8 };
+    static readonly double[] Turned = { 0.0, 0.13052619, 0.0, 0.99144486 };
+    static string Num(double v) => v.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+    static string Target(string path = LocationSigns.SylvaPath, string structure = ",\"structure\":\"location-sign-v1\"") =>
+        "\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + path + "\",\"component\":\"Helpers.Culling.RendererCuller\"" + structure + "}";
+    static string Place(double[] p, double[] r = null) => "\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", p.Select(Num)) + "],\"rotation\":[" + String.Join(",", (r ?? Turned).Select(Num)) + "]}";
+    static string Mod(string id, string body, string deps = "[]", string path = LocationSigns.SylvaPath) => "\"" + id + "\":{" + Target(path) + "," + body + ",\"dependsOn\":" + deps + "}";
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
+    static bool Near(double[] a, double[] b, double tolerance = 0.001) => a != null && b != null && a.Zip(b, (x, y) => Math.Abs(x - y)).All(d => d <= tolerance);
+    // The registrations the native components hold agree with the board's own placement and activity.
+    static bool Consistent(FakeBoardWorld world, FakeBoard board) {
+        if (!board.Active) return board.Sphere == null && board.Keys.Count == 0;
+        return Near(board.Sphere, board.Position) && board.Keys.Count == board.Masks && board.Keys.All(k => world.MaskStore.ContainsKey(k) && Near(world.MaskStore[k], board.Position));
+    }
+    // Whether Setup's board holds a mask that also flattens the terrain height.
+    static bool flattening;
+    static (FakeBoardWorld, FakeBoard, LocationSigns, PatchEngine) Setup() {
+        var world = new FakeBoardWorld(); var board = world.Add(new FakeBoard { Flattens = flattening }); world.BuildTiles();
+        var boards = new LocationSigns(world); return (world, board, boards, new PatchEngine(boards));
+    }
+    internal static void Run() {
+        PlacementMovesBoardAndItsRegistrations();
+        ConformingBoardsQualifyWithoutTrackBinding();
+        PreflightRefusalLeavesBoardUnchanged();
+        TargetResolutionAndMapContext();
+        RepeatAndOrderDoNotAccumulate();
+        ActivityReleasesAndRestoresRegistrations();
+        FailedMutationRestoresBoardAndRegistrations();
+        UnverifiedRestorationGuardsRetry();
+        TerrainOutputFollowsTheEdit();
+        WindowWaitsForEditedTerrain();
+        TerrainWriteFailureIsReportedAndRetryable();
+        RestorationWaitsForTerrainOutput();
+        ModdedBoardFollowsHistoryAndRemoval();
+        EditedTerrainFailureKeepsEditAndRetries();
+        FailedEditWaitsForRestoredOutput();
+        SaveRaisesMinimumForPatternBoards();
+        InspectedOutputResolvesOncePerInspection();
+        ChangedObjectsAreReadFromTheScenePatchFile();
+        FileVersionReportsInvalidBoardRotation();
+        FlatteningBoardMovesWithItsMask();
+    }
+    // A board whose circle mask also flattens the terrain height moves with its mask like any other board: the
+    // placement applies with the mask rebuilt at the board, the terrain at the old and the new place is tracked, a
+    // failed rebuild restores the board or reports an incomplete cleanup that guards the retry, and Undo, Redo,
+    // removal, Save and the dependency minimum behave as for any board.
+    static void FlatteningBoardMovesWithItsMask() {
+        flattening = true;
+        try {
+            var (world, board, boards, engine) = Setup();
+            Assert(world.Facts(board).FlattensHeight && boards.Refusal(board) == null, "A flattening board is not refused: " + boards.Refusal(board));
+            PlacementMovesBoardAndItsRegistrations();
+            FailedMutationRestoresBoardAndRegistrations();
+            UnverifiedRestorationGuardsRetry();
+            TerrainOutputFollowsTheEdit();
+            ModdedBoardFollowsHistoryAndRemoval();
+            SaveRaisesMinimumForPatternBoards();
+        } finally { flattening = false; }
+    }
+    static void FileVersionReportsInvalidBoardRotation() {
+        var initial = Doc(Mod("move", Place(Moved)));
+        var (world, board, boards, session, mapEditor, store) = PatchEditing(initial);
+        var invalid = Doc(Mod("move", Place(Moved, new[] { 1.0, 0.22025036811828613, 0.0, -0.9754433631896973 })));
+        store.Patch = invalid;
+        session.CheckFileVersion();
+        var choice = session.UseFileVersion();
+        var outcome = session.LastVersionApplication.Outcomes["move"];
+        Assert(choice.Applied && !outcome.Applied && outcome.Error.Contains("unit quaternion") && Near(board.Position, new FakeBoard().Position),
+            "Choosing a file with an invalid board rotation retains the file but reports the failed application and leaves the underlying placement: " + outcome.Error);
+    }
+    // The outliner marks every row this mod modifies. That reads the scene patch file alone and never searches the scene.
+    static void ChangedObjectsAreReadFromTheScenePatchFile() {
+        var (world, board, boards, session, mapEditor, store) = PatchEditing();
+        Assert(!session.IsChanged(Sylva), "An untouched object is not changed");
+        Assert(session.Edit(Sylva, PlacementAt(Moved), null).Applied, "The board is placed");
+        var finds = world.Finds;
+        for (var row = 0; row < 825; row++) Assert(session.IsChanged(Sylva) && !session.IsChanged(Whittier), "The placed board is changed, another board is not");
+        Assert(session.IsChanged(new TargetIdentity(Scene, LocationSigns.SylvaPath, LocationSigns.CullerType)) && !session.IsChanged(new TargetIdentity(Scene, LocationSigns.SylvaPath, "Other.Component")),
+            "An observation without a structure matches the modification of the same object; another component does not");
+        Assert(world.Finds == finds, "Marking rows does not search the scene: " + (world.Finds - finds));
+        mapEditor.Undo();
+        Assert(!session.IsChanged(Sylva), "Undo of the only edit leaves the object unchanged");
+        mapEditor.Redo();
+        Assert(session.IsChanged(Sylva) && session.Remove(Sylva).Applied && !session.IsChanged(Sylva), "Removing the modification leaves the object unchanged");
+    }
+    // The panel reads the terrain output of the inspected board every frame. The scene is searched once per
+    // inspection; the output still follows the game's rebuild.
+    static void InspectedOutputResolvesOncePerInspection() {
+        var (world, board, boards, session, mapEditor, store) = PatchEditing();
+        Assert(session.Edit(Sylva, PlacementAt(Far), null).Applied, "The board moves to another terrain tile");
+        SceneObservation Observe() => new SceneObservation(board, Sylva, "Location sign", true, board.Position, board.Rotation, new string[0], new string[0], new string[0], "Fixed placement and activity");
+        var inspected = Observe();
+        var output = new RailroaderScenePatcher.InspectedOutput();
+        var finds = world.Finds;
+        for (var frame = 0; frame < 100; frame++) {
+            var current = output.Of(session, inspected, out var problem);
+            Assert(problem == null && current.Outstanding.Count == 2 && !current.Settled, "Every frame reads the outstanding output of the inspected board");
+        }
+        Assert(world.Finds == finds + 1, "One inspection searches the scene once, not once per frame: " + (world.Finds - finds));
+        world.BuildTiles(); boards.Poll();
+        Assert(output.Of(session, inspected, out _).Settled && world.Finds == finds + 1, "Completion is read without another search");
+        var expected = session.Output(Sylva);
+        var cached = output.Of(session, inspected, out _);
+        Assert(cached.Completed.SequenceEqual(expected.Completed) && cached.Outstanding.SequenceEqual(expected.Outstanding) && cached.Error == expected.Error, "The cached read equals the resolving read");
+        finds = world.Finds;
+        var refreshed = Observe();
+        Assert(output.Of(session, refreshed, out _).Settled && output.Of(session, refreshed, out _).Settled && world.Finds == finds + 1, "A new observation, as every refresh and edit produces, searches once again");
+        var twin = world.Add(new FakeBoard());
+        finds = world.Finds;
+        var ambiguous = Observe();
+        var none = output.Of(session, ambiguous, out var ambiguity);
+        Assert(ambiguity == null && none.Completed.Count == 0 && none.Outstanding.Count == 0 && none.Error == null && session.Output(Sylva).Completed.Count == 0, "A target that does not resolve uniquely has no output, as before");
+        output.Of(session, ambiguous, out _);
+        Assert(world.Finds == finds + 2, "The failed resolution is remembered for that observation: " + (world.Finds - finds));
+        world.Boards.Remove(twin);
+    }
+    static readonly TargetIdentity Sylva = new TargetIdentity(Scene, LocationSigns.SylvaPath, LocationSigns.CullerType, LocationSigns.Structure);
+    static readonly TargetIdentity Whittier = new TargetIdentity(Scene, OtherPath, LocationSigns.CullerType, LocationSigns.Structure);
+    static Placement PlacementAt(double[] p) => new Placement((double[])p.Clone(), (double[])Turned.Clone());
+    static (FakeBoardWorld, FakeBoard, LocationSigns, PatchEditingSession, NativeMapEditor, Store) PatchEditing(string patch = null) {
+        var (world, board, boards, engine) = Setup();
+        var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
+        if (patch != null) engine.Apply(patch, "author/pack");
+        var session = new PatchEditingSession(engine, mapEditor, store); mapEditor.Session = session;
+        return (world, board, boards, session, mapEditor, store);
+    }
+    static void PlacementMovesBoardAndItsRegistrations() {
+        var (world, board, boards, engine) = Setup();
+        var result = engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
+        Assert(result.Error == null && result.Outcomes["move"].Applied, "Board placement applies: " + result.Error + result.Outcomes["move"].Error);
+        Assert(Near(board.Position, Moved) && Near(board.Rotation, Turned), "Board receives the fixed map placement");
+        Assert(Consistent(world, board) && world.Registrations == 1, "Culling sphere and mask registration follow the board without a duplicate registration");
+    }
+    const string OtherPath = "World/Signs/Loc: Whittier";
+    static void ConformingBoardsQualifyWithoutTrackBinding() {
+        var (world, board, boards, engine) = Setup();
+        var other = world.Add(new FakeBoard { Path = OtherPath, Position = new[] { 100.0, 5.0, 100.0 } });
+        var result = engine.Apply(Doc(Mod("other", Place(new[] { 110.0, 5.0, 90.0 }), path: OtherPath)), "author/pack");
+        Assert(result.Outcomes["other"].Applied && Near(other.Position, new[] { 110.0, 5.0, 90.0 }) && Consistent(world, other), "Another board conforming to the pattern receives placement and refreshed registrations");
+        Assert(Near(board.Position, new FakeBoard().Position), "Placing one board leaves another unchanged");
+        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, OtherPath, LocationSigns.CullerType, LocationSigns.Structure)) == "0.5.0", "Boards beyond the Sylva board need the pattern-based patcher");
+        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, LocationSigns.SylvaPath, LocationSigns.CullerType, LocationSigns.Structure)) == null, "The original Sylva target needs no newer capability minimum");
+    }
+    static void PreflightRefusalLeavesBoardUnchanged() {
+        foreach (var (name, change, reason) in new (string, Action<FakeBoard>, string)[] {
+            ("track dependency", b => b.Unexpected = "Track.TrackMarker", "Track.TrackMarker"),
+            ("disabled culler", b => b.CullerEnabled = false, "renderer culler"),
+            ("two masks", b => b.Masks = 2, "exactly one"),
+            ("inactive parent", b => b.ParentsActive = false, "parents"),
+        }) {
+            var (world, board, boards, engine) = Setup();
+            change(board);
+            var before = (Position: (double[])board.Position.Clone(), Sphere: board.Sphere, Keys: board.Keys.ToArray(), Rebuilds: world.Rebuilds, Writes: world.PlacementWrites);
+            var result = engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
+            Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.Contains(reason), name + ": preflight refuses with its reason: " + result.Outcomes["move"].Error);
+            Assert(Near(board.Position, before.Position) && ReferenceEquals(board.Sphere, before.Sphere) && board.Keys.SequenceEqual(before.Keys) && world.Rebuilds == before.Rebuilds && world.PlacementWrites == before.Writes, name + ": refusal leaves placement and registrations unchanged");
+            Assert(boards.Output(board).Settled && boards.Output(board).Completed.Count == 0, name + ": refusal starts no terrain output");
+        }
+    }
+    static void TargetResolutionAndMapContext() {
+        var (world, board, boards, engine) = Setup();
+        var result = engine.Apply(Doc(Mod("missing", Place(Moved), path: "World/Signs/Absent") + "," + Mod("move", Place(Moved))), "author/pack");
+        Assert(!result.Outcomes["missing"].Applied && result.Outcomes["move"].Applied, "A missing board fails alone");
+        (world, board, boards, engine) = Setup();
+        world.Add(new FakeBoard());
+        result = engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
+        Assert(!result.Outcomes["move"].Applied && !world.Boards.Any(b => Near(b.Position, Moved)), "An ambiguous board identity moves neither candidate");
+        (world, board, boards, engine) = Setup();
+        result = engine.Apply(Doc(Mod("move", Place(Moved)), "elsewhere"), "author/pack");
+        Assert(result.Error != null && result.Outcomes.Count == 0 && !Near(board.Position, Moved) && world.PlacementWrites == 0, "A map mismatch rejects the scene patch file before resolution");
+        (world, board, boards, engine) = Setup();
+        result = engine.Apply(Doc("\"wrong\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + LocationSigns.SylvaPath + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-v1\"}," + Place(Moved) + ",\"dependsOn\":[]}"), "author/pack");
+        Assert(!result.Outcomes["wrong"].Applied && world.PlacementWrites == 0, "Another structure identity does not resolve to a board");
+    }
+    static void RepeatAndOrderDoNotAccumulate() {
+        var (world, board, boards, engine) = Setup();
+        var other = world.Add(new FakeBoard { Path = OtherPath, Position = new[] { 100.0, 5.0, 100.0 } });
+        var json = Doc(Mod("second", Place(new[] { 120.0, 5.0, 80.0 }), "[\"first\"]", OtherPath) + "," + Mod("first", Place(Moved)));
+        var result = engine.Apply(json, "author/pack");
+        Assert(result.Outcomes["first"].Applied && result.Outcomes["second"].Applied, "A dependent board placement listed first applies after its prerequisite");
+        result = new PatchEngine(boards).Apply(json, "author/pack");
+        result = new PatchEngine(boards).Apply(json, "author/pack");
+        Assert(Near(board.Position, Moved) && Near(other.Position, new[] { 120.0, 5.0, 80.0 }), "Repeated application keeps the absolute placement without offset accumulation");
+        Assert(Consistent(world, board) && Consistent(world, other) && world.Registrations == 2, "Repeated application leaves one registration per mask");
+        var missing = Doc(Mod("second", Place(new[] { 130.0, 5.0, 70.0 }), "[\"absent\"]", OtherPath));
+        result = new PatchEngine(boards).Apply(missing, "author/pack");
+        Assert(!result.Outcomes["second"].Applied && Near(other.Position, new[] { 120.0, 5.0, 80.0 }), "A missing prerequisite isolates its dependent");
+    }
+    static void ActivityReleasesAndRestoresRegistrations() {
+        var (world, board, boards, engine) = Setup();
+        var result = engine.Apply(Doc(Mod("hide", "\"active\":false")), "author/pack");
+        Assert(result.Outcomes["hide"].Applied && !board.Active && board.Sphere == null && board.Keys.Count == 0 && world.Registrations == 0, "Disabling releases the culling sphere and mask registration");
+        result = new PatchEngine(boards).Apply(Doc(Mod("hide", "\"active\":false," + Place(Moved))), "author/pack");
+        Assert(result.Outcomes["hide"].Applied && Near(board.Position, Moved) && world.Registrations == 0, "A disabled board moves without registering");
+        result = new PatchEngine(boards).Apply(Doc(Mod("show", "\"active\":true")), "author/pack");
+        Assert(result.Outcomes["show"].Applied && Consistent(world, board) && world.Registrations == 1, "Enabling registers at the current placement once");
+    }
+    static void FailedMutationRestoresBoardAndRegistrations() {
+        var (world, board, boards, engine) = Setup();
+        var original = (double[])board.Position.Clone();
+        world.FailRebuildCount = 1;
+        var result = engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
+        Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.Contains("back as it was"), "A failure after the placement changed reports restoration: " + result.Outcomes["move"].Error);
+        Assert(Near(board.Position, original) && Consistent(world, board) && world.Registrations == 1, "Restoration recovers the captured placement and its registrations");
+    }
+    static void UnverifiedRestorationGuardsRetry() {
+        var (world, board, boards, engine) = Setup();
+        world.FailRebuild = true;
+        var result = engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
+        Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.Contains("could not be verified"), "A restoration that cannot refresh the mask reports incomplete cleanup: " + result.Outcomes["move"].Error);
+        world.FailRebuild = false;
+        result = engine.Apply(Doc(Mod("again", Place(Moved))), "author/pack");
+        Assert(!result.Outcomes["again"].Applied && result.Outcomes["again"].Error.Contains("Cleanup"), "Retry on the same board is blocked until cleanup is verified");
+    }
+    static void TerrainOutputFollowsTheEdit() {
+        var (world, board, boards, engine) = Setup();
+        var original = (double[])board.Position.Clone();
+        engine.Apply(Doc(Mod("move", Place(Far))), "author/pack");
+        var output = boards.Output(board);
+        Assert(output.Outstanding.Count == 2 && output.Error == null && !output.Settled, "Old and new terrain positions remain outstanding until the game rebuilds them: " + String.Join("; ", output.Outstanding));
+        boards.Poll();
+        Assert(!boards.Output(board).Settled, "Idle terrain alone does not settle writes whose tiles have not been rebuilt");
+        world.BuildTiles("51,0"); boards.Poll();
+        Assert(boards.Output(board).Completed.Count == 0, "A rebuilt tile does not complete while other terrain work is still pending");
+        world.BuildTiles(); boards.Poll();
+        output = boards.Output(board);
+        Assert(output.Settled && output.Completed.Count == 2, "Rebuilt tiles and idle terrain complete both writes");
+        (world, board, boards, engine) = Setup();
+        world.UnloadedTiles.Add("52,0");
+        engine.Apply(Doc(Mod("move", Place(Far))), "author/pack");
+        Assert(boards.Output(board).Outstanding.Count == 1 && boards.Output(board).Completed.Count == 1, "A position whose tile is not built needs no rebuild; the tile builds from the current mask");
+        Assert(!Near(board.Position, original) && Near(board.Position, Far) && Consistent(world, board), "The board moves although the tile of its new position is not built");
+    }
+    static void WindowWaitsForEditedTerrain() {
+        var (world, _, boards, engine) = Setup();
+        using (boards) {
+            var queue = new RequestQueue(new EditFeedback());
+            var revision = boards.TerrainRevision;
+            queue.Enqueue("Placement", "Move", () => {
+                engine.Apply(Doc(Mod("move", Place(Far))), "author/pack");
+                if (boards.TerrainWorkingSince(revision)) queue.WaitForTerrain();
+            });
+            queue.Run();
+            world.BuildTiles("51,0");
+            boards.Poll();
+            queue.ObserveTerrain(boards.TerrainWorkingSince(revision));
+            Assert(queue.Busy, "The window stays busy after the first of the two tiles is rebuilt");
+            world.BuildTiles();
+            boards.Poll();
+            queue.ObserveTerrain(boards.TerrainWorkingSince(revision));
+            Assert(!queue.Busy, "The window takes input again after both tiles rebuild");
+
+            revision = boards.TerrainRevision;
+            queue.Enqueue("Placement", "Move back", () => {
+                engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
+                if (boards.TerrainWorkingSince(revision)) queue.WaitForTerrain();
+            });
+            queue.Run();
+            Assert(queue.Busy, "Moving back starts another terrain wait");
+            world.Clock = TerrainOutput.Timeout + 1;
+            boards.Poll();
+            queue.ObserveTerrain(boards.TerrainWorkingSince(revision));
+            Assert(!queue.Busy && boards.Failures.Any(), "A terrain timeout ends the busy state and leaves a failure report");
+        }
+    }
+    static void TerrainWriteFailureIsReportedAndRetryable() {
+        var (world, board, boards, engine) = Setup();
+        engine.Apply(Doc(Mod("move", Place(Far))), "author/pack");
+        // The old position's tile is rebuilt; the invalidation of the new one is lost before the game builds it.
+        world.PendingTiles.Remove("52,0"); world.BuildTiles(); boards.Poll();
+        world.Clock = LocationSigns.OutputTimeout + 1; boards.Poll();
+        var output = boards.Output(board);
+        Assert(output.Error != null && output.Completed.Count == 1 && output.Outstanding.Count == 1 && !output.Settled, "A terrain write that does not complete is reported with its completed and outstanding writes");
+        Assert(Near(board.Position, Far) && Consistent(world, board), "The board edit is kept when terrain output fails");
+        Assert(boards.Failures.Count() == 1, "The failed terrain output is identifiable");
+        boards.RetryOutput(board);
+        Assert(boards.Output(board).Error == null && !boards.Output(board).Settled && world.Invalidated.SequenceEqual(new[] { "52,0" }), "Retry requests the outstanding writes again without reporting them complete");
+        world.BuildTiles(); boards.Poll();
+        Assert(boards.Output(board).Settled && boards.Output(board).Completed.Count == 2 && !boards.Failures.Any(), "The retried writes complete");
+    }
+    static void RestorationWaitsForTerrainOutput() {
+        var (world, board, boards, engine) = Setup();
+        world.FailRebuildCount = 1;
+        var result = engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
+        Assert(result.Outcomes["move"].Error.Contains("back as it was"), "Restored placement and registrations verify immediately");
+        result = engine.Apply(Doc(Mod("again", Place(Moved))), "author/pack");
+        Assert(!result.Outcomes["again"].Applied && result.Outcomes["again"].Failure == FailureKind.AwaitingOutput, "Retry waits while restored terrain output is outstanding, without counting as an incomplete cleanup: " + result.Outcomes["again"].Error);
+        world.BuildTiles(); boards.Poll();
+        result = engine.Apply(Doc(Mod("later", Place(Moved))), "author/pack");
+        Assert(result.Outcomes["later"].Applied && Near(board.Position, Moved), "Verified terrain output lifts the cleanup guard: " + result.Outcomes["later"].Error);
+    }
+    static void ModdedBoardFollowsHistoryAndRemoval() {
+        var (world, board, boards, session, mapEditor, store) = PatchEditing();
+        var original = (double[])board.Position.Clone();
+        Assert(session.Edit(Sylva, PlacementAt(Moved), null).Applied && Near(board.Position, Moved) && Consistent(world, board) && world.Registrations == 1, "This mod's board placement moves the board and its registrations");
+        var scenePatchFile = JObject.Parse(session.ScenePatchFileText);
+        var modification = (JObject)scenePatchFile["modifications"].First.First;
+        Assert((string)modification["target"]["structure"] == LocationSigns.Structure && modification["placement"] != null && modification.Properties().All(p => p.Name != "binding"), "The scene patch file records the board placement without a track binding");
+        mapEditor.Undo();
+        Assert(Near(board.Position, original) && Consistent(world, board) && world.Registrations == 1, "Undo restores the captured placement and registrations without an owned leftover");
+        mapEditor.Redo();
+        Assert(Near(board.Position, Moved) && Consistent(world, board) && world.Registrations == 1, "Redo reapplies the placement and registrations");
+        Assert(session.Edit(Sylva, null, false).Applied && world.Registrations == 0 && board.Sphere == null, "This mod's disable releases the board's registrations");
+        mapEditor.Undo();
+        Assert(board.Active && Consistent(world, board) && world.Registrations == 1, "Undo of the disable registers the board again once");
+        Assert(session.Remove(Sylva).Applied && Near(board.Position, original) && Consistent(world, board) && world.Registrations == 1, "Removal returns the board and its registrations to the effective underlying state");
+        mapEditor.Undo();
+        Assert(Near(board.Position, Moved) && Consistent(world, board), "Undo of the removal restores this mod's placement");
+        world.BuildTiles(); boards.Poll();
+        Assert(session.Output(Sylva).Settled, "Terrain output of every history step completes once the game rebuilds the tiles");
+    }
+    static void EditedTerrainFailureKeepsEditAndRetries() {
+        var (world, board, boards, session, mapEditor, store) = PatchEditing();
+        Assert(session.Edit(Sylva, PlacementAt(Far), null).Applied, "The board edit applies");
+        world.PendingTiles.Remove("52,0"); world.BuildTiles(); boards.Poll();
+        world.Clock = LocationSigns.OutputTimeout + 1; boards.Poll();
+        var output = session.Output(Sylva);
+        Assert(output.Error != null && output.Completed.Count == 1 && output.Outstanding.Count == 1, "A terrain-write failure names its completed and outstanding writes");
+        Assert(Near(board.Position, Far) && session.ScenePatchFileText.Contains("26310"), "The in-memory edit survives the terrain-write failure");
+        Assert(mapEditor.Save() == null && !mapEditor.IsDirty, "Save persists the scene patch file; Save does not write the generated terrain output");
+        Assert(!session.Output(Sylva).Settled, "Save does not report the failed terrain output complete");
+        var retry = session.RetryOutput(Sylva);
+        Assert(retry.Applied && !session.Output(Sylva).Settled && session.Output(Sylva).Error == null, "Retry requests the outstanding write again without reporting it complete");
+        world.BuildTiles(); boards.Poll();
+        Assert(session.Output(Sylva).Settled && session.Output(Sylva).Completed.Count == 2, "The retried terrain write completes");
+        Assert(!session.RetryOutput(Sylva).Applied, "Retry is refused when nothing is outstanding");
+    }
+    static void FailedEditWaitsForRestoredOutput() {
+        var (world, board, boards, session, mapEditor, store) = PatchEditing();
+        var original = (double[])board.Position.Clone();
+        world.FailRebuildCount = 1;
+        var failed = session.Edit(Sylva, PlacementAt(Moved), null);
+        Assert(!failed.Applied && failed.Error.Contains("back as it was") && Near(board.Position, original) && Consistent(world, board), "A failed edit restores the board and its registrations: " + failed.Error);
+        Assert(JObject.Parse(session.ScenePatchFileText)["modifications"].Count() == 0 && mapEditor.UndoGroups.Count == 0, "A failed edit leaves the scene patch file and history unchanged");
+        var blocked = session.Edit(Sylva, PlacementAt(Moved), null);
+        Assert(!blocked.Applied && blocked.Failure == FailureKind.AwaitingOutput && !session.CleanupUnverified(Sylva), "The board waits for the restored terrain output before the next edit, without counting as an incomplete cleanup: " + blocked.Error);
+        world.PendingTiles.Clear(); world.Clock = LocationSigns.OutputTimeout + 1; boards.Poll();
+        Assert(session.Output(Sylva).Error != null && !session.Edit(Sylva, PlacementAt(Moved), null).Applied, "Restored terrain output that stopped keeps the board guarded");
+        Assert(session.Recheck(Sylva).Applied && world.Invalidated.Count > 0 && !session.Edit(Sylva, PlacementAt(Moved), null).Applied, "Recheck requests the restored output again and keeps the guard until it verifies");
+        world.BuildTiles(); boards.Poll();
+        Assert(session.Edit(Sylva, PlacementAt(Moved), null).Applied && Near(board.Position, Moved), "Verified restored output permits the retry");
+    }
+    static void SaveRaisesMinimumForPatternBoards() {
+        var (world, board, boards, session, mapEditor, store) = PatchEditing();
+        world.Add(new FakeBoard { Path = OtherPath, Position = new[] { 100.0, 5.0, 100.0 } });
+        Assert(session.Edit(Sylva, PlacementAt(Moved), null).Applied && session.MinimumPatcherVersion == "0.1.0", "The Sylva board keeps the fixed-placement minimum");
+        Assert(session.Edit(Whittier, PlacementAt(new[] { 110.0, 5.0, 90.0 }), null).Applied && session.MinimumPatcherVersion == "0.5.0", "Another conforming board needs the pattern-based patcher");
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save writes the raised dependency minimum");
+    }
+}

@@ -1,0 +1,136 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using RailroaderScenePatcher.Core;
+using UnityEngine;
+
+namespace RailroaderScenePatcher {
+    // The loaded track graph's poses for track-following placement, in map coordinates. A segment location uses the
+    // graph's position and rotation at that distance from the named end; its forward axis points away from that end
+    // along the segment. An endpoint uses the node's own position and rotation. Segment and node IDs are keys of the
+    // graph's lookups, so an anchor is unique or missing.
+    internal sealed class NativeTrackPoses : ITrackPoseScene, ITrackPointLookup, ISegmentGeometry {
+        const string GraphType = "Track.Graph", SegmentType = "Track.TrackSegment", LocationType = "Track.Location";
+        readonly Type graph, location, end, segmentType;
+        internal NativeTrackPoses() {
+            graph = Native.Type(GraphType); location = Native.Type(LocationType);
+            var segment = Native.Type(SegmentType);
+            if (graph == null || location == null || segment == null) throw new InvalidOperationException("Track-following prerequisites unavailable");
+            segmentType = segment;
+            end = segment.GetNestedType("End", Native.Flags) ?? throw new MissingMemberException(SegmentType, "End");
+            if (location.GetConstructor(Native.Flags, null, new[] { segment, typeof(float), end }, null) == null) throw new MissingMethodException(LocationType, ".ctor");
+            foreach (var method in new[] { "GetSegment", "GetNode", "GetPositionRotation" }) if (graph.GetMethod(method, Native.Flags) == null) throw new MissingMethodException(GraphType, method);
+        }
+        // The map positions of a track span's lower and upper locations that resolve on the loaded graph; a location
+        // that does not resolve is left out.
+        internal double[][] SpanPositions(GameObject go) {
+            var span = go == null ? null : go.GetComponent(Native.Type("Track.TrackSpan"));
+            var found = new System.Collections.Generic.List<double[]>();
+            if (span == null) return found.ToArray();
+            foreach (var name in new[] { "_lower", "_upper" }) {
+                try {
+                    var at = Native.Read(span, name);
+                    var segment = Native.Read(at, "segmentId") as string;
+                    if (String.IsNullOrEmpty(segment)) continue;
+                    var end = Convert.ToString(Native.Read(at, "end")) == "A" ? "a" : "b";
+                    found.Add(TrackPose(TrackAnchor.At(new TrackLocation(segment, end, (float)Native.Read(at, "distance")))).Position);
+                } catch (InvalidOperationException) { }
+            }
+            return found.ToArray();
+        }
+        // The map position of a marker's serialized track location on the loaded graph: where a new-game car placement
+        // puts the front of its cut. Null for an empty location or one that does not resolve. The marker's object
+        // position plays no part.
+        internal double[] MarkerPoint(GameObject go) {
+            var marker = go == null ? null : go.GetComponent(Native.Type("Track.TrackMarker"));
+            if (marker == null) return null;
+            try {
+                var at = Native.Read(marker, "_location");
+                var segment = Native.Read(at, "segmentId") as string;
+                if (String.IsNullOrEmpty(segment)) return null;
+                var end = Convert.ToString(Native.Read(at, "end")) == "A" ? "a" : "b";
+                return TrackPose(TrackAnchor.At(new TrackLocation(segment, end, (float)Native.Read(at, "distance")))).Position;
+            } catch (Exception) {
+                // An unreadable location, a missing segment or a distance beyond the segment: no track point.
+                return null;
+            }
+        }
+        public TrackPose TrackPose(TrackAnchor anchor) {
+            var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
+            if (anchor.Node != null) {
+                var node = Native.Call(shared, "GetNode", anchor.Node) ?? throw new InvalidOperationException("Track anchor " + anchor + " does not resolve: the node is missing");
+                return Pose((Vector3)Native.Read(node, "Position"), (Quaternion)Native.Read(node, "Rotation"), anchor);
+            }
+            var at = anchor.Location;
+            var segment = Native.Call(shared, "GetSegment", at.Segment) ?? throw new InvalidOperationException("Track anchor " + anchor + " does not resolve: the segment is missing");
+            var length = (float)Native.Call(segment, "GetLength");
+            if (at.Distance > length + 0.001) throw new InvalidOperationException("Track anchor " + anchor + " does not resolve: distance " + ShownNumber.Text(at.Distance) + " lies outside the segment");
+            var native = Activator.CreateInstance(location, segment, (float)at.Distance, Enum.Parse(end, at.End == "a" ? "A" : "B"));
+            var methods = Array.FindAll(graph.GetMethods(Native.Flags), m => m.Name == "GetPositionRotation");
+            if (methods.Length != 1) throw new MissingMethodException(GraphType, "GetPositionRotation");
+            var parameters = methods[0].GetParameters();
+            var args = new object[parameters.Length];
+            args[0] = native;
+            for (var i = 1; i < args.Length; i++) args[i] = parameters[i].DefaultValue;
+            var result = methods[0].Invoke(shared, args);
+            return Pose((Vector3)Native.Read(result, "Position"), (Quaternion)Native.Read(result, "Rotation"), anchor);
+        }
+        // The radius within which the native map editor reprojects a track-anchored object onto the track after a move
+        // (Game.MapEditor.ObjectsEditor.ReprojectTrackAnchor).
+        internal const float LookupRadius = 25f;
+        // The game's own lookup from a map position to the track: Graph.TryGetLocationFromGamePoint takes, over every
+        // segment whose group is enabled, the nearest point within the radius, the earlier segment on a tie. Map
+        // coordinates are game coordinates. Null when no track lies within the radius.
+        public TrackLocation TrackAt(double[] position) {
+            var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
+            var lookup = graph.GetMethod("TryGetLocationFromGamePoint", Native.Flags, null, new[] { typeof(Vector3), typeof(float), location.MakeByRefType() }, null)
+                ?? throw new MissingMethodException(GraphType, "TryGetLocationFromGamePoint");
+            var args = new object[] { new Vector3((float)position[0], (float)position[1], (float)position[2]), LookupRadius, null };
+            if (!(bool)lookup.Invoke(shared, args)) return null;
+            var found = args[2];
+            var segment = Native.Read(Native.Read(found, "segment"), "id") as string;
+            if (String.IsNullOrEmpty(segment)) return null;
+            var end = Convert.ToString(Native.Read(found, "end")) == "A" ? "a" : "b";
+            return new TrackLocation(segment, end, Math.Round((float)Native.Read(found, "distance"), 3));
+        }
+        // The length of the loaded segment with this ID; segment IDs are keys of the graph's lookup, so there is one or none.
+        public System.Collections.Generic.IReadOnlyList<double> SegmentLengths(string segmentId) {
+            var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
+            var segment = String.IsNullOrWhiteSpace(segmentId) ? null : Native.Call(shared, "GetSegment", segmentId);
+            return segment == null ? new double[0] : new double[] { (float)Native.Call(segment, "GetLength") };
+        }
+        // The distance from end a of the point on the segment nearest to a map position, by the game's own projection
+        // onto one segment (Graph.TryGetLocationFromPoint), with a radius that takes in any point of the map.
+        const float AnyPoint = 100000f;
+        public double DistanceFromA(string segmentId, double[] position) {
+            var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
+            var segment = Native.Call(shared, "GetSegment", segmentId) ?? throw new InvalidOperationException("Segment " + segmentId + " is missing");
+            var project = graph.GetMethod("TryGetLocationFromPoint", Native.Flags, null, new[] { segmentType, typeof(Vector3), typeof(float), location.MakeByRefType() }, null)
+                ?? throw new MissingMethodException(GraphType, "TryGetLocationFromPoint");
+            var args = new object[] { segment, new Vector3((float)position[0], (float)position[1], (float)position[2]), AnyPoint, null };
+            if (!(bool)project.Invoke(shared, args)) throw new InvalidOperationException("The game found no point of segment " + segmentId + " near the gizmo");
+            var distance = (double)(float)Native.Read(args[3], "distance");
+            return Convert.ToString(Native.Read(args[3], "end")) == "A" ? distance : (float)Native.Call(segment, "GetLength") - distance;
+        }
+        // The location on the segment nearest to a world position, measured from end a, sampled every half metre.
+        internal TrackLocation Nearest(string segmentId, Vector3 world) {
+            var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
+            var segment = Native.Call(shared, "GetSegment", segmentId) ?? throw new InvalidOperationException("Segment " + segmentId + " is missing");
+            var length = (float)Native.Call(segment, "GetLength");
+            var target = (Vector3)Native.Call(Native.Type("Helpers.WorldTransformer"), "WorldToGame", world);
+            double best = 0, distance = Double.PositiveInfinity;
+            var steps = Math.Max(1, Math.Min(4000, (int)Math.Ceiling(length / 0.5f)));
+            for (var i = 0; i <= steps; i++) {
+                var d = length * i / steps;
+                var p = TrackPose(TrackAnchor.At(new TrackLocation(segmentId, "a", d))).Position;
+                var squared = (p[0] - target.x) * (p[0] - target.x) + (p[1] - target.y) * (p[1] - target.y) + (p[2] - target.z) * (p[2] - target.z);
+                if (squared < distance) { distance = squared; best = d; }
+            }
+            return new TrackLocation(segmentId, "a", Math.Round(best, 3));
+        }
+        static TrackPose Pose(Vector3 p, Quaternion q, TrackAnchor anchor) {
+            if (Single.IsNaN(p.x + p.y + p.z + q.x + q.y + q.z + q.w) || Single.IsInfinity(p.x + p.y + p.z)) throw new InvalidOperationException("Track anchor " + anchor + " has no finite native pose");
+            return new TrackPose(new double[] { p.x, p.y, p.z }, new double[] { q.x, q.y, q.z, q.w });
+        }
+    }
+}

@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup>
+    <!-- Release, the configuration that ships, is also the one a build without a configuration uses, such as the shared dotnet-test part's. -->
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <Authors>CrankyAnt</Authors>
+    <Version>0.5.0</Version>
+    <BuildArtifactsRoot Condition="'$(BuildArtifactsRoot)' == ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetTempPath()), 'RailroaderScenePatcherBuild'))</BuildArtifactsRoot>
+    <BaseOutputPath>$(BuildArtifactsRoot)/$(MSBuildProjectName)/bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(BuildArtifactsRoot)/$(MSBuildProjectName)/obj/</BaseIntermediateOutputPath>
+    <!-- Test-only fault injection: only a build with -p:SceneFaults=true compiles the hooks and the FaultInjection switch.
+         The fault build keeps its outputs and intermediate files apart from the normal build's, so a project can build in
+         both shapes in one build root; the packages it restores are the same, so the restore output stays shared. -->
+    <DefineConstants Condition="'$(SceneFaults)' == 'true'">$(DefineConstants);SCENE_PATCHER_FAULTS</DefineConstants>
+    <BaseOutputPath Condition="'$(SceneFaults)' == 'true'">$(BaseOutputPath)faults/</BaseOutputPath>
+    <IntermediateOutputPath Condition="'$(SceneFaults)' == 'true'">$(BaseIntermediateOutputPath)faults/$(Configuration)/</IntermediateOutputPath>
+  </PropertyGroup>
+</Project>

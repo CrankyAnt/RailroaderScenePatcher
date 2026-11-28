@@ -1,0 +1,1148 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Linq;
+using Newtonsoft.Json.Linq;
+using RailroaderScenePatcher;
+using RailroaderScenePatcher.Core;
+
+static class CommandBandTests {
+    static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+    internal static void Run() {
+        LampsShowOneWordAndColourPerState();
+        ARefusedSaveIsShownEvenWithTheWindowClosed();
+        LampWordsFitOrMoveIntoTheTooltip();
+        CommandsAreDisabledOnlyForTheirOwnReason();
+        MarkersStandBeforeTheName();
+        BadgesAreTheNativeOnes();
+        TheWindowOpensBelowTheMapEditorOrAtTheTopRight();
+        OwnSaveKeepsTheDefinitionsCurrent();
+        ADisabledControlKeepsItsDescription();
+        HierarchyLinesHaveAShortForm();
+        ChoiceLabelsLeadWithWhatTellsThemApart();
+        TheWindowLogsItsOpeningsAndIconClicks();
+        AnOpenedFormScrollsIntoView();
+        PartsReadAsPartsInWorldChoicesAndTheStateLine();
+        AConfirmedWorldChoiceIsADebugLineLikeItsRefusals();
+        APendingWorldChoiceKeepsItsClickFromTheGamesClickTargets();
+        APadGizmoBlocksTheWorldOnlyDuringABindingEdit();
+        ThePatcherWindowIsBuiltOnceItsInputIsAvailableAgain();
+        SessionDetailsSayTheyShowTheLastFullRead();
+        AddedEquipmentIsNamedBySourceAndEquipmentId();
+        AddedEquipmentIsNamedFromItsStoredSource();
+        EquipmentIdsSurviveNarrowLabels();
+        OutlinerRowsShortenAddedNamesOnlyWhenNarrow();
+        EquipmentDisplayHidesInternalIdentities();
+        EquipmentChoiceShowsItsModelWithoutItsCrossing();
+        WorldChoicesKeepAddedEquipmentIds();
+        AClickOnTheInspectedRowClearsTheInspection();
+        ClearActivityNeedsAnActivityValue();
+        AClosedPanelCancelsTheWaitingRequest();
+        InputWaitsForTheEditAndItsTerrain();
+        InputAlreadySubmittedWhenBusyIsReported();
+        QueuingGizmoSetupKeepsTheConnectionsPreview();
+        SharedRulesHoldAtEveryCallSite();
+        AClickedControlShowsItsTooltipOnlyAfterThePointerReturns();
+        NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
+        ReasonsReadAsOnePlainSentence();
+        EditingLinesEndWithAFullStop();
+        GroupVerdictsSayWhyTheyAreNotEditable();
+        ARefusedAdditionTakesItsCorrectionFromUse();
+        Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
+    }
+    // A refused addition is corrected in its own Edit form: Use then gives that addition the device as its source and
+    // keeps its ID and placement, instead of starting a new addition. A valid addition's form and no form start a new one.
+    // The preview the form shows also stands in the footer, so a removal or correction that builds nothing says so there.
+    static void ARefusedAdditionTakesItsCorrectionFromUse() {
+        var source = new EquipmentSource("BushnellWhittier", "World/Roads/Grade Crossing - Bryson Everett/Signal 1");
+        EquipmentAddition Item(string id) => new EquipmentAddition(id, EquipmentAddition.LightGatePattern, source, new Placement(new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }));
+        var entries = new[] { new EquipmentEntry(Item("bell-as-light-a"), null, "Equipment bell-as-light-a: the source does not conform"), new EquipmentEntry(Item("west"), Item("west"), null) };
+        Check(CommandBand.CorrectedAddition("bell-as-light-a", entries) == "bell-as-light-a", "Use in the form of a refused addition corrects that addition");
+        Check(CommandBand.CorrectedAddition("west", entries) == null && CommandBand.CorrectedAddition(null, entries) == null && CommandBand.CorrectedAddition("gone", entries) == null,
+            "Use in a valid addition's form, without a form, or for an addition the file no longer holds starts a new addition");
+        var lines = new[] { "Remove bell-as-light-a from the scene patch file. Nothing is built because the modification is still refused. Reason: Equipment bell-as-light-b: no." };
+        Check(CommandBand.PreviewReport("Equipment", lines) == "Equipment preview completed. " + lines[0] + " Click Apply to apply it.",
+            "The footer carries the preview line and asks for a click: " + CommandBand.PreviewReport("Equipment", lines));
+        Check(CommandBand.PreviewReport("Coverage", new string[0]) == "Coverage preview completed. Click Apply to apply it.", "A preview without lines asks for the click only");
+        // Apply of a coverage form waits for a preview, and stays inactive with the reason after a preview that changes nothing.
+        Check(CommandBand.CoverageApplyBlock(false, false) == "Click Preview first." && CommandBand.CoverageApplyBlock(false, true) == "Click Preview first."
+            && CommandBand.CoverageApplyBlock(true, false) == null && CommandBand.CoverageApplyBlock(true, true) == "The object already has this value.",
+            "Apply is inactive before a preview and after a preview that changes nothing: " + CommandBand.CoverageApplyBlock(true, true));
+        var unchanged = CommandBand.PreviewReport("Coverage", null, true);
+        Check(unchanged == "Coverage preview completed. The object already has this value." && !unchanged.Contains(WindowGuidance.ApplyPreview),
+            "A preview whose edit changes nothing says so and does not ask for Apply: " + unchanged);
+    }
+    // A group left out under a settled rule, such as a group that holds a map icon, is not waiting for support and
+    // never reads "Not yet supported:".
+    static void GroupVerdictsSayWhyTheyAreNotEditable() {
+        SceneObjectVerdict Verdict(string name, Node part) =>
+            SceneObjectRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node(name, part, new Node("Shell").Solid())))))
+                .Single(v => v.Path == "World/Large Scenery/Town/" + name);
+        const string family = "Scene object";
+        var markers = Verdict("Signs", new Node("Yard Limit").With("Track.TrackMarker").Solid().Family());
+        Check(CommandBand.GroupInspectionOnly(markers, family) == null, "A group that holds track markers is a listed group: " + CommandBand.GroupInspectionOnly(markers, family));
+        var settled = CommandBand.GroupInspectionOnly(Verdict("Depot Icon", new Node("Icon").With("UI.Map.MapIcon")), family);
+        Check(settled == "Not editable as a group: " + SceneObjectRules.MapIconReason,
+            "A group left out under a rule reads Not editable as a group with its reason: " + settled);
+        Check(settled.IndexOf("yet", StringComparison.OrdinalIgnoreCase) < 0 && CommandBand.Refusal(settled) == null,
+            "Its reason promises no later support and is no refusal of a supported family: " + settled);
+        Check(CommandBand.EditReason(settled) == "Edit its map icon separately" && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + SceneObjectRules.MapIconReason
+            && CommandBand.Tooltip("Does something.", CommandBand.EditReason(settled)) == "Edit its map icon separately.",
+            "The message, the Inspection only line and the tooltip give the reason without its label: " + CommandBand.Tooltip("Does something.", settled));
+        var spawn = Verdict("Alarka Spawn", new Node("Spawn").With("Character.SpawnPoint"));
+        Check(CommandBand.GroupInspectionOnly(spawn, family) == "Not editable as a group: " + SceneObjectRules.SpawnPointReason,
+            "A group with a spawn point reads Not editable as a group and names the Spawn point family: " + CommandBand.GroupInspectionOnly(spawn, family));
+        var bridge = Verdict("Almond Road Bridge", new Node("Deck").Solid());
+        Check(CommandBand.GroupInspectionOnly(bridge, family) == null, "A road bridge is a listed group: " + CommandBand.GroupInspectionOnly(bridge, family));
+        // A group with a map icon elsewhere is not editable as a group: station map icons have their own family.
+        var icon = Verdict("Depot", new Node("Icon").With("UI.Map.MapIcon"));
+        Check(CommandBand.GroupInspectionOnly(icon, family) == "Not editable as a group: " + SceneObjectRules.MapIconReason,
+            "A group with a map icon reads Not editable as a group: " + CommandBand.GroupInspectionOnly(icon, family));
+        Check(CommandBand.GroupInspectionOnly(Verdict("Platform", new Node("Deck").Solid()), family) == null, "A listed group is not inspection only");
+        Check(CommandBand.GroupInspectionOnly(null, family) == "Not yet supported: this scene object cannot be edited", "A group without a verdict waits for support");
+        // A crossbuck is a listed group of its own, not inspection only.
+        var crossbuck = SceneObjectRules.Classify(new Node("World", new Node("Roads Bryson", new Node("Crossing Unprotected",
+            new Node("Crossing Pad").With("Track.TrackMarker", "Track.TrackCurveMeshBuilder").Solid().Family(), new Node("Sign-Crossing0 (1)", new Node("LOD0").Solid()).With("Helpers.Culling.RendererCuller")))))
+            .Single(v => v.Path.EndsWith("Sign-Crossing0 (1)", StringComparison.Ordinal));
+        Check(crossbuck.Crossbuck && CommandBand.GroupInspectionOnly(crossbuck, family) == null, "A crossbuck is a listed group: " + CommandBand.GroupInspectionOnly(crossbuck, family));
+    }
+    static void QueuingGizmoSetupKeepsTheConnectionsPreview() {
+        Check(!CommandBand.ClearsConnectionsPreviewOnQueue(CommandBand.GizmoPlace), "Queuing gizmo setup must preserve a prepared Connections preview");
+        Check(CommandBand.ClearsConnectionsPreviewOnQueue("Placement"), "Queuing a placement edit invalidates a prepared Connections preview");
+    }
+    // The name comes from the source the addition was built from, stored with it, so it reads the same whether or not its copy
+    // object still exists, and from the Equipment ID the modder chose.
+    static void AddedEquipmentIsNamedBySourceAndEquipmentId() {
+        Check(InventoryPresentationState.AddedEquipmentName("Signal 1", "north-signal") == "Signal 1 (added: north-signal)", "A light or gate is named by its source and Equipment ID");
+        Check(InventoryPresentationState.AddedEquipmentName("US&S Teardrop Crossing Bell", "north-bell") == "US&S Teardrop Crossing Bell (added: north-bell)", "A bell is named by its source and Equipment ID");
+        var first = InventoryPresentationState.AddedEquipmentName("Signal 1", "north-signal"); var second = InventoryPresentationState.AddedEquipmentName("Signal 1", "south-signal");
+        Check(first != second && !first.Contains(" of ") && !second.Contains(" of "), "Two additions from one source are told apart by their Equipment IDs, without a number");
+    }
+    // A light or gate is named after the source device, a bell after its definition's name, or its identifier without one.
+    static void AddedEquipmentIsNamedFromItsStoredSource() {
+        Check(InventoryPresentationState.AddedEquipmentName(new EquipmentSource("scene", "World/Crossings/Signal 1").StoredName(), "west") == "Signal 1 (added: west)", "A light or gate is named after its source device");
+        Check(InventoryPresentationState.AddedEquipmentName(EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName("US&S Teardrop Crossing Bell"), "ring") == "US&S Teardrop Crossing Bell (added: ring)", "A bell is named after its definition's name");
+        Check(InventoryPresentationState.AddedEquipmentName(EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName(" "), "ring-2") == "bell-uss-teardrop (added: ring-2)", "A bell definition without a name is named after its identifier, as its player is");
+    }
+    static void EquipmentIdsSurviveNarrowLabels() {
+        const string name = "US&S Teardrop Crossing Bell (added: north-bell)";
+        float Width(string value) => value.Sum(character => character == '&' ? 3 : 1);
+        foreach (var family in new[] { CommandBand.AddedBellFamily, CommandBand.AddedEquipmentFamily }) {
+            Check(InventoryPresentationState.NarrowName(family, name, 36, Width) == "US&S Teardrop… (added: north-bell)",
+                "The Equipment ID follows the shortened name for both added families: " + InventoryPresentationState.NarrowName(family, name, 36, Width));
+            Check(InventoryPresentationState.NarrowName(family, name, 100, Width) == name,
+                "A wide label fits the full added name and Equipment ID");
+        }
+        Check(InventoryPresentationState.NarrowName(CommandBand.AddedBellFamily, "ÜS&S Teardrop Crossing Bell (added: ring)", 16, Width) == "… (added: ring)",
+            "Shortening cannot split a letter from its combining mark");
+        Check(InventoryPresentationState.NarrowName("Other family", name, 32, Width) == name, "The narrow format only applies to added equipment");
+    }
+    // An outliner row is fitted to the width its cell has, with the row's markers and markup measured. The full name shows
+    // where it fits; a narrow row shortens the source name and keeps "(added: <Equipment ID>)".
+    static void OutlinerRowsShortenAddedNamesOnlyWhenNarrow() {
+        const string name = "Signal 1 (added: north-signal)";
+        string Markup(string value) => "<b>+</b> " + value + "  <alpha=#99>Sylva<alpha=#FF>";
+        float Width(string value) => System.Text.RegularExpressions.Regex.Replace(value, "<[^>]*>", "").Length;
+        var row = new InventoryPresentationState.FittedRow(CommandBand.AddedEquipmentFamily, name, Markup);
+        Check(row.Full == Markup(name), "A row starts with its full name");
+        Check(row.Fit(Width(Markup(name)), Width) == Markup(name), "A row wide enough for the full name shows it unshortened: " + row.Fit(Width(Markup(name)), Width));
+        Check(row.Fit(300, Width) == Markup(name), "A widened row shows the full name");
+        Check(row.Fit(Width(Markup(name)) - 1, Width) == Markup("Signal… (added: north-signal)"),
+            "A row slightly too narrow shortens only the source name: " + row.Fit(Width(Markup(name)) - 1, Width));
+        Check(row.Fit(Width(Markup("… (added: north-signal)")), Width) == Markup("… (added: north-signal)"),
+            "A narrow row keeps the Equipment ID readable before the source name: " + row.Fit(Width(Markup("… (added: north-signal)")), Width));
+        Check(row.Fit(Width(Markup("… (added: north-signal)")) - 5, Width) == Markup("… (added: north-signal)"),
+            "A row too narrow even for the Equipment ID keeps the ellipsis that marks the cut source name: " + row.Fit(Width(Markup("… (added: north-signal)")) - 5, Width));
+        var other = new InventoryPresentationState.FittedRow("Other family", "Grade Crossing - Allen", Markup);
+        Check(other.Fit(5, Width) == other.Full, "Other rows keep the outliner's own shortening at the end of the row");
+    }
+    static void EquipmentChoiceShowsItsModelWithoutItsCrossing() {
+        var mast = new BaseMapFixture().Objects.First(o => o.Family == SceneFamilies.CrossingMast);
+        var path = mast.Path.Substring(0, mast.Path.LastIndexOf('/'));
+        var source = new SourceCandidate(new EquipmentSource("BushnellWhittier", path), "Crossing Signal Wishbone A (1)", null,
+            null, null, "Signal 1", "Bryson Everett [mod object author/pack copy]", null, null);
+        Check(InventoryPresentationState.EquipmentSourceName(source) == "Crossing Signal Wishbone A (1)",
+            "The Use label names the model without the crossing or its internal identity");
+        Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.Bell(FakeEquipmentWorld.CrossingBell, "US&S Teardrop Crossing Bell", null))
+            == "US&S Teardrop Crossing Bell", "The Use label names the bell without its definition identifier");
+    }
+    static void EquipmentDisplayHidesInternalIdentities() {
+        var addition = new EquipmentAddition("signal-1-added", EquipmentAddition.LightGatePattern, new EquipmentSource("scene", "World/Crossings/Signal 1"), null);
+        var source = new SourceCandidate(addition.Source, "source-model", null, null, null, "Signal 1", "Gov Island", null, null);
+        Check(InventoryPresentationState.EquipmentSourceName(addition.Source, new[] { source }) == "Signal 1 at Gov Island",
+            "The stored source of an addition retains its equipment and crossing names");
+        var other = new EquipmentAddition("signal-2-added", addition.Pattern, addition.Source, null);
+        Check(InventoryPresentationState.UnbuiltEquipmentName(addition, new[] { source }) == "signal-1-added: Signal 1 at Gov Island"
+            && InventoryPresentationState.UnbuiltEquipmentName(other, new[] { source }) == "signal-2-added: Signal 1 at Gov Island",
+            "Failed copies of one source show different equipment IDs and end with the source crossing");
+        var unbuiltName = InventoryPresentationState.UnbuiltEquipmentName(addition, new[] { source });
+        Check(InventoryPresentationState.NarrowName(CommandBand.AddedEquipmentFamily, unbuiltName, 27, value => ("Edit " + value).Length)
+            == "signal-1-added: Signa…", "A narrow Edit button can shorten an unbuilt name without losing its Equipment ID");
+        Check(InventoryPresentationState.EquipmentSourceName(EquipmentSource.ForDefinition("rr/missing-bell"), Array.Empty<SourceCandidate>()) == "missing-bell",
+            "An unavailable bell definition is named after the last part of its identifier, not its kind");
+        var unloaded = new EquipmentAddition("west", EquipmentAddition.LightGatePattern, new EquipmentSource("scene", "World/Crossings/Gone/Signal 3"), null);
+        Check(InventoryPresentationState.UnbuiltEquipmentName(unloaded, Array.Empty<SourceCandidate>()) == "west: Signal 3",
+            "An unbuilt light or gate whose source is not loaded is named after the last element of its source path");
+        var unavailableBell = new EquipmentAddition("ring", EquipmentAddition.BellPattern, EquipmentSource.ForDefinition("rr/bell-uss-teardrop"), null);
+        Check(InventoryPresentationState.UnbuiltEquipmentName(unavailableBell, null) == "ring: bell-uss-teardrop",
+            "An unbuilt bell whose definition is unavailable is named after its identifier's last part");
+        Check(InventoryPresentationState.UnbuiltEquipmentName(unavailableBell, new[] { SourceCandidate.Bell("rr/bell-uss-teardrop", "US&S Teardrop Crossing Bell", "refused") }) == "ring: US&S Teardrop Crossing Bell",
+            "An unbuilt bell whose definition is available uses its metadata name");
+        Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.Bell("rr/bell-plain", null, null)) == "bell-plain",
+            "A bell definition without a name is offered under its identifier's last part");
+        Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.UnavailableBells(EquipmentAddition.BellsUnavailable)) == "Bell",
+            "The rejected row that stands for unavailable bell definitions is not an addition and keeps the name Bell");
+        var identity = new TargetIdentity("scene", "World/Crossings/CrankyAnt Scene Patcher equipment author:pack signal-1-added", "OwnedEquipment");
+        var added = new SceneObservation(new object(), identity, CommandBand.AddedEquipmentFamily, true, Array.Empty<double>(), Array.Empty<double>(),
+            Array.Empty<string>(), Array.Empty<string>(), new[] { "Missing object at " + identity.Path }, null, displayName: "Signal 1 (added: north-signal)");
+        var copied = JObject.Parse(PatchEditingSession.CopyId(new[] { "rr/test-map" }, added));
+        var target = copied["target"];
+        Check((string)target["scene"] == "scene" && (string)target["path"] == identity.Path && (string)target["component"] == "OwnedEquipment",
+            "Copy ID writes the scene, internal path and component to the target JSON");
+        var candidate = new SelectionCandidate(added.Handle, SelectionIdentity.SceneObject(added.Identity), added.DisplayName);
+        Check(candidate.Identity.ToString() == "scene/" + identity.Path + " [OwnedEquipment]",
+            "World choice Details shows the full target identity alongside the visible candidate name");
+    }
+    static void WorldChoicesKeepAddedEquipmentIds() {
+        var identity = new TargetIdentity("scene", "World/Crossings/Owned equipment bell-2", "OwnedEquipment");
+        var added = new SceneObservation(new object(), identity, CommandBand.AddedBellFamily, true, Array.Empty<double>(), Array.Empty<double>(),
+            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), null, displayName: "US&S Teardrop Crossing Bell (added: north-bell)");
+        var label = added.Family + ": " + identity.Path;
+        Check(CommandBand.ChoiceLabel(label, new[] { label }, 34, added) == "US&S Teardrop… (added: north-bell)",
+            "A long world choice retains the Equipment ID after the shortened name: " + CommandBand.ChoiceLabel(label, new[] { label }, 34, added));
+    }
+    static void NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit() {
+        var current = new[] { "8", "2", "3", "0", "90", "0" };
+        var unchanged = new[] { "8.00", "2", "3", "-0", "90", "0" };
+        var draft = new[] { "9", "2", "3", "0", "90", "0" };
+        Check(CommandBand.NumericEditBlocksWorld(true, unchanged, current), "A focused numeric field blocks native editing before a value changes");
+        Check(!CommandBand.NumericEditBlocksWorld(false, unchanged, current), "Leaving an unchanged numeric field restores native world input");
+        Check(CommandBand.NumericEditBlocksWorld(false, draft, current), "Leaving a changed numeric field keeps the edit open until Apply or Read");
+    }
+    // The Map Editor's Save button stays enabled. A refused Save shows its reason in the message area of the open window; with
+    // the window closed, a native alert in the style of Save Failed shows it, so the click never looks ignored.
+    static void ARefusedSaveIsShownEvenWithTheWindowClosed() {
+        const string reason = "The scene patch file changed outside scene patch editing. Save won't overwrite it until you choose a version.";
+        Check(CommandBand.SaveRefusalAlert(true, reason) == null, "The open window shows the refusal in its message area, without an alert");
+        var alert = CommandBand.SaveRefusalAlert(false, reason);
+        Check(alert != null && alert.Value.Title == "Save refused" && alert.Value.Message == "Nothing was saved. " + reason, "The closed window's alert gives the reason: " + alert);
+        var lower = CommandBand.SaveRefusalAlert(false, "the original scene patch file or its backup changed after fresh start");
+        Check(lower.Value.Message == "Nothing was saved. The original scene patch file or its backup changed after fresh start.", "The reason reads as one sentence: " + lower.Value.Message);
+    }
+    // A tooltip of a control that cannot be used gives its reason as one plain sentence, without a label.
+    // The footer's amber Editing line ends each edit block with a full stop, as its tooltip does, and keeps the text as it
+    // stands: a block that already ends a sentence keeps its ending, and a label is not stripped.
+    static void EditingLinesEndWithAFullStop() {
+        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications) == PatchEditingSession.SeveralModifications.TrimEnd('.') + ".",
+            "The several-modifications block ends with a full stop: " + CommandBand.EditingLine(PatchEditingSession.SeveralModifications));
+        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications).EndsWith(CommandBand.Tooltip("x", PatchEditingSession.SeveralModifications), StringComparison.Ordinal),
+            "The footer line ends as the tooltip does");
+        Check(CommandBand.EditingLine("Confirm or cancel the world selection to edit.") == "Confirm or cancel the world selection to edit.", "A block that ends a sentence keeps one full stop");
+        Check(CommandBand.EditingLine("Ready?") == "Ready?" && CommandBand.EditingLine(" Stop! ") == "Stop!", "A question or exclamation keeps its mark");
+        Check(CommandBand.EditingLine(CommandBand.NotEditable("this object")) == CommandBand.NotEditable("this object").TrimEnd('.') + ".", "A labelled block keeps its label: " + CommandBand.EditingLine(CommandBand.NotEditable("this object")));
+    }
+    static void ReasonsReadAsOnePlainSentence() {
+        Check(CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }) == null && CommandBand.WreckAction(true) == "Start derailed: Yes" && CommandBand.WreckAction(false) == "Start derailed: No", "The Wreck checkbox is usable for one reader and names its edit by the new state");
+        // The Inspection only line of a tooltip or state line carries one label, with the reason as one plain sentence.
+        if (CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("groups that hold a spawn point")) != "Inspection only: Groups that hold a spawn point cannot be edited.")
+            throw new Exception("The Inspection only line stacks labels: " + CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("groups that hold a spawn point")));
+        var starter = StarterPlacements.ObjectSettings + ".";
+        var blocked = CommandBand.NotEditable(StarterPlacements.ObjectSettings);
+        foreach (var row in new[] {
+            new[] { blocked, starter },
+            new[] { CommandBand.EditReason(blocked), "Has no effect on where cars start." },
+            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of(StarterPlacements.Family, StarterPlacementScene.Structure, blocked)), CommandBand.GizmoMode, false), "Has no effect on where cars start." },
+            new[] { StarterPlacements.NoDetach, StarterPlacements.NoDetach + "." },
+            new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
+            new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
+            new[] { SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Track span", null, CommandBand.NotYetSupported("the Track span family"))), CommandBand.SnapMode, false), "This family has no supported edits." },
+            new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects have this hierarchy path. A scene patch file target can't single out this object." },
+            new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
+            new[] { "Inspect an object first.", "Inspect an object first." },
+            new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
+            new[] { CommandBand.WreckReason(null, new string[0]), "No new-game car placement uses it." },
+            new[] { CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no", StarterPlacements.ReaderPrefix + "ewh-diesel, car placement 1 of 1: cars rr/gb-gondola3; wreck: no" }),
+                "Several new-game car placements use it." },
+            new[] { CommandBand.WreckReason("placements unavailable", new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }),
+                "The new-game setups can't be read." },
+        }) {
+            var tooltip = CommandBand.Tooltip("Does something.", row[0]);
+            Check(tooltip == row[1], "The tooltip gives the reason as one plain sentence: " + tooltip);
+            var reason = tooltip;
+            Check(new[] { "Not editable:", "Not yet supported:", "binding unavailable:", "Unavailable:" }.All(label => reason.IndexOf(label, StringComparison.OrdinalIgnoreCase) < 0)
+                && (Char.IsUpper(reason[0]) || Char.IsDigit(reason[0])) && reason.EndsWith(".", StringComparison.Ordinal), "The tooltip has no label and the reason is a sentence: " + tooltip);
+            Check(CommandBand.Tooltip(null, row[0]) == tooltip, "Without a description the tooltip is the same: " + CommandBand.Tooltip(null, row[0]));
+        }
+    }
+    // A lamp shows green for Current and Saved and amber for Stale and Unsaved, and reserves its longer word.
+    static void LampsShowOneWordAndColourPerState() {
+        var current = CommandBand.Inventory(false); var stale = CommandBand.Inventory(true);
+        Check(current.Word == "Current" && current.Good && current.Color == "#7FB86B", "A current inventory reads Current in green");
+        Check(stale.Word == "Stale" && !stale.Good && stale.Color == "#E8A33D", "A stale inventory reads Stale in amber");
+        Check(current.Reserve == "Current" && stale.Reserve == "Current", "The inventory lamp reserves the width of Current in both states");
+        var saved = CommandBand.Save(false); var unsaved = CommandBand.Save(true);
+        Check(saved.Word == "Saved" && saved.Good && saved.Color == "#7FB86B", "Saved work reads Saved in green");
+        Check(unsaved.Word == "Unsaved" && !unsaved.Good && unsaved.Color == "#E8A33D", "Unsaved work reads Unsaved in amber");
+        Check(saved.Reserve == "Unsaved" && unsaved.Reserve == "Unsaved", "The save lamp reserves the width of Unsaved in both states");
+        Check(current.Reserve.Length >= current.Word.Length && stale.Reserve.Length >= stale.Word.Length && saved.Reserve.Length >= saved.Word.Length, "The reserved word is the longer one");
+    }
+    // Refresh and both lamps with their words need 75 + (10 + 3 + 66) + (10 + 3 + 72) + 3 x 4 = 251 canvas units. The
+    // decision uses fixed widths, so it is the same before and after the band's first layout.
+    static void LampWordsFitOrMoveIntoTheTooltip() {
+        Check(CommandBand.LeftBandWidth == 251 && CommandBand.InventoryLamp == 79 && CommandBand.SaveLamp == 85, "The left band needs 251 units: " + CommandBand.LeftBandWidth);
+        Check(CommandBand.WordsFit(CommandBand.LeftBandWidth), "The words fit a band that is exactly as wide as they need");
+        Check(CommandBand.WordsFit(252) && CommandBand.WordsFit(284), "The words fit the band at the outliner's minimum width and at any wider one");
+        Check(!CommandBand.WordsFit(236) && !CommandBand.WordsFit(250), "A band that is too narrow keeps the lamps and drops the words");
+        // A window saved at its minimum of 660 by 410 has a content of 636 by 364 inside a frame of 24 by 46.
+        Check(CommandBand.RestoredContent(636, 660, 24) == 636 && CommandBand.RestoredContent(364, 410, 46) == 364, "A content size saved at the minimum window is restored as saved, not raised to the window's minimum");
+        Check(CommandBand.RestoredContent(900, 660, 24) == 900 && CommandBand.RestoredContent(100, 660, 24) == 636, "A larger saved size stays, and a smaller one is raised to the minimum window's content");
+        Check(CommandBand.LampTooltip(CommandBand.Inventory(false), "The inventory is up to date. You can inspect and edit objects.") ==
+            ("Current", "The inventory is up to date. You can inspect and edit objects."), "The Current tooltip body gives the next available actions.");
+        var scene = new Scene();
+        var inventory = new SceneInventory(scene);
+        inventory.Refresh();
+        scene.Maps = new[] { "another map" };
+        inventory.CheckFreshness();
+        Check(CommandBand.LampTooltip(CommandBand.Inventory(inventory.IsStale), InventoryPresentationState.Notice(inventory, false)) ==
+            ("Stale", "The map context changed. Click Refresh to update the inventory. Edits are refused until then."), "The Stale tooltip gives the reason and tells the user how to update the inventory.");
+        Check(CommandBand.LampTooltip(CommandBand.Inventory(true, false), FilePanelState.Reason(FilePanelState.Kind.Repair)) ==
+            ("Paused", "The scene patch file needs repair. Use the Repair panel first."), "The Paused tooltip body names the panel without repeating its title.");
+        Check(CommandBand.LampTooltip(CommandBand.Save(false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.None, false)) ==
+            ("Saved", "There are no changes to save."), "The Saved tooltip body explains what the status means.");
+        Check(CommandBand.Inventory(true, false).Word == "Paused" && !CommandBand.Inventory(true, false).Good &&
+            CommandBand.Save(false, false).Word == "Blocked" && !CommandBand.Save(false, false).Good, "A file lock pauses inspection and unavailable saving cannot show green Saved");
+        var writes = new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata };
+        Check(CommandBand.LampTooltip(CommandBand.Save(true), CommandBand.SaveNotice(writes, FileVersionState.None, false)) ==
+            ("Unsaved", "Click Save to write changes to the map data, scene patch file, and patcher dependency."), "The Unsaved tooltip body names all outstanding writes and the next action.");
+        Check(CommandBand.LampTooltip(CommandBand.Save(true, false), CommandBand.SaveNotice(new[] { PatchEditingSession.PatchData }, FileVersionState.Repair, true)) ==
+            ("Unsaved", "Changes to the scene patch file still need saving. Restore the scene patch file or click Keep editor version before saving."), "The Unsaved tooltip keeps the outstanding write and names the recovery action when the file is missing.");
+        Check(CommandBand.LampTooltip(CommandBand.Save(false, false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.Repair, false)) ==
+            ("Blocked", "The scene patch file needs repair. Resolve the issue before saving."), "The Blocked tooltip body gives repair guidance.");
+        Check(CommandBand.LampTooltip(CommandBand.Save(false, false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.Changed, false)) ==
+            ("Blocked", "The scene patch file changed outside scene patch editing. Choose a file version before saving."), "The Blocked tooltip body retains the reason and action for a file version choice.");
+        Check(CommandBand.SaveRefusalAlert(false, "Save requires a choice", true).Value.Message.EndsWith("Open Scene Patcher to choose which version to keep.", StringComparison.Ordinal), "The closed-window alert tells the player where to make a file version choice.");
+        Check(CommandBand.InventoryWord >= 60 && CommandBand.SaveWord >= CommandBand.InventoryWord, "The reserved widths hold the longer word of each lamp");
+    }
+    static void CommandsAreDisabledOnlyForTheirOwnReason() {
+        Check(CommandBand.SelectInWorld(true, false) == null, "Select in world is enabled without a pending choice, whether or not an object is inspected");
+        Check(CommandBand.SelectInWorld(true, true) == "Confirm or cancel the pending world choice first.", "Select in world is disabled while a world choice is pending, with that reason");
+        Check(CommandBand.SelectInWorld(false, false) != null, "Select in world has nothing to start when world selection is unavailable");
+        Check(CommandBand.Focus(true) == null && CommandBand.CopyId(true) == null, "Focus and Copy ID are enabled for an inspected object, also while a world choice is pending");
+        Check(CommandBand.Clear(true, false) == null && CommandBand.Clear(false, true) == null && CommandBand.Clear(true, true) == null,
+            "Clear is enabled for an inspected object and for a pending world choice without one");
+        // One press of Escape does one thing. Columns: field focus, open list, pending choice, drag, gizmo, snap.
+        foreach (var row in new[] {
+            new object[] { false, false, false, false, false, false, CommandBand.EscapeStep.None, "with nothing pending leaves the inspection alone" },
+            new object[] { false, true, true, true, true, true, CommandBand.EscapeStep.CloseList, "closes the list before cancelling anything" },
+            new object[] { false, false, true, true, true, true, CommandBand.EscapeStep.CancelDrag, "cancels a drag before a pending choice" },
+            new object[] { false, false, true, false, true, true, CommandBand.EscapeStep.CancelChoice, "cancels a pending choice before a gizmo" },
+            new object[] { false, false, false, false, true, true, CommandBand.EscapeStep.CancelGizmo, "cancels a standing gizmo before a prepared snap" },
+            new object[] { false, false, false, false, false, true, CommandBand.EscapeStep.CancelSnap, "cancels a prepared snap" },
+            new object[] { true, true, true, true, true, true, CommandBand.EscapeStep.None, "leaves everything alone when a field has focus" } })
+            Check(CommandBand.Escape((bool)row[0], (bool)row[1], (bool)row[2], (bool)row[3], (bool)row[4], (bool)row[5]) == (CommandBand.EscapeStep)row[6], "Escape " + row[7]);
+        // A field that had the focus when Escape went down has given it up by the time the panel is asked: the
+        // focus counts for the frame it was last seen in and the two after it.
+        foreach (var row in new[] { new[] { 100, 100, 1 }, new[] { 101, 100, 1 }, new[] { 102, 100, 1 }, new[] { 103, 100, 0 }, new[] { 100, -1, 0 }, new[] { 1, -1, 0 }, new[] { 500, 100, 0 } })
+            Check(CommandBand.FieldHasFocus(row[0], row[1]) == (row[2] == 1), "In frame " + row[0] + " a field last focused in frame " + row[1] + " " + (row[2] == 1 ? "has" : "does not have") + " the keyboard");
+        Check(CommandBand.FocusFrames == 2, "The focus counts for two frames after it was last seen");
+        // Field focus takes precedence over every combination of patcher interactions.
+        for (var state = 0; state < 32; state++)
+            Check(CommandBand.Escape(true, (state & 1) != 0, (state & 2) != 0, (state & 4) != 0, (state & 8) != 0, (state & 16) != 0) == CommandBand.EscapeStep.None, "Escape with the caret in a field cancels nothing: " + state);
+        // The tooltip stays hidden through one pause, whatever the panel does meanwhile.
+        foreach (var row in new[] {
+            new object[] { true, true, false, true, "paused with the panel open: hidden" },
+            new object[] { true, false, true, true, "the panel closed while still paused: stays hidden" },
+            new object[] { true, false, false, false, "paused with the panel closed all along: the game's own tooltips are left alone" },
+            new object[] { false, true, true, false, "the pause menu closed: shown again" },
+            new object[] { false, false, true, false, "the pause menu closed after the panel closed: shown again" },
+            new object[] { false, true, false, false, "not paused: never hidden" } })
+            Check(CommandBand.HidesTooltip((bool)row[0], (bool)row[1], (bool)row[2]) == (bool)row[3], "The tooltip, " + row[4]);
+        Check(CommandBand.Clear(false, false) == "Nothing is inspected and no world choice is pending.", "Clear is disabled only when nothing is inspected and no world choice is pending");
+        Check(CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo, or snap. Changes that were made stay.", CommandBand.Clear(false, false))
+            == "Nothing is inspected and no world choice is pending.", "The disabled Clear gives only why it cannot be used");
+        Check(CommandBand.Focus(false) == "Inspect an object first." && CommandBand.CopyId(false) == "Inspect an object first.", "Focus and Copy ID are disabled when nothing is inspected, with that reason");
+        Check(CommandBand.CopyId(true, "Invalid JSON. The scene patch file is protected from overwrite.") == "Invalid JSON. The scene patch file is protected from overwrite."
+            && CommandBand.CopyId(false, "Invalid JSON.") == "Inspect an object first.", "Copy ID is disabled with the session's refusal while the scene patch file cannot be read, and asks for an inspection first");
+    }
+    // The native outline appends its markers; the panel puts them before the name so that a cut-off name keeps them.
+    static void MarkersStandBeforeTheName() {
+        Check(CommandBand.RowMarkers(false, false, false) == "" && CommandBand.RowText("", "Loc: Walker Branch") == "Loc: Walker Branch", "An unmarked row starts with its name");
+        Check(CommandBand.RowText(CommandBand.RowMarkers(false, true, false), "Loc: Walker Branch") == "* Loc: Walker Branch", "A changed object has * before its name");
+        Check(CommandBand.RowText(CommandBand.RowMarkers(false, false, true), "Sign") == "+ Sign", "An added object has + before its name");
+        Check(CommandBand.RowText(CommandBand.RowMarkers(true, true, true), "Sign") == "!*+ Sign", "Problem, changed and added keep that order before the name");
+        Check(!CommandBand.RowText(CommandBand.RowMarkers(false, true, true), "Sign").EndsWith("*") && !CommandBand.RowText(CommandBand.RowMarkers(false, true, true), "Sign").EndsWith("+"), "No marker follows the name");
+    }
+    static void BadgesAreTheNativeOnes() {
+        Check(CommandBand.Badges(false, false).Count == 0, "An unchanged object has no badge");
+        var changed = CommandBand.Badges(true, false).Single();
+        Check(changed.Text == "* CHANGED" && changed.Color == "#E8A33D" && changed.Markup == "<color=#E8A33D><b><size=90%>* CHANGED</size></b></color>", "The changed badge is * CHANGED, amber, bold, at 90 percent: " + changed.Markup);
+        var added = CommandBand.Badges(false, true).Single();
+        Check(added.Text == "+ ADDED" && added.Color == "#7FB86B" && added.Markup == "<color=#7FB86B><b><size=90%>+ ADDED</size></b></color>", "The added badge is + ADDED, green, bold, at 90 percent: " + added.Markup);
+        Check(CommandBand.Badges(true, true).Select(b => b.Text).SequenceEqual(new[] { "* CHANGED", "+ ADDED" }), "Both badges keep their order");
+    }
+    // The supplied definitions are stale when a scene patch file changed outside scene patch editing, not when the patcher saved
+    // it itself, and a refresh makes them current again. The lamp follows: Current, Stale, Current.
+    static void OwnSaveKeepsTheDefinitionsCurrent() {
+        RailroaderScenePatcher.Core.LoadedMod Loaded(string id, string json, string error = null) =>
+            new RailroaderScenePatcher.Core.LoadedMod(new RailroaderScenePatcher.Core.PatchSource(id, id, "1.0"), json, null, true, error);
+        const string before = "{\"modifications\":{}}", written = "{\"modifications\":{\"board\":{\"active\":false}}}", outside = "{\"modifications\":{\"board\":{\"active\":true}}}";
+        var definitions = new SuppliedDefinitions();
+        Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "Before the first refresh the definitions are not read");
+        definitions.Read(new[] { Loaded("pack", before) });
+        definitions.Compare(new[] { Loaded("pack", before) });
+        Check(!definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Current", "After a refresh the unchanged scene patch file is current");
+        // The patcher saves: the file now holds what it wrote.
+        definitions.Written("pack", written);
+        definitions.Compare(new[] { Loaded("pack", written) });
+        Check(!definitions.Stale, "The patcher's own Save keeps the definitions current");
+        definitions.Compare(new[] { Loaded("pack", written) });
+        Check(!definitions.Stale, "and they stay current on every later comparison");
+        // The file is changed outside scene patch editing.
+        definitions.Compare(new[] { Loaded("pack", outside) });
+        Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "A scene patch file changed outside scene patch editing marks the definitions stale");
+        definitions.Compare(new[] { Loaded("pack", written) });
+        Check(definitions.Stale, "Changing the file back does not clear it: only a refresh does");
+        definitions.Read(new[] { Loaded("pack", outside) });
+        Check(!definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Current", "Refresh returns Current");
+        // A scene patch file reordered or re-spaced outside scene patch editing has equal content: it is not reported as changed.
+        const string keyed = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"a\":{\"active\":false,\"dependsOn\":[\"b\",\"c\"],\"x\":12},\"b\":{\"active\":true}}}";
+        const string reordered = "{\n  \"modifications\": {\n    \"b\": { \"active\": true },\n    \"a\": { \"x\": 12.0, \"dependsOn\": [\"c\", \"b\"], \"active\": false }\n  },\n  \"sourceMap\": { \"mapId\": \"map\" },\n  \"formatVersion\": 1\n}\n";
+        var form = new SuppliedDefinitions();
+        form.Read(new[] { Loaded("pack", keyed) });
+        form.Compare(new[] { Loaded("pack", reordered) });
+        Check(!form.Stale && CommandBand.Inventory(form.Stale).Word == "Current", "A reordered and re-spaced scene patch file with another number literal is not reported as changed");
+        form.Compare(new[] { Loaded("pack", keyed) });
+        Check(!form.Stale, "and neither is the first form when it returns");
+        form.Compare(new[] { Loaded("pack", reordered.Replace("12.0", "13")) });
+        Check(form.Stale, "A changed value in the reordered scene patch file marks the definitions stale");
+        form.Read(new[] { Loaded("pack", keyed) });
+        form.Compare(new[] { Loaded("pack", keyed.Replace("[\"b\",\"c\"]", "[\"b\",\"b\",\"c\"]")) });
+        Check(form.Stale, "A repeated dependency is other content");
+        form.Read(new[] { Loaded("pack", "{broken") });
+        form.Compare(new[] { Loaded("pack", "{broken") });
+        Check(!form.Stale, "The same unparseable text is unchanged");
+        form.Compare(new[] { Loaded("pack", "{ broken") });
+        Check(form.Stale, "Another unparseable text marks them stale");
+        // The first Save creates the scene patch file: no mod carried one at the refresh.
+        var fresh = new SuppliedDefinitions();
+        fresh.Read(new RailroaderScenePatcher.Core.LoadedMod[0]);
+        fresh.Written("pack", written);
+        fresh.Compare(new[] { Loaded("pack", written) });
+        Check(!fresh.Stale, "A scene patch file the patcher's own Save created is current");
+        fresh.Compare(new[] { Loaded("pack", written), Loaded("other", before) });
+        Check(fresh.Stale, "A scene patch file that appears from elsewhere marks them stale");
+        // A scene patch file that can no longer be read, and one removed outside scene patch editing.
+        definitions.Compare(new[] { Loaded("pack", null, "Cannot read scene patch file") });
+        Check(definitions.Stale, "An unreadable scene patch file marks them stale");
+        definitions.Read(new[] { Loaded("pack", outside) });
+        definitions.Compare(new RailroaderScenePatcher.Core.LoadedMod[0]);
+        Check(definitions.Stale, "A removed scene patch file marks them stale");
+        // A write while already stale does not vouch for what else changed.
+        definitions.Read(new[] { Loaded("pack", before) });
+        definitions.Compare(new[] { Loaded("pack", outside) });
+        definitions.Written("pack", written);
+        definitions.Compare(new[] { Loaded("pack", written) });
+        Check(definitions.Stale, "A Save after an outside change leaves the definitions stale until Refresh");
+        // A new load attempt starts over, as before the first refresh.
+        definitions.Read(new[] { Loaded("pack", before) });
+        definitions.Reset();
+        Check(definitions.Stale, "After a reset the definitions are not read");
+        definitions.Written("pack", written);
+        definitions.Compare(new[] { Loaded("pack", written) });
+        Check(definitions.Stale, "A write does not stand in for the refresh a new load attempt needs");
+        var messages = new EditFeedback();
+        messages.Report("Placement", "Placement completed."); messages.Follow("Terrain output", "Terrain output complete.");
+        messages.Clear();
+        Check(messages.Messages.Count == 0 && messages.Result == "", "A new load attempt starts without messages");
+        // The inventory notice names the supplied definitions for this state.
+        Check(InventoryPresentationState.Notice(null, true).Contains("inspection is unavailable"), "Without an inventory the notice names that first");
+    }
+    // An enabled control says what it does; a disabled one only why it cannot be used now.
+    static void ADisabledControlKeepsItsDescription() {
+        Check(CommandBand.Tooltip("Move the object with the native gizmo.", null) == "Move the object with the native gizmo.", "An enabled control shows its description");
+        Check(CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first.") == "Inspect an object first.",
+            "A disabled control shows only the reason, without its description");
+        Check(CommandBand.Tooltip(null, "Inspect an object first.") == "Inspect an object first." && CommandBand.Tooltip("", null) == "", "Without a description the reason reads the same");
+        Check(CommandBand.CandidateDetailsReason(0) == "Click a marking or track in the world first." && CommandBand.CandidateDetailsReason(1) == null && CommandBand.CandidateDetailsReason(3) == null,
+            "The details of a world choice open only once something was clicked");
+        Check(CommandBand.NotEditable("the marker is inside a crossing") == "Not editable: the marker is inside a crossing", "An object of a supported family that cannot be edited keeps its own reason");
+        // An added light or gate is a supported family: its edits are on its crossing's Connections tab, so it is not inspection only.
+        Check(CommandBand.InspectionOnly(CommandBand.AddedEquipmentFamily, false) == null && CommandBand.InspectionOnly("Crossing light", false).StartsWith("Not yet supported: ", StringComparison.Ordinal)
+            && CommandBand.InspectionOnly("Crossing light", true) == null, "An added light or gate is not inspection only; another family without an edit is");
+        var operations = CommandBand.AddedEquipmentOperations("Signal 1 (added)");
+        Check(operations == "Signal 1 (added). Edit it on its crossing controller" && CommandBand.Refusal(operations) == null, "Its supported edits name the crossing controller: " + operations);
+        // An added bell is a supported family of its own, edited on its crossing's Connections tab as well.
+        var bellOperations = CommandBand.AddedEquipmentOperations("Brass bell (added)");
+        Check(CommandBand.InspectionOnly(CommandBand.AddedBellFamily, false) == null && CommandBand.IsAddedFamily(CommandBand.AddedBellFamily) && !CommandBand.IsAddedFamily("Crossing bell")
+            && bellOperations == "Brass bell (added). Edit it on its crossing controller" && CommandBand.Refusal(bellOperations) == null,
+            "An added bell is not inspection only and names where it is edited: " + bellOperations);
+        // A hierarchy path that more than one object holds: no edit, with the reason under Supported edits.
+        Check(CommandBand.SharedPath(1) == null && CommandBand.SharedPath(0) == null, "A path one object holds can be edited");
+        Check(CommandBand.SharedPath(2) == "2 objects have this hierarchy path. A scene patch file target can't single out this object"
+            && CommandBand.Refusal(CommandBand.NotEditable(CommandBand.SharedPath(2))) == CommandBand.SharedPath(2), "A path two objects hold reads Not editable with its reason");
+        // Supported edits and the footer use the same short reason.
+        Check(CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))) == "This path doesn't identify one object"
+            && CommandBand.InspectorEditBlock(false, CommandBand.NotEditable(CommandBand.SharedPath(3))) == CommandBand.SharedPathBlock && !CommandBand.SharedPathBlock.Contains(CommandBand.SharedPath(2)),
+            "The footer repeats the short reason for a shared path: " + CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))));
+        // A file path shows from the game folder, or from the mod's own folder when the mod lies elsewhere; never from the drive.
+        Check(CommandBand.ShownPath(@"D:\Games\Railroader\Mods\MyMap\Data\scene-patches.json", @"D:\Games\Railroader") == "Mods/MyMap/Data/scene-patches.json"
+            && CommandBand.ShownPath(@"C:\Work\ModDev\MyMap\Data\scene-patches.json", @"D:\Games\Railroader") == "MyMap/Data/scene-patches.json"
+            && CommandBand.ShownPath("/home/user/mods/MyMap/Data/scene-patches.json", null) == "MyMap/Data/scene-patches.json"
+            && CommandBand.ShownPath(@"C:\Work\scene-patches.json", @"D:\Games\Railroader") == "scene-patches.json" && CommandBand.ShownPath(null, null) == null,
+            "A shown path starts at the game folder or at the mod's folder: " + CommandBand.ShownPath(@"C:\Work\ModDev\MyMap\Data\scene-patches.json", @"D:\Games\Railroader"));
+        // An object without edits is not told what Disable would do.
+        Check(CommandBand.TrackGroup(false) == "Activity follows the track group." && CommandBand.TrackGroup(true).Contains("Disable keeps it inactive"), "The track-group line names edits only where the object offers them");
+        // The help of a tab closes when another tab opens; the outliner's and the window's stay.
+        var tabs = new[] { "object", "placement", "connections", "changes" };
+        Check(CommandBand.ClosesHelp("object", "placement", tabs) && !CommandBand.ClosesHelp("placement", "placement", tabs), "A tab's help closes on a switch to another tab");
+        Check(!CommandBand.ClosesHelp("outliner", "placement", tabs) && !CommandBand.ClosesHelp("main", "changes", tabs) && !CommandBand.ClosesHelp(null, "object", tabs), "The outliner's and the window's help stay through a tab switch");
+        // A component the game adds while it runs is no dependency.
+        Check(HierarchyDependencies.IsRuntimeComponent("Helpers.Animation.PlayableGraphAnimatorAdapter") && !HierarchyDependencies.IsRuntimeComponent("RollingStock.Controls.KeyValueBoolAnimator")
+            && !HierarchyDependencies.IsRuntimeComponent("UnityEngine.Animator") && !HierarchyDependencies.IsRuntimeComponent(null), "The playable-graph adapter an animator adds while running is runtime state; the animator itself is authored");
+        // A placed window that no longer lies within the screen, such as one whose corner was dragged past the screen's
+        // bottom edge, is moved back inside with its size, as the native window keeps itself within its parent; it never
+        // jumps back to the default layout. A window larger than the screen takes the screen's size.
+        PanelPlacement.Area A(float x, float y, float w, float h) => new PanelPlacement.Area { X = x, Y = y, Width = w, Height = h };
+        string S(PanelPlacement.Area? a) => a == null ? "none" : a.Value.X + "," + a.Value.Y + " " + a.Value.Width + "x" + a.Value.Height;
+        Check(S(PanelPlacement.Within(A(100, 300, 734, 700), 1920, 1080)) == "100,300 734x700", "A window within the screen stays as it is");
+        var rounded = PanelPlacement.Within(A(100, 300, 734, 780.4f), 1920, 1080);
+        Check(rounded != null && rounded.Value.Y == 300 && rounded.Value.Height == 780.4f, "A window that ends a fraction of a pixel past the edge stays as it is");
+        Check(S(PanelPlacement.Within(A(100, 300, 734, 812), 1920, 1080)) == "100,268 734x812", "A corner dragged past the bottom edge keeps the size and moves the window up: " + S(PanelPlacement.Within(A(100, 300, 734, 812), 1920, 1080)));
+        Check(S(PanelPlacement.Within(A(1500, -20, 734, 700), 1920, 1080)) == "1186,0 734x700", "A window past the right and top edges moves inside");
+        Check(S(PanelPlacement.Within(A(0, 100, 734, 1300), 1920, 1080)) == "0,0 734x1080", "A window taller than the screen takes the screen's height");
+        Check(PanelPlacement.Within(A(0, 0, 0, 700), 1920, 1080) == null && PanelPlacement.Within(A(0, 0, 734, 0), 1920, 1080) == null, "A window without a size has no place within the screen");
+        // The help window stands beside the panel and never over it.
+        var right = PanelPlacement.Beside(0, 734, 300, 364, 800, 2560, 1440, 8);
+        Check(right.X == 742 && right.Y == 300 && right.Width == 364 && right.Height == 800, "With room at the right the help stands right of the panel, at the height of its ?: " + right.X);
+        var left = PanelPlacement.Beside(1186, 1920, 300, 364, 600, 1920, 1080, 8);
+        Check(left.X == 1186 - 8 - 364 && left.X + left.Width <= 1186, "A panel at the right edge gets its help at its left, clear of the panel: " + left.X);
+        var low = PanelPlacement.Beside(0, 734, 900, 364, 800, 1920, 1080, 8);
+        Check(low.Y == 280 && low.X == 742, "A help that would leave the screen moves up, not over the panel: " + low.Y);
+        var both = PanelPlacement.Beside(0, 734, 100, 364, 1101, 2560, 1440, 8);
+        Check(both.X >= 734 && both.Y == 100, "The outliner's help at 2560 x 1440 stands right of the whole panel, not over the outliner");
+        // The help window is as high as its content at its one width; one too long for the screen takes the screen's
+        // height, and the rest scrolls (HelpWindowTests).
+        var scaled = PanelPlacement.HelpSize(width => 340f * 1500 / width, 864, 60, 120);
+        Check(scaled.Width == 610 && scaled.Height == 864 - 60 - 2 * PanelPlacement.HelpMargin && scaled.Height < 340f * 1500 / 610, "At UI scale 1.25 a long help takes the screen's height, and the rest scrolls: " + scaled.Width + " x " + scaled.Height);
+        Check(PanelPlacement.HelpSize(width => 10, 1080, 60, 120).Height == 120 && PanelPlacement.HelpSize(width => 5000, 100, 60, 120).Height == 120, "The help window is never lower than its least height");
+        var placed = PanelPlacement.Beside(0, 734, 100, 634, scaled.Height + 60, 2560, 864, 8);
+        Check(placed.Y + placed.Height <= 864 && placed.Y >= 0, "The widest help at the screen's height stands within the screen: " + placed.Y);
+        var cramped = PanelPlacement.Beside(200, 900, 0, 364, 400, 1000, 800, 8);
+        Check(cramped.X == 0, "Without room on either side it takes the side with more room, at the screen's edge: " + cramped.X);
+        Check(PanelPlacement.Beside(100, 950, 0, 364, 400, 1000, 800, 8).X == 0 && PanelPlacement.Beside(100, 900, 0, 364, 400, 1000, 800, 8).X == 636, "More room at the left takes the left edge; equal room takes the right edge");
+        Check(CommandBand.NotYetSupported("the Milepost family") == "Not yet supported: the Milepost family cannot be edited" && CommandBand.Refusal(CommandBand.NotYetSupported("the Milepost family")) == null,
+            "A kind without an edit says that it is not supported yet, which is no refusal of a supported family");
+        // The followed track element is the one the world marks green: the anchor's node, or its location's segment.
+        Check(CommandBand.Followed(null) == null, "An object that follows nothing has no followed element");
+        var onSegment = CommandBand.Followed(new TrackFollowing(TrackAnchor.At(new TrackLocation("S12", "a", 3.5)), new double[3], new double[] { 0, 0, 0, 1 }));
+        Check(onSegment.Kind == SelectionKind.TrackSegment && onSegment.Identifier == "S12", "A location anchor marks its segment");
+        var onNode = CommandBand.Followed(new TrackFollowing(TrackAnchor.Endpoint("N7"), new double[3], new double[] { 0, 0, 0, 1 }));
+        Check(onNode.Kind == SelectionKind.TrackNode && onNode.Identifier == "N7", "An endpoint anchor marks its node");
+        // A group of values: caption above, short labels in front of the boxes, the unit once.
+        Check(CommandBand.PlacementGroups.SequenceEqual(new[] { "Position", "Rotation" }) && CommandBand.PlacementUnits.SequenceEqual(new[] { "m", "deg" }) && CommandBand.Axes.SequenceEqual(new[] { "X", "Y", "Z" }), "A placement is a position and a rotation, each with X, Y and Z");
+        foreach (var row in new[] {
+            new[] { "Position", "m", "edit", "Position (m)" }, new[] { "Position", "m", "read", "Position" },
+            new[] { "Rotation", "deg", "edit", "Rotation (deg)" }, new[] { "Approach A", null, "edit", "Approach A" } })
+            Check(CommandBand.GroupCaption(row[0], row[1], row[2] == "edit") == row[3], "The caption of " + row[0] + " carries its unit only while the row can be edited: " + row[3]);
+        Check(CommandBand.RunningLine(CommandBand.Axes, new[] { "4361.091", "528.405", "5380.431" }, "m") == "X 4361.091  Y 528.405  Z 5380.431 (m)", "A position that cannot be edited is one running line with its unit once at the end");
+        Check(CommandBand.RunningLine(CommandBand.Axes, new[] { "0", "70.041", "0" }, "deg") == "X 0  Y 70.041  Z 0 (deg)", "A rotation reads the same way, in degrees");
+        Check(CommandBand.RunningLine(new[] { "Segment", "End", "Distance" }, new[] { "S377", " a ", "" }, "m") == "Segment S377  End a  Distance - (m)", "A binding reads the same way; a value that is not set is a dash");
+        Check(CommandBand.RunningLine(new[] { "A", "B" }, new[] { "1" }, null) == "A 1  B -", "A line without a unit ends with its last value");
+        // A group of one value, such as Replacement ID, has only its caption: the value stands without a second label.
+        Check(CommandBand.RunningLine(new[] { "ID" }, new[] { "Myyi" }, null) == "Myyi" && !CommandBand.HasBoxLabels(new[] { "ID" }) && CommandBand.HasBoxLabels(CommandBand.Axes),
+            "A single value repeats no label: " + CommandBand.RunningLine(new[] { "ID" }, new[] { "Myyi" }, null));
+        // The reason an object cannot be edited is its own, wherever it is given, as one plain sentence.
+        foreach (var row in new[] {
+            new[] { CommandBand.NotYetSupported("the Milepost family"), "This family has no supported edits" },
+            new[] { CommandBand.NotEditable("the marker is inside a crossing"), "Its structure isn't supported" },
+            new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", CommandBand.SharedPathBlock },
+            new[] { "Fixed placement and activity", "Uses fixed placement" }, new[] { null, "Its state can't be read" }, new[] { " ", "Its state can't be read" } })
+            Check(CommandBand.EditReason(row[0]) == row[1], "The editing message gives the object's own reason: " + row[1] + " / " + CommandBand.EditReason(row[0]));
+        Check(!CommandBand.EditReason(CommandBand.NotYetSupported("x")).Contains("Object tab"), "The editing message does not send the user to another tab");
+        // An added light, gate or bell is edited on its crossing controller's Connections tab: its editing message and the
+        // The disabled controls name the same route as Supported edits.
+        foreach (var name in new[] { "Brass bell (added)", "Signal 1 (added)" })
+            Check(CommandBand.EditReason(CommandBand.AddedEquipmentOperations(name)) == "Edit it on its crossing controller",
+                "The editing message of added equipment names its edit route: " + CommandBand.EditReason(CommandBand.AddedEquipmentOperations(name)));
+        // No placement mode moves a crossing pad: each is inactive for a pad, with the one reason.
+        foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Crossing pad marker", CrossingPadScene.Structure, CommandBand.PadOperations)), mode, false) == CommandBand.PadFollowsTrack, "Placement mode " + mode + " is inactive for a crossing pad");
+        Check(CommandBand.PadFollowsTrack == "Placed by its track binding", "The reason says what places the pad");
+        Check(CommandBand.PadOperations.StartsWith("The pad moves only when you change its track location.", StringComparison.Ordinal) && !CommandBand.PadOperations.Contains("fixed placement") && CommandBand.PadOperations.Contains("Enable or disable it separately."), "A pad's Supported edits promises no placement");
+        // An edit whose fields hold the current values is disabled.
+        foreach (var row in new[] {
+            new object[] { new[] { "4387.212", "528.6", "0" }, new[] { "4387.212", "528.6", "0" }, true },
+            new object[] { new[] { " 4387.2120 ", "528.60", "-0" }, new[] { "4387.212", "528.6", "0" }, true },
+            new object[] { new[] { "4387.213", "528.6", "0" }, new[] { "4387.212", "528.6", "0" }, false },
+            new object[] { new[] { "x", "a", "7.5" }, new[] { "X", "A", "7.50" }, true },
+            new object[] { new[] { "S378", "A", "7.5" }, new[] { "S377", "A", "7.5" }, false },
+            new object[] { new[] { "", "A", "" }, new[] { "", "A", "" }, true },
+            new object[] { new[] { "1" }, new[] { "1", "2" }, false }, new object[] { new[] { "1" }, null, false } })
+            Check(CommandBand.SameFields((string[])row[0], (string[])row[1]) == (bool)row[2], "Fields " + String.Join("/", (string[])row[0]) + " equal the current values: " + row[2]);
+        // A button that applies fields follows the typing: each row is the state after one more keystroke.
+        var shown = new[] { "4387.212", "528.6", "0" };
+        foreach (var row in new[] {
+            new object[] { null, new[] { "4387.212", "528.6", "0" }, CommandBand.SamePlacement },
+            new object[] { null, new[] { "4387.2125", "528.6", "0" }, null },
+            new object[] { null, new[] { "4387.212", "528.6", "0" }, CommandBand.SamePlacement },
+            new object[] { null, new[] { "4387.21", "528.6", "0" }, null },
+            new object[] { null, new[] { "4387.212", "528.6", "" }, null },
+            new object[] { null, new[] { "4387.2120", "528.60", "0.0" }, CommandBand.SamePlacement },
+            new object[] { "Inspect an object first.", new[] { "1", "2", "3" }, "Inspect an object first." },
+            new object[] { "Inspect an object first.", new[] { "4387.212", "528.6", "0" }, "Inspect an object first." } })
+            Check(CommandBand.FieldReason((string)row[0], (string[])row[1], shown, CommandBand.SamePlacement) == (string)row[2], "With the fields " + String.Join("/", (string[])row[1]) + " the button's reason is " + (row[2] ?? "none"));
+        Check(CommandBand.FieldReason(null, new[] { "S378", "A", "7.5" }, new[] { "S377", "A", "7.5" }, CommandBand.SameBinding) == null && CommandBand.FieldReason(null, new[] { "S377", "a", "7.50" }, new[] { "S377", "A", "7.5" }, CommandBand.SameBinding, CommandBand.BindingIds) == CommandBand.SameBinding, "Set follows the binding fields the same way");
+        // A segment ID is compared as it is written: the game finds a segment by its exact ID. The end is a or b in
+        // either case.
+        Check(!CommandBand.SameFields(new[] { "s377", "A", "7.5" }, new[] { "S377", "A", "7.5" }, CommandBand.BindingIds) && CommandBand.SameFields(new[] { "S377", "a", "7.5" }, new[] { "S377", "A", "7.5" }, CommandBand.BindingIds)
+            && CommandBand.FieldReason(null, new[] { "s377", "A", "7.5" }, new[] { "S377", "A", "7.5" }, CommandBand.SameBinding, CommandBand.BindingIds) == null, "A segment ID in another letter case is another segment, so Set is available; the end's case does not count");
+        Check(CommandBand.BindingIds.SequenceEqual(new[] { 0 }), "The segment ID is the first binding field");
+        // One form for a track location everywhere: segment, end in lower case, distance to three decimals.
+        Check(new TrackLocation("S9728", "A", 74.43612).Display == "S9728 / a / 74.436" && new TrackLocation("S9728", "a", 74).Display == "S9728 / a / 74", "A track location reads S9728 / a / 74.436");
+        Check(TrackAnchor.At(new TrackLocation("S9728", "a", 74.436)).Display == "S9728 / a / 74.436" && TrackAnchor.Endpoint("N7").Display == "node N7", "A followed anchor reads as a binding does, a node by its ID");
+        Check(CommandBand.BindingAction("S9728", "A", 74.43612) == "Track binding to S9728 / a / 74.436", "The binding's log name uses the same form");
+        foreach (var row in new[] { new[] { "end", "A", "a" }, new[] { "end", "b", "b" }, new[] { "end", null, "" }, new[] { "segment", "S9728", "S9728" } })
+            Check(CommandBand.Shown(row[0], row[1]) == row[2], "The value " + row[0] + "=" + row[1] + " shows as " + row[2]);
+        // An offered list and a miss are instructions, not errors; a refusal is a problem.
+        Check(PendingSelection.IsInstruction(PendingSelection.SeveralOffers) && PendingSelection.IsInstruction(PendingSelection.NoOffer) && PendingSelection.NoOffer == "No candidate at this point. Nothing available for this selection is under the pointer.", "An offered list and a click that met no candidate read as ordinary text: nothing is broken");
+        Check(!PendingSelection.IsInstruction(null) && !PendingSelection.IsInstruction("The candidate changed or no longer resolves uniquely: it is no longer found."), "A refusal stays a problem, in red");
+        // The log line of a world choice names the candidates of the clicked spot, and the object the choice is for only when it is for one.
+        var offered = new[] { "Crossing light: World/Roads/Everett/Signal 1/Signal 1", "Crossing gate: World/Roads/Everett/Signal 1/Signal 1/Wishbone" };
+        var logged = CommandBand.ChoiceLog(null, PendingSelection.SeveralOffers, offered);
+        Check(logged.StartsWith("[World choice] ", StringComparison.Ordinal) && logged.Contains(PendingSelection.SeveralOffers + " Candidates: 1 ") && logged.Contains("; 2 ") && logged.Contains("Wishbone") && !logged.Contains("World/Signs"), "A choice that only inspects logs the spot's candidates and no object path: " + logged);
+        Check(CommandBand.ChoiceLog("World/Signs/Whistle Sign E", "No candidate at this point", new string[0]) == CommandBand.LogLine("World choice", "World/Signs/Whistle Sign E", "No candidate at this point"), "A choice for an object names that object; one candidate or none adds no list");
+        // A shown marker takes its click before another candidate's label; markings on one spot are drawn neutral first.
+        Check(CommandBand.MarkerBeforeLabel(true) && !CommandBand.MarkerBeforeLabel(false), "A click on a shown square marker reaches that marker");
+        Check(CommandBand.DrawRank(false, false) < CommandBand.DrawRank(true, false) && CommandBand.DrawRank(true, false) < CommandBand.DrawRank(true, true) && CommandBand.DrawRank(false, true) == CommandBand.DrawRank(true, true), "A neutral marker is drawn first, a candidate over it, a pointed-at one last");
+        Check(CommandBand.InactiveAlpha == .4f && CommandBand.RowFill > 0 && CommandBand.RowFill < 1, "An inactive label is dimmed to the native 0.4; the hovered list row is filled");
+        // The result of an edit says what happened.
+        foreach (var row in new[] {
+            new object[] { false, false, null, "Enable completed." },
+            new object[] { true, false, null, "The object already has this value." },
+            new object[] { false, true, null, "Enable completed. The value equals the object's value without this mod, so the modification no longer sets it." },
+            new object[] { false, false, "Enable did something else.", "Enable did something else." },
+            new object[] { true, true, "x", "The object already has this value." } })
+            Check(CommandBand.EditResult("Enable", (bool)row[0], (bool)row[1], (string)row[2]) == (string)row[3], "An edit's result reads: " + row[3]);
+        // An unchanged result names no label of its own: the footer and the log line each put the place's label before
+        // it once, also where the action differs from the place.
+        foreach (var row in new[] { new[] { "Crossing coverage", "Crossing coverage" }, new[] { "Activity", "Disable" } }) {
+            var result = CommandBand.EditResult(row[1], true, false, null);
+            var footer = row[0] + " " + CommandBand.WithoutSource(row[0], result);
+            var line = CommandBand.LogLine(row[0], "World/Crossings/Bryson Everett", result);
+            Check(footer == row[0] + " The object already has this value." && line == "[" + row[0] + "] World/Crossings/Bryson Everett: The object already has this value.",
+                "An unchanged " + row[1] + " states its result once, without a second label: " + footer + " | " + line);
+        }
+        // A crossing detection problem names its own repair route, Edit circuit or Edit detection addition, and offers no
+        // track-binding guided task; a binding problem still offers it.
+        var track = new FakeDetectionTrack().Segment("S1", 40.5).Segment("S2", 200).Segment("S3", 100);
+        var segments = new System.Collections.Generic.HashSet<string>(track.Segments.Keys, StringComparer.Ordinal);
+        TrackLocation At(string segment, double distance) => new TrackLocation(segment, "a", distance);
+        DetectionSpan[] Circuit(string first) => new[] { new DetectionSpan("PA", At("S2", 50), At(first, 50)), new DetectionSpan("PI", At("S2", 50), At("S2", 70)), new DetectionSpan("PB", At("S2", 70), At("S3", 50)) };
+        var native = CircuitSpanChecks.Findings(0, "PI", Circuit("S1"), segments, track, null).Problems;
+        var addition = CircuitSpanChecks.Findings(0, DetectionAddition.Key("mod", "north"), Circuit("S1"), segments, track, null).Problems;
+        var unresolved = CircuitSpanChecks.Findings(0, "PI", Circuit("Sgone"), segments, track, null).Problems;
+        Check(native.Count == 1 && addition.Count == 1 && unresolved.Count == 1, "Each circuit has one detection problem: " + String.Join(" | ", native.Concat(addition).Concat(unresolved)));
+        foreach (var problem in native.Concat(addition).Concat(unresolved))
+            Check(!CommandBand.OffersBindingRepair(new[] { problem }), "A crossing detection problem offers no track-binding guided task: " + problem);
+        Check(CommandBand.OffersBindingRepair(new[] { "Duplicate marker ID Mg6m is repaired, but this is a different problem: the track binding names segment z5w8si, which doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab." })
+            && CommandBand.OffersBindingRepair(new[] { native[0], "Marker broken binding: missing segment S9" }), "A binding problem still offers the track-binding guided task");
+        // The entry icon's tooltip says what a click on the icon does now; a reload requirement keeps its own text.
+        Check(CommandBand.EntryStatus(false, null) == ("Scene Patcher", "Open the Scene Patcher window.") && CommandBand.EntryStatus(true, null) == ("Scene Patcher", "Close the Scene Patcher window."),
+            "The entry tooltip opens a closed window and closes an open one: " + CommandBand.EntryStatus(true, null));
+        Check(CommandBand.EntryStatus(true, "Reload the map.") == ("Scene Patcher: reload", "Reload the map.") && CommandBand.EntryStatus(false, "Reload the map.") == ("Scene Patcher: reload", "Reload the map."),
+            "A reload requirement keeps its caption and reason in both states");
+        Check(CommandBand.WithoutSource("Placement", "Placement completed.") == "completed." && CommandBand.WithoutSource("Placement", "Gizmo placement completed.") == "Gizmo placement completed.",
+            "A result that begins with its own source does not say it twice");
+        // One rule for every shown number: three decimals, no trailing zeros, never scientific notation, no negative zero.
+        foreach (var row in new[] { new object[] { 528.405334, "528.405" }, new object[] { 70.04144, "70.041" }, new object[] { 1.13392689E-05, "0" }, new object[] { -1.13392689E-05, "0" }, new object[] { 25692.9766, "25692.977" },
+            new object[] { 0.0, "0" }, new object[] { 334.5, "334.5" }, new object[] { 1e21, "1000000000000000000000" }, new object[] { -0.0006, "-0.001" } })
+            Check(CommandBand.Number((double)row[0]) == (string)row[1] && !CommandBand.Number((double)row[0]).Contains("E"), "A number reads " + row[1] + ", got " + CommandBand.Number((double)row[0]));
+        // Every shown number goes through the one shared formatter (ShownNumber). Any other format string, in a
+        // ToString call, a composite format item or an interpolation hole, is a key form, a state signature, a full-precision verification
+        // record, the game's own text or the text form of a value that is no number, each listed here with its reason.
+        var allowed = new[] {
+            "Src/RailroaderScenePatcher.Core/ShownNumber.cs|0.###",   // the shared formatter itself
+            "Src/RailroaderScenePatcher.Core/Bindings.cs|R",          // TrackLocation.ToString, a key form
+            "Src/RailroaderScenePatcher/BridgeWorld.cs|R",            // the bridge's state signature
+            "Src/RailroaderScenePatcher.Core/CrossingEquipment.cs|R", // the verification record, whose tolerances need full precision
+            "Src/RailroaderScenePatcher/NativeDiagnostics.cs|F1",     // the game's own warning text, matched exactly
+            "Src/RailroaderScenePatcher/TrackMarkerWorld.cs|F1",      // the game's own warning text, matched exactly
+            "Src/RailroaderScenePatcher/CrossingPadWorld.cs|X16",     // the pad geometry signature's mesh hash
+            "Src/RailroaderScenePatcher/CrossingPadWorld.cs|0.00",    // the pad geometry signature's rounded bounds
+            "Src/RailroaderScenePatcher/CrossingPadWorld.cs|0.000",   // the pad geometry signature's rounded curve points
+            "Src/RailroaderScenePatcher/SpatialSelection.cs|R",       // a track candidate's identity evidence, compared exactly
+            "Src/RailroaderScenePatcher/EntryPoint.cs|N",             // a Guid's text form
+            "Src/RailroaderScenePatcher.Core/ReloadReturn.cs|N",      // a Guid's text form
+            "Src/RailroaderScenePatcher.Core/ModStorage.cs|N",        // a Guid's text form
+            "Src/RailroaderScenePatcher.Core/FaultInjection.cs|O" };  // a timestamp in the test-only fault record
+        // An interpolation hole is caught when its format follows the colon without a space, as C# requires; a
+        // conditional expression in a hole, such as {a ? b : c}, has a space there and is no format.
+        const string numberFormat = @"ToString\(""([^""]*)""|\{\d+(?:,-?\d+)?:([^}""]+)\}|\{[^{}"":]+:([^}""\s]+)\}";
+        var root = System.IO.Path.GetFullPath(System.IO.Path.Combine(SourceDirectory(), "..", ".."));
+        var formats = System.IO.Directory.GetFiles(System.IO.Path.Combine(root, "Src"), "*.cs", System.IO.SearchOption.AllDirectories)
+            .SelectMany(file => System.Text.RegularExpressions.Regex.Matches(System.IO.File.ReadAllText(file), numberFormat).Cast<System.Text.RegularExpressions.Match>()
+                .Select(m => file.Substring(root.Length + 1).Replace('\\', '/') + "|" + (m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value)))
+            .Distinct().Where(found => !allowed.Contains(found)).ToArray();
+        Check(formats.Length == 0, "Every shown number goes through ShownNumber: " + String.Join(", ", formats));
+        Check(new[] { "x.ToString(\"0\")", "x.ToString(\"0.0\")", "x.ToString(\"N2\")", "String.Format(\"{0:0.0}\", x)", "$\"{v:0.0}\"", "$\"{point.x:F2} m\"" }
+            .All(sample => System.Text.RegularExpressions.Regex.IsMatch(sample, numberFormat)), "The number-format check catches every format string");
+        Check(!System.Text.RegularExpressions.Regex.IsMatch("$\"{(a ? b : c)}\"", numberFormat), "A conditional expression in an interpolation hole is no format");
+        // A native distance read as text reaches the window only in a structured "distance=" binding line, which
+        // CommandBand.Shown formats; any other line takes it as a number through ShownNumber.
+        var rawDistances = System.IO.Directory.GetFiles(System.IO.Path.Combine(root, "Src"), "*.cs", System.IO.SearchOption.AllDirectories)
+            .SelectMany(file => System.Text.RegularExpressions.Regex.Matches(System.IO.File.ReadAllText(file), @"(.{0,16})Text\(Field\([^()]*""distance""\)\)").Cast<System.Text.RegularExpressions.Match>()
+                .Where(m => !m.Groups[1].Value.EndsWith("distance=\" + ", StringComparison.Ordinal)).Select(m => System.IO.Path.GetFileName(file) + ": " + m.Value.Trim()))
+            .ToArray();
+        Check(rawDistances.Length == 0, "A native distance reaches window text only through a distance= line: " + String.Join(" | ", rawDistances));
+        // A named location shows in the one form of a track location, as a value without a full stop; where it is
+        // registered under another segment or belongs to another object, that is information of its own.
+        Check(CommandBand.NamedLocationLine("Ss85", "A", 25.45431f, "Ss85", true) == "Named location: Ss85 / a / 25.454", "A named location reads in the shown form: " + CommandBand.NamedLocationLine("Ss85", "A", 25.45431f, "Ss85", true));
+        var noted = CommandBand.NamedLocationLine("Ss85", "B", 3, "S9xx", false);
+        Check(noted == "Named location: Ss85 / b / 3. It's registered under segment S9xx. This location belongs to another object.", "A named location keeps its notes as sentences of their own: " + noted);
+        Check(CommandBand.NamedLocationLine(null, "A", 1, "S1", true) == "Named location: no segment / a / 1. It's registered under segment S1." && CommandBand.NamedLocationLine(null, null, null, null, true) == "Named location: none",
+            "A location without a segment, and no named location, read as values");
+        var named = CommandBand.NamedLocationRow(noted);
+        Check(named.Value == "Ss85 / b / 3" && named.Notes.SequenceEqual(new[] { "It's registered under segment S9xx.", "This location belongs to another object." }),
+            "The window shows the location as the row's value and each note as a line of its own: " + named.Value + " | " + String.Join(" | ", named.Notes));
+        var plain = CommandBand.NamedLocationRow("Named location: Ss85 / a / 25.454");
+        Check(plain.Value == "Ss85 / a / 25.454" && plain.Notes.Length == 0, "A location without notes is only the value");
+        // A field that still shows the object's value stands for the exact value; a changed field for what was entered.
+        Check(CommandBand.Entered("528.405", 528.405334, out var kept) && kept == 528.405334, "An untouched field keeps the exact value");
+        Check(CommandBand.Entered(" 528.41 ", 528.405334, out var typed) && typed == 528.41, "A changed field gives the entered number");
+        Check(CommandBand.Entered("0", 1.13392689E-05, out var tiny) && tiny == 1.13392689E-05, "A field that shows 0 for a tiny value keeps the tiny value");
+        Check(!CommandBand.Entered("abc", 1, out _) && !CommandBand.Entered("", 1, out _), "Text that is no number is refused");
+        foreach (var row in new[] { new[] { "distance", "7.51166105", "7.512" }, new[] { "from", "1.5E-05", "0" }, new[] { "to", "12", "12" }, new[] { "id", "1E5", "1E5" }, new[] { "segment", "377", "377" }, new[] { "distance", "none", "none" }, new[] { "segment length", "130.94512", "130.945" } })
+            Check(CommandBand.Shown(row[0], row[1]) == row[2], "A binding value " + row[0] + "=" + row[1] + " shows as " + row[2]);
+        foreach (var row in new[] { new[] { "approachA", "Approach A" }, new[] { "island", "Island" }, new[] { "approachB", "Approach B" }, new[] { "other", "other" } })
+            Check(CommandBand.RoleCaption(row[0]) == row[1], "The role " + row[0] + " reads " + row[1]);
+        // Placement modes per object: a pad has none, an object that cannot be edited keeps Numeric only.
+        var why = CommandBand.NotYetSupported("the Milepost family");
+        foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode }) {
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Generic track marker", TrackMarkerScene.Structure, "Fixed placement")), mode, true) == null, "Mode " + mode + " is open for an object that can be edited");
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Crossing pad marker", CrossingPadScene.Structure, "x")), mode, false) == CommandBand.PadFollowsTrack, "Mode " + mode + " is inactive for a pad");
+            Check(SupportedEdits.ModeBlock(SupportedEdits.Of(EditEntries.Of("Milepost", null, why)), mode, true) == (mode == CommandBand.NumericMode ? null : "This family has no supported edits"), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
+        }
+        Check(CommandBand.ShowsCurrentRelations(false) && !CommandBand.ShowsCurrentRelations(true), "A confirmed target that is not yet used is the one green relation");
+        // A candidate among several offers carries one number everywhere.
+        foreach (var row in new[] { new object[] { "Choice", 2, 3, "Choice 2" }, new object[] { "New", 1, 3, "New 1" }, new object[] { "Choose", 3, 3, "Choose 3" }, new object[] { "Candidate", 1, 1, "Candidate" }, new object[] { "Choice", 0, 3, "Choice" } })
+            Check(CommandBand.ChoiceTag((string)row[0], (int)row[1], (int)row[2]) == (string)row[3]
+                && CommandBand.ChoiceLine((string)row[0], (int)row[1], (int)row[2], "Track segment Se6a", Array.Empty<string>()) == (string)row[3] + ": Track segment Se6a.",
+                "A candidate keeps its number and ends its label before the confirmation instruction: " + row[3]);
+        Check(new[] { CommandBand.ClearActivity, CommandBand.DiscardPrepared, CommandBand.RemoveModification }.Distinct().Count() == 3, "The three controls that take something back have three names");
+    }
+    // The Object tab's Dependencies and Runtime state show a short form by default: paths relative to the inspected
+    // object, one line per object of its hierarchy with its components after it, the inspected object first. Lines that
+    // name no object of the hierarchy stay as they are, before the objects. The long form is the lines themselves.
+    static void HierarchyLinesHaveAShortForm() {
+        const string Scene = "BushnellWhittier", Path = "World/Roads/Crossing";
+        var dependencies = new[] {
+            "Duplicate marker ID Mg6m is used by 2 scene markers.",
+            "Component BushnellWhittier/World/Roads/Crossing [Track.CrossingController]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate [Track.CrossingGate]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate [UnityEngine.MeshRenderer]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate/Arm [UnityEngine.MeshFilter]; enabled=False",
+            "Component BushnellWhittier/World/Roads/Crossing (1)/Gate [Track.CrossingGate]",
+            "Referenced by BushnellWhittier/World/Roads/Crossing/Gate [Track.CrossingGate].controller",
+            "Track-relative placement and track-group subscription."
+        };
+        var shortForm = HierarchyDependencies.ShortForm(Scene, Path, dependencies);
+        var expected = new[] {
+            "Duplicate marker ID Mg6m is used by 2 scene markers.",
+            "Component BushnellWhittier/World/Roads/Crossing (1)/Gate [Track.CrossingGate]",
+            "Referenced by Gate [Track.CrossingGate].controller",
+            "Track-relative placement and track-group subscription.",
+            "This object: CrossingController",
+            "Gate: CrossingGate, MeshRenderer",
+            "Gate/Arm: MeshFilter disabled"
+        };
+        Check(shortForm.SequenceEqual(expected), "The short form groups the hierarchy's components per object: " + String.Join(" | ", shortForm));
+        var runtime = new[] {
+            "BushnellWhittier/World/Roads/Crossing/Bell [UnityEngine.AudioSource] enabled=True",
+            "BushnellWhittier/World/Roads/Crossing/Bell [CrossingBell] enabled=False",
+            "Runtime object BushnellWhittier/World/Roads/Crossing/Bell/Pool [UnityEngine.AudioSource]",
+            "Culled by SimpleCuller: World/Roads/Crossing/Lamp active=True"
+        };
+        var shortRuntime = HierarchyDependencies.ShortForm(Scene, Path, runtime);
+        var expectedRuntime = new[] {
+            "Culled by SimpleCuller: World/Roads/Crossing/Lamp active=True",
+            "Bell: AudioSource enabled, CrossingBell disabled",
+            "Bell/Pool: AudioSource (runtime object)"
+        };
+        Check(shortRuntime.SequenceEqual(expectedRuntime), "The short form of the runtime state: " + String.Join(" | ", shortRuntime));
+        Check(HierarchyDependencies.ShortForm(Scene, Path, new string[0]).Count == 0 && HierarchyDependencies.ShortForm(null, null, new[] { "x" }).SequenceEqual(new[] { "x" }), "No lines stay none, and without a path the lines stay as they are");
+    }
+    // The labels of overlapping candidates differ at their end, which is the object's own name: the short label leads
+    // with it, and a cut falls on the family.
+    static void ChoiceLabelsLeadWithWhatTellsThemApart() {
+        var offered = new[] {
+            "Generic track marker: World/Large Scenery/Whittier/Whittier Signs/wh-e-water",
+            "Generic track marker: World/Large Scenery/Whittier/Whittier Signs/wh-e-whistle [inactive]",
+            "Location sign: World/Signs/Loc: Walker Branch" };
+        Check(CommandBand.ChoiceLabel(offered[0], offered) == "wh-e-water (Generic track marker)", "The name comes first: " + CommandBand.ChoiceLabel(offered[0], offered));
+        Check(CommandBand.ChoiceLabel(offered[1], offered) == "wh-e-whistle [inactive] (Generic trac...", "An inactive object says so after its name, and a cut falls on the family: " + CommandBand.ChoiceLabel(offered[1], offered));
+        Check(CommandBand.ChoiceLabel(offered[2], offered) == "Loc: Walker Branch (Location sign)", "A colon inside a name stays in the name: " + CommandBand.ChoiceLabel(offered[2], offered));
+        var twins = new[] { "Crossing pad marker: World/Roads Wilmot/Crossing Unprotected/Crossing Pad", "Crossing pad marker: World/Roads Sylva/Crossing Unprotected (1)/Crossing Pad" };
+        Check(CommandBand.ChoiceLabel(twins[0], twins) == "Crossing Unprotected/Crossing Pad (Cr..." && CommandBand.ChoiceLabel(twins[1], twins) == "Crossing Unprotected (1)/Crossing Pad...",
+            "Equal names take their parents until they differ, and the cut falls at the end: " + CommandBand.ChoiceLabel(twins[0], twins) + " | " + CommandBand.ChoiceLabel(twins[1], twins));
+        Check(CommandBand.ChoiceLabel(twins[0], twins) != CommandBand.ChoiceLabel(twins[1], twins), "The two labels differ");
+        Check(CommandBand.ChoiceLabel("Track segment Sdb78", new[] { "Track segment Sdb78", "Track segment S9728" }) == "Track segment Sdb78", "A track's label is kept");
+        Check(CommandBand.ChoiceLabel(offered[0], offered, 12) == "wh-e-wate...", "A label longer than its room is cut at the end");
+        Check(CommandBand.ChoiceLabel(null, offered) == "" && AddedChoicesKeepTheirVisibleName(), "No label gives none; added-object list rows and candidate captions keep their visible name");
+    }
+    static SceneObservation Baked(string path, string groupPath, bool active = true) => new SceneObservation(new object(),
+        new TargetIdentity("scene", path, "UnityEngine.Transform"), groupPath == null ? SceneObjectRules.Family : SceneObjectRules.ChildFamily, active, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement", groupPath: groupPath);
+    static void PartsReadAsPartsInWorldChoicesAndTheStateLine() {
+        // A child object keeps its family for every rule, and the panel calls it a Part.
+        var part = Baked("World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)", "World/Large Scenery/Bryson/Bryson Depot");
+        var root = Baked("World/Large Scenery/Bryson/Bryson Depot", null);
+        Check(part.Family == SceneObjectRules.ChildFamily, "The observed family of a child object is Child object");
+        Check(CommandBand.ShownFamily(part) == "Part" && CommandBand.ShownFamily(root) == "Group", "A part shows as Part, a top scene object as Group: " + CommandBand.ShownFamily(part));
+        Check(CommandBand.CandidateLabel(part) == "Part: World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)", "A part's candidate label names it a Part: " + CommandBand.CandidateLabel(part));
+        Check(CommandBand.CandidateLabel(Baked(part.Identity.Path, part.GroupPath, active: false)).EndsWith(" [inactive]", StringComparison.Ordinal), "An inactive part says so");
+        var labels = new[] { CommandBand.CandidateLabel(part), CommandBand.CandidateLabel(root) };
+        var line = CommandBand.ChoiceLine("Object", 0, 1, labels[0], new[] { labels[0] }, part);
+        Check(line == "Object: Spotlight Outdoor (1) (Part).", "The world choice's line reads the part as a Part: " + line);
+        Check(CommandBand.ChoiceLabel(labels[0], labels) == "Spotlight Outdoor (1) (Part)" && CommandBand.ChoiceLabel(labels[1], labels) == "Bryson Depot (Group)",
+            "The world choice list reads the part as a Part and the group as a group: " + String.Join(" | ", labels.Select(label => CommandBand.ChoiceLabel(label, labels))));
+        Check(CommandBand.CandidateLabel(root) == "Group: World/Large Scenery/Bryson/Bryson Depot", "A group's candidate label names it a Group: " + CommandBand.CandidateLabel(root));
+        Check(labels.All(l => l.IndexOf("complex", StringComparison.OrdinalIgnoreCase) < 0 && l.IndexOf("child object", StringComparison.OrdinalIgnoreCase) < 0 && l.IndexOf("Scene object", StringComparison.Ordinal) < 0), "No world choice label reads as a complex, a child object or a scene object");
+    }
+    static void AConfirmedWorldChoiceIsADebugLineLikeItsRefusals() {
+        var label = "Part: World/Large Scenery/Bryson/Bryson Depot/Spotlight Outdoor (1)";
+        var inspect = CommandBand.ChoiceConfirmedLog(null, label);
+        Check(inspect == "[World choice] Confirmed choice: " + label + ".", "A confirmed choice that only inspects logs the confirmed candidate and no object: " + inspect);
+        Check(CommandBand.ChoiceLog(null, "x", null).StartsWith("[World choice] ", StringComparison.Ordinal), "It carries the place of the choice's refusals");
+        Check(CommandBand.ChoiceConfirmedLog("World/Signs/Whistle Sign E", "Track segment Sdb78") == CommandBand.LogLine("World choice", "World/Signs/Whistle Sign E", "Confirmed choice: Track segment Sdb78."), "A choice for an object names that object, as its refusals do");
+        // The line goes through the debug entry point: written with Debug logging on, never in player mode.
+        var player = RecordingLog.Capture(false, () => PatcherLog.Debug(() => CommandBand.ChoiceConfirmedLog(null, label)));
+        Check(player.Lines.Count == 0, "Player mode writes no confirmed-choice line");
+        var debug = RecordingLog.Capture(true, () => PatcherLog.Debug(() => CommandBand.ChoiceConfirmedLog(null, label))).At(LogLevel.Debug).ToArray();
+        Check(debug.Length == 1 && debug[0] == inspect, "Debug logging writes the confirmed-choice line: " + String.Join(" | ", debug));
+    }
+    static void APendingWorldChoiceKeepsItsClickFromTheGamesClickTargets() {
+        // gizmoShown, activation, editOpen, overlayShielded, choicePending
+        Check(CommandBand.BlocksPickable(false, true, false, false, true), "A click during a pending world choice that only inspects does not open a station window");
+        Check(!CommandBand.BlocksPickable(false, false, false, false, true), "A hover during the choice still reaches the game");
+        Check(!CommandBand.BlocksPickable(false, true, false, false, false), "Without a choice, edit, shielding label or gizmo the click reaches the game");
+        Check(CommandBand.BlocksPickable(false, true, true, false, false) && CommandBand.BlocksPickable(false, true, false, true, false), "An open edit and a shielding world label still block the click");
+        Check(CommandBand.BlocksPickable(true, false, false, false, false) && CommandBand.BlocksPickable(true, true, false, false, false), "A shown gizmo still blocks hover and click");
+    }
+    // A crossing pad's distance gizmo that only stands blocks nothing, as inspecting blocks nothing; the native map editor's
+    // world clicks, hover and box select are blocked from the start of a binding edit until it ends: the pointer on a
+    // handle, where the press starts the drag, the drag itself, or a focused binding field.
+    static void APadGizmoBlocksTheWorldOnlyDuringABindingEdit() {
+        // handleUnderPointer, dragging, fieldEdited
+        var standing = CommandBand.PadGizmoBlocks(false, false, false);
+        Check(!standing && !CommandBand.BlocksPickable(standing, true, false, false, false) && !CommandBand.BlocksPickable(standing, false, false, false, false),
+            "A standing pad gizmo leaves the game's hover and clicks alone");
+        foreach (var edit in new[] { CommandBand.PadGizmoBlocks(true, false, false), CommandBand.PadGizmoBlocks(false, true, false), CommandBand.PadGizmoBlocks(false, false, true) })
+            Check(edit && CommandBand.BlocksPickable(edit, true, false, false, false) && CommandBand.BlocksPickable(edit, false, false, false, false),
+                "A handle under the pointer, a drag or a focused binding field blocks hover and click");
+    }
+    static void ThePatcherWindowIsBuiltOnceItsInputIsAvailableAgain() {
+        // After a Map Editor reload in the same world the pointer input comes back frames after the map editor appeared.
+        Check(!CommandBand.BuildsPresentation(false, false, false), "No window is built while its input is unavailable");
+        Check(CommandBand.BuildsPresentation(false, true, false), "The window, with its entry icon, is built as soon as the input is available again");
+        Check(!CommandBand.BuildsPresentation(true, true, false), "A standing window is not built again");
+        Check(!CommandBand.BuildsPresentation(false, true, true), "A build that failed for this map editor is not retried every frame");
+    }
+    static void SessionDetailsSayTheyShowTheLastFullRead() {
+        var line = CommandBand.InventoryRead(false);
+        Check(line.StartsWith("The last full read ", StringComparison.Ordinal) && !line.Contains("Nothing was applied"), "The Inventory line says it is about the last full read, not about edits since: " + line);
+        Check(CommandBand.InventoryRead(true).EndsWith(" The inspected object is no longer present.", StringComparison.Ordinal), "A lost inspection is still said");
+        RailroaderScenePatcher.Core.LoadedMod Loaded(string json) => new RailroaderScenePatcher.Core.LoadedMod(new RailroaderScenePatcher.Core.PatchSource("pack", "pack", "1.0"), json, null, true, null);
+        var definitions = new SuppliedDefinitions();
+        definitions.Written("pack", "{}");
+        Check(!definitions.ShownOutdated, "Before the first read there is nothing shown to follow a write");
+        definitions.Read(new[] { Loaded("{\"modifications\":{}}") });
+        Check(!definitions.ShownOutdated, "A refresh shows what it read");
+        definitions.Written("pack", "{\"modifications\":{\"place-bryson-depot\":{}}}");
+        Check(definitions.ShownOutdated && !definitions.Stale, "The patcher's own Save keeps the lamp Current and marks the shown supplied definitions for reading again");
+        definitions.Shown();
+        Check(!definitions.ShownOutdated, "Once read again the shown supplied definitions follow the saved file");
+        definitions.Written("pack", "{}");
+        definitions.Reset();
+        Check(!definitions.ShownOutdated, "A new load attempt starts over");
+    }
+    static void AnOpenedFormScrollsIntoView() {
+        // current, top, bottom, view, content: distances in units from the top of the scrolled content.
+        // The walkthrough: Use on a bell row near the bottom of the Connections tab opened the form at the tab's top.
+        Check(CommandBand.RevealOffset(900, 0, 220, 400, 1400) == 0, "A form at the top of the tab, above the view, scrolls the tab to its top");
+        Check(CommandBand.RevealOffset(100, 150, 300, 400, 1400) == 100, "A form already in view leaves the scroll where it is");
+        Check(CommandBand.RevealOffset(0, 600, 800, 400, 1400) == 400, "A form below the view comes up until its bottom is in view");
+        Check(CommandBand.RevealOffset(0, 600, 1300, 400, 1400) == 600, "A form taller than the view shows its top");
+        Check(CommandBand.RevealOffset(0, 1300, 1400, 400, 1400) == 1000, "The offset stays within what the region scrolls");
+        Check(CommandBand.RevealOffset(50, 0, 100, 400, 300) == 0, "Content shorter than the view does not scroll");
+        // The reveal says in the debug log what it did, so a game run shows whether it acted.
+        Check(CommandBand.RevealLog(new float[] { 900, 0, 0, 220, 400, 1400 }) == "Scrolled the opened form into view: from 900 to 0. Form 0 to 220, view 400 of 1400.", "A reveal that scrolls logs from where to where: " + CommandBand.RevealLog(new float[] { 900, 0, 0, 220, 400, 1400 }));
+        Check(CommandBand.RevealLog(new float[] { 100, 100, 150, 300, 400, 1400 }).StartsWith("The opened form is in view already at 100.", StringComparison.Ordinal), "A form in view is logged as such");
+        Check(CommandBand.RevealLog(null) == "The opened form wasn't scrolled into view: no scroll region holds it.", "A form outside a scroll region is logged");
+    }
+    // The next run shows whether the first icon click found the window counted as open, and where it stood.
+    static void TheWindowLogsItsOpeningsAndIconClicks() {
+        var line = CommandBand.WindowLog("icon clicked", true, true, new float[] { 0, 520, 570, 600, 2560, 1440 });
+        Check(line == "Scene Patcher window icon clicked: open, object active, at 0, 520 size 570 x 600 on a screen of 2560 x 1440.", "The icon click line: " + line);
+        Check(CommandBand.WindowLog("opened as it was when the Map Editor was left", false, false, new float[] { 0, 0, 0, 0, 1920, 1080 }).Contains(": closed, object inactive,"), "A closed, inactive window says so");
+    }
+    static bool AddedChoicesKeepTheirVisibleName() {
+        SceneObservation Added(string id) => new SceneObservation(new object(),
+            new TargetIdentity("scene", "World/Roads Sylva/Grade Crossing - Allen/CrankyAnt Scene Patcher equipment crankyant:maptest " + id, "OwnedEquipment"),
+            "Added light or gate", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "Inspection only", displayName: "Signal 1 (added)");
+        var entries = new[] { Added("signal-1-added-2"), Added("signal-1-added-3") };
+        var labels = entries.Select(entry => entry.Family + ": " + entry.Identity.Path).ToArray();
+        for (var i = 0; i < entries.Length; i++) {
+            if (CommandBand.ChoiceLabel(labels[i], labels, 60, entries[i]) != "Signal 1 (added)"
+                || CommandBand.ChoiceLine("Object", i + 1, 2, labels[i], labels, entries[i]) != "Object " + (i + 1) + ": Signal 1 (added).") return false;
+        }
+        return true;
+    }
+    static void AClickOnTheInspectedRowClearsTheInspection() {
+        object inspected = new object(), other = new object();
+        Check(CommandBand.ClearsInspection(inspected, inspected), "A click on the inspected row clears the inspection");
+        Check(!CommandBand.ClearsInspection(inspected, other), "A click on another row inspects that row");
+        Check(!CommandBand.ClearsInspection(null, other) && !CommandBand.ClearsInspection(null, null), "With nothing inspected a click inspects");
+    }
+    static void ClearActivityNeedsAnActivityValue() {
+        Check(CommandBand.ClearActivityReason(true) == null, "With an activity value Clear activity is enabled");
+        Check(CommandBand.ClearActivityReason(false) == "This mod sets no activity for this object, so there is nothing to clear.", "Without one it is disabled with that reason");
+    }
+    // A request waits for the comparison of the scene. Closing the panel or leaving the native map editor cancels it: it never
+    // runs, and a refusal says why.
+    // A control's tooltip stays hidden after a click while the pointer stays on the control, also when the click rebuilt
+    // the control in a new state at the same place, and shows again once the pointer has left it and returned.
+    static void AClickedControlShowsItsTooltipOnlyAfterThePointerReturns() {
+        var rule = new CommandBand.ClickedTooltip();
+        rule.Frame(50, 20);
+        Check(!rule.Hides, "A control the pointer comes onto without a click keeps its tooltip");
+        // Apply at x 40..120, y 10..34 in screen pixels.
+        rule.Press(40, 10, 80, 24);
+        rule.Frame(50, 20);
+        Check(rule.Hides, "Right after a click the tooltip of the control under the pointer is hidden");
+        rule.Frame(52, 21);
+        Check(rule.Hides, "The tooltip stays hidden while the pointer moves on the clicked control");
+        rule.Frame(120, 34);
+        Check(rule.Hides, "The control's edge still belongs to the control");
+        rule.Frame(30, 20);
+        Check(!rule.Hides, "Once the pointer has left the control, tooltips show again");
+        rule.Frame(50, 20);
+        Check(!rule.Hides, "The pointer that returns to the clicked control sees its tooltip as for a control it comes onto without a click");
+        // A second click hides it again; leaving upwards counts as leaving too.
+        rule.Press(40, 10, 80, 24);
+        rule.Frame(50, 20);
+        Check(rule.Hides, "A second click hides the tooltip again");
+        rule.Frame(50, 35);
+        Check(!rule.Hides, "Leaving the control over its top edge counts as leaving");
+        // A click on another control moves the rule to that control.
+        rule.Press(40, 10, 80, 24);
+        rule.Press(200, 10, 24, 24);
+        rule.Frame(210, 20);
+        Check(rule.Hides, "A click on another control hides that control's tooltip");
+        rule.Frame(50, 20);
+        Check(!rule.Hides, "The control clicked before shows its tooltip again");
+    }
+    // The rules that every window, tab and row of the panel shares: one table per rule, over all call sites.
+    static string SourceDirectory([System.Runtime.CompilerServices.CallerFilePath] string path = "") => System.IO.Path.GetDirectoryName(path);
+    static void SharedRulesHoldAtEveryCallSite() {
+        // Button padding: every button of every row is as wide as its widest label plus the native padding on both
+        // sides, and every row fits the inspector's minimum with its full labels.
+        Check(CommandBand.ButtonPadding == 6 && CommandBand.ButtonWidth(62.15f) == 75, "A button is its label and 6 units of padding on each side, rounded up: " + CommandBand.ButtonWidth(62.15f));
+        foreach (var row in CommandBand.ActionRows) {
+            var widths = new System.Collections.Generic.List<float>();
+            foreach (var button in row) {
+                foreach (var label in button) Check(CommandBand.LabelWidths.ContainsKey(label), "Every label of an action row has a measured width: " + label);
+                var width = CommandBand.ButtonWidth(button.Select(label => CommandBand.LabelWidths[label]).ToArray());
+                foreach (var label in button) {
+                    var free = width - CommandBand.LabelWidths[label];
+                    Check(free >= 2 * CommandBand.ButtonPadding, "No label overflows its button: " + label + " in " + width);
+                    if (button.Length == 1) Check(free < 2 * CommandBand.ButtonPadding + 1, "A button with one label has no more than its padding around it: " + label + " in " + width);
+                }
+                widths.Add(width);
+            }
+            Check(CommandBand.RowFits(widths), "Every action row fits the inspector's minimum with its full labels: " + String.Join(", ", row.Select(button => button[0])) + " = " + widths.Sum());
+        }
+        Check(CommandBand.ButtonWidth(CommandBand.LabelWidths["Disable"], CommandBand.LabelWidths["Enable"]) == CommandBand.ButtonWidth(CommandBand.LabelWidths["Disable"]), "A button whose label changes takes its widest label, so the change moves nothing");
+        // The file panel's Repair and Import rows fit the inspector's minimum with full or short labels.
+        Check(CommandBand.ShortLabel(FilePanelState.Copy) == "Copy", "Copy to clipboard has the short label Copy");
+        foreach (var row in CommandBand.FilePanelRows) {
+            var full = row.Select(label => CommandBand.ButtonWidth(CommandBand.LabelWidths[label])).ToArray();
+            var shortened = row.Select(label => CommandBand.ButtonWidth(CommandBand.LabelWidths[CommandBand.ShortLabel(label)])).ToArray();
+            Check(CommandBand.RowFits(full) || CommandBand.RowFits(shortened), "A file panel row fits with full or short labels: " + String.Join(", ", row));
+        }
+        Check(!CommandBand.RowFits(new[] { 200f, 150f }) && CommandBand.RowFits(new[] { 200f, 136f }) && CommandBand.ShortLabel(CommandBand.RemoveModification) == "Remove" && CommandBand.ShortLabel("Recheck") == "Recheck",
+            "A row that would not fit takes the shorter label where a button has one");
+        // World colours: one table for every marking.
+        float Max(float[] c) => Math.Max(c[0], Math.Max(c[1], c[2]));
+        float Min(float[] c) => Math.Min(c[0], Math.Min(c[1], c[2]));
+        float Saturation(float[] c) => (Max(c) - Min(c)) / Max(c);
+        var hover = CommandBand.WorldColor(CommandBand.WorldMark.CandidateHover); var chosen = CommandBand.WorldColor(CommandBand.WorldMark.CandidateSelected);
+        var relation = CommandBand.WorldColor(CommandBand.WorldMark.Relation); var relationHover = CommandBand.WorldColor(CommandBand.WorldMark.RelationHover);
+        Check(hover[2] == Max(hover) && chosen[2] == Max(chosen), "A candidate is blue, under the pointer and after a click");
+        Check(Saturation(hover) > Saturation(chosen) && chosen[0] == .3f && chosen[1] == .8f && chosen[2] == 1f, "The hovered candidate is more saturated, while a clicked candidate keeps the plain native blue");
+        Check(relation[1] == Max(relation) && relationHover[1] == Max(relationHover) && Saturation(relationHover) > Saturation(relation), "A current relation is green, more saturated under the pointer");
+        var gold = CommandBand.WorldColor(CommandBand.WorldMark.Inspected);
+        Check(gold[0] == 1 && gold[2] == 0 && CommandBand.WorldColor(CommandBand.WorldMark.Broken)[0] == 1, "The inspected object is gold and a broken item red");
+        // Which state has which colour, at every kind of marking: a hovered candidate is blue, never green.
+        Check(CommandBand.CandidateMark(false, true) == CommandBand.WorldMark.CandidateHover && CommandBand.CandidateMark(true, false) == CommandBand.WorldMark.CandidateSelected
+            && CommandBand.CandidateMark(true, true) == CommandBand.WorldMark.CandidateSelected && CommandBand.CandidateMark(false, false) == CommandBand.WorldMark.Marker, "A candidate is blue on hover and after a click until Confirm, and a plain marker otherwise");
+        Check(CommandBand.RelationMark(false) == CommandBand.WorldMark.Relation && CommandBand.RelationMark(true) == CommandBand.WorldMark.RelationHover, "A current relation is green, hovered or not");
+        Check(CommandBand.WorldFill == .22f, "Every ribbon has one fill");
+        // Markers in a pick mode: every candidate of the mode, without hover; tracks within a distance.
+        Check(CommandBand.ShowsMarker(false, 5000, false) && CommandBand.ShowsMarker(true, 499, false) && !CommandBand.ShowsMarker(true, 501, false) && CommandBand.ShowsMarker(true, 5000, true),
+            "Every candidate carries its marker without hover; a track's within 500 m, or when hovered or clicked");
+        // The placement mode an object opens in.
+        Check(CommandBand.PlacementMode(true) == CommandBand.FollowMode && CommandBand.PlacementMode(false) == CommandBand.NumericMode && CommandBand.FollowMode == 3 && CommandBand.GizmoMode == 1, "An object that follows a track opens in Follow, any other in Numeric");
+        // No false success for a crossing pad's placement.
+        var pad = CommandBand.PadPlacement("Gizmo placement");
+        Check(pad.StartsWith("Gizmo placement changed the pad object's physical placement only.") && !pad.Contains("completed") && pad.Contains("did not move"), "A pad's placement result says that the pad did not move: " + pad);
+        // Terrain output in plain words.
+        Check(CommandBand.Terrain(null, null, true, "none", "none", false) == "Terrain unchanged." && CommandBand.Terrain(null, null, true, "tile 3", "none", true) == "Terrain updated: tile 3."
+            && CommandBand.Terrain(null, null, false, "none", "tile 4", false).StartsWith("Terrain pending: ") && CommandBand.Terrain(null, "no tile", true, "a", "b", true).StartsWith("Terrain update stopped: no tile")
+            && CommandBand.Terrain("unreadable", null, true, "", "", false) == "Terrain state unknown: unreadable", "Terrain output reads in plain words in every state");
+        // Log lines name the action group, the object and the value.
+        Check(CommandBand.LogLine("Track binding", "World/Signs/Yard Limit", "Track binding to S377 / a / 7.512 completed.") == "[Track binding] World/Signs/Yard Limit: Track binding to S377 / a / 7.512 completed."
+            && CommandBand.LogLine("World choice", null, "No candidate at this point") == "[World choice] No candidate at this point" && CommandBand.LogLine(null, null, "x") == "x", "A log line names the action group and the object");
+        Check(CommandBand.BindingAction("S377", "a", 7.5116) == "Track binding to S377 / a / 7.512", "A binding edit names the track location it sets");
+    }
+    static void InputWaitsForTheEditAndItsTerrain() {
+        var feedback = new EditFeedback();
+        var queue = new RequestQueue(feedback);
+        var writes = 0;
+        queue.Enqueue("Placement", "Move", () => {
+            Check(queue.Busy, "Input stays locked while the edit runs");
+            writes++;
+            queue.WaitForTerrain();
+            queue.WaitForRefresh();
+        });
+        Check(queue.Busy && queue.Pending, "Input is locked while the edit waits for a scene check");
+        queue.Run();
+        Check(queue.Busy && !queue.Pending && writes == 1, "The terrain wait keeps input locked after the edit runs");
+        queue.ObserveTerrain(true);
+        Check(queue.Busy, "A frame with outstanding terrain cannot take input");
+        queue.ObserveTerrain(false);
+        Check(queue.Busy, "The window does not take input on the old controls while it is still reading the new values");
+        queue.Refreshed();
+        Check(!queue.Busy, "Input resumes after the terrain and window values are ready");
+        queue.Enqueue("Placement", "Move again", () => writes++);
+        Check(queue.Cancel("you cancelled before the edit ran") && !queue.Busy && writes == 1,
+            "Cancel unlocks the window and drops the waiting edit");
+    }
+    static void InputAlreadySubmittedWhenBusyIsReported() {
+        var feedback = new EditFeedback();
+        var queue = new RequestQueue(feedback);
+        queue.Enqueue("Track binding", "Set distance to 20", () => {
+            feedback.Refuse("Track binding", "Set distance to 20", "the track segment is unavailable");
+            queue.WaitForTerrain();
+        });
+        Check(queue.RefuseBusyInput("Track binding", "Set distance to 100"), "A second submission cannot enter the queue");
+        queue.Run();
+        queue.ObserveTerrain(true);
+        queue.ShowBusyRefusals();
+        Check(feedback.Messages.Count == 1, "The second submission waits for the result of the edit already in progress");
+        queue.ObserveTerrain(false);
+        queue.ShowBusyRefusals();
+        Check(feedback.Messages.Any(m => m.Text == "Set distance to 100 refused. Another edit is still running."),
+            "The value that could not be applied is visible after the busy state ends");
+        Check(feedback.Messages.Any(m => m.Text.Contains("the track segment is unavailable", StringComparison.OrdinalIgnoreCase)),
+            "The earlier edit's refusal stays readable beside the second submission");
+    }
+    static void AClosedPanelCancelsTheWaitingRequest() {
+        var feedback = new EditFeedback(); var ran = 0;
+        var queue = new RequestQueue(feedback);
+        Check(!queue.Pending && queue.Place == null && !queue.Cancel("the panel was closed before the request ran"), "Nothing waits at first, and cancelling nothing reports nothing");
+        Check(feedback.Messages.Count == 0, "No refusal without a request");
+        queue.Enqueue("Activity", "Disable", () => ran++);
+        Check(queue.Pending && queue.Place == "Activity", "A request waits under its action group");
+        Check(queue.Cancel("the panel was closed before the request ran") && !queue.Pending && queue.Place == null, "Closing the panel cancels it");
+        Check(ran == 0 && feedback.Result == "Disable refused. The panel was closed before the request ran." && feedback.Place == "Activity", "The cancelled request did not run and left its refusal: " + feedback.Result);
+        queue.Run();
+        Check(ran == 0, "Running after the cancellation runs nothing");
+        // A request that is not cancelled runs once.
+        queue.Enqueue("Crossing coverage", "Coverage preview", () => ran++);
+        var refused = false;
+        try { queue.Enqueue("Activity", "Enable", () => ran += 10); } catch (InvalidOperationException) { refused = true; }
+        Check(refused, "A second request is not taken while one waits");
+        queue.Run(); queue.Run();
+        Check(ran == 1 && !queue.Pending, "A waiting request runs once");
+        // Leaving the native map editor.
+        queue.Enqueue("Crossing coverage", "Coverage preview", () => ran++);
+        queue.Cancel("you left the Map Editor before the request ran");
+        Check(ran == 1 && feedback.Result == "Coverage preview refused. You left the Map Editor before the request ran.", "Leaving the native map editor cancels a preview too: " + feedback.Result);
+        // Clearing the inspection drops the object's results and keeps the refusal of the request that waited for it.
+        var board = new object(); var other = new object();
+        feedback.Inspecting(board);
+        feedback.Report("Activity", "Disable completed.");
+        queue.Enqueue("Activity", "Enable", () => ran++);
+        Check(queue.Release("the inspection was cleared before the request ran") && !queue.Pending, "Clearing the inspection cancels the waiting request");
+        Check(ran == 1 && feedback.Messages.Count == 1 && feedback.Result == "Enable refused. The inspection was cleared before the request ran.",
+            "Only the refusal is left after the inspection was cleared: " + String.Join(" / ", feedback.Messages.Select(m => m.Text)));
+        feedback.Inspecting(null);
+        Check(feedback.Messages.Count == 1, "The refusal stays while nothing is inspected");
+        // Without a waiting request, clearing the inspection leaves nothing.
+        feedback.Inspecting(board);
+        Check(feedback.Messages.Count == 0, "The refusal goes when an object is inspected again");
+        feedback.Report("Activity", "Disable completed.");
+        Check(!queue.Release("the inspection was cleared before the request ran") && feedback.Messages.Count == 0, "A cleared inspection without a request leaves no message");
+        feedback.Inspecting(other);
+        feedback.Report("Activity", "Enable completed.");
+        Check(feedback.Messages.Count == 1, "Messages work as before for the next object");
+        // Clearing the inspection while a world choice is pending cancels the choice first, through its own Cancel,
+        // then restores what was prepared, and the refusal of the waiting request is still the one line left.
+        var steps = new System.Collections.Generic.List<string>();
+        queue.Enqueue("Activity", "Disable", () => ran++);
+        Check(queue.ReleaseInspection(true, () => steps.Add("cancel choice"), () => steps.Add("restore"), "the inspection was cleared before the request ran"), "A waiting request is reported as cancelled");
+        Check(steps.SequenceEqual(new[] { "cancel choice", "restore" }), "A pending world choice is cancelled before the rest is restored: " + String.Join(", ", steps));
+        Check(ran == 1 && feedback.Messages.Count == 1 && feedback.Result == "Disable refused. The inspection was cleared before the request ran.", "The refusal is reported after the choice was cancelled: " + feedback.Result);
+        // The kept refusal stays through a tab switch and a history move, until an object is inspected.
+        feedback.View("object/0"); feedback.View("placement/1"); feedback.HistoryMoved();
+        Check(feedback.Messages.Count == 1 && feedback.Messages[0].Kept, "The refusal stays readable until the next inspection");
+        feedback.Inspecting(board);
+        Check(feedback.Messages.Count == 0, "The next inspection ends it");
+        // Clear in the band with nothing inspected and a world choice pending cancels that choice and reports nothing.
+        steps.Clear();
+        Check(!queue.ReleaseInspection(true, () => steps.Add("cancel choice"), () => steps.Add("restore"), "unused") && steps.SequenceEqual(new[] { "cancel choice", "restore" }) && feedback.Messages.Count == 0,
+            "Clear cancels a pending world choice also when nothing is inspected");
+        steps.Clear();
+        Check(!queue.ReleaseInspection(false, () => steps.Add("cancel choice"), () => steps.Add("restore"), "unused") && steps.SequenceEqual(new[] { "restore" }) && feedback.Messages.Count == 0,
+            "Without a pending choice or a request, only the restore runs and nothing is reported");
+    }
+    static void TheWindowOpensBelowTheMapEditorOrAtTheTopRight() {
+        // 2560 x 1440, scale 1: the Map Editor window ends at 666, so 774 units remain below it.
+        var roomy = PanelPlacement.Default(2560, 1440, 1, 0, 604, 666, 60, 690, 660, 410);
+        Check(!roomy.TopRight && roomy.X == 0 && roomy.Y == 666 && roomy.Width == 690 && roomy.Height == 774, "With 600 units or more below the Map Editor the window fills that space: " + roomy.Y + " " + roomy.Height);
+        var roomyScaled = PanelPlacement.Default(2560, 1440, 1.25f, 0, 755, 832.5f, 75, 734, 660, 470);
+        Check(!roomyScaled.TopRight && roomyScaled.X == roomy.X && roomyScaled.Y == 832.5f && roomyScaled.Height == 607.5f,
+            "Increasing the UI scale keeps the window below the Map Editor when the scaled minimum still fits");
+        var minimumDoesNotFit = PanelPlacement.Default(2560, 1440, 1.5f, 0, 906, 999, 90, 734, 660, 470);
+        Check(minimumDoesNotFit.TopRight && minimumDoesNotFit.Height >= 705, "The fallback still applies when the scaled minimum cannot fit below the Map Editor");
+        // 1920 x 1080, scale 1: 414 units remain below, fewer than 600.
+        var small = PanelPlacement.Default(1920, 1080, 1, 0, 604, 666, 60, 690, 660, 410);
+        Check(small.TopRight && small.X == 1920 - 690 && small.Y == 60 && small.Width == 690 && small.Height == 660, "With fewer than 600 units below, the window opens at the top right below the strip, with the same width: " + small.X + " " + small.Y + " " + small.Height);
+        // 1920 x 1080, scale 1.25: one canvas unit is 1.25 pixels. The Map Editor ends at 832; 248 pixels remain.
+        var scaled = PanelPlacement.Default(1920, 1080, 1.25f, 0, 755, 832, 75, 690, 660, 410);
+        Check(scaled.TopRight && scaled.Width == 862.5f && scaled.X == 1920 - 862.5f && scaled.Y == 75 && scaled.Height == 825, "At the larger scale the sizes are canvas units times the scale: " + scaled.Width + " " + scaled.Height);
+        // The strip leaves less than the default height: the window takes what remains, never less than its minimum.
+        var low = PanelPlacement.Default(1280, 720, 1, 0, 604, 500, 60, 690, 660, 410);
+        Check(low.TopRight && low.Y == 60 && low.Height == 660, "The remaining height below the strip bounds the window: " + low.Height);
+        var tiny = PanelPlacement.Default(1280, 430, 1, 0, 604, 400, 60, 690, 660, 410);
+        Check(tiny.TopRight && tiny.Height == 410 && tiny.Y == 20, "The window keeps its minimum height and stays on the screen: " + tiny.Y + " " + tiny.Height);
+        // Exactly 600 units below stays below the Map Editor.
+        var edge = PanelPlacement.Default(1920, 1266, 1, 0, 604, 666, 60, 690, 660, 410);
+        Check(!edge.TopRight && edge.Height == 600, "600 units below is enough");
+        // A Map Editor window wider than the default sets the width in both placements.
+        var wide = PanelPlacement.Default(1920, 1080, 1, 0, 800, 666, 60, 690, 660, 410);
+        Check(wide.TopRight && wide.Width == 800 && wide.X == 1120, "The window keeps the width it would have below the Map Editor");
+        // Without a Map Editor window the default size stands at the left.
+        var none = PanelPlacement.Default(1920, 1080, 1, 0, 0, 0, 60, 690, 660, 410);
+        Check(!none.TopRight && none.X == 0 && none.Width == 690 && none.Height == 660 && none.Y == 420, "Without a Map Editor window the default size is used");
+        // The corner's lower edge: the strip, the readout below it, not a window elsewhere or a rectangle further down.
+        var corner = new[] {
+            new PanelPlacement.Area { X = 1500, Y = 0, Width = 420, Height = 40 },
+            new PanelPlacement.Area { X = 1700, Y = 40, Width = 220, Height = 24 },
+            new PanelPlacement.Area { X = 0, Y = 0, Width = 604, Height = 666 },
+            new PanelPlacement.Area { X = 1600, Y = 300, Width = 200, Height = 100 } };
+        Check(PanelPlacement.OccupiedBelow(1230, 1920, corner, 400) == 64, "The edge is below the strip and the readout: " + PanelPlacement.OccupiedBelow(1230, 1920, corner, 400));
+        Check(PanelPlacement.OccupiedBelow(1230, 1920, new PanelPlacement.Area[0], 400) == 0, "An empty corner starts at the top");
+    }
+}
