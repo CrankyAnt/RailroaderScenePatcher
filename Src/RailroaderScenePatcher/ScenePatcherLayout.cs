@@ -1493,7 +1493,10 @@ namespace RailroaderScenePatcher {
             } else if (guided.Enabled && !String.IsNullOrEmpty(guided.Recovery)) { source = "Guided task"; state = Literal(guided.Recovery); }
             else if (primary == EditFeedback.PrimaryMessage.BackupDiagnosis) {
                 source = RecoveryPlace; state = Literal(EditFeedback.BackupNotice(session));
-            } else if (selectionProblem != null) { source = "World choice"; state = Tint(Red, selectionProblem); }
+            } else if (selectionProblem != null) {
+                source = selectionProblem == WorldMarkingDiagnostics.DrawFailed ? null : "World choice";
+                state = Tint(Red, selectionProblem);
+            }
             else if (primary == EditFeedback.PrimaryMessage.Reported) { state = null; } // The newest result leads the list below.
             // A confirmed target belongs to the object it was chosen for; another object does not show it.
             else if (primary == EditFeedback.PrimaryMessage.ConfirmedChoice) {

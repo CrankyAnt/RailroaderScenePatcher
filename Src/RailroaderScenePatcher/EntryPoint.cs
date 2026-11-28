@@ -1096,6 +1096,7 @@ namespace RailroaderScenePatcher {
         }
         static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);
         void OnDestroy() { Release(); }
+        string lastWorldMarkingException;
         void OnGUI() {
             try { DrawPlacingMark(); } catch (Exception e) { PatcherLog.Debug("The pointer mark for placing a mod object is unavailable: " + e.GetBaseException().Message); }
             if (presentation == null || !presentation.IsOpen || selection == null || Event.current.type != EventType.Repaint) return;
@@ -1109,8 +1110,19 @@ namespace RailroaderScenePatcher {
                 if (StationMapIconRules.ShowsMapIcon(selected) && selected.Handle is GameObject icon && icon != null)
                     WorldMapIcon.Draw(icon, icon.transform.position, covered);
                 selection.Draw(selected, covered, worldLabelBacking, InspectedTrackPoint(), InspectedCut(), CrossingNodeFrame(), MarkedEnds());
+                lastWorldMarkingException = null;
+                if (selectionProblem == WorldMarkingDiagnostics.DrawFailed) selectionProblem = null;
             }
-            catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
+            catch (Exception e) {
+                selectionProblem = WorldMarkingDiagnostics.DrawFailed;
+                if (PatcherLog.DebugEnabled) {
+                    var detail = e.ToString();
+                    if (detail != lastWorldMarkingException) {
+                        lastWorldMarkingException = detail;
+                        PatcherLog.Debug(WorldMarkingDiagnostics.DrawFailed + " " + detail);
+                    }
+                }
+            }
         }
         // bindingSlot says the choice fills the inspected marker's track binding, a crossing pad's included.
         // coverageTo says a coverage role's choice fills the role's To end; otherwise it fills the From end.
@@ -1255,7 +1267,7 @@ namespace RailroaderScenePatcher {
         string loggedChoiceProblem;
         void LogChoiceProblem() {
             var pending = selection?.Pending;
-            var problem = pending?.Problem ?? selectionProblem;
+            var problem = pending?.Problem ?? (selectionProblem == WorldMarkingDiagnostics.DrawFailed ? null : selectionProblem);
             // The same problem at another spot is another line: the candidates are part of what is logged.
             var offers = pending == null ? null : pending.Offers.Select(offer => offer.Label).ToArray();
             // The line names the object the choice is for, and none for a choice that only inspects: the object

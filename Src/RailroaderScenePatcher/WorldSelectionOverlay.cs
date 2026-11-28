@@ -1308,19 +1308,19 @@ namespace RailroaderScenePatcher {
                 text.Append(" The frame combines ").Append(result.Boxes).Append(result.Boxes == 1 ? " box" : " boxes").Append(". Object rotation about the vertical axis: ").Append(ObjectMarkingGeometry.Yaw(objectAxes.X, objectAxes.Z))
                     .Append(". Frame box rotation about the vertical axis: ").Append(ObjectMarkingGeometry.Yaw(result.Box)).Append('.');
             // One entry per line: the frame, then each renderer.
-            var entries = new List<string>();
-            for (int index = 0; index < renderers.Length; index++) {
-                var renderer = renderers[index];
+            var entries = new List<string> { text.ToString() };
+            // The renderer list can outlive a renderer rebuilt by the game. Keep the original indices for the frame decisions.
+            entries.AddRange(WorldMarkingDiagnostics.RendererLines(renderers, renderer => renderer != null, (renderer, index) => {
                 var name = "#" + index;
                 var decision = String.Join(" / ", lines.Where(l => l.StartsWith(name + ":", StringComparison.Ordinal)).Select(l => l.Substring(name.Length + 2)));
-                var lod = lods.TryGetValue(renderer, out var level) ? BoardScene.PathOf(level.Key.transform) + ", level " + level.Value : "none";
-                entries.Add(text.ToString()); text.Clear();
+                var lod = lods.TryGetValue(renderer, out var level) && level.Key != null ? BoardScene.PathOf(level.Key.transform) + ", level " + level.Value : "none";
+                text.Clear();
                 text.Append("Frame check for ").Append(candidate.Choice.Label).Append(", renderer ").Append(name).Append(' ').Append(BoardScene.PathOf(renderer.transform)).Append(". Drawing component: ").Append(renderer.GetType().Name)
                     .Append(". Box width/height/depth in metres: ").Append(Vector(renderer.bounds.size)).Append(". Drawn together with other scenery: ").Append(renderer.isPartOfStaticBatch)
                     .Append(". Distance-based detail group and level: ").Append(lod).Append(". Drawing component switched on: ").Append(renderer.enabled && renderer.gameObject.activeInHierarchy)
                     .Append(". Frame decision: ").Append(decision.Length == 0 ? "No decision recorded." : decision);
-            }
-            entries.Add(text.ToString());
+                return text.ToString();
+            }));
             foreach (var entry in entries) PatcherLog.Debug(entry);
         }
         static string Number(double value) => ShownNumber.Text(value);

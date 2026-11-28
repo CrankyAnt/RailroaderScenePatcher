@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // Select in world keeps its per-frame work proportional to what changes: an object's piece is kept between camera
@@ -70,6 +71,19 @@ static class MarkingCostTests {
         RepeatedObservationKeepsOneEntry();
         KeptGroupPieceGivesTheFreshGroupFrame();
         GroupPieceHoldsWhileItsObjectsStay();
+        FrameCheckSkipsARendererLostAfterACrossingMove();
+    }
+
+    static void FrameCheckSkipsARendererLostAfterACrossingMove() {
+        var cached = new[] { new[] { "old crossbuck" }, new[] { "other crossbuck" }, new[] { "pad" } };
+        var oldCrossbuck = cached[0];
+        // Unity can keep the managed reference after destroying the native renderer.
+        var lines = WorldMarkingDiagnostics.RendererLines(cached, renderer => renderer != null && renderer != oldCrossbuck,
+            (renderer, index) => {
+                if (renderer == oldCrossbuck) throw new NullReferenceException("The cached renderer has no native object.");
+                return index + ": " + renderer[0];
+            });
+        Check(lines.SequenceEqual(new[] { "1: other crossbuck", "2: pad" }), "frame diagnostics retain the surviving renderers and their original indices");
     }
 
     static bool SameGroup(GroupMarking a, GroupMarking b) =>

@@ -15,6 +15,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/EnteredEditValues.cs" Link="EnteredEditValues.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/CoverageFormFields.cs" Link="CoverageFormFields.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/CommandBand.cs" Link="CommandBand.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/WorldMarkingDiagnostics.cs" Link="WorldMarkingDiagnostics.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/SupportedEdits.cs" Link="SupportedEdits.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/EditReasons.cs" Link="EditReasons.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)../../Src/RailroaderScenePatcher/CompactRail.cs" Link="CompactRail.cs" />
