@@ -12,7 +12,7 @@ namespace RailroaderScenePatcher {
     // The native operations of the scene object with child objects and part capabilities: the transform and activity of a top scene object
     // or a part, the game's cullers in the group and the physics state of its colliders. The rules live in Core's
     // SceneObjectRules, SceneObjects and ChildObjects.
-    internal sealed class GroupWorld : IGroupWorld, IFrameWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisableRefusal, IGroupActivityRefusal, IDisposable {
+    internal sealed class GroupWorld : ITrackMarkerGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisableRefusal, IGroupActivityRefusal, IDisposable {
         internal const string SimpleCullerType = CullerTypes.SimpleCuller, GameObjectCullerType = CullerTypes.GameObjectCuller;
         static readonly Type simple = Native.Type(SimpleCullerType), renderer = Native.Type(BoardScene.CullerType), switcher = Native.Type(GameObjectCullerType);
         static readonly FieldInfo cullingGroup = simple?.GetField("_cullingGroup", Native.Flags), cullingSpheres = simple?.GetField("_cullingSpheres", Native.Flags),
@@ -911,6 +911,11 @@ namespace RailroaderScenePatcher {
         public bool Below(object target, object above) =>
             target is GameObject part && part != null && above is GameObject over && over != null && part != over && part.transform.IsChildOf(over.transform);
         public bool Alive(object handle) => handle is GameObject go && go != null;
+        public object MarkerGroup(object target) {
+            var group = TopObjectOf(target as GameObject);
+            return group != null && PlacementRefusal(group) == null ? group : null;
+        }
+        public Placement MarkerParentPlacement(object target) => MapPlacement(PartObject(target).transform.parent.gameObject);
         // A crossbuck stands in the crossing object of its crossing without signals and moves with it (PartHolds).
         public object FrameAbove(object handle) {
             var go = handle as GameObject;

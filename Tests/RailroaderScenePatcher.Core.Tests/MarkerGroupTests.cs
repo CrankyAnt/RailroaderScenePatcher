@@ -33,8 +33,20 @@ static class MarkerGroupTests {
     // The group world of the base map. A track marker below a group is a transform below its root, as in the game: a
     // placement of the root carries it, and nothing else about it changes. Its serialized location and its
     // registration are the marker world's.
-    sealed class Groups : FakeGroupWorld, IGroupWorld {
+    sealed class Groups : FakeGroupWorld, ITrackMarkerGroupWorld {
         public readonly Dictionary<FakeGroup, List<FakeMarker>> MarkersBelow = new Dictionary<FakeGroup, List<FakeMarker>>();
+        public object MarkerGroup(object target) => MarkersBelow.FirstOrDefault(pair => pair.Value.Contains(target as FakeMarker)).Key;
+        public Placement MarkerParentPlacement(object target) => PlacementOf(MarkerGroup(target));
+        public object FrameAbove(object target) => null;
+        public object ModObjectOf(object target) => null;
+        public Placement PlacementOf(object target) => target is FakeMarker marker
+            ? new Placement(new[] { marker.Position[0] + Origin, marker.Position[1], marker.Position[2] }, marker.Rotation)
+            : Observe(target).Root.Placement;
+        public new void SetPartPlacement(object target, Placement placement) {
+            if (!(target is FakeMarker marker)) { base.SetPartPlacement(target, placement); return; }
+            marker.Position = new[] { placement.Position[0] - Origin, placement.Position[1], placement.Position[2] };
+            marker.Rotation = placement.Rotation;
+        }
         // A marker stands below its group, as a transform below the root does.
         public new bool Below(object target, object above) => target is FakeMarker marker ? above is FakeGroup group && MarkersBelow.TryGetValue(group, out var markers) && markers.Contains(marker) : base.Below(target, above);
         public new bool Alive(object handle) => handle is FakeMarker marker ? MarkersBelow.Values.Any(markers => markers.Contains(marker)) : base.Alive(handle);
@@ -92,8 +104,11 @@ static class MarkerGroupTests {
         // The capabilities of one load attempt over this world.
         public SceneCapabilities Capabilities() {
             var scene = new SceneCapabilities(() => World.Maps) { Tracks = Tracks };
-            scene.Add(new SceneObjects(World, placed: Placed));
-            scene.Add(new TrackMarkerScene(Markers, Capability.Unchecked, placed: Placed));
+            var holds = new PartHolds();
+            scene.Add(new SceneObjects(World, holds: holds, placed: Placed));
+            var markers = new TrackMarkerScene(Markers, Capability.Unchecked, placed: Placed);
+            markers.UseGroups(World, holds);
+            scene.Add(markers);
             return scene;
         }
         public double[] Root() => World.Observe(Signs).Root.Placement.Position;
@@ -130,6 +145,8 @@ static class MarkerGroupTests {
         EachMarkerKeepsItsTrackBinding();
         RotatingTheGroupTurnsItsPartsAboutTheGroup();
         HistorySaveReloadAndRemoval();
+        FixedMarkerPlacementSurvivesSaveAndReload();
+        AnInactiveMarkerKeepsItsOwnOrbit();
         AMarkerStaysEditableInItsOwnFamily();
         AMarkerOnARailBridgeIsNoTrackOwnedComponent();
         TheGroupsActivityStaysRefused();
@@ -209,6 +226,72 @@ static class MarkerGroupTests {
         Assert(removed.Applied && Near(f.Root(), Home) && f.Together(Home) && f.Bindings() == Bound, "Remove modification returns the group with its markers to the scene's placement: " + removed.Error + " " + f.Where());
     }
 
+    static void FixedMarkerPlacementSurvivesSaveAndReload() {
+        foreach (var partFirst in new[] { true, false }) {
+            var f = new Fixture();
+            var session = f.Session(out var store, out var editor);
+            var marker = MarkerId(SpeedPath);
+            var atHome = new Placement(new[] { 5325.0, 10, 5736 }, Turn.Yaw(30));
+            var afterMove = new Placement(new[] { 4803.0, 11, 4425 }, Turn.Yaw(120));
+            if (partFirst) Assert(session.Edit(marker, atHome, null).Applied, "The speed sign takes its own placement");
+            Assert(session.Edit(GroupId(), new Placement(Shifted, Quarter), null).Applied, "The group moves and turns");
+            if (!partFirst) Assert(session.Edit(marker, afterMove, null).Applied, "The speed sign can be placed in a group that has already moved");
+            Assert(Near(f.At(f.Speed), afterMove.Position) && SameTurn(f.Speed.Rotation, afterMove.Rotation)
+                && f.Together(Shifted, 90, f.Speed), "The speed sign and its siblings keep their respective placements: " + f.Where());
+            Assert(editor.Save() == null, "Save writes both placements");
+            var modifications = (JObject)JObject.Parse(store.Patch)["modifications"];
+            var speed = modifications.Properties().Single(p => (string)p.Value["target"]["path"] == SpeedPath);
+            var group = modifications.Properties().Single(p => (string)p.Value["target"]["path"] == Group);
+
+            var fresh = new Fixture();
+            var reload = fresh.Engine.Apply(store.Patch, "author/pack");
+            Assert(reload.Error == null && reload.Outcomes.Values.All(o => o.Applied)
+                && Near(fresh.At(fresh.Speed), afterMove.Position) && SameTurn(fresh.Speed.Rotation, afterMove.Rotation)
+                && fresh.Together(Shifted, 90, fresh.Speed) && fresh.Bindings() == Bound,
+                "A fresh load restores the fixed sign relative to its moved group: " + fresh.Where());
+            Assert(Near(speed.Value["placement"]["position"].Values<double>().ToArray(), atHome.Position)
+                && speed.Value["dependsOn"].Values<string>().SequenceEqual(new[] { group.Name }),
+                "The file records the sign at the group's map placement and makes it depend on the group move");
+            var unscheduledMarker = (JObject)speed.Value.DeepClone();
+            unscheduledMarker["dependsOn"] = new JArray();
+            var separate = new Fixture();
+            var first = separate.Engine.Apply(Doc("\"marker\":" + unscheduledMarker), "author/sign");
+            var second = separate.Engine.Apply(Doc("\"group\":" + group.Value), "author/group");
+            Assert(first.Outcomes["marker"].Applied && second.Outcomes["group"].Applied
+                && Near(separate.At(separate.Speed), afterMove.Position) && SameTurn(separate.Speed.Rotation, afterMove.Rotation),
+                "Applying the sign before the group in separate files keeps the same relative placement: " + separate.Where());
+            Assert(session.Remove(GroupId()).Applied && Near(f.At(f.Speed), atHome.Position), "Removing the group move does not remove the sign's own placement");
+            editor.Undo();
+            Assert(Near(f.At(f.Speed), afterMove.Position), "Undo restores the group move and carries the sign again");
+        }
+    }
+
+    static void AnInactiveMarkerKeepsItsOwnOrbit() {
+        Fixture WithInactiveYardLimit() {
+            var fixture = new Fixture();
+            fixture.Markers.SetActive(fixture.Yard, false);
+            // X and Z from the inactive Yard Limit's transform below Bryson Signs in the base map.
+            fixture.Yard.Position[0] = 4957.21923828125 - fixture.World.Origin;
+            fixture.Yard.Position[2] = 5588.79345703125;
+            return fixture;
+        }
+        var f = WithInactiveYardLimit();
+        var session = f.Session(out var store, out var editor);
+        Assert(session.Edit(MarkerId(SpeedPath), new Placement(new[] { 5325.0, 10, 5736 }, Turn.Yaw(30)), null).Applied,
+            "The speed sign takes an independent two-metre offset");
+        Assert(session.Edit(GroupId(), new Placement(new[] { 4405.0, 10, 5345 }, Identity), null).Applied
+            && session.Edit(GroupId(), new Placement(new[] { 4405.0, 10, 5345 }, Quarter), null).Applied,
+            "The group moves five metres and rotates by a quarter turn");
+        var expected = new[] { 4648.79345703125, 10, 4787.78076171875 };
+        Assert(!f.Yard.Active && Near(f.At(f.Yard), expected) && SameTurn(f.Yard.Rotation, Quarter),
+            "The inactive yard limit rotates by its own offset: " + f.Where());
+        Assert(editor.Save() == null, "Save writes the group and speed sign placements");
+        var fresh = WithInactiveYardLimit();
+        Assert(fresh.Engine.Apply(store.Patch, "author/pack").Outcomes.Values.All(outcome => outcome.Applied)
+            && !fresh.Yard.Active && Near(fresh.At(fresh.Yard), expected) && SameTurn(fresh.Yard.Rotation, Quarter),
+            "Reload retains the inactive yard limit's orbit: " + fresh.Where());
+    }
+
     // After the group moved, a marker below it still takes its own family's edits: a rebinding changes only its binding,
     // and the group stays where it was moved.
     static void AMarkerStaysEditableInItsOwnFamily() {
@@ -259,8 +342,9 @@ static class MarkerGroupTests {
     // key order, and a later move of the track, which carries the marker along that track.
     static void AMarkerThatFollowsItsTrackStaysOnItsTrackPoint() {
         var f = new Fixture(); var session = f.Session(out var store, out var editor);
-        f.Tracks.Poses["node:N1"] = new TrackPose(new[] { 4950.0, 10, 5580 }, Identity);
-        var followed = session.Follow(MarkerId(YardPath), TrackAnchor.Endpoint("N1"));
+        var anchor = TrackAnchor.At(new TrackLocation("Sitz", "a", 0));
+        f.Tracks.Poses["Sitz|a|0"] = new TrackPose(new[] { 3920.16, 529, 5015.7 }, Identity);
+        var followed = session.Follow(MarkerId(YardPath), anchor);
         Assert(followed.Applied && f.Placed.Contains(f.Yard), "The yard limit follows its track: " + followed.Error);
         var onTrack = f.At(f.Yard); var facing = (double[])f.Yard.Rotation.Clone();
         var moved = session.Edit(GroupId(), new Placement(Shifted, Quarter), null);
@@ -271,13 +355,13 @@ static class MarkerGroupTests {
         Assert(editor.Save() == null, "Save writes the file");
         var modifications = JObject.Parse(store.Patch)["modifications"].Children<JProperty>().ToArray();
         foreach (var order in new[] { modifications, modifications.Reverse().ToArray() }) {
-            var fresh = new Fixture(); fresh.Tracks.Poses["node:N1"] = f.Tracks.Poses["node:N1"];
+            var fresh = new Fixture(); fresh.Tracks.Poses["Sitz|a|0"] = f.Tracks.Poses["Sitz|a|0"];
             var reordered = new JObject(new JProperty("formatVersion", 1), new JProperty("sourceMap", new JObject(new JProperty("mapId", "map"))), new JProperty("modifications", new JObject(order.Select(p => new JProperty(p.Name, p.Value.DeepClone())))));
             var reload = fresh.Engine.Apply(reordered.ToString(), "author/pack");
             Assert(reload.Error == null && reload.Outcomes.Values.All(o => o.Applied) && fresh.Together(Shifted, 90, fresh.Yard) && Near(fresh.At(fresh.Yard), onTrack) && fresh.Placed.Contains(fresh.Yard),
                 "A fresh load in key order " + String.Join(",", order.Select(p => p.Name)) + " keeps the yard limit on its track point: " + fresh.Where());
         }
-        f.Tracks.Poses["node:N1"] = new TrackPose(new[] { 4960.0, 10, 5580 }, Identity);
+        f.Tracks.Poses["Sitz|a|0"] = new TrackPose(new[] { 3930.16, 529, 5015.7 }, Identity);
         var carried = session.ReconcileTrackFollowing().Single().Value;
         Assert(carried.Applied && Near(f.At(f.Yard), new[] { onTrack[0] + 10, onTrack[1], onTrack[2] }) && f.Together(Shifted, 90, f.Yard), "A later track move carries the yard limit along its track; the group stays: " + carried.Error + " " + f.Where());
         var stopped = session.StopFollowing(MarkerId(YardPath));

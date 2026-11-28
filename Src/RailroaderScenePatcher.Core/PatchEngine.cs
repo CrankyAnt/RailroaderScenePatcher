@@ -169,6 +169,7 @@ namespace RailroaderScenePatcher.Core {
         public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage, StarterSetting starter) : this(placement, active, marker, coverage, null, starter) { }
         public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage, CrossingEquipment equipment, StarterSetting starter) { Placement = placement; Active = active; Marker = marker; Coverage = coverage; Equipment = equipment; Starter = starter; }
         public Placement Placement { get; }
+        internal ObjectState At(Placement placement) => new ObjectState(placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = LeavesActivity, Segments = Segments, MarkerId = MarkerId };
         public bool? Active { get; }
         // The track-marker relationship: a location or explicit detachment. Null leaves it untouched, and an object without one reads null.
         public MarkerBinding Marker { get; }

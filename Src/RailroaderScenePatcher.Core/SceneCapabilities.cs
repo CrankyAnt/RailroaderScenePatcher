@@ -46,6 +46,7 @@ namespace RailroaderScenePatcher.Core {
         public IEnumerable<string> MapPatchIds => MapPatches?.Invoke() ?? Enumerable.Empty<string>();
         // The frame belongs to the adapter that resolved the object; an adapter without frames reports none.
         public Placement FramePlacement(object target) => target != null && owners.TryGetValue(target, out var owner) && owner is IFramedScene framed ? framed.FramePlacement(target) : null;
+        internal object MarkerGroup(object target) => target != null && owners.TryGetValue(target, out var owner) && owner is TrackMarkerScene markers ? markers.GroupOf(target) : null;
         // An object whose adapter records no own placement records its map placement.
         public Placement Recorded(object target, Placement inMap) => target != null && owners.TryGetValue(target, out var owner) && owner is IRecordedPlacementScene recorded ? recorded.Recorded(target, inMap) : inMap;
         public Placement InMap(object target, Placement recorded) => target != null && owners.TryGetValue(target, out var owner) && owner is IRecordedPlacementScene placed ? placed.InMap(target, recorded) : recorded;

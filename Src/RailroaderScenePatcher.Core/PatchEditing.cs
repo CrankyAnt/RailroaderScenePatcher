@@ -1280,16 +1280,22 @@ namespace RailroaderScenePatcher.Core {
                     if (value.Parent != null) value = (JObject)value.DeepClone();
                     value[ModObjects.PartMarkerIdsMember] = existing[ModObjects.PartMarkerIdsMember].DeepClone();
                 }
-                var normal = Normalised(existing, value, engine.Underlying(resolved));
+                var under = engine.Underlying(resolved);
+                if (under?.Placement?.Frame != null && scene is SceneCapabilities capabilities && capabilities.MarkerGroup(resolved) != null)
+                    under = under.At(capabilities.Recorded(resolved, under.Placement));
+                var normal = Normalised(existing, value, under);
                 outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !PreservingJson.SameModification(normal, value));
                 value = WithModObjectDependency(WithIdDependencies(normal, resolved, existing), target);
+                value = WithMarkerGroupDependency(value, resolved, existing);
                 // A modification that stays in the scene patch file but does not take effect would be reported as applied
                 // without changing the object, so the edit is refused with the reason. Removing it remains possible.
                 if (value != null && ineffective != null)
                     throw new InvalidOperationException("Modification " + ScenePatchFile.Key(existing) + " is not effective because " + ineffective + ". " + WindowGuidance.CorrectThatFirst + " Nothing was changed");
                 // A modification another modification names in dependsOn cannot leave the scene patch file: the dependents would stop taking effect.
                 if (value == null && existing != null) {
-                    var dependents = Dependents(ScenePatchFile.Key(existing));
+                    var key = ScenePatchFile.Key(existing);
+                    var released = MarkerGroupDependents(target, resolved, key, existing, null).Select(entry => entry.Key);
+                    var dependents = Dependents(key).Except(released, StringComparer.Ordinal).ToList();
                     if (dependents.Count != 0)
                         throw new InvalidOperationException("Modification " + ScenePatchFile.Key(existing) + " cannot leave the scene patch file because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name") + " it in dependsOn. " + (dependents.Count == 1 ? WindowGuidance.ChangeDependentFirst : WindowGuidance.ChangeDependentsFirst) + " Nothing was changed");
                 }
@@ -1369,6 +1375,62 @@ namespace RailroaderScenePatcher.Core {
             var result = (JObject)value.DeepClone();
             result["dependsOn"] = new JArray(next.Cast<object>().ToArray());
             return result;
+        }
+        static bool HasFixedPlacement(JObject item) => item?["placement"] is JObject placement
+            && placement["mode"]?.Type == JTokenType.String && (string)placement["mode"] == "fixed";
+        // Each fixed marker placement in the active file uses its group's current frame. A group placement in that
+        // file runs first. A marker that follows a track does not depend on the group placement.
+        JObject WithMarkerGroupDependency(JObject value, object target, JObject existing) {
+            if (value == null || (!HasFixedPlacement(value) && !HasFixedPlacement(existing)) || !(scene is SceneCapabilities capabilities)) return value;
+            var group = capabilities.MarkerGroup(target);
+            if (group == null) return value;
+            var key = ScenePatchFile.Key(existing);
+            foreach (var entry in Own(group).Where(item => item["placement"] != null)) {
+                var groupKey = ScenePatchFile.Key(entry);
+                if (key == null || !OrdersAfter(groupKey, key)) value = WithDependency(value, groupKey, HasFixedPlacement(value));
+            }
+            return value;
+        }
+        bool OrdersAfter(string key, string prerequisite) {
+            var pending = new Stack<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            pending.Push(key);
+            while (pending.Count != 0) {
+                var next = pending.Pop();
+                if (next == prerequisite) return true;
+                if (seen.Add(next) && (scenePatchFile.Modifications[next] as JObject)?["dependsOn"] is JArray dependencies)
+                    foreach (var dependency in dependencies.Where(d => d.Type == JTokenType.String)) pending.Push((string)dependency);
+            }
+            return false;
+        }
+        static JObject WithDependency(JObject item, string key, bool required) {
+            if (!(item["dependsOn"] is JArray list) || list.Any(d => d.Type != JTokenType.String)) return item;
+            var present = list.Values<string>().Contains(key, StringComparer.Ordinal);
+            if (present == required) return item;
+            var changed = (JObject)item.DeepClone();
+            var dependencies = list.Values<string>();
+            changed["dependsOn"] = new JArray(required ? dependencies.Append(key).OrderBy(d => d, StringComparer.Ordinal) : dependencies.Where(d => d != key));
+            return changed;
+        }
+        // A group placement can be edited after its marker. Apply the same dependency when the group step runs, including
+        // on replay. Prepare copies so a refused or failed world edit can leave the other entries as they were.
+        IReadOnlyList<(string Key, JObject Value)> MarkerGroupDependents(TargetIdentity identity, object group, string key, JObject current, JObject value) {
+            var changed = new List<(string, JObject)>();
+            var placed = value?["placement"] != null;
+            if (identity.Structure != SceneObjects.Structure || placed == (current?["placement"] != null)
+                || !(scene is SceneCapabilities capabilities)) return changed;
+            foreach (var item in scenePatchFile.Items.Where(HasFixedPlacement)) {
+                var markerKey = ScenePatchFile.Key(item);
+                if (markerKey == key) continue;
+                if (placed && value["dependsOn"] is JArray dependencies && dependencies.Where(d => d.Type == JTokenType.String).Any(d => OrdersAfter((string)d, markerKey))) continue;
+                object target;
+                try { target = engine.ResolveUnique(PatchEngine.Parse(item).Identity); }
+                catch (InvalidOperationException) { continue; }
+                if (!ReferenceEquals(capabilities.MarkerGroup(target), group)) continue;
+                var next = WithDependency(item, key, placed);
+                if (!ReferenceEquals(next, item)) changed.Add((markerKey, next));
+            }
+            return changed;
         }
         // Records a failure with its kind: a failure that names no mutation was refused before one started.
         static void Fail(Outcome outcome, Exception e) {
@@ -1582,6 +1644,7 @@ namespace RailroaderScenePatcher.Core {
             var mapContext = scene.MapIds.ToArray();
             var prior = scene.Read(target);
             engine.Underlying(target);
+            var markerDependents = MarkerGroupDependents(identity, target, key, current, value);
             scenePatchFile.Replace(key, value);
             var mutating = false; var contentChecked = false;
             contentRefusal = null;
@@ -1609,6 +1672,7 @@ namespace RailroaderScenePatcher.Core {
 #endif
                 if (!Same(scene.Read(target), desired)) throw new InvalidOperationException("Applied state did not verify");
                 NameModObject(target, value);
+                foreach (var dependent in markerDependents) scenePatchFile.Replace(dependent.Key, dependent.Value);
             } catch (Exception e) {
                 scenePatchFile.Replace(key, current);
                 if (mutating) try { NameModObject(target, current); } catch { }

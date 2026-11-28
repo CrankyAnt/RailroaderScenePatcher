@@ -327,6 +327,7 @@ namespace RailroaderScenePatcher {
                     groupWorld = new GroupWorld(); var holds = groupHolds = new PartHolds();
                     capabilities.Add(new SceneObjects(groupWorld, Capability.Unchecked, holds, groundMasks, trackPlaced));
                     capabilities.Add(new ChildObjects(groupWorld, holds, masks: groundMasks));
+                    markerScene?.UseGroups(groupWorld, holds);
                 } catch (Exception e) {
                     capabilities.AddUnavailable(SceneObjects.Structure, e.GetBaseException().Message);
                     capabilities.AddUnavailable(ChildObjects.Structure, e.GetBaseException().Message);
