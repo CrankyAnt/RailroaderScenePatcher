@@ -38,6 +38,8 @@ static class CommandBandTests {
         AClickOnTheInspectedRowClearsTheInspection();
         ClearActivityNeedsAnActivityValue();
         AClosedPanelCancelsTheWaitingRequest();
+        InputWaitsForTheEditAndItsTerrain();
+        InputAlreadySubmittedWhenBusyIsReported();
         QueuingGizmoSetupKeepsTheConnectionsPreview();
         SharedRulesHoldAtEveryCallSite();
         AClickedControlShowsItsTooltipOnlyAfterThePointerReturns();
@@ -1002,6 +1004,48 @@ static class CommandBandTests {
         Check(CommandBand.LogLine("Track binding", "World/Signs/Yard Limit", "Track binding to S377 / a / 7.512 completed.") == "[Track binding] World/Signs/Yard Limit: Track binding to S377 / a / 7.512 completed."
             && CommandBand.LogLine("World choice", null, "No candidate at this point") == "[World choice] No candidate at this point" && CommandBand.LogLine(null, null, "x") == "x", "A log line names the action group and the object");
         Check(CommandBand.BindingAction("S377", "a", 7.5116) == "Track binding to S377 / a / 7.512", "A binding edit names the track location it sets");
+    }
+    static void InputWaitsForTheEditAndItsTerrain() {
+        var feedback = new EditFeedback();
+        var queue = new RequestQueue(feedback);
+        var writes = 0;
+        queue.Enqueue("Placement", "Move", () => {
+            Check(queue.Busy, "Input stays locked while the edit runs");
+            writes++;
+            queue.WaitForTerrain();
+            queue.WaitForRefresh();
+        });
+        Check(queue.Busy && queue.Pending, "Input is locked while the edit waits for a scene check");
+        queue.Run();
+        Check(queue.Busy && !queue.Pending && writes == 1, "The terrain wait keeps input locked after the edit runs");
+        queue.ObserveTerrain(true);
+        Check(queue.Busy, "A frame with outstanding terrain cannot take input");
+        queue.ObserveTerrain(false);
+        Check(queue.Busy, "The window does not take input on the old controls while it is still reading the new values");
+        queue.Refreshed();
+        Check(!queue.Busy, "Input resumes after the terrain and window values are ready");
+        queue.Enqueue("Placement", "Move again", () => writes++);
+        Check(queue.Cancel("you cancelled the edit before it ran") && !queue.Busy && writes == 1,
+            "Cancel unlocks the window and drops the waiting edit");
+    }
+    static void InputAlreadySubmittedWhenBusyIsReported() {
+        var feedback = new EditFeedback();
+        var queue = new RequestQueue(feedback);
+        queue.Enqueue("Track binding", "Set distance to 20", () => {
+            feedback.Refuse("Track binding", "Set distance to 20", "the track segment is unavailable");
+            queue.WaitForTerrain();
+        });
+        Check(queue.RefuseBusyInput("Track binding", "Set distance to 100"), "A second submission cannot enter the queue");
+        queue.Run();
+        queue.ObserveTerrain(true);
+        queue.ShowBusyRefusals();
+        Check(feedback.Messages.Count == 1, "The second submission waits for the result of the edit already in progress");
+        queue.ObserveTerrain(false);
+        queue.ShowBusyRefusals();
+        Check(feedback.Messages.Any(m => m.Text == "Set distance to 100 refused. Another edit is still running."),
+            "The value that could not be applied is visible after the busy state ends");
+        Check(feedback.Messages.Any(m => m.Text.Contains("the track segment is unavailable", StringComparison.OrdinalIgnoreCase)),
+            "The earlier edit's refusal stays readable beside the second submission");
     }
     static void AClosedPanelCancelsTheWaitingRequest() {
         var feedback = new EditFeedback(); var ran = 0;

@@ -7,6 +7,9 @@ using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
     internal static class EnteredEditValues {
+        // Keep an unsubmitted draft together, including the unchanged fields that give it meaning.
+        internal static bool IsDraft(string[] fields, string[] observed, string[] submitted) =>
+            fields != null && observed != null && !ReferenceEquals(fields, submitted) && !fields.SequenceEqual(observed);
         internal static Placement Placement(string[] entered, double[] own, IReadOnlyList<double> ownRotation, Func<double, double, double, double[]> rotationFromEuler) {
             if (entered == null || entered.Length != 6 || own == null || own.Length != 6 || ownRotation == null || ownRotation.Count != 4 || rotationFromEuler == null) return null;
             var values = new double[6];

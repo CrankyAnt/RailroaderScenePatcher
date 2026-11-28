@@ -24,11 +24,13 @@ namespace RailroaderScenePatcher.Core {
         readonly ITerrainWorld world;
         readonly Dictionary<object, Work> work = new Dictionary<object, Work>();
         readonly Action<double[], double[]> built;
+        internal long Revision { get; private set; }
         sealed class Write { internal double[] Position; internal string Label; internal (long X, long Z) Key; internal bool Built; }
         sealed class Work {
             internal readonly List<Write> Outstanding = new List<Write>();
             internal readonly List<string> Completed = new List<string>();
             internal double Since;
+            internal long Revision;
             internal string Error;
             internal bool Settled => Outstanding.Count == 0 && Error == null;
         }
@@ -42,6 +44,7 @@ namespace RailroaderScenePatcher.Core {
             if (!work.TryGetValue(target, out var item)) work.Add(target, item = new Work());
             else if (item.Settled) item.Completed.Clear();
             item.Error = null; item.Since = world.Now;
+            item.Revision = ++Revision;
             var label = "terrain output at map x=" + Text(position[0]) + ", z=" + Text(position[2]);
             if (!world.TileLoaded(position)) { item.Completed.Add(label + " (tile not built; it builds from the current mask)"); return; }
             var key = KeyOf(position);
@@ -74,6 +77,7 @@ namespace RailroaderScenePatcher.Core {
         public void RetryOutput(object target) {
             if (target == null || !work.TryGetValue(target, out var item) || item.Outstanding.Count == 0) return;
             item.Error = null; item.Since = world.Now;
+            item.Revision = ++Revision;
             foreach (var write in item.Outstanding.ToArray()) {
                 if (!world.TileLoaded(write.Position)) { item.Outstanding.Remove(write); item.Completed.Add(write.Label + " (tile unloaded; it builds from the current mask)"); continue; }
                 write.Built = false;
@@ -86,6 +90,8 @@ namespace RailroaderScenePatcher.Core {
         // How many targets stopped without completing, and how many positions are outstanding.
         public int Stopped => work.Count(p => p.Value.Error != null);
         public int Outstanding => work.Values.Sum(w => w.Outstanding.Count);
+        internal bool WorkingSince(long revision) =>
+            work.Values.Any(item => item.Revision > revision && item.Error == null && item.Outstanding.Count != 0);
         public void Dispose() { world.TileBuilt -= built; work.Clear(); }
         static string Text(double v) => ShownNumber.Text(v);
         // Writes at one place: positions that round to the same tenth of a metre on both map axes, so a write within

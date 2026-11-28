@@ -79,8 +79,11 @@ namespace RailroaderScenePatcher {
 
         // Where the target stands in map coordinates: an object with its own placement in a frame reads it as recorded there.
         Placement ShownPlacement() { var read = scene.Read(target).Placement; return scene is IRecordedPlacementScene recorded ? recorded.InMap(target, read) : read; }
-        internal void Initialize(PatchEngine engine, IScene scene, MapEditorAttachment attachment, TargetIdentity identity, InspectedTarget inspected, TransformGizmoMode mode, Action<Outcome, string> finished) {
+        Action beginEdit;
+        Func<bool> inputBlocked;
+        internal void Initialize(PatchEngine engine, IScene scene, MapEditorAttachment attachment, TargetIdentity identity, InspectedTarget inspected, TransformGizmoMode mode, Func<bool> inputBlocked, Action beginEdit, Action<Outcome, string> finished) {
             this.engine = engine; this.scene = scene; this.attachment = attachment; this.identity = identity; this.inspected = inspected; this.finished = finished;
+            this.inputBlocked = inputBlocked; this.beginEdit = beginEdit;
             dragFault = new DragFault(attachment.Fault);
             try {
                 if (current != null) throw new EditRefusal("Another scene-patch gizmo is shown");
@@ -124,7 +127,7 @@ namespace RailroaderScenePatcher {
         // A drag starts only when no native operation holds the pointer or an edit session: the gizmo does not take
         // input from the native map editor, it waits for it.
         bool CanDrag() {
-            if (!Shown || holding || Time.unscaledTime - activated < 0.2f || attachment.Session.Blocked != null) return false;
+            if (!Shown || holding || inputBlocked() || Time.unscaledTime - activated < 0.2f || attachment.Session.Blocked != null) return false;
             try {
                 foreach (var name in new[] { "_spanEndpointTool", "_builtinPlacementTool", "_terrainPaintTool", "_terrainTileTool" }) {
                     var tool = Native.Read(controller, name);
@@ -155,7 +158,7 @@ namespace RailroaderScenePatcher {
         }
         void Begin() {
             dragFault.Begin();
-            try { gesture = new PlacementGesture(engine, attachment.Session, identity, inspected); live = gesture.Initial; }
+            try { beginEdit(); gesture = new PlacementGesture(engine, attachment.Session, identity, inspected); live = gesture.Initial; }
             catch (Exception e) { Fail(PatcherLog.Reason(e)); }
         }
         void Preview(TransformGizmoDelta delta) {

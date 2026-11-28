@@ -84,9 +84,9 @@ namespace RailroaderScenePatcher {
         object inspected;
         // A result is about the object inspected when it was reported: inspecting another object clears it. An object
         // that is no longer present clears nothing.
-        internal void Inspecting(object handle) {
+        internal void Inspecting(object handle, bool preserve = false) {
             if (handle == null || ReferenceEquals(handle, inspected)) return;
-            if (inspected != null) messages.Clear();
+            if (inspected != null && !preserve) messages.Clear();
             inspected = handle;
         }
         // Nothing is inspected any more: the messages about the object go. What is reported after this, such as the
@@ -125,6 +125,11 @@ namespace RailroaderScenePatcher {
         internal void Follow(string place, string message) {
             messages.RemoveAll(m => m.FollowUp);
             messages.Insert(0, New(place, message, true));
+            Log();
+        }
+        // A notice about input or terrain stays beside the result it accompanies.
+        internal void AddNotice(string place, string message) {
+            messages.Insert(0, New(place, message, false));
             Log();
         }
         // Track file state even when another caller performs the check, such as Save.

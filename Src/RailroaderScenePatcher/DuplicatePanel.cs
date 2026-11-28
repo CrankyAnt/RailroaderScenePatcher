@@ -206,14 +206,17 @@ namespace RailroaderScenePatcher {
             if (!Duplicating) { placingGhost.Clear(); return; }
             var source = duplicate.Source?.Handle as GameObject;
             if (!open || attachment == null || FileLocked || presentation.Compact || source == null) { EndDuplicate(); placingGhost.Clear(); return; }
-            if (!PlacingModObject) { placingGhost.Hide(); return; }
+            if (!PlacingModObject || Requests.Busy) { placingGhost.Hide(); return; }
             var mouse = Input.mousePosition;
             var pointer = new Vector2(mouse.x, Screen.height - mouse.y);
             placingPointer.At = presentation.PanelBounds.Contains(pointer) ? (Vector2?)null : pointer;
             placingPointer.Click = inputBlocker?.WorldClick;
             var message = duplicate.Message;
             TargetIdentity placed = null;
-            try { placed = duplicate.Tick(placingPointer, (from, placement) => attachment.Session.PlaceModObject(from.Identity, placement, null, from.GroupPath, markerIdRandom.Next)); }
+            try {
+                placed = duplicate.Tick(placingPointer, (from, placement) =>
+                    TrackEditTerrain(() => attachment.Session.PlaceModObject(from.Identity, placement, null, from.GroupPath, markerIdRandom.Next)));
+            }
             catch (Exception e) { duplicate.End(); feedback.Report(DuplicatePlace, "The object couldn't be placed: " + PatcherLog.Reason(e).TrimEnd('.') + "."); }
             if (placed != null) {
                 placedModObject = placed;

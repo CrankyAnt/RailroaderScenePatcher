@@ -14,6 +14,15 @@ static class EnteredEditValuesTests {
         ClickedTrackLocationUpdatesSameSegment();
         InvalidClickedTrackLocationPreservesDraft();
         ChangedRotationAndInvalidInputs();
+        PreserveUnsubmittedTrackLocation();
+    }
+    static void PreserveUnsubmittedTrackLocation() {
+        var observed = new[] { "S8it", "b", "20" };
+        var entered = new[] { "S8it", "b", "100" };
+        Check(EnteredEditValues.IsDraft(entered, observed, null),
+            "A different edit does not reset the entered distance or the track and end it belongs to");
+        Check(!EnteredEditValues.IsDraft(entered, observed, entered),
+            "An edit that submitted this location can show the newly observed values");
     }
     static void ClickedTrackLocationReplacesDraft() {
         var fields = new[] { "S8it", "b", "106.626" };

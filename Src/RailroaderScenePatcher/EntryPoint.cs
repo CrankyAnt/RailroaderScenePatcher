@@ -580,6 +580,7 @@ namespace RailroaderScenePatcher {
                     CancelRequest("the panel was closed before the request ran");
                 });
                 presentation.ResetRequested = ResetLayout;
+                presentation.CancelEdit = () => CancelRequest("you cancelled the edit before it ran");
                 presentation.CompactSwitched = LogCompactSwitch;
                 presentation.AutoOpenReady = SessionReady;
                 presentation.Logged = line => PatcherLog.Debug(line);
@@ -614,6 +615,10 @@ namespace RailroaderScenePatcher {
             CancelGizmo();
             // A request made in this native map editor does not run in the next one.
             CancelRequest("you left the Map Editor before the request ran");
+            Requests.ObserveTerrain(false);
+            Requests.Refreshed();
+            pendingEditDrafts = null;
+            ShowEditBusy();
             ModScenePatchFiles.Written = null;
             if (attachment == null) return;
             if (ReferenceEquals(Hooks.Current, attachment)) Hooks.Current = null;
@@ -636,7 +641,7 @@ namespace RailroaderScenePatcher {
             var placing = PlacingModObject;
             inputBlocker.WorldPicking = open && (pendingEdit || placing);
             inputBlocker.WorldInspecting = open && pendingInspectOnly;
-            inputBlocker.WorldEditing = open && (pendingEdit || worldEditActionOpen || gizmoShown || placing);
+            inputBlocker.WorldEditing = open && (Requests.Busy || pendingEdit || worldEditActionOpen || gizmoShown || placing);
             inputBlocker.GizmoShown = open && gizmoShown;
         }
         void BeginWorldEditAction() {
@@ -671,7 +676,12 @@ namespace RailroaderScenePatcher {
         SceneObservation refreshTarget;
         readonly List<TargetIdentity> replayed = new List<TargetIdentity>();
         readonly List<object> moved = new List<object>();
-        void RefreshAfterEdit() { refreshFrame = Time.frameCount + 2; refreshTarget = selected; inventory?.CancelFreshnessCheck(); }
+        EditDrafts pendingEditDrafts;
+        void RefreshAfterEdit(EditDrafts drafts) {
+            refreshFrame = Time.frameCount + 2; refreshTarget = selected; pendingEditDrafts = drafts;
+            Requests.WaitForRefresh();
+            inventory?.CancelFreshnessCheck();
+        }
         // The snapshot was compared with the whole scene, by a refresh or a completed pass, while the native map editor's history
         // read comparedKey; comparedAt is when. An edit or a preview that starts while that still holds, and soon
         // enough, needs no pass of its own: nothing but this patcher changed the authored scene state since, and the
@@ -788,7 +798,7 @@ namespace RailroaderScenePatcher {
                     // The request runs on a snapshot that was just compared: the marker capability may use that
                     // discovery's reference scan.
                     running = true;
-                    try { Requests.Run(); } finally { running = false; }
+                    try { TrackEditTerrain(Requests.Run); } finally { running = false; }
                     presentation?.RequestRefresh();
                 }
             }
@@ -799,11 +809,18 @@ namespace RailroaderScenePatcher {
                 // as it was compared. The first fill of the inventory, and a scene that cannot observe one object, read
                 // it all.
                 var edited = refreshTarget; refreshTarget = null;
-                var updated = fullRefresh || inventory == null || edited == null ? null : inventory.ReobserveRelated(edited);
-                fullRefresh = false;
-                if (updated != null) { KeepSelection(edited, updated); ReobserveMarkerIdHolders(edited, updated); } else Inspect();
-                InspectPlacedModObject();
-                ReadPlacement(); presentation?.RequestRefresh();
+                var drafts = pendingEditDrafts; pendingEditDrafts = null;
+                try {
+                    var updated = fullRefresh || inventory == null || edited == null ? null : inventory.ReobserveRelated(edited);
+                    fullRefresh = false;
+                    if (updated != null) { KeepSelection(edited, updated); ReobserveMarkerIdHolders(edited, updated); } else Inspect(preserveFeedback: edited != null);
+                    InspectPlacedModObject();
+                    ReadPlacement();
+                    RestoreEditDrafts(drafts);
+                } finally {
+                    Requests.Refreshed();
+                    presentation?.RequestRefresh();
+                }
             }
             // Undo and Redo of this patcher's own steps changed their objects: observe those again, so they do not read
             // as foreign changes. A step can destroy objects, which the game completes at the end of the frame, so the
@@ -840,11 +857,11 @@ namespace RailroaderScenePatcher {
             // Escape cancels an armed interaction and is consumed, as in the native map editor modes, so
             // it does not also open the pause menu. The gizmo also ends through the native map editor's own Escape route, which
             // can run before this handler in the same frame: an Escape in the frame a gizmo ended is consumed as well.
-            // While a field of the panel has the keyboard the patcher takes no Escape at all: the handler is not even
-            // registered, so the key reaches the field and the game as without the mod.
-            var escapable = !(presentation != null && presentation.FieldFocused) && (selection?.Pending != null || gizmo?.Active == true || PadGizmoDragging || Time.frameCount <= gizmoEnded + 1 || EscapeGizmo() || EscapeSnap() || PlacingModObject);
+            // Busy work takes Escape as Cancel. Otherwise a focused field gets the key before the patcher.
+            var escapable = Requests.Busy || !(presentation != null && presentation.FieldFocused) && (selection?.Pending != null || gizmo?.Active == true || PadGizmoDragging || Time.frameCount <= gizmoEnded + 1 || EscapeGizmo() || EscapeSnap() || PlacingModObject);
             if (escapable != escapeHeld) try {
                 if (escapable) UI.GameInput.RegisterEscapeHandler(UI.GameInput.EscapeHandler.Transient, () => {
+                    if (Requests.Busy) { CancelRequest("you cancelled the edit before it ran"); return true; }
                     // While a mod object is being placed, Escape stops placing and returns to the blank object window.
                     if (duplicate.Release()) { presentation?.RequestRefresh(); return true; }
                     // One press does one thing. A list closes before a drag or choice is cancelled; over the panel
@@ -886,7 +903,7 @@ namespace RailroaderScenePatcher {
             if (!open) CancelGizmo();
             SyncInputRegions();
             TickDuplicate(open);
-            if (open && selection?.Pending != null && inputBlocker?.WorldClick is Vector2 pointer) {
+            if (open && !Requests.Busy && selection?.Pending != null && inputBlocker?.WorldClick is Vector2 pointer) {
                 try { selection.Pick(pointer, presentation.WorldUiBounds()); selectionProblem = null; }
                 catch (Exception e) {
                     selection.Pending.Offer(Array.Empty<SelectionCandidate>());
@@ -928,18 +945,31 @@ namespace RailroaderScenePatcher {
             // clears it again where it is reported.
             var surfaceKey = ChangeStamp();
             if (surfaceKey != surfaceStamp) { surfaceStamp = surfaceKey; selection?.ClearSurface(); }
+            var terrainReadFailed = false;
             if (scene != null) try {
                 scene.Poll();
                 foreach (var failure in scene.Failures)
                     Report("terrain/" + world.Label(failure.Key) + "/" + failure.Value.Error, "Terrain output for " + world.Label(failure.Key) + " did not complete: " + failure.Value.Error + ". Completed: " + Join(failure.Value.Completed) + ". Outstanding: " + Join(failure.Value.Outstanding) + ". " + WindowGuidance.PlacementKeptUntilReload + " Report this to the patcher maintainer.");
-            } catch (Exception e) { Report("terrain", "The patcher couldn't check the terrain affected by the changes. " + WindowGuidance.ReloadMapBeforeRetrying + " Report this to the patcher maintainer. " + e.GetBaseException().Message); }
+            } catch (Exception e) {
+                terrainReadFailed = true;
+                Report("terrain", "The patcher couldn't check the terrain affected by the changes. " + WindowGuidance.ReloadMapBeforeRetrying + " Report this to the patcher maintainer. " + e.GetBaseException().Message);
+            }
             if (groundMasks != null) try {
                 groundMasks.Poll();
                 foreach (var failure in groundMasks.Failures) {
                     var label = failure.Key is GameObject moved && moved != null ? BoardScene.PathOf(moved.transform) : "an unloaded object";
                     Report("terrain/" + label + "/" + failure.Value.Error, "Terrain output for " + label + " didn't complete: " + failure.Value.Error + ". Completed: " + Join(failure.Value.Completed) + ". Outstanding: " + Join(failure.Value.Outstanding) + ". " + WindowGuidance.PlacementKeptUntilReload + " Report this to the patcher maintainer.");
                 }
-            } catch (Exception e) { Report("terrain-masks", "The patcher couldn't check the terrain affected by a ground mask. " + WindowGuidance.ReloadMapBeforeRetrying + " Report this to the patcher maintainer. " + e.GetBaseException().Message); }
+            } catch (Exception e) {
+                terrainReadFailed = true;
+                Report("terrain-masks", "The patcher couldn't check the terrain affected by a ground mask. " + WindowGuidance.ReloadMapBeforeRetrying + " Report this to the patcher maintainer. " + e.GetBaseException().Message);
+            }
+            if (Requests.WaitingForTerrain) {
+                Requests.ObserveTerrain(!terrainReadFailed && TerrainWorkingSince(editTerrain));
+                if (terrainReadFailed)
+                    feedback.AddNotice(TerrainPlace, "The patcher couldn't check the terrain update. " + WindowGuidance.ReloadMapBeforeRetrying);
+            }
+            ShowEditBusy();
             if (presentation != null) {
                 // A closed window shows nothing: it computes no snapshot. Opening builds the content anew.
                 if (open) {
@@ -1238,7 +1268,7 @@ namespace RailroaderScenePatcher {
                 // and is bound anew once the object was observed again. Another object gets a gizmo of its own.
                 if (ReferenceEquals(gizmoHandle, selected.Handle)) gizmo.Hold(); else CancelPlacementGizmo();
             } else if (key == gizmoArmKey) return;
-            if (Requests.Pending || refreshFrame != 0 || replayFrame != 0) return;
+            if (Requests.Busy || refreshFrame != 0 || replayFrame != 0) return;
             gizmoArmKey = key; gizmoHandle = selected.Handle;
             // A bell takes no rotation, so its gizmo starts on Move whatever tool was chosen last.
             BeginGizmo(CommandBand.RotationBlock(selected.Identity.Structure) != null ? UI.Gizmos.TransformGizmoMode.Move : gizmoTool);
@@ -1436,6 +1466,33 @@ namespace RailroaderScenePatcher {
             for (var i = 0; i < 6; i++) placementFields[i] = current[i];
             ReadBinding();
         }
+        sealed class EditDrafts {
+            internal SceneObservation Target;
+            internal (string Label, string[] Fields, string[] Draft)[] Groups;
+        }
+        EditDrafts ReadEditDrafts(string[] submitted = null) {
+            if (selected == null) return null;
+            var groups = new[] {
+                (Label: "Placement", Fields: placementFields, Observed: CurrentPlacement()),
+                (Label: "Track location", Fields: binding, Observed: CurrentBinding()),
+                (Label: "Segments", Fields: segmentFields, Observed: new[] { CommandBand.SegmentText(CurrentSegments()) }),
+                (Label: "Replacement ID", Fields: markerIdFields, Observed: new[] { CurrentMarkerId() })
+            }.Where(group => EnteredEditValues.IsDraft(group.Fields, group.Observed, submitted))
+                .Select(group => (group.Label, group.Fields, (string[])group.Fields.Clone())).ToArray();
+            return new EditDrafts { Target = selected, Groups = groups };
+        }
+        void RestoreEditDrafts(EditDrafts drafts) {
+            if (drafts == null) return;
+            var sameTarget = selected != null && ReferenceEquals(drafts.Target.Handle, selected.Handle) && TargetIdentity.SameObject(drafts.Target.Identity, selected.Identity);
+            // An edit can replace the observation or remove a target. Keep its result and any notice through that refresh.
+            feedback.Inspecting(selected?.Handle, preserve: true);
+            foreach (var draft in drafts.Groups) {
+                if (sameTarget)
+                    Array.Copy(draft.Draft, draft.Fields, draft.Fields.Length);
+                else
+                    feedback.AddNotice(ModificationPlace, "Unapplied " + draft.Label.ToLowerInvariant() + " values were cleared (" + String.Join(" / ", draft.Draft) + ").");
+            }
+        }
         void ReadNumericPlacement() {
             EndWorldEditAction();
             presentation?.ClearFocusForEdit();
@@ -1490,7 +1547,7 @@ namespace RailroaderScenePatcher {
         // consumes says the edit uses the target confirmed in the world: once it completed, that confirmation is used
         // up, and its "Confirmed" line leaves the message area.
         // guarded says the edit is refused while an earlier failure guards the object; Recheck, which ends that guard, is not.
-        void Edit(string place, string action, Func<PatchEditingSession, InspectedTarget, Outcome> change, bool consumes = false, Action<bool> completed = null, bool guarded = true) {
+        void Edit(string place, string action, Func<PatchEditingSession, InspectedTarget, Outcome> change, bool consumes = false, Action<bool> completed = null, bool guarded = true, string[] submitted = null) {
             EndWorldEditAction();
             presentation?.ClearFocusForEdit();
             Queue(place, action, pin => {
@@ -1498,10 +1555,11 @@ namespace RailroaderScenePatcher {
                 var truthful = IsPad && (place == PlacementPlace || place == SnapPlace || place == FollowPlace) ? CommandBand.PadPlacement(action) : null;
                 var target = selected?.Identity;
                 Func<Outcome> guard = guarded && target != null ? () => attachment.Session.GuardOutcome(target) : (Func<Outcome>)null;
+                var drafts = ReadEditDrafts(submitted);
                 var applied = feedback.Run(place, action, null, inventory, selected, inspection => change(attachment.Session, inspection), pin, truthful, guard);
                 if (applied) {
                     if (consumes) selection?.Consume();
-                    OwnChange(); RefreshAfterEdit();
+                    OwnChange(); RefreshAfterEdit(drafts);
                 }
                 completed?.Invoke(applied);
             }, () => completed?.Invoke(false));
@@ -1514,9 +1572,10 @@ namespace RailroaderScenePatcher {
         // so a change of the target up to the mutation is refused.
         void Queue(string place, string action, Action<Func<SceneObservation, InspectedTarget>> run, Action refused = null) {
             void Refuse(string reason) { feedback.Refuse(place, action, reason); refused?.Invoke(); }
+            if (Requests.RefuseBusyInput(place, action)) { refused?.Invoke(); return; }
             var blocked = selection?.Pending != null ? "a world selection is pending. " + WindowGuidance.ConfirmOrCancelChoice
                 : gizmo?.Active == true || PadGizmoDragging ? "the gizmo is active. " + WindowGuidance.CompleteOrCancelGizmo
-                : attachment == null ? "editing is unavailable" : Requests.Pending ? "another edit is still running" : null;
+                : attachment == null ? "editing is unavailable" : null;
             if (blocked != null) { feedback.Run(place, action, blocked, inventory, selected, null); refused?.Invoke(); return; }
             ResetSnapState();
             if (CommandBand.ClearsConnectionsPreviewOnQueue(place)) ResetConnectionsPreview();
@@ -1532,6 +1591,7 @@ namespace RailroaderScenePatcher {
                 var passes = queuedPasses; var compared = queuedCompared;
                 run(entry => compared ? inventory.PinCompared(entry) : inventory.PinAfterPass(entry, passes, true));
             });
+            ShowEditBusy();
         }
         // The preview compares the scene as an edit does: without a blocking scan.
         void PrepareCoverage(PatchEditingSession session, TargetIdentity identity, string circuit, CircuitCoverage value, string addition) {
@@ -1684,11 +1744,37 @@ namespace RailroaderScenePatcher {
         // ending the load attempt cancel it with a refusal: Cancel applies to every pending interaction.
         RequestQueue requests;
         RequestQueue Requests => requests ?? (requests = new RequestQueue(feedback));
+        (long Signs, long Masks) editTerrain;
+        (long Signs, long Masks) TerrainRevision() => (scene?.TerrainRevision ?? 0, groundMasks?.TerrainRevision ?? 0);
+        bool TerrainWorkingSince((long Signs, long Masks) revision) =>
+            scene?.TerrainWorkingSince(revision.Signs) == true || groundMasks?.TerrainWorkingSince(revision.Masks) == true;
+        void WaitForEditTerrain((long Signs, long Masks) revision) {
+            if (TerrainWorkingSince(revision)) {
+                if (!Requests.WaitingForTerrain) editTerrain = revision;
+                Requests.WaitForTerrain();
+            }
+            ShowEditBusy();
+        }
+        void TrackEditTerrain(Action edit) {
+            var revision = TerrainRevision();
+            try { edit(); }
+            finally { WaitForEditTerrain(revision); }
+        }
+        T TrackEditTerrain<T>(Func<T> edit) {
+            var revision = TerrainRevision();
+            try { return edit(); }
+            finally { WaitForEditTerrain(revision); }
+        }
+        void ShowEditBusy() {
+            Requests.ShowBusyRefusals();
+            presentation?.SetEditBusy(Requests.Busy, Requests.WaitingForTerrain, Requests.Pending);
+        }
         void CancelRequest(string reason) {
             var snapPending = Requests.Place == SnapPlace;
             if (!Requests.Cancel(reason)) return;
             if (snapPending) EndWorldEditAction();
             inventory?.CancelFreshnessCheck();
+            ShowEditBusy();
             presentation?.RequestRefresh();
         }
         // Takes the placement gizmo and a crossing pad's distance gizmo away. A drag in progress is cancelled and
@@ -1717,13 +1803,20 @@ namespace RailroaderScenePatcher {
                 var root = new GameObject("CrankyAnt Scene Patcher transform gizmo");
                 root.transform.SetParent(transform, false);
                 gizmo = root.AddComponent<GizmoController>();
-                gizmo.Initialize(engine, capabilities, attachment, selected.Identity, inspection, mode, (outcome, message) => {
+                var terrainBeforeGizmo = TerrainRevision();
+                EditDrafts drafts = null;
+                gizmo.Initialize(engine, capabilities, attachment, selected.Identity, inspection, mode, () => Requests.Busy, () => {
+                    terrainBeforeGizmo = TerrainRevision();
+                    drafts = ReadEditDrafts();
+                }, (outcome, message) => {
                     gizmo = null; gizmoEnded = Time.frameCount;
                     // The gizmo comes back for the next drag once the object was observed again.
                     gizmoArmKey = null;
                     if (outcome?.Applied == true && !outcome.Unchanged) ResetConnectionsPreview();
                     feedback.Report(GizmoPlace, message ?? (outcome?.Applied == true ? (outcome.Unchanged ? "Gizmo released without a move; nothing changed." : IsPad ? CommandBand.PadPlacement("Gizmo placement") : "Gizmo placement completed.") : "Gizmo placement refused: " + outcome?.Error));
-                    OwnChange(); RefreshAfterEdit(); attachment?.RefreshChrome();
+                    OwnChange(); RefreshAfterEdit(drafts);
+                    WaitForEditTerrain(terrainBeforeGizmo);
+                    attachment?.RefreshChrome();
                 });
             } catch (Exception e) { gizmo = null; GizmoUnavailable(e); }
         }
@@ -1748,8 +1841,8 @@ namespace RailroaderScenePatcher {
                 foreach (var line in SceneObjectChecks.Summary(GroupWorld.Report())) PatcherLog.Debug(LoadAttempt.Label + ": " + line);
             } catch (Exception e) { PatcherLog.Debug(LoadAttempt.Label + ": The patcher couldn't report the scene object checks: " + e.GetBaseException().Message); }
         }
-        void Inspect() {
-            feedback.Refreshed();
+        void Inspect(bool preserveFeedback = false) {
+            if (!preserveFeedback) feedback.Refreshed();
             ClearSnap();
             try {
                 if (inventory == null) throw new InvalidOperationException("Inspection is unavailable");

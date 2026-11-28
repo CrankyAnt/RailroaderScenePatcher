@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // A controlled board world with the lifecycle the game's components have: enabling a board registers its
@@ -127,6 +128,7 @@ static class BoardTests {
         FailedMutationRestoresBoardAndRegistrations();
         UnverifiedRestorationGuardsRetry();
         TerrainOutputFollowsTheEdit();
+        WindowWaitsForEditedTerrain();
         TerrainWriteFailureIsReportedAndRetryable();
         RestorationWaitsForTerrainOutput();
         ModdedBoardFollowsHistoryAndRemoval();
@@ -328,6 +330,38 @@ static class BoardTests {
         engine.Apply(Doc(Mod("move", Place(Far))), "author/pack");
         Assert(boards.Output(board).Outstanding.Count == 1 && boards.Output(board).Completed.Count == 1, "A position whose tile is not built needs no rebuild; the tile builds from the current mask");
         Assert(!Near(board.Position, original) && Near(board.Position, Far) && Consistent(world, board), "The board moves although the tile of its new position is not built");
+    }
+    static void WindowWaitsForEditedTerrain() {
+        var (world, _, boards, engine) = Setup();
+        using (boards) {
+            var queue = new RequestQueue(new EditFeedback());
+            var revision = boards.TerrainRevision;
+            queue.Enqueue("Placement", "Move", () => {
+                engine.Apply(Doc(Mod("move", Place(Far))), "author/pack");
+                if (boards.TerrainWorkingSince(revision)) queue.WaitForTerrain();
+            });
+            queue.Run();
+            world.BuildTiles("51,0");
+            boards.Poll();
+            queue.ObserveTerrain(boards.TerrainWorkingSince(revision));
+            Assert(queue.Busy, "The window stays busy after the first of the two tiles is rebuilt");
+            world.BuildTiles();
+            boards.Poll();
+            queue.ObserveTerrain(boards.TerrainWorkingSince(revision));
+            Assert(!queue.Busy, "The window takes input again after both tiles rebuild");
+
+            revision = boards.TerrainRevision;
+            queue.Enqueue("Placement", "Move back", () => {
+                engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
+                if (boards.TerrainWorkingSince(revision)) queue.WaitForTerrain();
+            });
+            queue.Run();
+            Assert(queue.Busy, "Moving back starts another terrain wait");
+            world.Clock = TerrainOutput.Timeout + 1;
+            boards.Poll();
+            queue.ObserveTerrain(boards.TerrainWorkingSince(revision));
+            Assert(!queue.Busy && boards.Failures.Any(), "A terrain timeout ends the busy state and leaves a failure report");
+        }
     }
     static void TerrainWriteFailureIsReportedAndRetryable() {
         var (world, board, boards, engine) = Setup();

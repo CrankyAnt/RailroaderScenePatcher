@@ -29,7 +29,7 @@ namespace RailroaderScenePatcher {
             if (padGizmo != null && padGizmo.Closed) padGizmo = null;
             if (PadGizmoDragging) return;
             var wanted = CommandBand.ShowsPadGizmo(IsPad, inspectorTab.Value == ConnectionsTab, EditBlock() == null, selection?.Pending != null, guided.Enabled)
-                && attachment != null && trackPoses != null && !Requests.Pending && refreshFrame == 0 && replayFrame == 0;
+                && attachment != null && trackPoses != null && !Requests.Busy && refreshFrame == 0 && replayFrame == 0;
             TrackLocation start = null;
             if (wanted) {
                 try { start = PadDistance.Start(trackPoses, binding[0], EnteredEditValues.TrackLocation(binding)); } catch { start = null; }

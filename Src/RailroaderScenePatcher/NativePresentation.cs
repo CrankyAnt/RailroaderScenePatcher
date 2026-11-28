@@ -110,12 +110,16 @@ namespace RailroaderScenePatcher {
             if (reason != null && Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=file lock"); }
             if (reason != null && HelpRegion != WindowHelpRegion) CloseHelp();
             if (divider != null) divider.enabled = reason == null;
-            SetTitleRepairControls();
+            SetTitleControls();
         }
-        void SetTitleRepairControls() {
+        void SetTitleControls() {
             foreach (var rect in new[] { titleReset, titleClose, titleCompact }) {
                 var button = rect == null ? null : rect.GetComponent<Button>();
-                if (button != null) button.interactable = !repairMode;
+                if (button != null) button.interactable = !repairMode && !editBusy;
+            }
+            foreach (var rect in new[] { titleHelp, titleDetails }) {
+                var button = rect == null ? null : rect.GetComponent<Button>();
+                if (button != null) button.interactable = !editBusy;
             }
             // The native close button has no tooltip of its own; it gets one only to say why it is unavailable.
             if (titleClose != null) {
@@ -268,7 +272,7 @@ namespace RailroaderScenePatcher {
             }
             AddCompactIcon(manager, close.transform.parent);
             PlaceTitleHelp();
-            SetTitleRepairControls();
+            SetTitleControls();
         }
         // Draws a glyph of 56 x 56 pixels with a soft edge, white so that the image tints it. covers says whether a
         // point of the texture, rows counted from the bottom, lies in the drawing.
@@ -663,8 +667,55 @@ namespace RailroaderScenePatcher {
             finally { UnityEngine.Object.Destroy(holder); }
         }
 
-        // The window itself does not scroll: the layout owns its columns, and each scrolling region is built with Scroll.
-        void BuildContent(UIPanelBuilder builder) { scroll = null; content(builder); }
+        // Block pointer hits above every content control without rebuilding during a click or focused text edit.
+        // The native title bar stays outside this overlay so the window can still move.
+        bool editBusy;
+        RectTransform busyOverlay;
+        TMP_Text busyText;
+        Button busyCancel;
+        UI.Common.PanelResizer busyResizer;
+        internal Action CancelEdit;
+
+        void BuildContent(UIPanelBuilder builder) {
+            scroll = null;
+            content(builder);
+            busyOverlay = builder.VStack(column => {
+                column.HStack(row => {
+                    busyText = row.AddLabel("").GetComponent<TMP_Text>();
+                    busyCancel = row.AddButtonCompact("Cancel", () => CancelEdit?.Invoke()).RectTransform.GetComponent<Button>();
+                    row.Spacer();
+                }).Height(32);
+            });
+            (busyOverlay.GetComponent<LayoutElement>() ?? busyOverlay.gameObject.AddComponent<LayoutElement>()).ignoreLayout = true;
+            busyOverlay.anchorMin = Vector2.zero; busyOverlay.anchorMax = Vector2.one;
+            busyOverlay.offsetMin = busyOverlay.offsetMax = Vector2.zero;
+            busyOverlay.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.6f);
+            busyOverlay.gameObject.AddComponent<CanvasGroup>().ignoreParentGroups = true;
+            busyOverlay.gameObject.SetActive(editBusy);
+        }
+
+        internal void SetEditBusy(bool busy, bool terrain, bool canCancel) {
+            if (editBusy != busy) {
+                editBusy = busy;
+                SetTitleControls();
+                var contentArea = window.NativeWindow.contentRectTransform;
+                var group = contentArea.GetComponent<CanvasGroup>() ?? contentArea.gameObject.AddComponent<CanvasGroup>();
+                group.interactable = !busy;
+                if (busy) {
+                    ClearFocus();
+                    var grip = window.GetComponentInChildren<UI.Common.PanelResizer>(true);
+                    if (grip != null && grip.enabled) { busyResizer = grip; grip.enabled = false; }
+                } else if (busyResizer != null) {
+                    busyResizer.enabled = true;
+                    busyResizer = null;
+                }
+            }
+            if (busyOverlay == null) return;
+            var text = terrain ? "Updating terrain..." : "Working...";
+            if (busyText.text != text) busyText.text = text;
+            if (busyCancel != null) busyCancel.gameObject.SetActive(canCancel);
+            if (busyOverlay.gameObject.activeSelf != busy) busyOverlay.gameObject.SetActive(busy);
+        }
         // The mod-built divider between two columns: dragging it sets the width of the column on its left. The native
         // builders have no splitter; this control is the recorded exception to native construction.
         ColumnDivider divider;
@@ -720,7 +771,7 @@ namespace RailroaderScenePatcher {
             return view;
         }
         internal Action Action(Action action) => () => {
-            if (disposed || !IsOpen) return;
+            if (disposed || !IsOpen || editBusy) return;
             action(); dirty = true;
         };
         internal void RequestRefresh() { dirty = true; }
@@ -804,7 +855,7 @@ namespace RailroaderScenePatcher {
                 new[] { bounds.x, bounds.y, bounds.width, bounds.height, Screen.width, Screen.height });
         }
         void EntryClicked() {
-            if (disposed) return;
+            if (disposed || editBusy) return;
             try { Logged?.Invoke(WindowState("icon clicked")); } catch { }
             Toggle();
         }
@@ -815,7 +866,7 @@ namespace RailroaderScenePatcher {
             Layout(true);
         }
         void Close() {
-            if (disposed) return;
+            if (disposed || editBusy) return;
             if (Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=close"); }
             ClearFocus();
             window.NativeWindow.CloseWindow();
@@ -899,7 +950,7 @@ namespace RailroaderScenePatcher {
             // release before the game's event system handled it, destroys the control and loses the click. The
             // panel is rebuilt only once the pointer has been up for a frame.
             if (Input.GetMouseButton(0) || Input.GetMouseButtonUp(0) || Input.GetMouseButtonDown(0)) pointerFrame = Time.frameCount;
-            if (dirty && IsOpen && !Input.GetMouseButton(0) && Time.frameCount > pointerFrame + 1 && !window.GetComponentsInChildren<TMP_InputField>().Any(f => f.isFocused)) {
+            if (dirty && IsOpen && !editBusy && !Input.GetMouseButton(0) && Time.frameCount > pointerFrame + 1 && !window.GetComponentsInChildren<TMP_InputField>().Any(f => f.isFocused)) {
                 restoreScroll = scroll == null ? (float?)null : scroll.content.anchoredPosition.y;
                 dirty = false; window.Refresh();
                 // The rebuilt scroll views take the native wheel step now and once more after their own start.

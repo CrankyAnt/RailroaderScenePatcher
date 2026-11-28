@@ -108,7 +108,8 @@ namespace RailroaderScenePatcher {
         }
         void ApplyImport() {
             var session = attachment.Session;
-            var result = session.ApplyImport();
+            var drafts = ReadEditDrafts();
+            var result = TrackEditTerrain(session.ApplyImport);
             feedback.ObserveFileVersion(session, RecoveryPlace);
             if (!result.Applied) { feedback.Report(ImportPlace, "Import failed. " + CommandBand.Sentence(result.Error)); }
             else {
@@ -117,6 +118,7 @@ namespace RailroaderScenePatcher {
                 // The fields show the imported placement; the session value from before Import never stays behind.
                 ReadPlacement();
                 feedback.Report(ImportPlace, FilePanelState.Completed(session.LastImport, session.Outstanding(false).Contains(PatchEditingSession.PatchData)));
+                RestoreEditDrafts(drafts);
             }
             VersionChanged();
         }

@@ -139,6 +139,8 @@ namespace RailroaderScenePatcher.Core {
         }
         // Advances the completion of the tracked terrain output; called every frame.
         public void Poll() => output.Poll();
+        public long TerrainRevision => output.Revision;
+        public bool TerrainWorkingSince(long revision) => output.WorkingSince(revision);
         public DependentOutput Output(object target) => output.Output(target);
         public void RetryOutput(object target) => output.RetryOutput(target);
         // The edited objects whose terrain output stopped without completing, with their reports.

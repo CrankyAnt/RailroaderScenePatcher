@@ -129,7 +129,7 @@ namespace RailroaderScenePatcher {
             var id = markerIdFields[0];
             var reason = CommandBand.MarkerIdSetReason(null, id, CurrentMarkerId());
             if (reason != null) { feedback.Refuse(MarkerIdPlace, "Set marker ID", reason); return; }
-            Edit(MarkerIdPlace, "Set marker ID " + id, (edit, inspection) => edit.SetMarkerId(identity, id, inspection));
+            Edit(MarkerIdPlace, "Set marker ID " + id, (edit, inspection) => edit.SetMarkerId(identity, id, inspection), submitted: markerIdFields);
         }
         // The duplicate explanation of a holder that can receive a replacement ID offers the repair, active or not: for
         // the inspected marker through its guided task and, beside it, through the Replacement marker ID section of its Connections

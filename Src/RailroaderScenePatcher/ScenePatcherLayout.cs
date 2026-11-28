@@ -1342,7 +1342,7 @@ namespace RailroaderScenePatcher {
             var identity = selected.Identity;
             var ids = CommandBand.SegmentIds(segmentFields[0]);
             if (ids.Count == 0) { feedback.Refuse(SegmentsPlace, "Construction segments", "the segment ID list is empty. " + WindowGuidance.EnterSegmentId); return; }
-            Edit(SegmentsPlace, "Construction segments", (current, inspection) => current.SetConstructionSegments(identity, ids, inspection), true);
+            Edit(SegmentsPlace, "Construction segments", (current, inspection) => current.SetConstructionSegments(identity, ids, inspection), true, submitted: segmentFields);
         }
         bool HasBindingValue(TargetIdentity identity) {
             try { return attachment != null && identity != null && attachment.Session.HasTrackBinding(identity); } catch { return false; }
@@ -1814,7 +1814,7 @@ namespace RailroaderScenePatcher {
                     if (idle == null) { var output = inspectedOutput.Of(attachment.Session, selected, out _); if (output.Outstanding.Count == 0) idle = "No terrain is pending."; }
                     return new[] {
                         Slot("Retry", "Ask the game to rebuild the pending terrain again.", idle, () => {
-                            var outcome = attachment.Session.RetryOutput(identity);
+                            var outcome = TrackEditTerrain(() => attachment.Session.RetryOutput(identity));
                             feedback.Report(TerrainPlace, outcome.Applied ? "Terrain requested again." : "Terrain retry refused: " + outcome.Error);
                         }, "Retry terrain output") };
                 }
@@ -1906,7 +1906,7 @@ namespace RailroaderScenePatcher {
                 feedback.Refuse(BindingPlace, "Track location", "the segment ID, end a or b, or numeric distance is missing or invalid. " + WindowGuidance.EnterTrackLocation);
                 return;
             }
-            Edit(BindingPlace, CommandBand.StarterAction(location.Segment, location.End, location.Distance), (current, inspection) => current.PlaceStarter(identity, location, inspection), true);
+            Edit(BindingPlace, CommandBand.StarterAction(location.Segment, location.End, location.Distance), (current, inspection) => current.PlaceStarter(identity, location, inspection), true, submitted: binding);
         }
         bool HasActivityValue(TargetIdentity identity) {
             try { return attachment != null && identity != null && attachment.Session.HasActivityValue(identity); } catch { return false; }
@@ -1915,7 +1915,7 @@ namespace RailroaderScenePatcher {
             var identity = selected.Identity;
             var placement = EnteredPlacement(placementFields, PlacementValues(), selected);
             if (placement == null) { feedback.Refuse(PlacementPlace, "Placement", "the six position and rotation values aren't valid numbers. " + WindowGuidance.EnterPlacement); return; }
-            Edit(PlacementPlace, "Placement", (current, inspection) => current.Edit(identity, placement, null, inspection));
+            Edit(PlacementPlace, "Placement", (current, inspection) => current.Edit(identity, placement, null, inspection), submitted: placementFields);
         }
         void ApplyBinding() {
             var identity = selected.Identity;
@@ -1927,7 +1927,7 @@ namespace RailroaderScenePatcher {
             // The result names the binding the edit stores: a crossing pad's End b entry from End a.
             location = StoredBinding(location);
             var value = MarkerBinding.At(location);
-            Edit(BindingPlace, CommandBand.BindingAction(location.Segment, location.End, location.Distance), (current, inspection) => current.Bind(identity, value, inspection), true);
+            Edit(BindingPlace, CommandBand.BindingAction(location.Segment, location.End, location.Distance), (current, inspection) => current.Bind(identity, value, inspection), true, submitted: binding);
         }
 
         // The World choice section of the session details window: what the choice is for, the candidate that was clicked, and

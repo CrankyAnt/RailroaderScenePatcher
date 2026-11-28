@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Collections.Generic;
 
 namespace RailroaderScenePatcher {
     // The one edit or preview that waits until the panel knows its snapshot agrees with the scene. A request belongs to
@@ -12,20 +13,42 @@ namespace RailroaderScenePatcher {
         readonly EditFeedback feedback;
         Action run;
         string action;
+        bool running, refreshing;
+        readonly List<(string Place, string Action)> busyRefusals = new List<(string, string)>();
+        internal bool WaitingForTerrain { get; private set; }
         internal RequestQueue(EditFeedback feedback) { this.feedback = feedback ?? throw new ArgumentNullException(nameof(feedback)); }
         // The action group of the waiting request, or null. The message area shows it with "Working...".
         internal string Place { get; private set; }
         internal bool Pending => run != null;
+        internal bool Busy => Pending || running || refreshing || WaitingForTerrain;
+        internal void WaitForRefresh() { refreshing = true; }
+        internal void Refreshed() { refreshing = false; }
+        internal void WaitForTerrain() { WaitingForTerrain = true; }
+        internal void ObserveTerrain(bool working) { if (!working) WaitingForTerrain = false; }
+        internal bool RefuseBusyInput(string place, string action) {
+            if (!Busy) return false;
+            busyRefusals.Add((place, action));
+            return true;
+        }
+        internal void ShowBusyRefusals() {
+            if (Busy) return;
+            foreach (var refusal in busyRefusals)
+                feedback.AddNotice(refusal.Place, refusal.Action + " refused. Another edit is still running.");
+            busyRefusals.Clear();
+        }
         // Takes a request. One request waits at a time; a second one is refused by its caller before it gets here.
         internal void Enqueue(string place, string action, Action run) {
-            if (Pending) throw new InvalidOperationException("Another request is still waiting");
+            if (Busy) throw new InvalidOperationException("Another edit is still running");
             this.run = run ?? throw new ArgumentNullException(nameof(run)); Place = place; this.action = action;
         }
         // Runs the waiting request once and forgets it, whatever it does.
         internal void Run() {
             var request = run;
             run = null; Place = null; action = null;
-            request?.Invoke();
+            if (request == null) return;
+            running = true;
+            try { request(); }
+            finally { running = false; }
         }
         // The inspection ends: the results of the object that was inspected go, and a request that still waited for it
         // is refused. The refusal comes last, so it stays where the results were. Returns whether a request was waiting.

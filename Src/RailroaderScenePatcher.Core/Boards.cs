@@ -169,6 +169,8 @@ namespace RailroaderScenePatcher.Core {
         // Dependent terrain output.
         void Track(object target, double[] position) => output.Track(target, position);
         public void Poll() => output.Poll();
+        public long TerrainRevision => output.Revision;
+        public bool TerrainWorkingSince(long revision) => output.WorkingSince(revision);
         public DependentOutput Output(object target) => output.Output(target);
         public void RetryOutput(object target) => output.RetryOutput(target);
         // Boards whose dependent output stopped without completing, with their reports.
