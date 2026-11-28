@@ -17,7 +17,7 @@ namespace RailroaderScenePatcher {
         readonly List<(string Place, string Action)> busyRefusals = new List<(string, string)>();
         internal bool WaitingForTerrain { get; private set; }
         internal RequestQueue(EditFeedback feedback) { this.feedback = feedback ?? throw new ArgumentNullException(nameof(feedback)); }
-        // The action group of the waiting request, or null. The message area shows it with "Working...".
+        // The action group of the waiting request, or null. The message area shows it with "In progress...".
         internal string Place { get; private set; }
         internal bool Pending => run != null;
         internal bool Busy => Pending || running || refreshing || WaitingForTerrain;

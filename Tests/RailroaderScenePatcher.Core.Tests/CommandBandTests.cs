@@ -1025,7 +1025,7 @@ static class CommandBandTests {
         queue.Refreshed();
         Check(!queue.Busy, "Input resumes after the terrain and window values are ready");
         queue.Enqueue("Placement", "Move again", () => writes++);
-        Check(queue.Cancel("you cancelled the edit before it ran") && !queue.Busy && writes == 1,
+        Check(queue.Cancel("you cancelled before the edit ran") && !queue.Busy && writes == 1,
             "Cancel unlocks the window and drops the waiting edit");
     }
     static void InputAlreadySubmittedWhenBusyIsReported() {

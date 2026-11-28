@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace RailroaderScenePatcher {
     internal static class WorldMarkingDiagnostics {
-        internal const string DrawFailed = "Couldn't draw world markings.";
+        internal const string DrawFailed = "Couldn't show world markings.";
 
         internal static IEnumerable<string> RendererLines<T>(IReadOnlyList<T> renderers, Func<T, bool> isLive, Func<T, int, string> describe) {
             for (var index = 0; index < renderers.Count; index++) {

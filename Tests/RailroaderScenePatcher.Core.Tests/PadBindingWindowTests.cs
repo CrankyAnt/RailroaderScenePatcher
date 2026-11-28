@@ -65,7 +65,7 @@ static class PadBindingWindowTests {
         Check(CommandBand.PadEndNote(new[] { "S1", "a", "12" }, 130.945) == CommandBand.PadStoredFromEndA, "End a gives the short rule: " + CommandBand.PadEndNote(new[] { "S1", "a", "12" }, 130.945));
         Check(CommandBand.PadStoredFromEndA.Contains("End a") && CommandBand.PadStoredFromEndA.Length <= 40, "the rule is short: " + CommandBand.PadStoredFromEndA);
         var converted = CommandBand.PadEndNote(new[] { "S1", "b", "30" }, 130.945);
-        Check(converted == "Stored as End a, 100.945 m: the same place.", "End b shows the stored place: " + converted);
+        Check(converted == "Same place, stored as End a, 100.945 m.", "End b shows the stored place: " + converted);
         Check(CommandBand.PadEndNote(new[] { "S1", "B", " 30 " }, 130.945) == converted, "upper case and spaces read alike");
         Check(CommandBand.PadEndNote(new[] { "S1", "b", "x" }, 130.945) == CommandBand.PadStoredFromEndA && CommandBand.PadEndNote(new[] { "Gone", "b", "30" }, null) == CommandBand.PadStoredFromEndA
             && CommandBand.PadEndNote(new[] { "S1", "b", "200" }, 130.945) == CommandBand.PadStoredFromEndA, "without a place on a loaded segment only the rule shows");

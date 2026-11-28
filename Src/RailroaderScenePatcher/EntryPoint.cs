@@ -581,7 +581,7 @@ namespace RailroaderScenePatcher {
                     CancelRequest("the panel was closed before the request ran");
                 });
                 presentation.ResetRequested = ResetLayout;
-                presentation.CancelEdit = () => CancelRequest("you cancelled the edit before it ran");
+                presentation.CancelEdit = () => CancelRequest("you cancelled before the edit ran");
                 presentation.CompactSwitched = LogCompactSwitch;
                 presentation.AutoOpenReady = SessionReady;
                 presentation.Logged = line => PatcherLog.Debug(line);
@@ -862,7 +862,7 @@ namespace RailroaderScenePatcher {
             var escapable = Requests.Busy || !(presentation != null && presentation.FieldFocused) && (selection?.Pending != null || gizmo?.Active == true || PadGizmoDragging || Time.frameCount <= gizmoEnded + 1 || EscapeGizmo() || EscapeSnap() || PlacingModObject);
             if (escapable != escapeHeld) try {
                 if (escapable) UI.GameInput.RegisterEscapeHandler(UI.GameInput.EscapeHandler.Transient, () => {
-                    if (Requests.Busy) { CancelRequest("you cancelled the edit before it ran"); return true; }
+                    if (Requests.Busy) { CancelRequest("you cancelled before the edit ran"); return true; }
                     // While a mod object is being placed, Escape stops placing and returns to the blank object window.
                     if (duplicate.Release()) { presentation?.RequestRefresh(); return true; }
                     // One press does one thing. A list closes before a drag or choice is cancelled; over the panel
@@ -968,7 +968,7 @@ namespace RailroaderScenePatcher {
             if (Requests.WaitingForTerrain) {
                 Requests.ObserveTerrain(!terrainReadFailed && TerrainWorkingSince(editTerrain));
                 if (terrainReadFailed)
-                    feedback.AddNotice(TerrainPlace, "The patcher couldn't check the terrain update. " + WindowGuidance.ReloadMapBeforeRetrying);
+                    feedback.AddNotice(TerrainPlace, "Couldn't verify the terrain update. " + WindowGuidance.ReloadMapBeforeRetrying);
             }
             ShowEditBusy();
             if (presentation != null) {
@@ -1491,7 +1491,7 @@ namespace RailroaderScenePatcher {
                 if (sameTarget)
                     Array.Copy(draft.Draft, draft.Fields, draft.Fields.Length);
                 else
-                    feedback.AddNotice(ModificationPlace, "Unapplied " + draft.Label.ToLowerInvariant() + " values were cleared (" + String.Join(" / ", draft.Draft) + ").");
+                    feedback.AddNotice(ModificationPlace, "Cleared unapplied values for " + draft.Label + " (" + String.Join(" / ", draft.Draft) + ").");
             }
         }
         void ReadNumericPlacement() {
@@ -1568,7 +1568,7 @@ namespace RailroaderScenePatcher {
         // Runs an edit or a preview for the object that is inspected now, once the snapshot is known to agree with the
         // scene. When it was compared since the last foreign change, that is the next frame. Otherwise the comparison
         // of the whole scene runs first as a stepped pass, a few milliseconds a frame, so the game keeps running, and
-        // the message area says "Working..." meanwhile. A pass that finds a difference marks the inventory stale, and
+        // the message area says "In progress..." meanwhile. A pass that finds a difference marks the inventory stale, and
         // the request is refused with that reason. Either way the pin it gets observes the target at every validation,
         // so a change of the target up to the mutation is refused.
         void Queue(string place, string action, Action<Func<SceneObservation, InspectedTarget>> run, Action refused = null) {

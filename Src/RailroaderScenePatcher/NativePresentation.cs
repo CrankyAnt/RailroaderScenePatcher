@@ -711,7 +711,7 @@ namespace RailroaderScenePatcher {
                 }
             }
             if (busyOverlay == null) return;
-            var text = terrain ? "Updating terrain..." : "Working...";
+            var text = terrain ? "Updating terrain..." : "In progress...";
             if (busyText.text != text) busyText.text = text;
             if (busyCancel != null) busyCancel.gameObject.SetActive(canCancel);
             if (busyOverlay.gameObject.activeSelf != busy) busyOverlay.gameObject.SetActive(busy);

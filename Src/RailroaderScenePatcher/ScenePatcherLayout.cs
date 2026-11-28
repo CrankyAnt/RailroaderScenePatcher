@@ -1286,7 +1286,7 @@ namespace RailroaderScenePatcher {
             // fields, disabled with its own reason.
             if (HoldsBinding) {
                 Section(builder, pad ? "Crossing pad binding" : "Track binding");
-                ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move. End is a or b. Distance is measured in meters from the End you entered, along the whole segment. A pad is stored from End a: an End b location is stored as the same place from End a. The gizmo on the pad moves it along the segment." : "The track location this marker is registered at. A binding edit does not move the object. End is a or b.", column => column == 2, pad ? SegmentLengthLabel : (Action<UIPanelBuilder>)null);
+                ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, pad ? "This is where the pad's marker is registered on the track. Set a location to rebuild the pad there. The pad object stays in place. Enter a or b in End and a value in Distance. The distance counts in meters from that end along the segment. The patcher stores the same location from End a even if you enter End b. Drag the gizmo to move the pad along the segment." : "The track location this marker is registered at. A binding edit does not move the object. End is a or b.", column => column == 2, pad ? SegmentLengthLabel : (Action<UIPanelBuilder>)null);
                 if (pad) padEndNote = Line(builder, "<style=Footnote>" + Literal(PadEndNoteNow()) + "</style>", null, null).GetComponentInChildren<TMP_Text>(true);
                 if (pad && padGizmo?.Shown == true) Line(builder, "<style=Footnote>" + Literal(CommandBand.PadGizmoState(false)) + "</style>", null, null);
                 FieldLabel(builder, "Current binding");
@@ -1476,7 +1476,7 @@ namespace RailroaderScenePatcher {
             var confirmedForInspected = selected != null && confirmation?.Source != null && confirmation.Source.Equals(SelectionIdentity.SceneObject(selected.Identity));
             // The message area holds no version choice: that stands in the file panel.
             var primary = feedback.Primary(session, Requests.Place != null, pending != null, confirmedForInspected);
-            if (primary == EditFeedback.PrimaryMessage.Working) { source = Requests.Place; state = "Working..."; }
+            if (primary == EditFeedback.PrimaryMessage.Working) { source = Requests.Place; state = "In progress..."; }
             else if (primary == EditFeedback.PrimaryMessage.WorldChoice) {
                 var candidate = selection.Find(pending.Candidate);
                 source = "World choice";
@@ -2083,7 +2083,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Set, Detach, Clear binding", "Click Set to register the marker at the location you entered. Click Detach to remove it from the track. Click Clear binding to restore its underlying binding." },
                     new[] { "Crossing coverage", "Each circuit has an approach A, an island, and an approach B. Select which tracks the circuit covers, or detach it. A nearby track is covered only if it's part of a circuit. Click Preview to see the result for every circuit before you click Apply." },
                     new[] { "Detection addition", "To give an extra track its own circuit, enter an ID, click Add detection, and select the tracks for its three spans. Use Delete to remove the addition." },
-                    new[] { "Lights and gates", "To add a copy of a light or gate already loaded in the crossing's scene, click its Use button. The crossing controller operates it and shows or hides it with its own equipment. The list shows only usable choices. If several crossings share a source, it appears once." },
+                    new[] { "Lights and gates", "To add a copy of a light or gate already loaded in the crossing's scene, click its Use button. The crossing controller operates it and shows or hides it with its own equipment. The list shows only usable choices. A source shared by several crossings appears once." },
                     new[] { "Bells", "Add a bell that sounds like one the game uses at grade crossings. It rings whenever the crossing controller rings its own bell. The list shows only usable choices. If several crossings use the same bell definition, it appears once." },
                     new[] { "Crossing pad", "A pad uses its marker's binding. Setting the binding rebuilds the pad along the track at that location and leaves the pad object in place. To hide the pad, disable it. Detach is unavailable." },
                     new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },

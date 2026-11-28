@@ -86,7 +86,7 @@ Applying moves the object and creates or updates its modification in the scene p
 
 Every edit uses the observation you inspected. The patcher refuses an edit if the object, its placement, activity, bindings, or dependencies have changed since that observation, or if the inventory is stale.
 
-The first message slot shows the action group and **Working...** until the edit finishes, then shows a result such as `Placement completed.` A completed edit refreshes the inventory a moment later. After Undo, Redo, or a native edit, click **Refresh** before editing again. If you forget, the refusal tells you to refresh.
+The first message slot shows the action group and **In progress...** until the edit finishes. It then shows a result such as `Placement completed.` A completed edit refreshes the inventory a moment later. After Undo, Redo, or a native edit, click **Refresh** before editing again. If you forget, the refusal tells you to refresh.
 
 A refused edit, or one that does not run, reports why. The message area shows the newest message at the top and dims older messages beneath it. Every message starts with its action group. A **Gizmo** result keeps the previous **Copy ID** result below it. Only the latest automatic follow-up message, such as **Terrain output**, remains, so follow-up messages do not displace the action result. Scroll if the messages do not fit. Inspecting another object clears them all.
 
