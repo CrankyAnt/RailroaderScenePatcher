@@ -4,7 +4,7 @@
 
 A crossing pad is the road surface laid across the rails at a grade crossing. To move it in the native map editor, set or replace its track binding. This guide explains how to change that binding and what happens to the pad's geometry.
 
-The pad object has a `Track.TrackMarker` and a `Track.TrackCurveMeshBuilder`. The builder generates the pad mesh along the track curves around the marker's location, so the binding determines where the pad lies. The **Placement** tab shows the object's placement, but **Numeric**, **Gizmo**, **Snap**, and **Follow** are inactive for pads. None of these modes changes the binding used to generate the geometry.
+The pad object has a `Track.TrackMarker` and a `Track.TrackCurveMeshBuilder`. The builder generates the pad mesh along the track curves around the marker's location, so the binding determines where the pad lies. The **Placement** tab shows the object's placement, but **Numeric**, **Gizmo**, **Snap**, and **Follow** are inactive for pads. None of these modes changes the binding used to generate the geometry. To move a pad with a gizmo, use the gizmo on its **Connections** tab, which changes the binding.
 
 The game generates a pad once, when the pad first comes into view or close to the camera, and does not generate it again by itself. Writing a new location alone leaves the old mesh where it was. The patcher therefore runs the game's own pad generation after every binding change, so the visible pad and its culling follow the mod's location. A scene patch file with a crossing-pad modification needs patcher version 0.5.0 or later; the native map editor's Save writes that dependency.
 
@@ -27,10 +27,20 @@ The inventory shows such an object in the `Crossing pad marker` family with the 
 
 1. Open **Scene Patcher** and select the pad's row in the outliner, under **Grade crossing**. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
 2. On the **Connections** tab, check the stored segment, end, and distance under **Current binding** in **Crossing pad binding**. For a bound pad, **Marker segment length** shows how long the segment is. Each **Named location** entry shows a location registered under this marker ID and tells you if it belongs to another object.
-3. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in meters in **Distance**. The distance is measured from the **End** you entered, along the whole segment. To select the segment in the world, click **Segment** in **Replacement targets**, click the track, then click **Confirm** in the footer. The confirmed segment fills the **Segment** field.
+3. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in meters in **Distance**. The distance is measured from the **End** you entered, along the whole segment. When the fields start empty, **End** takes `a` as soon as you pick or type a segment. A pad's binding is always stored from end `a`, because the game builds a pad from end `a`: if you enter end `b`, the patcher stores the same place from end `a`, at the segment's length minus your distance. The note below the row shows that place, for example `Stored as End a, 100.945 m: the same place.` Beside the row's caption, **Segment length** shows how long the entered segment is, so the distance lies between 0 and that length. While one of the three fields has the focus, the world marks the entered segment and labels its two ends **End A** and **End B**. To select the segment in the world, click **Segment** in **Replacement targets**, click the track, then click **Confirm** in the footer. The confirmed segment fills the **Segment** field.
 4. Click **Set** at the bottom of the tab.
 
+## Move the pad along its track with the gizmo
+
+While the pad's **Connections** tab is open and the **Segment** field names a loaded segment, a move gizmo stands on the track at the entered location, or at the middle of the segment until the fields name a place on it. Drag the gizmo's arrow along the track, or its square in the ground plane: the gizmo stays on the segment, at the point nearest to where you drag it. **End** and **Distance** follow the drag, and the world marks the segment's **End A** and **End B**.
+
+The gizmo always counts from end `a`, as the pad is stored. It stays on the entered segment and stops at its ends.
+
+The pad itself stays where it is during the drag. When you release the mouse button, the patcher binds the pad at the dragged place, as **Set** does with the fields, and regenerates it there. Press Escape during the drag to keep the current binding and restore the fields. A release at the place where the drag began binds nothing.
+
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment, or an end other than `a` or `b` refuses the edit, and a refused distance names the segment's length; the pad keeps its binding, registration, and geometry.
+
+The game's pad builder measures a location from end `a`. A pad bound from end `b` in a scene patch file you write by hand is therefore built elsewhere, mostly near end `a`, and a short way from end `b` the game fails to build it. Write `"end": "a"` for a pad. If the game's builder fails at a place, for example where the pad runs into a short neighbouring segment, the edit fails and is undone with a reason that says to move the pad along the track.
 
 After the check, the patcher changes the marker's named location to the new location, as for a Generic marker, and then runs the game's pad generation. Generation replaces the pad mesh with one built along the track at the new location and moves the pad's culling sphere to the new mesh bounds. The game's culling then decides on the next frame whether the new mesh is shown. The pad object itself does not move.
 
@@ -81,7 +91,7 @@ On every world load the patcher applies the binding and generates the pad from i
 
 ## Limits
 
-The automated tests check rebinding, replacement, repair of a broken binding, repetition, refusal of missing, ambiguous, and out-of-range targets and of a detach, dependency isolation, map mismatch, generation failure with restoration of the captured mesh, incomplete cleanup with guarded retry, Undo, Redo, clear, removal, Save, and reload against a controlled track graph and pad builder. They do not load Railroader.
+The automated tests check rebinding, replacement, repair of a broken binding, repetition, refusal of missing, ambiguous, and out-of-range targets and of a detach, dependency isolation, map mismatch, generation failure with restoration of the captured mesh, incomplete cleanup with guarded retry, Undo, Redo, clear, removal, Save, and reload against a controlled track graph and pad builder. They do not load Railroader. Further tests check the location the distance gizmo chooses from a point on a controlled segment: the nearer end, the distance from it, clamping at the segment's ends and where the gizmo starts.
 
 Research on Railroader 0.6.2 observed the pad Mg74 at `World/Roads Wilmot/Crossing Unprotected/Crossing Pad`: a one-meter rebind left the mesh and culling sphere unchanged for at least 17 seconds, explicit generation shifted the visible pad along the track, and generating again after restoring the binding returned the recorded vertex signature, bounds and culling sphere.
 

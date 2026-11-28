@@ -120,6 +120,7 @@ static class CrossingPadTests {
         UnknownGeneratedSourceIsRegeneratedOnce();
         UnresolvedInputsChangeNothing();
         DetachIsRefusedBeforeMutation();
+        AnEndBBindingIsStoredFromEndA();
         PlacementAndActivityKeepTheBinding();
         PadsComposeWithGenericMarkers();
         PreflightRefusalChangesNothing();
@@ -152,8 +153,8 @@ static class CrossingPadTests {
         var generations = world.Generations;
         var again = engine.Apply(Doc(Binding("rebind", At("Sj7c", "a", 186.9477))));
         Assert(again.Outcomes["rebind"].Applied && world.Generations == generations && Mesh(world, pad) == Rebound && Entry(world, pad) == "Sj7c|a|186.9477", "Repeated application keeps one registration and does not regenerate current geometry");
-        var replaced = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Nnew", "b", 5))));
-        Assert(replaced.Outcomes["rebind"].Applied && Entry(world, pad) == "Nnew|b|5" && Mesh(world, pad) == "Nnew|b|5@1020", "A replacement on another segment registers and regenerates there: " + Mesh(world, pad));
+        var replaced = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Nnew", "a", 115))));
+        Assert(replaced.Outcomes["rebind"].Applied && Entry(world, pad) == "Nnew|a|115" && Mesh(world, pad) == "Nnew|a|115@1020", "A replacement on another segment registers and regenerates there: " + Mesh(world, pad));
         Assert(!world.Buckets["Sj7c"].ContainsKey("Mg74") && Entry(world, rear) == "Sj7c|a|210", "The old bucket releases the pad; the rear pad keeps its entry");
         // A broken pad binding without registration or geometry is repaired.
         (world, pad, rear, scene) = Setup();
@@ -242,6 +243,20 @@ static class CrossingPadTests {
         var outcome = new PatchEngine(scene).Apply(Doc(Binding("detach", "{\"detach\":true}"))).Outcomes["detach"];
         Assert(!outcome.Applied && outcome.Error.Contains("cannot be detached") && world.Mutations == 0, "A pad detach is refused before mutation: " + outcome.Error);
         Assert(Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == Baseline && pad.Active, "The refused detach leaves binding, geometry and activity");
+    }
+    // The game's pad builder measures from end a, so a pad is always bound from end a: an edit that enters end b writes
+    // the same place from end a, the segment's length minus the distance, and the pad is registered and built there.
+    static void AnEndBBindingIsStoredFromEndA() {
+        var (world, pad, rear, session, mapEditor, store) = Session();
+        var set = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "b", 30)));
+        Assert(set.Applied && Entry(world, pad) == "Sj7c|a|370" && Mesh(world, pad) == "Sj7c|a|370@1020", "b / 30 on the 400 m segment is bound as a / 370: " + set.Error + " " + Entry(world, pad));
+        var item = Only(session);
+        Assert((string)item["relationships"]["trackMarker"]["end"] == "a" && (double)item["relationships"]["trackMarker"]["distance"] == 370, "The scene patch file stores End a: " + item);
+        Assert(session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 12))).Applied && Entry(world, pad) == "Sj7c|a|12", "End a is written as entered");
+        var outside = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "b", 500)));
+        Assert(!outside.Applied && outside.Error.Contains("outside"), "An end b distance beyond the segment keeps its refusal: " + outside.Error);
+        var missing = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Smissing", "b", 5)));
+        Assert(!missing.Applied && missing.Error.Contains("missing"), "An end b location on a missing segment keeps its refusal: " + missing.Error);
     }
     static string Placed(string id, string extra = "") =>
         "\"" + id + "\":{" + Target() + ",\"placement\":{\"mode\":\"fixed\",\"position\":[1025,1,2],\"rotation\":[0,0,0,1]}" + extra + ",\"dependsOn\":[]}";
@@ -367,11 +382,12 @@ static class CrossingPadTests {
         var (world, pad, rear, session, mapEditor, store) = Session();
         session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
         session.Bind(Rear, MarkerBinding.At(new TrackLocation("Nnew", "b", 3.5)));
+        Assert(Entry(world, rear) == "Nnew|a|116.5", "An end b edit of a pad is saved from end a: " + Entry(world, rear));
         Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the pad version: " + store.Info);
         var (fresh, freshPad, freshRear, freshScene) = Setup();
         var engine = new PatchEngine(freshScene);
         var reload = engine.Apply(store.Patch);
-        Assert(reload.Outcomes.Values.All(o => o.Applied) && Mesh(fresh, freshPad) == Rebound && Mesh(fresh, freshRear) == "Nnew|b|3.5@1045", "A reloaded world reproduces the saved pad bindings and geometry");
+        Assert(reload.Outcomes.Values.All(o => o.Applied) && Mesh(fresh, freshPad) == Rebound && Mesh(fresh, freshRear) == "Nnew|a|116.5@1045", "A reloaded world reproduces the saved pad bindings and geometry");
         var generations = fresh.Generations;
         engine.Apply(store.Patch);
         Assert(fresh.Generations == generations && Entry(fresh, freshPad) == "Sj7c|a|186.9477" && fresh.Buckets.Values.Sum(b => b.Count) == 2, "A repeated world-load callback leaves one registration per pad and no duplicate generation");

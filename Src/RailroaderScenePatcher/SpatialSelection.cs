@@ -359,7 +359,8 @@ namespace RailroaderScenePatcher {
         // trackPoint is the inspected starter placement marker's track point in map coordinates, or null; cut is the track
         // its car cut stands on from that point back, in map coordinates, or null.
         // node is the crossing node the outliner has selected while no object is inspected, framed as the inspected object is.
-        internal void Draw(SceneObservation inspected, IReadOnlyList<Rect> covered, Texture2D backing, double[] trackPoint = null, IReadOnlyList<double[]> cut = null, SpatialCandidate node = null) {
+        // ends is the segment the binding fields name with its two ends while a binding field is edited, or null.
+        internal void Draw(SceneObservation inspected, IReadOnlyList<Rect> covered, Texture2D backing, double[] trackPoint = null, IReadOnlyList<double[]> cut = null, SpatialCandidate node = null, BindingEnds ends = null) {
             if (Event.current.type != EventType.Repaint || (Pending == null && inspected == null && node == null)) return;
             var camera = Camera.main;
             if (camera == null) return;
@@ -375,7 +376,29 @@ namespace RailroaderScenePatcher {
                     new[] { new Vector3((float)trackPoint[0], (float)trackPoint[1], (float)trackPoint[2]) }, null,
                     path: cut != null && cut.Count >= 2 ? cut.Select(p => new Vector3((float)p[0], (float)p[1], (float)p[2])).ToArray() : null)
                 : null;
-            overlay.Draw(candidates, Pending, original, source != null, relation, Followed(inspected), Bound(inspected), camera, WorldOffset(), covered, backing, point);
+            overlay.Draw(candidates, Pending, original, source != null, relation, Followed(inspected), Bound(inspected), camera, WorldOffset(), covered, backing, point,
+                inspected == null ? null : EnteredSegment(ends), inspected == null ? null : EndMarks(ends));
+        }
+        // The marking of the segment the binding fields name, rebuilt from the graph a few times a second, as the bound
+        // track's is.
+        string enteredId; SpatialCandidate enteredMark; int enteredAt = -100;
+        SpatialCandidate EnteredSegment(BindingEnds ends) {
+            if (ends == null) return null;
+            if (ends.Segment == enteredId && Time.frameCount < enteredAt + 20) return enteredMark;
+            enteredId = ends.Segment; enteredAt = Time.frameCount;
+            try {
+                var identity = SelectionIdentity.Graph(SelectionKind.TrackSegment, ends.Segment);
+                enteredMark = SpatialSelectionScene.Of(identity.Kind, SpatialSelectionScene.Member(identity));
+            } catch { enteredMark = null; }
+            return enteredMark;
+        }
+        // The two ends of that segment as points, each named by its end.
+        SpatialCandidate[] EndMarks(BindingEnds ends) {
+            if (ends == null) return null;
+            var identity = SelectionIdentity.Graph(SelectionKind.TrackSegment, ends.Segment);
+            SpatialCandidate Mark(string end, double[] at) => new SpatialCandidate(new SelectionCandidate(ends, identity, CommandBand.EndMark(end, ends.Segment), "segment end " + end),
+                new[] { new Vector3((float)at[0], (float)at[1], (float)at[2]) }, null);
+            return new[] { Mark("a", ends.A), Mark("b", ends.B) };
         }
 
         static Vector3 WorldOffset() =>

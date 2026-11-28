@@ -9,13 +9,14 @@ namespace RailroaderScenePatcher {
     // graph's position and rotation at that distance from the named end; its forward axis points away from that end
     // along the segment. An endpoint uses the node's own position and rotation. Segment and node IDs are keys of the
     // graph's lookups, so an anchor is unique or missing.
-    internal sealed class NativeTrackPoses : ITrackPoseScene, ITrackPointLookup {
+    internal sealed class NativeTrackPoses : ITrackPoseScene, ITrackPointLookup, ISegmentGeometry {
         const string GraphType = "Track.Graph", SegmentType = "Track.TrackSegment", LocationType = "Track.Location";
-        readonly Type graph, location, end;
+        readonly Type graph, location, end, segmentType;
         internal NativeTrackPoses() {
             graph = Native.Type(GraphType); location = Native.Type(LocationType);
             var segment = Native.Type(SegmentType);
             if (graph == null || location == null || segment == null) throw new InvalidOperationException("Track-following prerequisites unavailable");
+            segmentType = segment;
             end = segment.GetNestedType("End", Native.Flags) ?? throw new MissingMemberException(SegmentType, "End");
             if (location.GetConstructor(Native.Flags, null, new[] { segment, typeof(float), end }, null) == null) throw new MissingMethodException(LocationType, ".ctor");
             foreach (var method in new[] { "GetSegment", "GetNode", "GetPositionRotation" }) if (graph.GetMethod(method, Native.Flags) == null) throw new MissingMethodException(GraphType, method);
@@ -91,6 +92,25 @@ namespace RailroaderScenePatcher {
             if (String.IsNullOrEmpty(segment)) return null;
             var end = Convert.ToString(Native.Read(found, "end")) == "A" ? "a" : "b";
             return new TrackLocation(segment, end, Math.Round((float)Native.Read(found, "distance"), 3));
+        }
+        // The length of the loaded segment with this ID; segment IDs are keys of the graph's lookup, so there is one or none.
+        public System.Collections.Generic.IReadOnlyList<double> SegmentLengths(string segmentId) {
+            var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
+            var segment = String.IsNullOrWhiteSpace(segmentId) ? null : Native.Call(shared, "GetSegment", segmentId);
+            return segment == null ? new double[0] : new double[] { (float)Native.Call(segment, "GetLength") };
+        }
+        // The distance from end a of the point on the segment nearest to a map position, by the game's own projection
+        // onto one segment (Graph.TryGetLocationFromPoint), with a radius that takes in any point of the map.
+        const float AnyPoint = 100000f;
+        public double DistanceFromA(string segmentId, double[] position) {
+            var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
+            var segment = Native.Call(shared, "GetSegment", segmentId) ?? throw new InvalidOperationException("Segment " + segmentId + " is missing");
+            var project = graph.GetMethod("TryGetLocationFromPoint", Native.Flags, null, new[] { segmentType, typeof(Vector3), typeof(float), location.MakeByRefType() }, null)
+                ?? throw new MissingMethodException(GraphType, "TryGetLocationFromPoint");
+            var args = new object[] { segment, new Vector3((float)position[0], (float)position[1], (float)position[2]), AnyPoint, null };
+            if (!(bool)project.Invoke(shared, args)) throw new InvalidOperationException("The game found no point of segment " + segmentId + " near the gizmo");
+            var distance = (double)(float)Native.Read(args[3], "distance");
+            return Convert.ToString(Native.Read(args[3], "end")) == "A" ? distance : (float)Native.Call(segment, "GetLength") - distance;
         }
         // The location on the segment nearest to a world position, measured from end a, sampled every half metre.
         internal TrackLocation Nearest(string segmentId, Vector3 world) {

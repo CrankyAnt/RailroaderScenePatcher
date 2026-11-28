@@ -714,7 +714,8 @@ namespace RailroaderScenePatcher {
         // What the pointer marked on a kept shape in the last repaint is marked anew.
         static void Unmark(Shape shape) { shape.Text = null; shape.Label = default; shape.Listed = false; shape.Strong = false; shape.Detailed = false; }
         internal void Draw(SpatialCandidate[] candidates, PendingSelection pending, SpatialCandidate source, bool hasSource, SpatialCandidate confirmed, SpatialCandidate followed,
-            IReadOnlyList<SpatialCandidate> bound, Camera camera, Vector3 origin, IReadOnlyList<Rect> uiBounds, Texture2D backing, SpatialCandidate trackPoint = null) {
+            IReadOnlyList<SpatialCandidate> bound, Camera camera, Vector3 origin, IReadOnlyList<Rect> uiBounds, Texture2D backing, SpatialCandidate trackPoint = null,
+            SpatialCandidate entered = null, IReadOnlyList<SpatialCandidate> ends = null) {
             covered = uiBounds;
             inspectedMark = source;
             budget.Begin();
@@ -863,6 +864,16 @@ namespace RailroaderScenePatcher {
                     shapes.Add(point);
                 }
             }
+            // While a binding field is edited, the ends of the entered segment, gold as the inspected object, each named
+            // by its end, so the End field's a and b can be told apart on the track.
+            if (ends != null) foreach (var end in ends) {
+                var mark = Project(end, camera, origin, Double.PositiveInfinity, out _);
+                if (mark == null) continue;
+                mark.Color = Gold;
+                mark.Detailed = true;
+                mark.Text = end.Choice.Label;
+                shapes.Add(mark);
+            }
             // The current relations of the inspected object stay marked in green while it is inspected: a target
             // confirmed in the world, the track it follows, and, while the Connections tab is open, what it is bound to.
             // The offered marking of the same element leads.
@@ -871,6 +882,8 @@ namespace RailroaderScenePatcher {
                 Relation(shapes, followed, "Follows: ", camera, origin, pointer);
                 if (bound != null) foreach (var relation in bound) Relation(shapes, relation, "Bound: ", camera, origin, pointer);
             }
+            // The segment the binding fields name while one is edited, unless it is marked already, as the bound one.
+            Relation(shapes, entered, "Entered segment: ", camera, origin, pointer);
             var zones = VisibleWorld(uiBounds);
             // The list of one spot stands beside the click; every other label under its own marker.
             var listed = shapes.Where(s => s.Listed).OrderBy(s => pending.Number(s.Candidate.Choice)).ToArray();

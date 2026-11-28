@@ -379,7 +379,7 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.DetachBinding: place = BindingPlace; action = "Track detachment"; consumes = false; break;
                 case GuidedTaskKind.MarkerId: place = MarkerIdPlace; action = "Set marker ID " + guidedFields[0]; consumes = false; break;
                 case GuidedTaskKind.Wreck: place = WreckPlace; action = CommandBand.WreckAction(guidedFields[0] == "Yes"); consumes = false; break;
-                case GuidedTaskKind.Binding: place = BindingPlace; action = location == null ? "Track binding" : CommandBand.BindingAction(location.Segment, location.End, location.Distance); consumes = true; break;
+                case GuidedTaskKind.Binding: place = BindingPlace; location = StoredBinding(location); action = location == null ? "Track binding" : CommandBand.BindingAction(location.Segment, location.End, location.Distance); consumes = true; break;
                 case GuidedTaskKind.StarterPlacement: place = BindingPlace; action = location == null ? "Track location" : CommandBand.StarterAction(location.Segment, location.End, location.Distance); consumes = true; break;
                 default: place = PlacementPlace; action = "Placement"; consumes = false; break;
             }

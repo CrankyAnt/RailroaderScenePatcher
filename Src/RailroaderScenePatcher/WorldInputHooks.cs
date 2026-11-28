@@ -56,7 +56,7 @@ namespace RailroaderScenePatcher {
 
         static bool FindPickable(PickableActivation? __1, ref IPickable __2, ref float __3, ref bool __result) {
             // The picker can activate a world object directly before it falls back to the track context menu.
-            if (!CommandBand.BlocksPickable(GizmoController.IsShown, __1.HasValue, EditOpen, OverlayShielded, ChoicePending)) return true;
+            if (!CommandBand.BlocksPickable(GizmoController.IsShown || PadDistanceGizmo.Blocking, __1.HasValue, EditOpen, OverlayShielded, ChoicePending)) return true;
             __2 = null;
             __3 = float.MaxValue;
             __result = false;
@@ -70,8 +70,8 @@ namespace RailroaderScenePatcher {
             __result = true;
         }
 
-        static bool UpdateBoxSelect() => !GizmoController.IsShown;
+        static bool UpdateBoxSelect() => !GizmoController.IsShown && !PadDistanceGizmo.Blocking;
 
-        static bool RenderGizmo(TransformGizmo __instance) => !GizmoController.RestingNativeGizmo(__instance);
+        static bool RenderGizmo(TransformGizmo __instance) => !GizmoController.RestingNativeGizmo(__instance) && !PadDistanceGizmo.RestingNativeGizmo(__instance);
     }
 }

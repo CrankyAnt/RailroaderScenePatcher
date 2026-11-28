@@ -191,6 +191,9 @@ namespace RailroaderScenePatcher.Core {
             foreach (var adapter in capabilities.OfType<IPlannedStateScene>())
                 adapter.Plan(desired?.Where(pair => pair.Key != null && owners.TryGetValue(pair.Key, out var owner) && ReferenceEquals(owner, adapter)).ToDictionary(pair => pair.Key, pair => pair.Value, new ByReference()));
         }
+        // The location an edit writes for a track binding: a crossing pad's from end a, any other as entered.
+        public TrackLocation StoredBinding(object target, TrackLocation location) =>
+            Owner(target) is CrossingPadScene pad ? pad.StoredLocation(location) : location;
         // The cut the starter placement capability that resolved the object would place at the location; empty for any other object.
         public IReadOnlyList<double[]> StarterCut(object target, TrackLocation location) =>
             Owner(target) is StarterPlacementScene starter ? starter.CutPath(target, location) : Array.Empty<double[]>();

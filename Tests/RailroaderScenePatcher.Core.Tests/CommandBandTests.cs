@@ -25,6 +25,7 @@ static class CommandBandTests {
         PartsReadAsPartsInWorldChoicesAndTheStateLine();
         AConfirmedWorldChoiceIsADebugLineLikeItsRefusals();
         APendingWorldChoiceKeepsItsClickFromTheGamesClickTargets();
+        APadGizmoBlocksTheWorldOnlyDuringABindingEdit();
         ThePatcherWindowIsBuiltOnceItsInputIsAvailableAgain();
         SessionDetailsSayTheyShowTheLastFullRead();
         AddedEquipmentIsNamedBySourceAndEquipmentId();
@@ -824,6 +825,18 @@ static class CommandBandTests {
         Check(!CommandBand.BlocksPickable(false, true, false, false, false), "Without a choice, edit, shielding label or gizmo the click reaches the game");
         Check(CommandBand.BlocksPickable(false, true, true, false, false) && CommandBand.BlocksPickable(false, true, false, true, false), "An open edit and a shielding world label still block the click");
         Check(CommandBand.BlocksPickable(true, false, false, false, false) && CommandBand.BlocksPickable(true, true, false, false, false), "A shown gizmo still blocks hover and click");
+    }
+    // A crossing pad's distance gizmo that only stands blocks nothing, as inspecting blocks nothing; the native map editor's
+    // world clicks, hover and box select are blocked from the start of a binding edit until it ends: the pointer on a
+    // handle, where the press starts the drag, the drag itself, or a focused binding field.
+    static void APadGizmoBlocksTheWorldOnlyDuringABindingEdit() {
+        // handleUnderPointer, dragging, fieldEdited
+        var standing = CommandBand.PadGizmoBlocks(false, false, false);
+        Check(!standing && !CommandBand.BlocksPickable(standing, true, false, false, false) && !CommandBand.BlocksPickable(standing, false, false, false, false),
+            "A standing pad gizmo leaves the game's hover and clicks alone");
+        foreach (var edit in new[] { CommandBand.PadGizmoBlocks(true, false, false), CommandBand.PadGizmoBlocks(false, true, false), CommandBand.PadGizmoBlocks(false, false, true) })
+            Check(edit && CommandBand.BlocksPickable(edit, true, false, false, false) && CommandBand.BlocksPickable(edit, false, false, false, false),
+                "A handle under the pointer, a drag or a focused binding field blocks hover and click");
     }
     static void ThePatcherWindowIsBuiltOnceItsInputIsAvailableAgain() {
         // After a Map Editor reload in the same world the pointer input comes back frames after the map editor appeared.

@@ -649,6 +649,7 @@ namespace RailroaderScenePatcher.Core {
         // A null binding clears the mod's relationship: the object returns to its effective underlying relationship.
         public Outcome Bind(TargetIdentity target, MarkerBinding binding) { return Bind(target, binding, null); }
         public Outcome Bind(TargetIdentity target, MarkerBinding binding, InspectedTarget inspected) {
+            binding = StoredBinding(target, binding);
             return Change(binding == null ? "Clear track binding" : "Edit track binding", target, inspected, existing => {
                 if (existing != null) PatchEngine.Parse(existing);
                 if (binding == null) {
@@ -667,6 +668,17 @@ namespace RailroaderScenePatcher.Core {
                 value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
                 return value;
             }, null, "bind-");
+        }
+        // The binding an edit writes: a crossing pad's location from end a (CrossingPadScene.StoredLocation), any other as
+        // entered. A target that does not resolve keeps the entered binding, and the edit's own checks refuse it.
+        MarkerBinding StoredBinding(TargetIdentity target, MarkerBinding binding) {
+            if (binding?.Location == null || target?.Structure != CrossingPadScene.Structure) return binding;
+            try {
+                var resolved = engine.ResolveUnique(target);
+                var stored = scene is CrossingPadScene pad ? pad.StoredLocation(binding.Location)
+                    : scene is SceneCapabilities capabilities ? capabilities.StoredBinding(resolved, binding.Location) : binding.Location;
+                return ReferenceEquals(stored, binding.Location) ? binding : MarkerBinding.At(stored);
+            } catch (Exception) { return binding; }
         }
         // Sets or replaces this mod's replacement ID of a generic track marker. A null id clears the mod's value: the
         // marker returns to its effective underlying id. The capability checks the id against every scene marker, graph

@@ -1008,6 +1008,58 @@ namespace RailroaderScenePatcher {
         // A target confirmed in the world and not yet used is the one green relation: the relations it would replace,
         // the followed and the bound track, are not drawn beside it, and return once it is used or withdrawn.
         internal static bool ShowsCurrentRelations(bool confirmedShown) => !confirmedShown;
+        // The length of the segment the binding fields name, beside Distance: Distance counts from the entered End along
+        // the whole segment, from 0 up to this length. No text while no segment is entered.
+        internal static string SegmentLength(string segment, double? length) =>
+            String.IsNullOrWhiteSpace(segment) ? null : length == null ? "Segment not found" : "Segment length " + Number(length.Value) + " m";
+        internal const string SegmentLengthTip = "The length of the entered segment. Distance counts from the entered End along the whole segment, from 0 up to this length.";
+        // The segment whose End A and End B the world marks, or null: the entered segment while a binding field is
+        // edited, by typing or by dragging a crossing pad's distance gizmo.
+        internal static string MarkedEnds(bool fieldEdited, bool dragging, string segment) =>
+            (fieldEdited || dragging) && !String.IsNullOrWhiteSpace(segment) ? segment.Trim() : null;
+        internal static string EndMark(string end, string segment) => "End " + (end ?? "").ToUpperInvariant() + " of " + segment;
+        // A crossing pad's distance gizmo stands on the pad while its Connections tab is open and its binding can be set.
+        internal static bool ShowsPadGizmo(bool pad, bool connections, bool editable, bool choicePending, bool guided) =>
+            pad && connections && editable && !choicePending && !guided;
+        internal const string PadGizmoDragging = "Dragging. Release to bind the pad there; Escape keeps the current binding.";
+        // Whether a crossing pad's distance gizmo keeps the native map editor's world clicks, hover and box select. A gizmo
+        // that only stands blocks nothing, as inspecting blocks nothing; a binding edit blocks from its start until it ends:
+        // the pointer on a handle, where a press starts the drag, the drag itself, or a focused binding field.
+        internal static bool PadGizmoBlocks(bool handleUnderPointer, bool dragging, bool fieldEdited) => handleUnderPointer || dragging || fieldEdited;
+        // The release of a crossing pad's distance gizmo. A release away from where the drag began fills the fields with
+        // the released place, the nearer End and the distance from it, and binds the pad there once, as Set binds the
+        // fields. A release where the drag began binds nothing and returns the fields to their values from before the
+        // drag. Returns whether the pad is bound.
+        internal static bool ReleasePad(string[] fields, string[] before, TrackLocation start, TrackLocation released, Action bind) {
+            if (released == null || PadDistance.Same(released, start) || !EnteredEditValues.FillTrackLocation(fields, released)) {
+                if (before != null) Array.Copy(before, fields, fields.Length);
+                return false;
+            }
+            bind();
+            return true;
+        }
+        // Beside the End field of a crossing pad: the binding is stored from End a, as the game builds a pad from end a.
+        // An entered End b with a distance on the loaded segment shows the End a place it is stored as.
+        internal const string PadStoredFromEndA = "A pad is stored from End a.";
+        internal static string PadEndNote(IReadOnlyList<string> fields, double? length) {
+            var end = (fields?.Count > 1 ? fields[1] : null)?.Trim().ToLowerInvariant();
+            if (end != "b" || length == null || fields.Count < 3 || !Double.TryParse((fields[2] ?? "").Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var distance)
+                || distance < 0 || distance > length.Value + 0.001) return PadStoredFromEndA;
+            return "Stored as End a, " + Number(PadDistance.FromEndA(new TrackLocation("", "b", distance), length.Value).Distance) + " m: the same place.";
+        }
+        // The binding an edit stores, which its result names: a crossing pad's End b entry on a loaded segment, within its
+        // length, as the same place from End a (as PatchEditingSession.Bind stores it); any other entry as entered.
+        internal static TrackLocation StoredBinding(TrackLocation entered, bool pad, double? length) =>
+            pad && length != null && entered?.End == "b" && entered.Distance >= 0 && entered.Distance <= length.Value + 0.001
+                ? PadDistance.FromEndA(entered, length.Value) : entered;
+        // Binding fields that start empty, as for a duplicate or an unbound marker or pad, take End a as soon as a segment is
+        // picked or typed, for every track binding; an End already entered stays. Returns whether End was filled.
+        internal static bool DefaultEnd(string[] fields) {
+            if (fields == null || fields.Length < 3 || String.IsNullOrWhiteSpace(fields[0]) || !String.IsNullOrWhiteSpace(fields[1])) return false;
+            fields[1] = "a";
+            return true;
+        }
+        internal static string PadGizmoState(bool dragging) => dragging ? PadGizmoDragging : "Drag the gizmo on the pad to move it along its track.";
         // Why no placement mode moves a crossing pad. The pad's geometry is generated along its track binding, so a mode
         // moves the pad only when it changes that binding. None of the four does: Numeric and Gizmo write the pad object's
         // placement, Snap writes that placement once from a track, and Follow keeps that placement relative to a track

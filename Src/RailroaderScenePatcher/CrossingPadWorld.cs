@@ -89,6 +89,10 @@ namespace RailroaderScenePatcher {
                 ((c.GetType().FullName == Relative && field == "_marker") || (c.GetType().FullName == PadBuilder && field == "_marker")), placementOnly);
         }
         Component Builder(object target) => Get((GameObject)target, PadBuilder) ?? throw new InvalidOperationException("The object no longer has a crossing-pad builder");
+        // The pad's length along the track: the builder walks width / 2 to either side of the marker location.
+        double? PadLength(object target) {
+            try { var length = (float)width.GetValue(Builder(target)); return length > 0 ? length : (double?)null; } catch { return null; }
+        }
         public PadGeometry Geometry(object target) {
             var builder = Builder(target);
             var signature = Signature(builder);
@@ -195,7 +199,14 @@ namespace RailroaderScenePatcher {
         }
         public void Generate(object target) {
             var builder = Builder(target);
-            generate.Invoke(builder, null);
+            try { generate.Invoke(builder, null); }
+            catch (TargetInvocationException e) when (e.GetBaseException() is ArgumentException inner && inner.Message.Contains("is greater than length")) {
+                // The game's pad builder fails on a short piece of track that no check foresaw: the window gets the reason,
+                // not the game's own text.
+                var location = Location(target);
+                throw new InvalidOperationException(location != null ? PadDistance.CannotBuild(location, PadLength(target))
+                    : "The game can't build the pad at this track location: its pad builder fails there. Move the pad along the track", e);
+            }
             var signature = Signature(builder);
             records.Remove(builder);
             if (signature != null) records.Add(builder, new Record { Signature = signature, Source = Location(target), Origin = Position(target), Curves = SourceCurves(target), CurveToken = CurveToken(target) });

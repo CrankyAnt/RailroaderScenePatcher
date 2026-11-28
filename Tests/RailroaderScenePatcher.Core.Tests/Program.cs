@@ -289,6 +289,8 @@ class Program {
         NativeButtonSourceTests.Run();
         WorldRibbonGeometryTests.Run();
         WorldStrokeGeometryTests.Run();
+        PadDistanceTests.Run();
+        PadBindingWindowTests.Run();
         ObjectMarkingGeometryTests.Run();
         ObjectMarkingGeometryTests.RunBoxes();
         MarkingCostTests.Run();

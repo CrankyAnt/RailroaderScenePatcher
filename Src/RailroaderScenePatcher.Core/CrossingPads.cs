@@ -100,6 +100,14 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Marker != null && state.Marker.IsDetached)
                 throw new InvalidPatchDefinitionException("A crossing pad cannot be detached: its geometry is generated from its track location. Bind it to a location, or disable the pad to hide it");
         }
+        // The location an edit writes for a pad: always from end a, as the game's pad builder measures from end a. An end b
+        // location on one loaded segment becomes the same place from end a; any other stays for the checks to refuse.
+        public TrackLocation StoredLocation(TrackLocation location) {
+            if (location?.End != "b") return location;
+            var lengths = world.SegmentLengths(location.Segment) ?? Array.Empty<double>();
+            return lengths.Count == 1 && location.Distance >= 0 && location.Distance <= lengths[0] + TrackLocation.DistanceTolerance
+                ? PadDistance.FromEndA(location, lengths[0]) : location;
+        }
         public object Capture(object target) => relationship.Capture(target);
         public ObjectState Read(object target) => relationship.Read(target);
         public void Apply(object target, ObjectState state) => masks.Write(target, () => relationship.Apply(target, state));

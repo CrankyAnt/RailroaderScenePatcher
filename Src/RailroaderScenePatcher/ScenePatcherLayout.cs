@@ -154,8 +154,10 @@ namespace RailroaderScenePatcher {
                     // Every keystroke stores the value and lets the buttons that depend on it follow.
                     var field = input.GetComponent<TMP_InputField>();
                     if (freeText) FreeText(field);
-                    field.onValueChanged.AddListener(value => { values[index] = value; FieldsChanged(); });
+                    field.onValueChanged.AddListener(value => { values[index] = value; if (ReferenceEquals(values, binding)) UseBindingFields(); FieldsChanged(); });
                     if (ReferenceEquals(values, placementFields)) field.onSelect.AddListener(_ => BeginNumericWorldEdit(field));
+                    // A drag of a crossing pad's distance gizmo sets the binding's texts in place.
+                    if (ReferenceEquals(values, binding) && index < bindingInputs.Length) bindingInputs[index] = field;
                     if (numeric(column)) AlignNumeric(input);
                     input.Tooltip(CommandBand.HasBoxLabels(labels) ? caption + " " + label : caption, tip);
                     var layout = input.gameObject.GetComponent<LayoutElement>() ?? input.gameObject.AddComponent<LayoutElement>();
@@ -1284,7 +1286,9 @@ namespace RailroaderScenePatcher {
             // fields, disabled with its own reason.
             if (HoldsBinding) {
                 Section(builder, pad ? "Crossing pad binding" : "Track binding");
-                ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move. End is a or b. Distance is measured in meters from the End you entered, along the whole segment." : "The track location this marker is registered at. A binding edit does not move the object. End is a or b.", column => column == 2);
+                ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move. End is a or b. Distance is measured in meters from the End you entered, along the whole segment. A pad is stored from End a: an End b location is stored as the same place from End a. The gizmo on the pad moves it along the segment." : "The track location this marker is registered at. A binding edit does not move the object. End is a or b.", column => column == 2, pad ? SegmentLengthLabel : (Action<UIPanelBuilder>)null);
+                if (pad) padEndNote = Line(builder, "<style=Footnote>" + Literal(PadEndNoteNow()) + "</style>", null, null).GetComponentInChildren<TMP_Text>(true);
+                if (pad && padGizmo?.Shown == true) Line(builder, "<style=Footnote>" + Literal(CommandBand.PadGizmoState(false)) + "</style>", null, null);
                 FieldLabel(builder, "Current binding");
                 if (current.Length == 0) Line(builder, "None", null, null);
                 foreach (var line in current) BindingFields(builder, line);
@@ -1440,6 +1444,16 @@ namespace RailroaderScenePatcher {
         void ShowLiveGizmoDrag() {
             var dragging = gizmo?.Active == true;
             if (gizmoDragMessage != null && gizmoDragMessage.activeSelf != dragging) gizmoDragMessage.SetActive(dragging);
+            var padDragging = PadGizmoDragging;
+            if (padDragMessage != null && padDragMessage.activeSelf != padDragging) padDragMessage.SetActive(padDragging);
+        }
+        GameObject padDragMessage;
+        // The length of the entered segment at the right end of the binding's caption row, beside Distance below it.
+        void SegmentLengthLabel(UIPanelBuilder row) {
+            var label = row.AddLabel("<style=FieldLabel>" + Literal(SegmentLengthNow() ?? "") + "</style>", text => text.verticalAlignment = VerticalAlignmentOptions.Bottom);
+            label.Tooltip("Segment length", CommandBand.SegmentLengthTip);
+            segmentLengthText = label.GetComponentInChildren<TMP_Text>(true);
+            typed.Add(ShowSegmentLength);
         }
         void DrawFooter(UIPanelBuilder builder) {
             // Reserve room even when empty. The file panel uses a shorter viewport so its decisions have more room.
@@ -1496,6 +1510,7 @@ namespace RailroaderScenePatcher {
             var messages = feedback.Messages;
             var messageArea = presentation.Scroll(builder, messageHeight, lines => {
                 gizmoDragMessage = MessageSlot(lines, GizmoPlace, Literal(GizmoController.DraggingState), false).gameObject;
+                padDragMessage = MessageSlot(lines, BindingPlace, Literal(CommandBand.PadGizmoDragging), false).gameObject;
                 ShowLiveGizmoDrag();
                 var firstReport = 0;
                 if (!String.IsNullOrEmpty(state)) MessageSlot(lines, source, state, false);
@@ -1835,7 +1850,7 @@ namespace RailroaderScenePatcher {
                     Slot(CommandBand.ClearLocation, "Clear this mod's value for the track location; the marker returns to its underlying track location.", block ?? CommandBand.ClearLocationReason(HasStarterTrack(identity)),
                         () => Edit(BindingPlace, "Clearing the track location's mod value", (current, inspection) => current.ClearStarterTrack(identity, inspection)), null, 1, 124),
                     HasPickedBinding ? Slot("Cancel", "Restore the current track location in the fields.", null, CancelPickedBinding) :
-                    Slot("Picked", "Fill the segment field with the confirmed segment.", block ?? (picked ? null : "Choose a segment with Segment and confirm it first."), () => { binding[0] = confirmedTrack.Identifier; }, "Picked segment", 1, 70));
+                    Slot("Picked", "Fill the segment field with the confirmed segment.", block ?? (picked ? null : "Choose a segment with Segment and confirm it first."), () => { binding[0] = confirmedTrack.Identifier; UseBindingFields(); }, "Picked segment", 1, 70));
             }
             if (HoldsConstructionSegments) {
                 var current = CurrentSegments();
@@ -1860,7 +1875,7 @@ namespace RailroaderScenePatcher {
                 Slot("Detach", "Detach the marker from its track.", unavailable ?? (pad ? "A crossing pad cannot be detached. Disable it on the Object tab to hide it." : CurrentBinding()[0].Length == 0 ? CommandBand.AlreadyDetached : null), () => Edit(BindingPlace, "Track detachment", (current, inspection) => current.Bind(identity, MarkerBinding.Detached, inspection)), "Detach binding", 1, 72),
                 Slot(CommandBand.ClearBinding, "Clear this mod's value for the binding; the marker returns to its underlying binding.", unavailable ?? CommandBand.ClearBindingReason(HasBindingValue(identity)), () => Edit(BindingPlace, "Clearing the binding's mod value", (current, inspection) => current.Bind(identity, null, inspection)), null, 1, 124),
                 HasPickedBinding ? Slot("Cancel", "Restore the current binding in the fields.", null, CancelPickedBinding) :
-                Slot("Picked", "Fill the segment field with the confirmed segment.", unavailable ?? (segment ? null : "Choose a replacement segment and confirm it first."), () => { binding[0] = confirmed.Identifier; }, "Picked segment", 1, 70));
+                Slot("Picked", "Fill the segment field with the confirmed segment.", unavailable ?? (segment ? null : "Choose a replacement segment and confirm it first."), () => { binding[0] = confirmed.Identifier; UseBindingFields(); }, "Picked segment", 1, 70));
         }
         // A construction controller on an object of its own takes no placement and no Enabled setting: its position has
         // no effect, and the construction's visibility control runs on it.
@@ -1906,6 +1921,8 @@ namespace RailroaderScenePatcher {
                 feedback.Refuse(BindingPlace, "Track binding", "the segment ID, end a or b, or numeric distance is missing or invalid. " + WindowGuidance.EnterTrackLocation);
                 return;
             }
+            // The result names the binding the edit stores: a crossing pad's End b entry from End a.
+            location = StoredBinding(location);
             var value = MarkerBinding.At(location);
             Edit(BindingPlace, CommandBand.BindingAction(location.Segment, location.End, location.Distance), (current, inspection) => current.Bind(identity, value, inspection), true);
         }

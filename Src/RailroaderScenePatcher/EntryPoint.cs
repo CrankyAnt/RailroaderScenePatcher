@@ -625,7 +625,10 @@ namespace RailroaderScenePatcher {
             inputBlocker.SetRegions(open, open ? presentation.PanelBounds : Rect.zero, presentation == null ? Rect.zero : presentation.EntryBounds);
             var pendingInspectOnly = selection?.Pending?.InspectOnly == true;
             var pendingEdit = selection?.Pending != null && !pendingInspectOnly;
-            var gizmoShown = gizmo?.Shown == true;
+            // A crossing pad's distance gizmo that only stands blocks nothing; a binding edit with it does.
+            var padBlocks = open && PadEditBlocks();
+            PadDistanceGizmo.Blocking = padBlocks;
+            var gizmoShown = gizmo?.Shown == true || padBlocks;
             if (worldEditActionOpen && (!open || worldEditActionTab != inspectorTab.Value || worldEditActionMode != placementMode || !ReferenceEquals(worldEditActionTarget, selected?.Handle)))
                 EndWorldEditAction();
             ReleaseUnchangedNumericEdit();
@@ -839,16 +842,16 @@ namespace RailroaderScenePatcher {
             // can run before this handler in the same frame: an Escape in the frame a gizmo ended is consumed as well.
             // While a field of the panel has the keyboard the patcher takes no Escape at all: the handler is not even
             // registered, so the key reaches the field and the game as without the mod.
-            var escapable = !(presentation != null && presentation.FieldFocused) && (selection?.Pending != null || gizmo?.Active == true || Time.frameCount <= gizmoEnded + 1 || EscapeGizmo() || EscapeSnap() || PlacingModObject);
+            var escapable = !(presentation != null && presentation.FieldFocused) && (selection?.Pending != null || gizmo?.Active == true || PadGizmoDragging || Time.frameCount <= gizmoEnded + 1 || EscapeGizmo() || EscapeSnap() || PlacingModObject);
             if (escapable != escapeHeld) try {
                 if (escapable) UI.GameInput.RegisterEscapeHandler(UI.GameInput.EscapeHandler.Transient, () => {
                     // While a mod object is being placed, Escape stops placing and returns to the blank object window.
                     if (duplicate.Release()) { presentation?.RequestRefresh(); return true; }
                     // One press does one thing. A list closes before a drag or choice is cancelled; over the panel
                     // a standing gizmo or prepared snap can also be cancelled. Escape never ends the inspection.
-                    switch (CommandBand.Escape(presentation != null && presentation.FieldFocused, selection?.Pending?.ListOpen == true, selection?.Pending != null, gizmo?.Active == true, EscapeGizmo(), EscapeSnap())) {
+                    switch (CommandBand.Escape(presentation != null && presentation.FieldFocused, selection?.Pending?.ListOpen == true, selection?.Pending != null, gizmo?.Active == true || PadGizmoDragging, EscapeGizmo(), EscapeSnap())) {
                         case CommandBand.EscapeStep.CloseList: selection.Pending.CloseList(); selectionProblem = null; presentation?.RequestRefresh(); return true;
-                        case CommandBand.EscapeStep.CancelDrag: gizmo.Cancel(); presentation?.RequestRefresh(); return true;
+                        case CommandBand.EscapeStep.CancelDrag: if (PadGizmoDragging) padGizmo.Cancel(); else gizmo.Cancel(); presentation?.RequestRefresh(); return true;
                         case CommandBand.EscapeStep.CancelChoice: CancelSelection(); presentation?.RequestRefresh(); return true;
                         case CommandBand.EscapeStep.CancelGizmo:
                             if (Requests.Place == GizmoPlace) CancelRequest("you cancelled the gizmo before the action could run");
@@ -946,6 +949,7 @@ namespace RailroaderScenePatcher {
                     MarkFollowed();
                     MarkBound();
                     ArmGizmo();
+                    ArmPadGizmo();
                     ShowLivePlacement();
                     ShowLiveGizmoDrag();
                     LogChoiceProblem();
@@ -1000,7 +1004,7 @@ namespace RailroaderScenePatcher {
                 scenePatchFileInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
-                selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, reloadRequirement, MapEditorReload.Error, TerrainSnapshot(),
+                selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, padGizmo?.Shown, outstanding, reloadRequirement, MapEditorReload.Error, TerrainSnapshot(),
                 coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(), attachment?.Session.VersionState, attachment?.Session.VersionMessage, attachment?.Session.ObservedVersion, ImportSnapshot(),
                 equipmentSource, preparedEquipment == null ? "" : String.Join("\n", preparedEquipment.Preview.Lines) + preparedEquipment.Preview.Error);
         }
@@ -1104,7 +1108,7 @@ namespace RailroaderScenePatcher {
                 // A selected station map icon shows the map's icon at its place, below its marking.
                 if (StationMapIconRules.ShowsMapIcon(selected) && selected.Handle is GameObject icon && icon != null)
                     WorldMapIcon.Draw(icon, icon.transform.position, covered);
-                selection.Draw(selected, covered, worldLabelBacking, InspectedTrackPoint(), InspectedCut(), CrossingNodeFrame());
+                selection.Draw(selected, covered, worldLabelBacking, InspectedTrackPoint(), InspectedCut(), CrossingNodeFrame(), MarkedEnds());
             }
             catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
         }
@@ -1206,7 +1210,7 @@ namespace RailroaderScenePatcher {
             if (gizmo != null && gizmo.Closed) gizmo = null;
             var wanted = !guided.Enabled && selected != null && inspectorTab.Value == PlacementTab && placementMode == CommandBand.GizmoMode && !IsPad && selection?.Pending == null && Editable && attachment != null && (GameObject)selected.Handle != null;
             if (!wanted) {
-                if (gizmo != null && !gizmo.Active) CancelGizmo();
+                if (gizmo != null && !gizmo.Active) CancelPlacementGizmo();
                 gizmoArmKey = null;
                 return;
             }
@@ -1215,12 +1219,12 @@ namespace RailroaderScenePatcher {
                 if (gizmo.Active) return;
                 if (key == gizmoArmKey) {
                     // A held gizmo whose request ended without a new inspection, as when it was refused, goes.
-                    if (gizmo.Holding && !Requests.Pending) CancelGizmo();
+                    if (gizmo.Holding && !Requests.Pending) CancelPlacementGizmo();
                     return;
                 }
                 // The same object changed under the gizmo, as by a native Undo or Redo: the gizmo stays shown on it
                 // and is bound anew once the object was observed again. Another object gets a gizmo of its own.
-                if (ReferenceEquals(gizmoHandle, selected.Handle)) gizmo.Hold(); else CancelGizmo();
+                if (ReferenceEquals(gizmoHandle, selected.Handle)) gizmo.Hold(); else CancelPlacementGizmo();
             } else if (key == gizmoArmKey) return;
             if (Requests.Pending || refreshFrame != 0 || replayFrame != 0) return;
             gizmoArmKey = key; gizmoHandle = selected.Handle;
@@ -1311,6 +1315,7 @@ namespace RailroaderScenePatcher {
                 if (fillsBinding) {
                     pickedTrackSelection = picked;
                     binding[0] = picked.Identity.Identifier;
+                    UseBindingFields();
                     PlaceAtClick(candidate, picked);
                 }
                 if (inspectorTab.Value == ConnectionsTab && !fillsBinding) EndWorldEditAction();
@@ -1381,7 +1386,7 @@ namespace RailroaderScenePatcher {
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : IsStarter ? StarterBlock() ?? (inspectorTab.Value == ConnectionsTab ? null : CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)))
             : CommandBand.InspectorEditBlock(Editable, selected?.Operations)
-            ?? (gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
+            ?? (gizmo?.Active == true || PadGizmoDragging ? "Complete or cancel the gizmo to edit."
             : (GameObject)selected.Handle == null ? "The inspected object no longer exists. Refresh the inventory." : null);
         // Why the inspected starter placement marker's modification cannot be changed now, whatever the tab, or null: what
         // Remove modification and Recheck in the footer, and the track location on the Connections tab, wait for.
@@ -1391,7 +1396,7 @@ namespace RailroaderScenePatcher {
             attachment == null ? (String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)
             : FileLockReason != null ? FileLockReason
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
-            : gizmo?.Active == true ? "Complete or cancel the gizmo to edit." : null;
+            : gizmo?.Active == true || PadGizmoDragging ? "Complete or cancel the gizmo to edit." : null;
         static bool Alive(SceneObservation entry) => entry?.Handle is GameObject live && live != null;
         void ResetSnapState() { preparedSnap = null; choosingSnap = false; }
         void ResetConnectionsPreview() { choosingCoverageRole = null; preparedCoverage = null; preparedEquipment = null; }
@@ -1498,7 +1503,7 @@ namespace RailroaderScenePatcher {
         void Queue(string place, string action, Action<Func<SceneObservation, InspectedTarget>> run, Action refused = null) {
             void Refuse(string reason) { feedback.Refuse(place, action, reason); refused?.Invoke(); }
             var blocked = selection?.Pending != null ? "a world selection is pending. " + WindowGuidance.ConfirmOrCancelChoice
-                : gizmo?.Active == true ? "the gizmo is active. " + WindowGuidance.CompleteOrCancelGizmo
+                : gizmo?.Active == true || PadGizmoDragging ? "the gizmo is active. " + WindowGuidance.CompleteOrCancelGizmo
                 : attachment == null ? "editing is unavailable" : Requests.Pending ? "another edit is still running" : null;
             if (blocked != null) { feedback.Run(place, action, blocked, inventory, selected, null); refused?.Invoke(); return; }
             ResetSnapState();
@@ -1674,19 +1679,21 @@ namespace RailroaderScenePatcher {
             inventory?.CancelFreshnessCheck();
             presentation?.RequestRefresh();
         }
-        // Takes the gizmo away. A drag in progress is cancelled and reported; a gizmo that only stands goes silently.
-        void CancelGizmo() {
+        // Takes the placement gizmo and a crossing pad's distance gizmo away. A drag in progress is cancelled and
+        // reported; a gizmo that only stands goes silently.
+        void CancelGizmo() { CancelPlacementGizmo(); CancelPadGizmo(); }
+        void CancelPlacementGizmo() {
             var pending = gizmo; gizmo = null;
             if (pending != null) pending.Close();
         }
         // Starting the gizmo binds it to the inspected object: queued like an edit, so no scan blocks.
         void BeginGizmo(UI.Gizmos.TransformGizmoMode mode) {
-            if (gizmo == null || !gizmo.Holding) CancelGizmo();
+            if (gizmo == null || !gizmo.Holding) CancelPlacementGizmo();
             Queue(GizmoPlace, "Gizmo", pin => {
                 var standing = gizmo;
                 if (standing == null || !standing.Holding) { StartGizmo(mode, pin); return; }
                 try { standing.Rebind(EditRefusal.Check(() => pin(selected))); standing.SetMode(mode); }
-                catch (Exception e) { CancelGizmo(); GizmoUnavailable(e); }
+                catch (Exception e) { CancelPlacementGizmo(); GizmoUnavailable(e); }
             });
         }
         // The object the standing gizmo belongs to.
