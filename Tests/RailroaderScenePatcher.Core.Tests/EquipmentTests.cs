@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // A loaded crossing device: the facts the light/gate pattern reads from its hierarchy. The production LightGatePattern
@@ -13,6 +14,7 @@ using RailroaderScenePatcher.Core;
 class FakeDevice {
     public string Scene = "BushnellWhittier", Path, Model = "Crossing Signal Wishbone A";
     public int Mesh = 1;
+    public string[] GateComponents = { "UnityEngine.Animator", "RollingStock.Controls.KeyValueBoolAnimator" };
     public DeviceFacts Facts = new DeviceFacts {
         Lamps = { new LampFacts { Name = "Signal 1", Key = "lights", Targets = 1, Materials = 2, RendererUsesMaterial = true } },
         Gates = { new GateFacts { Name = "Crossing Signal Wishbone A (1)", Key = "gates", Animator = true, Clip = true } }
@@ -91,6 +93,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     public IReadOnlyList<SourceCandidate> Candidates(object controller) =>
         Devices.Where(d => d.Owner == null).Select(d => new SourceCandidate(new EquipmentSource(d.Scene, d.Path), d.Model,
             SourceProblem(d, controller, EquipmentAddition.LightGatePattern), device: new EquipmentDeviceIdentity(new object[] { d.Mesh, d.Facts.Lamps.Count, d.Facts.Gates.Count }
+                .Concat(HierarchyDependencies.AuthoredComponents(d.GateComponents, name => name))
                 .Concat(d.Facts.Lamps.Select(l => (object)l.Key)).Concat(d.Facts.Gates.Select(g => (object)g.Key)))))
             .Concat(BellPattern.Sources(CrossingBells, Bells, b => b.Identifier, b => b.Name, b => SourceProblem(b, controller, EquipmentAddition.BellPattern))).ToArray();
     public IReadOnlyList<object> Owned(object controller) => All.Where(a => ReferenceEquals(a.Controller, controller) && !a.Destroyed).Cast<object>().ToArray();
@@ -422,6 +425,9 @@ static class EquipmentTests {
             f.World.Device(mast.Path.Substring(0, mast.Path.LastIndexOf('/')), d => d.Model = wishbone);
         const string first = "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Signal 1";
         const string second = "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Signal 2";
+        // Railroader adds this component when the gate first animates. Other copies of the same mast may not have animated yet.
+        foreach (var device in f.World.Devices.Where(d => d.Path == first || d.Path == second))
+            device.GateComponents = device.GateComponents.Append("Helpers.Animation.PlayableGraphAnimatorAdapter").ToArray();
         f.World.Device("World/First/Signal", d => { d.Model = wishbone; d.Facts.MissingScript = true; });
         var distinct = f.World.Device("World/Z/Gate", d => { d.Model = "Other gate"; d.Mesh = 2; });
         f.World.Bell();
@@ -429,7 +435,7 @@ static class EquipmentTests {
 
         var choices = session.EquipmentSources(Crossing);
         Assert(choices.Where(c => !c.Source.IsDefinition).Select(c => c.Source.Path).SequenceEqual(new[] { first, distinct.Path }),
-            "One choice per usable model keeps the first source in ordinal order");
+            "Masts with and without a running gate animation share one choice, which keeps the first usable source in ordinal order");
         var bell = choices.Single(c => c.Source.IsDefinition);
         Assert(bell.Source.Definition == FakeEquipmentWorld.CrossingBell, "Only the crossing bell is offered by definition");
         var chosen = choices.Single(c => c.Model == wishbone);

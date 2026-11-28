@@ -40,6 +40,8 @@ namespace RailroaderScenePatcher {
         // Animator the first time it animates, which is when the camera first comes near. Such a component was not
         // saved with the scene: it is runtime state, and its arrival changes no observation.
         internal static bool IsRuntimeComponent(string typeName) => typeName == "Helpers.Animation.PlayableGraphAnimatorAdapter";
+        internal static T[] AuthoredComponents<T>(IEnumerable<T> components, Func<T, string> typeName) =>
+            components.Where(component => !IsRuntimeComponent(typeName(component))).ToArray();
         internal const string GeneratedPad = "Generated pad mesh and culling sphere, rebuilt by native generation from the marker location";
         // The short form of dependency or runtime lines, which the Object tab shows by default: every line that names a
         // component of the inspected hierarchy by its label (scene/path [type]) joins one line per object, which names

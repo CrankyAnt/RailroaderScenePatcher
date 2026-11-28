@@ -172,7 +172,7 @@ namespace RailroaderScenePatcher {
             int Target(GameObject target) => target == null ? -1 : indices[target.transform];
             Add(nodes.Length);
             foreach (var node in nodes) {
-                var components = node.GetComponents<Component>();
+                var components = HierarchyDependencies.AuthoredComponents(node.GetComponents<Component>(), component => component.GetType().FullName);
                 Add(node == root.transform ? -1 : indices[node.parent], components.Length);
                 foreach (var component in components) {
                     var type = component.GetType();

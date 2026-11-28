@@ -51,6 +51,7 @@ static class HelpWindowTests {
         foreach (var topic in new[] { "Lights and gates", "Bells" }) {
             var index = words.IndexOf(topic);
             Check(index >= 0 && words[index + 1].Contains("The list shows only usable choices."), topic + " help explains which choices appear");
+            Check(words[index + 1].Contains("it appears once."), topic + " help explains that shared sources appear once");
         }
     }
 
